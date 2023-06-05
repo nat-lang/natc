@@ -13,6 +13,13 @@
 
 typedef enum {
   OBJ_STRING,
+  // OBJ_TUPLE,
+  // OBJ_SET,
+  // OBJ_TREE,
+
+  // OBJ_CONDITIONAL,
+  // OBJ_TERNARY,
+  // OBJ_CASE,
 } ObjType;
 
 struct Obj {
@@ -24,6 +31,7 @@ struct ObjString {
   Obj obj;
   int length;
   char* chars;
+  uint32_t hash;
 };
 
 ObjString* takeString(char* chars, int length);
