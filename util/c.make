@@ -7,7 +7,7 @@
 
 ifeq ($(CPP),true)
 	# Ideally, we'd add -pedantic-errors, but the use of designated initializers
-	# means clox relies on some GCC/Clang extensions to compile as C++.
+	# means nat relies on some GCC/Clang extensions to compile as C++.
 	CFLAGS := -std=c++11
 	C_LANG := -x c++
 else
