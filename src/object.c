@@ -1,14 +1,15 @@
+#include "object.h"
+
 #include <stdio.h>
 #include <string.h>
 
 #include "memory.h"
-#include "object.h"
 #include "table.h"
 #include "value.h"
 #include "vm.h"
 
 #define ALLOCATE_OBJ(type, objectType) \
-    (type*)allocateObject(sizeof(type), objectType)
+  (type*)allocateObject(sizeof(type), objectType)
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
@@ -18,6 +19,14 @@ static Obj* allocateObject(size_t size, ObjType type) {
   vm.objects = object;
 
   return object;
+}
+
+ObjFunction* newFunction() {
+  ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+  function->arity = 0;
+  function->name = NULL;
+  initChunk(&function->chunk);
+  return function;
 }
 
 static ObjString* allocateString(char* chars, int length, uint32_t hash) {
@@ -40,8 +49,7 @@ static uint32_t hashString(const char* key, int length) {
 
 ObjString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = tableFindString(&vm.strings, chars, length,
-                                        hash);
+  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
   if (interned != NULL) return interned;
 
   char* heapChars = ALLOCATE(char, length + 1);
@@ -52,8 +60,7 @@ ObjString* copyString(const char* chars, int length) {
 
 ObjString* takeString(char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = tableFindString(&vm.strings, chars, length,
-                                        hash);
+  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
   if (interned != NULL) {
     FREE_ARRAY(char, chars, length + 1);
     return interned;
@@ -61,8 +68,19 @@ ObjString* takeString(char* chars, int length) {
   return allocateString(chars, length, hash);
 }
 
+static void printFunction(ObjFunction* function) {
+  if (function->name == NULL) {
+    printf("<script>");
+  } else {
+    printf("<fn %s>", function->name->chars);
+  }
+}
+
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
+    case OBJ_FUNCTION:
+      printFunction(AS_FUNCTION(value));
+      break;
     case OBJ_STRING:
       printf("%s", AS_CSTRING(value));
       break;
