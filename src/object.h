@@ -17,8 +17,8 @@
 typedef enum {
   OBJ_FUNCTION,
   OBJ_STRING,
-  OBJ_TREE,
-  OBJ_SET,
+  // OBJ_TREE,
+  // OBJ_SET,
   // OBJ_TUPLE,
   // OBJ_CONDITIONAL,
   // OBJ_TERNARY,
