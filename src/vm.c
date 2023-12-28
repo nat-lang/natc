@@ -44,9 +44,9 @@ static void runtimeError(const char* format, ...) {
   resetStack();
 }
 
-static void defineNative(const char* name, NativeFn function) {
+static void defineNative(const char* name, int arity, NativeFn function) {
   push(OBJ_VAL(copyString(name, (int)strlen(name))));
-  push(OBJ_VAL(newNative(function)));
+  push(OBJ_VAL(newNative(arity, function)));
   tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
   pop();
   pop();
@@ -58,7 +58,7 @@ void initVM() {
   initTable(&vm.globals);
   initTable(&vm.strings);
 
-  defineNative("clock", clockNative);
+  defineNative("clock", 0, clockNative);
 }
 
 void freeVM() {
@@ -79,12 +79,17 @@ Value pop() {
 
 static Value peek(int distance) { return vm.stackTop[-1 - distance]; }
 
-static bool call(ObjFunction* function, int argCount) {
-  if (argCount != function->arity) {
-    runtimeError("Expected %d arguments but got %d.", function->arity,
-                 argCount);
+static bool checkArity(int paramCount, int argCount) {
+  if (argCount != paramCount) {
+    runtimeError("Expected %d arguments but got %d.", paramCount, argCount);
     return false;
   }
+  return true;
+}
+
+static bool call(ObjFunction* function, int argCount) {
+  if (!checkArity(function->arity, argCount)) return false;
+
   if (vm.frameCount == FRAMES_MAX) {
     runtimeError("Stack overflow.");
     return false;
@@ -103,8 +108,11 @@ static bool callValue(Value callee, int argCount) {
       case OBJ_FUNCTION:
         return call(AS_FUNCTION(callee), argCount);
       case OBJ_NATIVE: {
-        NativeFn native = AS_NATIVE(callee);
-        Value result = native(argCount, vm.stackTop - argCount);
+        ObjNative* native = AS_NATIVE(callee);
+
+        if (!checkArity(native->arity, argCount)) return false;
+
+        Value result = (native->function)(argCount, vm.stackTop - argCount);
         vm.stackTop -= argCount + 1;
         push(result);
         return true;
