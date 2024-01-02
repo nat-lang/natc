@@ -21,6 +21,6 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: ./Dockerfile
+          file: ./build/Dockerfile
           push: true
           tags: ${{ secrets.ECR_REPOSITORY }}/natc:latest
