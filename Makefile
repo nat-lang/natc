@@ -4,7 +4,8 @@ default: nat
 
 # Remove all build outputs and intermediate files.
 clean:
-	@ rm -rf $(BUILD_DIR)
+	@ rm -rf $(BUILD_DIR)/release
+	@ rm $(BUILD_DIR)/nat
 	@ rm nat
 
 # Compile the interpreter.
