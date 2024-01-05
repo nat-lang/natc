@@ -1,29 +1,29 @@
 //
 
-var globalSet;
-var globalGet;
+let globalSet;
+let globalGet;
 
 fun testSharedUpvalue() {
-  var a = "initial";
+  let a =  "initial";
 
   fun set() { a = "updated"; }
-  fun get() { print a; }
+  fun get() {  print a; }
 
   globalSet = set;
   globalGet = get;
 }
 
 testSharedUpvalue();
-globalSet();
+globalSet ();
 globalGet();
 
-var globalOne;
-var globalTwo;
+let globalOne;
+let globalTwo;
 
 //
 
 fun testLoopClosure() {
-  for (var a = 1; a <= 2; a = a + 1) {
+  for (let a = 1; a <= 2; a = a + 1) {
     fun closure() {
       print a;
     }
@@ -56,8 +56,8 @@ fun vector(x, y) {
   return object;
 }
 
-var a = vector(1, 2);
-var b = vector(3, 4);
-var c = a("add")(b);
+let a = vector(1, 2);
+let b = vector(3, 4);
+let c = a("add")(b);
 print c("x");
 print c("y");

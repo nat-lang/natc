@@ -1,0 +1,10 @@
+
+let compose = (f, g) => {
+  return (a) => { return f(g(a)); };
+};
+
+print compose(
+  (a) => { return a + 1; },
+  (a) => { return a - 1; }
+)(1) == 1;
+

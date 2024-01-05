@@ -5,19 +5,22 @@
 
 #include "common.h"
 
-typedef struct {
-  const char *start;
-  const char *current;
-  int line;
-} Scanner;
-
 Scanner scanner;
+static Scanner checkpoint;
 
 void initScanner(const char *source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
 }
+
+void printScanner(Scanner sc) {
+  fprintf(stderr, "(scanner current): %s\n", scanner.current);
+}
+
+void saveScanner() { checkpoint = scanner; }
+
+void rewindScanner() { scanner = checkpoint; }
 
 static bool isAlpha(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
@@ -91,8 +94,8 @@ static void skipWhitespace() {
   }
 }
 
-static TokenType checkKeyword(int start, int length, const char *rest,
-                              TokenType type) {
+static TokenType checkpointKeyword(int start, int length, const char *rest,
+                                   TokenType type) {
   if (scanner.current - scanner.start == start + length &&
       memcmp(scanner.start + start, rest, length) == 0) {
     return type;
@@ -104,49 +107,47 @@ static TokenType checkKeyword(int start, int length, const char *rest,
 static TokenType identifierType() {
   switch (scanner.start[0]) {
     case 'a':
-      return checkKeyword(1, 2, "nd", TOKEN_AND);
+      return checkpointKeyword(1, 2, "nd", TOKEN_AND);
     case 'c':
-      return checkKeyword(1, 4, "lass", TOKEN_CLASS);
+      return checkpointKeyword(1, 4, "lass", TOKEN_CLASS);
     case 'e':
-      return checkKeyword(1, 3, "lse", TOKEN_ELSE);
+      return checkpointKeyword(1, 3, "lse", TOKEN_ELSE);
     case 'f':
       if (scanner.current - scanner.start > 1) {
         switch (scanner.start[1]) {
           case 'a':
-            return checkKeyword(2, 3, "lse", TOKEN_FALSE);
+            return checkpointKeyword(2, 3, "lse", TOKEN_FALSE);
           case 'o':
-            return checkKeyword(2, 1, "r", TOKEN_FOR);
-          case 'u':
-            return checkKeyword(2, 1, "n", TOKEN_FUN);
+            return checkpointKeyword(2, 1, "r", TOKEN_FOR);
         }
       }
       break;
     case 'i':
-      return checkKeyword(1, 1, "f", TOKEN_IF);
+      return checkpointKeyword(1, 1, "f", TOKEN_IF);
     case 'l':
-      return checkKeyword(1, 2, "et", TOKEN_LET);
+      return checkpointKeyword(1, 2, "et", TOKEN_LET);
     case 'n':
-      return checkKeyword(1, 2, "il", TOKEN_NIL);
+      return checkpointKeyword(1, 2, "il", TOKEN_NIL);
     case 'o':
-      return checkKeyword(1, 1, "r", TOKEN_OR);
+      return checkpointKeyword(1, 1, "r", TOKEN_OR);
     case 'p':
-      return checkKeyword(1, 4, "rint", TOKEN_PRINT);
+      return checkpointKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
-      return checkKeyword(1, 5, "eturn", TOKEN_RETURN);
+      return checkpointKeyword(1, 5, "eturn", TOKEN_RETURN);
     case 's':
-      return checkKeyword(1, 4, "uper", TOKEN_SUPER);
+      return checkpointKeyword(1, 4, "uper", TOKEN_SUPER);
     case 't':
       if (scanner.current - scanner.start > 1) {
         switch (scanner.start[1]) {
           case 'h':
-            return checkKeyword(2, 2, "is", TOKEN_THIS);
+            return checkpointKeyword(2, 2, "is", TOKEN_THIS);
           case 'r':
-            return checkKeyword(2, 2, "ue", TOKEN_TRUE);
+            return checkpointKeyword(2, 2, "ue", TOKEN_TRUE);
         }
       }
       break;
     case 'w':
-      return checkKeyword(1, 4, "hile", TOKEN_WHILE);
+      return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
   }
 
   return TOKEN_IDENTIFIER;
@@ -221,7 +222,12 @@ Token scanToken() {
     case '!':
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=':
-      return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+      if (peek() == '>') {
+        advance();
+        return makeToken(TOKEN_ARROW);
+      } else {
+        return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+      }
     case '<':
       return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
     case '>':

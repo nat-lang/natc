@@ -67,9 +67,20 @@ typedef struct Compiler {
 } Compiler;
 
 Parser parser;
+static Parser checkpoint;
 Compiler* current = NULL;
 
 static Chunk* currentChunk() { return &current->function->chunk; }
+
+static void saveParser() {
+  saveScanner();
+  checkpoint = parser;
+}
+
+static void rewindParser() {
+  rewindScanner();
+  parser = checkpoint;
+}
 
 static void errorAt(Token* token, const char* message) {
   if (parser.panicMode)
@@ -235,6 +246,7 @@ static void endScope() {
   }
 }
 
+static void function();
 static void expression();
 static void statement();
 static void declaration();
@@ -519,7 +531,6 @@ ParseRule rules[] = {
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE},
     [TOKEN_OR] = {NULL, or_, PREC_OR},
@@ -566,7 +577,7 @@ static uint8_t parseVariable(const char* errorMessage) {
 }
 
 static void markInitialized() {
-  if (current->scopeDepth == 0) return;  // not clear why this is necessary
+  if (current->scopeDepth == 0) return;
   current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
@@ -581,7 +592,33 @@ static void defineVariable(uint8_t global) {
 
 static ParseRule* getRule(TokenType type) { return &rules[type]; }
 
-static void expression() { parsePrecedence(PREC_ASSIGNMENT); }
+static bool findSignature() {
+  bool found;
+  saveParser();
+
+  consume(TOKEN_LEFT_PAREN, "Expect '(' before function parameters.");
+  if (!check(TOKEN_RIGHT_PAREN)) {
+    do {
+      consume(TOKEN_IDENTIFIER, "Expect identifier as parameter.");
+    } while (match(TOKEN_COMMA));
+  }
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after function parameters.");
+  consume(TOKEN_ARROW, "Expect '=>' after signature.");
+
+  found = !parser.hadError;
+  rewindParser();
+
+  return found;
+}
+
+static void expression() {
+  if (findSignature()) {
+    function(TYPE_FUNCTION);
+    markInitialized();
+  } else {
+    parsePrecedence(PREC_ASSIGNMENT);
+  }
+}
 
 static void block() {
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
@@ -608,6 +645,7 @@ static void function(FunctionType type) {
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+  consume(TOKEN_ARROW, "Expect '=>' after signature.");
   consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
   block();
 
@@ -618,13 +656,6 @@ static void function(FunctionType type) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
     emitByte(compiler.upvalues[i].index);
   }
-}
-
-static void funDeclaration() {
-  uint8_t global = parseVariable("Expect function name.");
-  markInitialized();
-  function(TYPE_FUNCTION);
-  defineVariable(global);
 }
 
 static void letDeclaration() {
@@ -756,7 +787,6 @@ static void synchronize() {
 
     switch (parser.current.type) {
       case TOKEN_CLASS:
-      case TOKEN_FUN:
       case TOKEN_FOR:
       case TOKEN_IF:
       case TOKEN_LET:
@@ -773,9 +803,7 @@ static void synchronize() {
 }
 
 static void declaration() {
-  if (match(TOKEN_FUN)) {
-    funDeclaration();
-  } else if (match(TOKEN_LET)) {
+  if (match(TOKEN_LET)) {
     letDeclaration();
   } else {
     statement();

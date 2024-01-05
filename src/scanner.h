@@ -15,6 +15,7 @@ typedef enum {
   TOKEN_SLASH,
   TOKEN_STAR,
   // One or two character tokens.
+  TOKEN_ARROW,
   TOKEN_BANG,
   TOKEN_BANG_EQUAL,
   TOKEN_EQUAL,
@@ -33,7 +34,6 @@ typedef enum {
   TOKEN_ELSE,
   TOKEN_FALSE,
   TOKEN_FOR,
-  TOKEN_FUN,
   TOKEN_IF,
   TOKEN_LET,
   TOKEN_NIL,
@@ -56,7 +56,16 @@ typedef struct {
   int line;
 } Token;
 
+typedef struct {
+  const char* start;
+  const char* current;
+  int line;
+} Scanner;
+
 void initScanner(const char* source);
+void saveScanner();
+void rewindScanner();
+void printScanner();
 Token scanToken();
 
 #endif
