@@ -114,18 +114,22 @@ static void advance() {
   for (;;) {
     parser.current = scanToken();
     if (parser.current.type != TOKEN_ERROR) break;
-
     errorAtCurrent(parser.current.start);
   }
 }
 
 static void consume(TokenType type, const char* message) {
-  if (parser.current.type == type) {
+  if (parser.current.type == type)
     advance();
-    return;
-  }
+  else
+    errorAtCurrent(message);
+}
 
-  errorAtCurrent(message);
+static void consumeQuiet(TokenType type) {
+  if (parser.current.type == type)
+    advance();
+  else
+    parser.hadError = true;
 }
 
 static bool check(TokenType type) { return parser.current.type == type; }
@@ -592,27 +596,36 @@ static void defineVariable(uint8_t global) {
 
 static ParseRule* getRule(TokenType type) { return &rules[type]; }
 
-static bool findSignature() {
+static bool scanSignature() {
   bool found;
   saveParser();
+  consumeQuiet(TOKEN_LEFT_PAREN);
 
-  consume(TOKEN_LEFT_PAREN, "Expect '(' before function parameters.");
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      consume(TOKEN_IDENTIFIER, "Expect identifier as parameter.");
+      consumeQuiet(TOKEN_IDENTIFIER);
     } while (match(TOKEN_COMMA));
   }
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after function parameters.");
-  consume(TOKEN_ARROW, "Expect '=>' after signature.");
+  consumeQuiet(TOKEN_RIGHT_PAREN);
+  consumeQuiet(TOKEN_ARROW);
 
   found = !parser.hadError;
+
+  rewindParser();
+
+  return found;
+}
+
+bool findSignature() {
+  saveParser();
+  bool found = scanSignature();
   rewindParser();
 
   return found;
 }
 
 static void expression() {
-  if (findSignature()) {
+  if (scanSignature()) {
     function(TYPE_FUNCTION);
     markInitialized();
   } else {
