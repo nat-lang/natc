@@ -205,6 +205,10 @@ Token scanToken() {
       return makeToken(TOKEN_LEFT_BRACE);
     case '}':
       return makeToken(TOKEN_RIGHT_BRACE);
+    case '[':
+      return makeToken(TOKEN_LEFT_BRACE);
+    case ']':
+      return makeToken(TOKEN_RIGHT_BRACE);
     case ';':
       return makeToken(TOKEN_SEMICOLON);
     case ',':
@@ -222,8 +226,7 @@ Token scanToken() {
     case '!':
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=':
-      if (peek() == '>') {
-        advance();
+      if (match('>')) {
         return makeToken(TOKEN_ARROW);
       } else {
         return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
