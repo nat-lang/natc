@@ -66,6 +66,8 @@ void initVM() {
 
   initTable(&vm.globals);
   initTable(&vm.strings);
+  vm.initString = NULL;
+  vm.initString = copyString("init", 4);
 
   defineNative("clock", 0, clockNative);
 }
@@ -73,6 +75,7 @@ void initVM() {
 void freeVM() {
   freeTable(&vm.globals);
   freeTable(&vm.strings);
+  vm.initString = NULL;
   freeObjects();
 }
 
@@ -124,6 +127,9 @@ static bool callValue(Value callee, int argCount) {
         Value initializer;
         if (tableGet(&klass->methods, vm.initString, &initializer)) {
           return call(AS_CLOSURE(initializer), argCount);
+        } else if (argCount != 0) {
+          runtimeError("Expected 0 arguments but got %d.", argCount);
+          return false;
         }
         return true;
       }
