@@ -6,6 +6,7 @@ print ((a) => { return a + 1; })(1);
 
 (() => {
   print "no params";
+  // print this;
 })();
 
 // as return values
