@@ -61,3 +61,6 @@ class CoffeeMaker {
 
 let maker = CoffeeMaker("coffee and chicory");
 maker.brew();
+
+maker.foo = () => { print "bar"; };
+maker.foo();

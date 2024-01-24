@@ -6,7 +6,6 @@ print ((a) => { return a + 1; })(1);
 
 (() => {
   print "no params";
-  // print this;
 })();
 
 // as return values
@@ -21,5 +20,3 @@ print compose(
   (a) => { return a + 1; },
   (a) => { return a - 1; }
 )(1) == 1;
-
-

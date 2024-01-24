@@ -54,6 +54,7 @@ typedef struct {
 } Upvalue;
 
 typedef enum {
+  TYPE_ANONYMOUS,
   TYPE_FUNCTION,
   TYPE_METHOD,
   TYPE_SCRIPT,
@@ -224,11 +225,13 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
   if (type == TYPE_METHOD || type == TYPE_FUNCTION) {
     current->function->name =
         copyString(parser.previous.start, parser.previous.length);
+  } else if (type == TYPE_ANONYMOUS) {
+    current->function->name = copyString("anonymous", 9);
   }
 
   Local* local = &current->locals[current->localCount++];
   local->depth = 0;
-  if (type != TYPE_FUNCTION) {
+  if (type == TYPE_METHOD || type == TYPE_INITIALIZER) {
     local->name.start = "this";
     local->name.length = 4;
   } else {
@@ -271,6 +274,7 @@ static void endScope() {
 
 static void function();
 static void expression();
+static void boundExpression();
 static void statement();
 static void declaration();
 static void classDeclaration();
@@ -436,6 +440,10 @@ static void dot(bool canAssign) {
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitBytes(OP_SET_PROPERTY, name);
+  } else if (match(TOKEN_LEFT_PAREN)) {
+    uint8_t argCount = argumentList();
+    emitBytes(OP_INVOKE, name);
+    emitByte(argCount);
   } else {
     emitBytes(OP_GET_PROPERTY, name);
   }
@@ -669,9 +677,18 @@ bool findSignature() {
   return found;
 }
 
-static void expression() {
+static void boundExpression() {
   if (scanSignature()) {
     function(TYPE_FUNCTION);
+    markInitialized();
+  } else {
+    parsePrecedence(PREC_ASSIGNMENT);
+  }
+}
+
+static void expression() {
+  if (scanSignature()) {
+    function(TYPE_ANONYMOUS);
     markInitialized();
   } else {
     parsePrecedence(PREC_ASSIGNMENT);
@@ -761,7 +778,7 @@ static void letDeclaration() {
   uint8_t global = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
-    expression();
+    boundExpression();
   } else {
     emitByte(OP_NIL);
   }

@@ -3,15 +3,15 @@
 let globalSet;
 let globalGet;
 
-fun testSharedUpvalue() {
-  let a =  "initial";
+let testSharedUpvalue = () => {
+  let a = "initial";
 
-  fun set() { a = "updated"; }
-  fun get() {  print a; }
+  let set = () => { a = "updated"; };
+  let get = () => { print a; };
 
   globalSet = set;
   globalGet = get;
-}
+};
 
 testSharedUpvalue();
 globalSet ();
@@ -22,18 +22,19 @@ let globalTwo;
 
 //
 
-fun testLoopClosure() {
+let testLoopClosure = () => {
   for (let a = 1; a <= 2; a = a + 1) {
-    fun closure() {
+    let closure = () => {
       print a;
-    }
+    };
+
     if (globalOne == nil) {
       globalOne = closure;
     } else {
       globalTwo = closure;
     }
   }
-}
+};
 
 testLoopClosure();
 globalOne();
@@ -41,20 +42,20 @@ globalTwo();
 
 //
 
-fun vector(x, y) {
-  fun object(message) {
-    fun add(other) {
+let vector = (x, y) => {
+  let object = (message) => {
+    let add = (other) => {
       return vector(x + other("x"), y + other("y"));
-    }
+    };
 
     if (message == "x") return x;
     if (message == "y") return y;
     if (message == "add") return add;
     print "unknown message";
-  }
+  };
 
   return object;
-}
+};
 
 let a = vector(1, 2);
 let b = vector(3, 4);
