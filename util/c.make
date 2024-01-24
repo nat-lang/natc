@@ -16,15 +16,12 @@ endif
 
 CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
 
-# If we're building at a point in the middle of a chapter, don't fail if there
-# are functions that aren't used yet.
-ifeq ($(SNIPPET),true)
-	CFLAGS += -Wno-unused-function
-endif
-
 # Mode configuration.
 ifeq ($(MODE),debug)
-	CFLAGS += -O0 -DDEBUG -g -D DEBUG_PRINT_CODE -D DEBUG_TRACE_EXECUTION -D DEBUG_STRESS_GC -D DEBUG_LOG_GC
+	CFLAGS += -O0 -DDEBUG -g -D DEBUG_PRINT_CODE -D DEBUG_TRACE_EXECUTION
+	BUILD_DIR := build/debug
+else ifeq ($(MODE),debug-gc)
+	CFLAGS += -O0 -DDEBUG -g -D DEBUG_STRESS_GC -D DEBUG_LOG_GC
 	BUILD_DIR := build/debug
 else
 	CFLAGS += -O3 -flto
