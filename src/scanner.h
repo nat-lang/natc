@@ -69,6 +69,7 @@ void initScanner(const char* source);
 void saveScanner();
 void rewindScanner();
 void printScanner();
+void skipWhitespace();
 Token scanToken();
 
 #endif

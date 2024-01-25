@@ -19,7 +19,7 @@ static void resetStack() {
   vm.openUpvalues = NULL;
 }
 
-static void runtimeError(const char* format, ...) {
+void runtimeError(const char* format, ...) {
   va_list args;
   va_start(args, format);
   vfprintf(stderr, format, args);
@@ -82,7 +82,7 @@ Value pop() {
   return *vm.stackTop;
 }
 
-static Value peek(int distance) { return vm.stackTop[-1 - distance]; }
+Value peek(int distance) { return vm.stackTop[-1 - distance]; }
 
 static bool checkArity(int paramCount, int argCount) {
   if (argCount == paramCount) return true;
@@ -108,6 +108,8 @@ static bool call(ObjClosure* closure, int argCount) {
 
 static bool callValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
+    printf("callee:");
+    printObject(callee);
     switch (OBJ_TYPE(callee)) {
       case OBJ_BOUND_METHOD: {
         ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
@@ -133,10 +135,7 @@ static bool callValue(Value callee, int argCount) {
 
         if (!checkArity(native->arity, argCount)) return false;
 
-        Value result = (native->function)(argCount, vm.stackTop - argCount);
-        vm.stackTop -= argCount + 1;
-        push(result);
-        return true;
+        return (native->function)(argCount, vm.stackTop - argCount);
       }
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);

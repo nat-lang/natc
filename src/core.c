@@ -1,4 +1,5 @@
 
+#include <string.h>
 #include <time.h>
 
 #include "object.h"
@@ -13,10 +14,42 @@ static void defineNative(const char* name, int arity, NativeFn function) {
   pop();
 }
 
-static Value mapNew(int argCount, Value* args) { return OBJ_VAL(newMap()); }
-static bool mapSet(int argCount, Value* args) {}
+static bool __mapNew__(int argCount, Value* args) {
+  vm.stackTop -= argCount + 1;
+  push(OBJ_VAL(newMap()));
+  return true;
+}
+
+static bool __mapSet__(int argCount, Value* args) {
+  Value val = pop();
+  Value key = pop();
+  pop();  // native fn.
+  Value map = pop();
+
+  ObjString* objKey;
+  if (IS_STRING(key))
+    objKey = AS_STRING(key);
+  else {
+    runtimeError("Map key must be a string.");
+    return false;
+  }
+
+  ObjMap* objMap;
+  if (IS_MAP(map))
+    objMap = AS_MAP(map);
+  else {
+    runtimeError("Can only set variable property of map.");
+    return false;
+  }
+
+  mapSet(objMap, objKey, val);
+
+  vm.stackTop -= argCount + 1;
+  push(map);
+  return true;
+}
 
 void initializeCore(VM* vm) {
-  defineNative("__map__", 0, mapNew);
-  defineNative("__mapSet__", 2, mapSet);
+  defineNative("__mapNew__", 0, __mapNew__);
+  defineNative("__mapSet__", 2, __mapSet__);
 }

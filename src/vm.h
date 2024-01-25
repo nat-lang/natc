@@ -48,9 +48,11 @@ extern VM vm;
 
 void initVM();
 void freeVM();
+void runtimeError(const char* format, ...);
 
 InterpretResult interpret(const char* source);
 void push(Value value);
 Value pop();
+Value peek(int distance);
 
 #endif

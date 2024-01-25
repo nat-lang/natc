@@ -279,6 +279,7 @@ static void boundExpression();
 static void statement();
 static void declaration();
 static void classDeclaration();
+static void map(bool canAssign);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
@@ -791,24 +792,26 @@ static void method() {
 // A map literal.
 static void map(bool canAssign) {
   // Instantiate a new map.
-  callNative("__map__", 0);
+  callNative("__mapNew__", 0);
 
   // Compile the map elements. Each one is compiled to just invoke the
   // subscript setter on the map.
   do {
-    skipWhitespace();
-
     // Stop if we hit the end of the map.
-    if (peek() == TOKEN_RIGHT_BRACE) break;
+    // printf("%s", parser.current.start);
+    if (parser.current.type == TOKEN_RIGHT_BRACE) break;
+
+    nativeVariable("__mapSet__");
 
     // The key.
     parsePrecedence(PREC_UNARY);
     consume(TOKEN_COLON, "Expect ':' after map key.");
-    skipWhitespace();
+    // skipWhitespace();
 
     // The value.
     expression();
-    callNative("__mapSet__", 2);
+
+    emitBytes(OP_CALL, 2);
   } while (match(TOKEN_COMMA));
 
   // Allow newlines before the closing '}'.

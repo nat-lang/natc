@@ -138,7 +138,6 @@ static void printFunction(ObjFunction* function) {
 }
 
 void initMap(ObjMap* map) {
-  map->name = NULL;
   map->count = 0;
   map->capacity = 0;
   map->entries = NULL;
@@ -149,10 +148,9 @@ void freeMap(ObjMap* map) {
   initMap(map);
 }
 
-ObjMap* newMap(ObjString* name) {
+ObjMap* newMap() {
   ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
   initMap(map);
-  map->name = name;
   return map;
 }
 
@@ -290,13 +288,7 @@ void markMap(ObjMap* map) {
   }
 }
 
-static void printMap(ObjMap* map) {
-  if (map->name == NULL) {
-    printf("<map>");
-  } else {
-    printf("<map %s>", map->name->chars);
-  }
-}
+static void printMap(ObjMap* map) { printf("<map>"); }
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
