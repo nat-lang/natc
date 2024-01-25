@@ -22,17 +22,21 @@ typedef struct {
   Value stack[STACK_MAX];
   Value* stackTop;
   Table strings;
-  ObjString* initString;
   Table globals;
   Obj* objects;
   ObjUpvalue* openUpvalues;
 
+  // memory management.
   int grayCount;
   int grayCapacity;
   Obj** grayStack;
 
   size_t bytesAllocated;
   size_t nextGC;
+
+  // methods with special semantics.
+  ObjString* initString;
+  ObjString* callString;
 } VM;
 
 typedef enum {

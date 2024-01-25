@@ -66,8 +66,12 @@ void initVM() {
 
   initTable(&vm.globals);
   initTable(&vm.strings);
+
   vm.initString = NULL;
   vm.initString = copyString("init", 4);
+
+  vm.callString = NULL;
+  vm.callString = copyString("call", 4);
 
   defineNative("clock", 0, clockNative);
 }
@@ -76,6 +80,7 @@ void freeVM() {
   freeTable(&vm.globals);
   freeTable(&vm.strings);
   vm.initString = NULL;
+  vm.callString = NULL;
   freeObjects();
 }
 
@@ -145,11 +150,23 @@ static bool callValue(Value callee, int argCount) {
         push(result);
         return true;
       }
+      case OBJ_INSTANCE: {
+        ObjInstance* instance = AS_INSTANCE(callee);
+        Value callFn;
+        if (tableGet(&instance->klass->methods, vm.callString, &callFn)) {
+          return call(AS_CLOSURE(callFn), argCount);
+        } else {
+          runtimeError("Objects require a 'call' method to be called.");
+          return false;
+        }
+        return true;
+      }
       default:
         break;  // Non-callable object type.
     }
   }
-  runtimeError("Can only call functions and classes.");
+  runtimeError(
+      "Can only call functions, classes, and objects with a 'call' method.");
   return false;
 }
 
@@ -255,7 +272,7 @@ static void concatenate() {
   push(OBJ_VAL(result));
 }
 
-static InterpretResult run() {
+static InterpretResult loop() {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
 #define READ_BYTE() (*frame->ip++)
@@ -469,6 +486,8 @@ static InterpretResult run() {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
+      // "invocation" is a superinstruction: dotted property access
+      // followed by a call.
       case OP_INVOKE: {
         ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
@@ -560,5 +579,5 @@ InterpretResult interpret(const char* source) {
   push(OBJ_VAL(closure));
   call(closure, 0);
 
-  return run();
+  return loop();
 }

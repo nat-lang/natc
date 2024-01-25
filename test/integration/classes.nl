@@ -64,3 +64,14 @@ maker.brew();
 
 maker.foo = () => { print "bar"; };
 maker.foo();
+
+// callability
+
+class Callable {
+  init(x) => { this.x = x; }
+  call(y) => { return this.x + y; }
+}
+
+let c = Callable(1);
+
+print c(2);

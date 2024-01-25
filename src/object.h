@@ -34,8 +34,9 @@ typedef enum {
   OBJ_NATIVE,
   OBJ_STRING,
   OBJ_UPVALUE,
+  // OBJ_MAP,
   // OBJ_SET,
-  // OBJ_TUPLE,
+  // OBJ_SEQ,
 } ObjType;
 
 struct Obj {
