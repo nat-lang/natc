@@ -3,7 +3,6 @@
 
 #include "chunk.h"
 #include "object.h"
-#include "table.h"
 #include "value.h"
 
 #define FRAMES_MAX 64
@@ -21,8 +20,8 @@ typedef struct {
 
   Value stack[STACK_MAX];
   Value* stackTop;
-  Table strings;
-  Table globals;
+  ObjMap strings;
+  ObjMap globals;
   Obj* objects;
   ObjUpvalue* openUpvalues;
 

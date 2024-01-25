@@ -87,7 +87,7 @@ static void blackenObject(Obj* object) {
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
       markObject((Obj*)klass->name);
-      markTable(&klass->methods);
+      markMap(&klass->methods);
       break;
     }
     case OBJ_CLOSURE: {
@@ -101,7 +101,7 @@ static void blackenObject(Obj* object) {
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
       markObject((Obj*)instance->klass);
-      markTable(&instance->fields);
+      markMap(&instance->fields);
       break;
     }
     case OBJ_UPVALUE:
@@ -111,6 +111,11 @@ static void blackenObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
       markArray(&function->chunk.constants);
+      break;
+    }
+    case OBJ_MAP: {
+      ObjMap* map = (ObjMap*)object;
+      markMap(map);
       break;
     }
     case OBJ_NATIVE:
@@ -130,7 +135,7 @@ static void freeObject(Obj* object) {
       break;
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
-      freeTable(&klass->methods);
+      freeMap(&klass->methods);
       FREE(ObjClass, object);
       break;
     }
@@ -149,13 +154,18 @@ static void freeObject(Obj* object) {
     }
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
-      freeTable(&instance->fields);
+      freeMap(&instance->fields);
       FREE(ObjInstance, object);
       break;
     }
     case OBJ_NATIVE:
       FREE(ObjNative, object);
       break;
+    case OBJ_MAP: {
+      ObjMap* map = (ObjMap*)object;
+      freeMap(map);
+      break;
+    }
     case OBJ_STRING: {
       ObjString* string = (ObjString*)object;
       FREE_ARRAY(char, string->chars, string->length + 1);
@@ -179,7 +189,7 @@ static void markRoots() {
        upvalue = upvalue->next) {
     markObject((Obj*)upvalue);
   }
-  markTable(&vm.globals);
+  markMap(&vm.globals);
   markCompilerRoots();
   markObject((Obj*)vm.initString);
 }
@@ -221,7 +231,7 @@ void collectGarbage() {
 
   markRoots();
   traceReferences();
-  tableRemoveWhite(&vm.strings);
+  mapRemoveWhite(&vm.strings);
   sweep();
 
   vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;

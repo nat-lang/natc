@@ -67,7 +67,7 @@ static Token errorToken(const char *message) {
   return token;
 }
 
-static void skipWhitespace() {
+void skipWhitespace() {
   for (;;) {
     char c = peek();
     switch (c) {
@@ -209,6 +209,8 @@ Token scanToken() {
       return makeToken(TOKEN_LEFT_BRACE);
     case ']':
       return makeToken(TOKEN_RIGHT_BRACE);
+    case ':':
+      return makeToken(TOKEN_COLON);
     case ';':
       return makeToken(TOKEN_SEMICOLON);
     case ',':

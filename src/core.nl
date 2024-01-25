@@ -1,7 +1,8 @@
-class Map {
-  call()
-}
+class Map {}
 class Set {}
+class Sequence {}
+class Tree {}
 
 
-let m = { a => 1, b => 2 };
+foo("bar") => 1;
+foo("bar") == 1;

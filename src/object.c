@@ -1,12 +1,14 @@
 #include "object.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "memory.h"
-#include "table.h"
 #include "value.h"
 #include "vm.h"
+
+#define MAP_MAX_LOAD 0.75
 
 #define ALLOCATE_OBJ(type, objectType) \
   (type*)allocateObject(sizeof(type), objectType)
@@ -36,7 +38,7 @@ ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
 ObjClass* newClass(ObjString* name) {
   ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
   klass->name = name;
-  initTable(&klass->methods);
+  initMap(&klass->methods);
   return klass;
 }
 
@@ -65,7 +67,7 @@ ObjFunction* newFunction() {
 ObjInstance* newInstance(ObjClass* klass) {
   ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
   instance->klass = klass;
-  initTable(&instance->fields);
+  initMap(&instance->fields);
   return instance;
 }
 
@@ -83,7 +85,7 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   string->hash = hash;
 
   push(OBJ_VAL(string));
-  tableSet(&vm.strings, string, NIL_VAL);
+  mapSet(&vm.strings, string, NIL_VAL);
   pop();
 
   return string;
@@ -100,7 +102,7 @@ static uint32_t hashString(const char* key, int length) {
 
 ObjString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+  ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
   if (interned != NULL) return interned;
 
   char* heapChars = ALLOCATE(char, length + 1);
@@ -119,7 +121,7 @@ ObjUpvalue* newUpvalue(Value* slot) {
 
 ObjString* takeString(char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+  ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
   if (interned != NULL) {
     FREE_ARRAY(char, chars, length + 1);
     return interned;
@@ -132,6 +134,167 @@ static void printFunction(ObjFunction* function) {
     printf("<script>");
   } else {
     printf("<fn %s>", function->name->chars);
+  }
+}
+
+void initMap(ObjMap* map) {
+  map->name = NULL;
+  map->count = 0;
+  map->capacity = 0;
+  map->entries = NULL;
+}
+
+void freeMap(ObjMap* map) {
+  FREE_ARRAY(MapEntry, map->entries, map->capacity);
+  initMap(map);
+}
+
+ObjMap* newMap(ObjString* name) {
+  ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
+  initMap(map);
+  map->name = name;
+  return map;
+}
+
+static MapEntry* mapFindEntry(MapEntry* entries, int capacity, ObjString* key) {
+  uint32_t index = key->hash & (capacity - 1);
+  MapEntry* tombstone = NULL;
+
+  for (;;) {
+    MapEntry* entry = &entries[index];
+
+    if (entry->key == NULL) {
+      if (IS_NIL(entry->value)) {
+        // Empty entry.
+        return tombstone != NULL ? tombstone : entry;
+      } else {
+        // We found a tombstone.
+        if (tombstone == NULL) tombstone = entry;
+      }
+    } else if (entry->key == key) {
+      // We found the key.
+      return entry;
+    }
+
+    index = (index + 1) & (capacity - 1);
+  }
+}
+
+static void mapAdjustCapacity(ObjMap* map, int capacity) {
+  MapEntry* entries = ALLOCATE(MapEntry, capacity);
+
+  for (int i = 0; i < capacity; i++) {
+    entries[i].key = NULL;
+    entries[i].value = NIL_VAL;
+  }
+
+  map->count = 0;
+
+  for (int i = 0; i < map->capacity; i++) {
+    MapEntry* entry = &map->entries[i];
+    if (entry->key == NULL) continue;
+
+    MapEntry* dest = mapFindEntry(entries, capacity, entry->key);
+    dest->key = entry->key;
+    dest->value = entry->value;
+    map->count++;
+  }
+
+  FREE_ARRAY(MapEntry, map->entries, map->capacity);
+  map->entries = entries;
+  map->capacity = capacity;
+}
+
+bool mapGet(ObjMap* map, ObjString* key, Value* value) {
+  if (map->count == 0) return false;
+
+  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
+  if (entry->key == NULL) return false;
+
+  *value = entry->value;
+  return true;
+}
+
+bool mapSet(ObjMap* map, ObjString* key, Value value) {
+  if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
+    int capacity = GROW_CAPACITY(map->capacity);
+    mapAdjustCapacity(map, capacity);
+  }
+
+  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
+
+  bool isNewKey = entry->key == NULL;
+  if (isNewKey && IS_NIL(entry->value)) map->count++;
+
+  entry->key = key;
+  entry->value = value;
+  return isNewKey;
+}
+
+bool mapDelete(ObjMap* map, ObjString* key) {
+  if (map->count == 0) return false;
+
+  // Find the entry.
+  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
+  if (entry->key == NULL) return false;
+
+  // Place a tombstone in the entry.
+  entry->key = NULL;
+  entry->value = BOOL_VAL(true);
+  return true;
+}
+
+void mapAddAll(ObjMap* from, ObjMap* to) {
+  for (int i = 0; i < from->capacity; i++) {
+    MapEntry* entry = &from->entries[i];
+    if (entry->key != NULL) {
+      mapSet(to, entry->key, entry->value);
+    }
+  }
+}
+
+ObjString* mapFindString(ObjMap* map, const char* chars, int length,
+                         uint32_t hash) {
+  if (map->count == 0) return NULL;
+
+  uint32_t index = hash & (map->capacity - 1);
+  for (;;) {
+    MapEntry* entry = &map->entries[index];
+    if (entry->key == NULL) {
+      // Stop if we find an empty non-tombstone entry.
+      if (IS_NIL(entry->value)) return NULL;
+    } else if (entry->key->length == length && entry->key->hash == hash &&
+               memcmp(entry->key->chars, chars, length) == 0) {
+      // We found it.
+      return entry->key;
+    }
+
+    index = (index + 1) & (map->capacity - 1);
+  }
+}
+
+void mapRemoveWhite(ObjMap* map) {
+  for (int i = 0; i < map->capacity; i++) {
+    MapEntry* entry = &map->entries[i];
+    if (entry->key != NULL && !entry->key->obj.isMarked) {
+      mapDelete(map, entry->key);
+    }
+  }
+}
+
+void markMap(ObjMap* map) {
+  for (int i = 0; i < map->capacity; i++) {
+    MapEntry* entry = &map->entries[i];
+    markObject((Obj*)entry->key);
+    markValue(entry->value);
+  }
+}
+
+static void printMap(ObjMap* map) {
+  if (map->name == NULL) {
+    printf("<map>");
+  } else {
+    printf("<map %s>", map->name->chars);
   }
 }
 
@@ -151,6 +314,9 @@ void printObject(Value value) {
       break;
     case OBJ_INSTANCE:
       printf("%s instance", AS_INSTANCE(value)->klass->name->chars);
+      break;
+    case OBJ_MAP:
+      printMap(AS_MAP(value));
       break;
     case OBJ_NATIVE:
       printf("<native fn>");

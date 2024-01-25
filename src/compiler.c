@@ -527,6 +527,16 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
+static void nativeVariable(char* name) {
+  uint8_t var = makeConstant(OBJ_VAL(copyString(name, strlen(name))));
+  emitBytes(OP_GET_GLOBAL, var);
+}
+
+static void callNative(char* name, int argCount) {
+  nativeVariable(name);
+  emitBytes(OP_CALL, argCount);
+}
+
 static void variable(bool canAssign) {
   namedVariable(parser.previous, canAssign);
 }
@@ -592,7 +602,7 @@ static void unary(bool canAssign) {
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {map, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACKET] = {tree, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
@@ -776,6 +786,34 @@ static void method() {
 
   function(type);
   emitBytes(OP_METHOD, constant);
+}
+
+// A map literal.
+static void map(bool canAssign) {
+  // Instantiate a new map.
+  callNative("__map__", 0);
+
+  // Compile the map elements. Each one is compiled to just invoke the
+  // subscript setter on the map.
+  do {
+    skipWhitespace();
+
+    // Stop if we hit the end of the map.
+    if (peek() == TOKEN_RIGHT_BRACE) break;
+
+    // The key.
+    parsePrecedence(PREC_UNARY);
+    consume(TOKEN_COLON, "Expect ':' after map key.");
+    skipWhitespace();
+
+    // The value.
+    expression();
+    callNative("__mapSet__", 2);
+  } while (match(TOKEN_COMMA));
+
+  // Allow newlines before the closing '}'.
+  skipWhitespace();
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after map entries.");
 }
 
 static void classDeclaration() {

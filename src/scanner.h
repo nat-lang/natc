@@ -1,5 +1,5 @@
-#ifndef clox_scanner_h
-#define clox_scanner_h
+#ifndef nat_scanner_h
+#define nat_scanner_h
 
 typedef enum {
   // Single-character tokens.
@@ -13,6 +13,7 @@ typedef enum {
   TOKEN_DOT,
   TOKEN_MINUS,
   TOKEN_PLUS,
+  TOKEN_COLON,
   TOKEN_SEMICOLON,
   TOKEN_SLASH,
   TOKEN_STAR,

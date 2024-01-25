@@ -3,19 +3,15 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 #include "common.h"
 #include "compiler.h"
+#include "core.h"
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
 
 VM vm;
-
-static Value clockNative(int argCount, Value* args) {
-  return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
-}
 
 static void resetStack() {
   vm.stackTop = vm.stack;
@@ -45,14 +41,6 @@ static void runtimeError(const char* format, ...) {
   resetStack();
 }
 
-static void defineNative(const char* name, int arity, NativeFn function) {
-  push(OBJ_VAL(copyString(name, (int)strlen(name))));
-  push(OBJ_VAL(newNative(arity, function)));
-  tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
-  pop();
-  pop();
-}
-
 void initVM() {
   resetStack();
   vm.objects = NULL;
@@ -64,8 +52,8 @@ void initVM() {
   vm.grayCapacity = 0;
   vm.grayStack = NULL;
 
-  initTable(&vm.globals);
-  initTable(&vm.strings);
+  initMap(&vm.globals);
+  initMap(&vm.strings);
 
   vm.initString = NULL;
   vm.initString = copyString("init", 4);
@@ -73,12 +61,12 @@ void initVM() {
   vm.callString = NULL;
   vm.callString = copyString("call", 4);
 
-  defineNative("clock", 0, clockNative);
+  initializeCore(&vm);
 }
 
 void freeVM() {
-  freeTable(&vm.globals);
-  freeTable(&vm.strings);
+  freeMap(&vm.globals);
+  freeMap(&vm.strings);
   vm.initString = NULL;
   vm.callString = NULL;
   freeObjects();
@@ -130,7 +118,7 @@ static bool callValue(Value callee, int argCount) {
         ObjClass* klass = AS_CLASS(callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
         Value initializer;
-        if (tableGet(&klass->methods, vm.initString, &initializer)) {
+        if (mapGet(&klass->methods, vm.initString, &initializer)) {
           return call(AS_CLOSURE(initializer), argCount);
         } else if (argCount != 0) {
           runtimeError("Expected 0 arguments but got %d.", argCount);
@@ -153,7 +141,7 @@ static bool callValue(Value callee, int argCount) {
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);
         Value callFn;
-        if (tableGet(&instance->klass->methods, vm.callString, &callFn)) {
+        if (mapGet(&instance->klass->methods, vm.callString, &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
         } else {
           runtimeError("Objects require a 'call' method to be called.");
@@ -172,7 +160,7 @@ static bool callValue(Value callee, int argCount) {
 
 static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
   Value method;
-  if (!tableGet(&klass->methods, name, &method)) {
+  if (!mapGet(&klass->methods, name, &method)) {
     runtimeError("Undefined property '%s'.", name->chars);
     return false;
   }
@@ -190,7 +178,7 @@ static bool invoke(ObjString* name, int argCount) {
   ObjInstance* instance = AS_INSTANCE(receiver);
 
   Value value;
-  if (tableGet(&instance->fields, name, &value)) {
+  if (mapGet(&instance->fields, name, &value)) {
     vm.stackTop[-argCount - 1] = value;
     return callValue(value, argCount);
   }
@@ -200,7 +188,7 @@ static bool invoke(ObjString* name, int argCount) {
 
 static bool bindMethod(ObjClass* klass, ObjString* name) {
   Value method;
-  if (!tableGet(&klass->methods, name, &method)) {
+  if (!mapGet(&klass->methods, name, &method)) {
     runtimeError("Undefined property '%s'.", name->chars);
     return false;
   }
@@ -247,7 +235,7 @@ static void closeUpvalues(Value* last) {
 static void defineMethod(ObjString* name) {
   Value method = peek(0);
   ObjClass* klass = AS_CLASS(peek(1));
-  tableSet(&klass->methods, name, method);
+  mapSet(&klass->methods, name, method);
   pop();
 }
 
@@ -339,7 +327,7 @@ static InterpretResult loop() {
       case OP_GET_GLOBAL: {
         ObjString* name = READ_STRING();
         Value value;
-        if (!tableGet(&vm.globals, name, &value)) {
+        if (!mapGet(&vm.globals, name, &value)) {
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -348,14 +336,14 @@ static InterpretResult loop() {
       }
       case OP_DEFINE_GLOBAL: {
         ObjString* name = READ_STRING();
-        tableSet(&vm.globals, name, peek(0));
+        mapSet(&vm.globals, name, peek(0));
         pop();
         break;
       }
       case OP_SET_GLOBAL: {
         ObjString* name = READ_STRING();
-        if (tableSet(&vm.globals, name, peek(0))) {
-          tableDelete(&vm.globals, name);
+        if (mapSet(&vm.globals, name, peek(0))) {
+          mapDelete(&vm.globals, name);
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -371,7 +359,7 @@ static InterpretResult loop() {
         ObjString* name = READ_STRING();
 
         Value value;
-        if (tableGet(&instance->fields, name, &value)) {
+        if (mapGet(&instance->fields, name, &value)) {
           pop();  // Instance.
           push(value);
           break;
@@ -389,7 +377,7 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(peek(1));
-        tableSet(&instance->fields, READ_STRING(), peek(0));
+        mapSet(&instance->fields, READ_STRING(), peek(0));
         Value value = pop();
         pop();
         push(value);
@@ -552,7 +540,7 @@ static InterpretResult loop() {
         }
 
         ObjClass* subclass = AS_CLASS(peek(0));
-        tableAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
+        mapAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
         pop();  // Subclass.
         break;
       }
