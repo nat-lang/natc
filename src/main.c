@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
 #include "chunk.h"
+#include "common.h"
+#include "compiler.h"
 #include "debug.h"
 #include "vm.h"
 
@@ -36,10 +37,19 @@ static char* readFile(const char* path) {
   return buffer;
 }
 
+// Load and compile module at [path] without executing.
+static void compileFile(const char* path) {
+  char* source = readFile(path);
+  compile(source);
+  free(source);
+}
+
+// Load, compile, and execute module at [path].
 static void runFile(const char* path) {
   char* source = readFile(path);
   InterpretResult result = interpret(source);
-  free(source); 
+  compile(source);
+  free(source);
 
   if (result == INTERPRET_COMPILE_ERROR) exit(65);
   if (result == INTERPRET_RUNTIME_ERROR) exit(70);
@@ -66,6 +76,8 @@ int main(int argc, const char* argv[]) {
     repl();
   } else if (argc == 2) {
     runFile(argv[1]);
+  } else if (false) {
+    compileFile(argv[1]);
   } else {
     fprintf(stderr, "Usage: nat [path]\n");
     exit(64);

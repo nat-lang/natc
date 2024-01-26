@@ -8,17 +8,14 @@
 #include "vm.h"
 
 static void defineNative(const char* name, int arity, NativeFn function) {
-  push(OBJ_VAL(copyString(name, (int)strlen(name))));
-  push(OBJ_VAL(newNative(arity, function)));
+  // intern the name.
+  ObjString* strName = copyString(name, (int)strlen(name));
+
+  push(OBJ_VAL(strName));
+  push(OBJ_VAL(newNative(arity, strName, function)));
   mapSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
   pop();
   pop();
-}
-
-static bool __mapNew__(int argCount, Value* args) {
-  vm.stackTop -= argCount + 1;
-  push(OBJ_VAL(newMap()));
-  return true;
 }
 
 static bool validateMapKey(Value key) {
@@ -37,6 +34,12 @@ static bool validateMap(Value map, char* msg) {
   return true;
 }
 
+static bool __mapNew__(int argCount, Value* args) {
+  vm.stackTop -= argCount + 1;
+  push(OBJ_VAL(newMap()));
+  return true;
+}
+
 static bool __mapSet__(int argCount, Value* args) {
   Value val = pop();
   Value key = pop();
@@ -48,7 +51,7 @@ static bool __mapSet__(int argCount, Value* args) {
 
   mapSet(AS_MAP(map), AS_STRING(key), val);
 
-  push(map);
+  push(map);  // return the map.
   return true;
 }
 

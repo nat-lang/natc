@@ -60,6 +60,7 @@ typedef bool (*NativeFn)(int argCount, Value *args);
 typedef struct {
   Obj obj;
   int arity;
+  ObjString *name;
   NativeFn function;
 } ObjNative;
 
@@ -120,7 +121,7 @@ ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjInstance *newInstance(ObjClass *klass);
 ObjMap *newMap();
-ObjNative *newNative(int arity, NativeFn function);
+ObjNative *newNative(int arity, ObjString *name, NativeFn function);
 ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
 ObjUpvalue *newUpvalue(Value *slot);

@@ -15,6 +15,7 @@
 typedef struct {
   Token current;
   Token previous;
+  Token penult;
 
   bool hadError;
   bool panicMode;
@@ -121,6 +122,7 @@ static void errorAtCurrent(const char* message) {
 }
 
 static void advance() {
+  parser.penult = parser.previous;
   parser.previous = parser.current;
 
   for (;;) {
@@ -214,6 +216,20 @@ static void patchJump(int offset) {
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
+static ObjString* functionName(FunctionType type) {
+  switch (type) {
+    case TYPE_INITIALIZER:
+    case TYPE_METHOD:
+      return copyString(parser.previous.start, parser.previous.length);
+    case TYPE_FUNCTION:
+      return copyString(parser.penult.start, parser.penult.length);
+    case TYPE_ANONYMOUS:
+      return copyString("lambda", 6);
+    case TYPE_SCRIPT:
+      return copyString("script", 6);
+  }
+}
+
 static void initCompiler(Compiler* compiler, FunctionType type) {
   compiler->enclosing = current;
   compiler->function = NULL;
@@ -223,12 +239,7 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
   compiler->function = newFunction();
 
   current = compiler;
-  if (type == TYPE_METHOD || type == TYPE_FUNCTION) {
-    current->function->name =
-        copyString(parser.previous.start, parser.previous.length);
-  } else if (type == TYPE_ANONYMOUS) {
-    current->function->name = copyString("lambda", 6);
-  }
+  current->function->name = functionName(type);
 
   Local* local = &current->locals[current->localCount++];
   local->depth = 0;
@@ -282,6 +293,10 @@ static void classDeclaration();
 static void map(bool canAssign);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
+
+static Value identifier(char* name) {
+  return OBJ_VAL(copyString(name, strlen(name)));
+}
 
 static uint8_t identifierConstant(Token* name) {
   return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
@@ -528,9 +543,10 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
-static void nativeVariable(char* name) {
-  uint8_t var = makeConstant(OBJ_VAL(copyString(name, strlen(name))));
+static uint8_t nativeVariable(char* name) {
+  uint8_t var = makeConstant(identifier(name));
   emitBytes(OP_GET_GLOBAL, var);
+  return var;
 }
 
 static void callNative(char* name, int argCount) {
@@ -719,7 +735,7 @@ static void map(bool canAssign) {
   // Instantiate a new map.
   callNative("__mapNew__", 0);
 
-  // Compile the map elements. Just invoke the subscript
+  // Compile the map elements. Just invoke the map
   // setter on each key/val.
   do {
     if (parser.current.type == TOKEN_RIGHT_BRACE) break;
@@ -741,14 +757,21 @@ static void map(bool canAssign) {
 
 // Subscript or "array indexing" operator like `foo[bar]`.
 static void subscript(bool canAssign) {
-  nativeVariable("__subscript__");
+  // store the address of the function identifier.
+  int fn = nativeVariable("__subscript__");
+
   expression();
-  emitBytes(OP_CALL, 1);
   consume(TOKEN_RIGHT_BRACKET, "Expect ']' after arguments.");
 
-  // if (canAssign && match(TOKEN_EQUAL)) {
-  // expression();
-  // }
+  // if it's assignment, revise the instruction.
+  if (canAssign && match(TOKEN_EQUAL)) {
+    currentChunk()->constants.values[fn] = identifier("__mapSet__");
+
+    expression();
+    emitBytes(OP_CALL, 2);
+  } else {
+    emitBytes(OP_CALL, 1);
+  }
 }
 
 static void classDeclaration() {

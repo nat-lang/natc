@@ -71,9 +71,10 @@ ObjInstance* newInstance(ObjClass* klass) {
   return instance;
 }
 
-ObjNative* newNative(int arity, NativeFn function) {
+ObjNative* newNative(int arity, ObjString* name, NativeFn function) {
   ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   native->arity = arity;
+  native->name = name;
   native->function = function;
   return native;
 }
@@ -311,7 +312,7 @@ void printObject(Value value) {
       printMap(AS_MAP(value));
       break;
     case OBJ_NATIVE:
-      printf("<native fn>");
+      printf("<fn %s>", AS_NATIVE(value)->name->chars);
       break;
     case OBJ_STRING:
       printf("%s", AS_CSTRING(value));
