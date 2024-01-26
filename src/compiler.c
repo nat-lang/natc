@@ -13,6 +13,7 @@
 #endif
 
 typedef struct {
+  Token next;
   Token current;
   Token previous;
   Token penult;
@@ -121,15 +122,20 @@ static void errorAtCurrent(const char* message) {
   errorAt(&parser.current, message);
 }
 
+static void initParser() {
+  parser.hadError = false;
+  parser.panicMode = false;
+  parser.current = scanToken();
+  parser.next = scanToken();
+}
+
 static void advance() {
   parser.penult = parser.previous;
   parser.previous = parser.current;
+  parser.current = parser.next;
 
-  for (;;) {
-    parser.current = scanToken();
-    if (parser.current.type != TOKEN_ERROR) break;
-    errorAtCurrent(parser.current.start);
-  }
+  parser.next = scanToken();
+  if (parser.current.type == TOKEN_ERROR) errorAtCurrent(parser.current.start);
 }
 
 static void consume(TokenType type, const char* message) {
@@ -290,7 +296,6 @@ static void boundExpression();
 static void statement();
 static void declaration();
 static void classDeclaration();
-static void map(bool canAssign);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
@@ -549,9 +554,10 @@ static uint8_t nativeVariable(char* name) {
   return var;
 }
 
-static void callNative(char* name, int argCount) {
-  nativeVariable(name);
+static int callNative(char* name, int argCount) {
+  int address = nativeVariable(name);
   emitBytes(OP_CALL, argCount);
+  return address;
 }
 
 static void variable(bool canAssign) {
@@ -730,29 +736,65 @@ static void method() {
   emitBytes(OP_METHOD, constant);
 }
 
-// A map literal.
-static void map(bool canAssign) {
-  // Instantiate a new map.
-  callNative("__mapNew__", 0);
+static void finishMapVal() {
+  consume(TOKEN_COLON, "Expect ':' after map key.");
 
+  expression();
+
+  emitBytes(OP_CALL, 2);
+}
+
+// A map literal.
+static void finishMap() {
   // Compile the map elements. Just invoke the map
   // setter on each key/val.
   do {
-    if (parser.current.type == TOKEN_RIGHT_BRACE) break;
-
     nativeVariable("__mapSet__");
+    // the key.
+    expression();
+    // the val.
+    finishMapVal();
+  } while (match(TOKEN_COMMA));
+}
 
-    // The key.
-    parsePrecedence(PREC_UNARY);
-    consume(TOKEN_COLON, "Expect ':' after map key.");
+static void finishSet() {
+  do {
+    nativeVariable("__setAdd__");
 
-    // The value.
     expression();
 
-    emitBytes(OP_CALL, 2);
+    emitBytes(OP_CALL, 1);
   } while (match(TOKEN_COMMA));
+}
 
-  consume(TOKEN_RIGHT_BRACE, "Expect '}' after map entries.");
+// A map or set literal.
+static void braces(bool canAssign) {
+  int newFn = callNative("__setNew__", 0);
+
+  // empty curlies is an empty set.
+  if (check(TOKEN_RIGHT_BRACE)) {
+    advance();
+    return;
+  }
+
+  int addFn = nativeVariable("__setAdd__");
+
+  // first element: could be a map key or a set element.
+  expression();
+
+  if (check(TOKEN_COMMA)) {
+    advance();
+    emitBytes(OP_CALL, 1);
+    finishSet();
+  } else {
+    currentChunk()->constants.values[newFn] = identifier("__mapNew__");
+    currentChunk()->constants.values[addFn] = identifier("__mapSet__");
+
+    finishMapVal();
+    finishMap();
+  }
+
+  consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
 // Subscript or "array indexing" operator like `foo[bar]`.
@@ -1009,7 +1051,7 @@ static void statement() {
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACE] = {map, NULL, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {braces, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACKET] = {NULL, subscript, PREC_CALL},
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
@@ -1079,11 +1121,7 @@ ObjFunction* compile(const char* source) {
   initScanner(source);
   Compiler compiler;
   initCompiler(&compiler, TYPE_SCRIPT);
-
-  parser.hadError = false;
-  parser.panicMode = false;
-
-  advance();
+  initParser();
 
   while (!match(TOKEN_EOF)) {
     declaration();
