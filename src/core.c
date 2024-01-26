@@ -1,4 +1,5 @@
 
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -20,36 +21,69 @@ static bool __mapNew__(int argCount, Value* args) {
   return true;
 }
 
+static bool validateMapKey(Value key) {
+  if (!IS_STRING(key)) {
+    runtimeError("Map key must be a string.");
+    return false;
+  }
+  return true;
+}
+
+static bool validateMap(Value map, char* msg) {
+  if (!IS_MAP(map)) {
+    runtimeError(msg);
+    return false;
+  }
+  return true;
+}
+
 static bool __mapSet__(int argCount, Value* args) {
   Value val = pop();
   Value key = pop();
   pop();  // native fn.
   Value map = pop();
 
-  ObjString* objKey;
-  if (IS_STRING(key))
-    objKey = AS_STRING(key);
-  else {
-    runtimeError("Map key must be a string.");
-    return false;
-  }
+  if (!validateMapKey(key)) return false;
+  if (!validateMap(map, "Can only set property of a map.")) return false;
 
-  ObjMap* objMap;
-  if (IS_MAP(map))
-    objMap = AS_MAP(map);
-  else {
-    runtimeError("Can only set variable property of map.");
-    return false;
-  }
+  mapSet(AS_MAP(map), AS_STRING(key), val);
 
-  mapSet(objMap, objKey, val);
-
-  vm.stackTop -= argCount + 1;
   push(map);
+  return true;
+}
+
+static bool __mapGet__(Value key, Value map, Value* val) {
+  if (!validateMapKey(key)) return false;
+  if (!validateMap(map, "Can only get property of a map.")) return false;
+
+  mapGet(AS_MAP(map), AS_STRING(key), val);
+
+  return true;
+}
+
+static bool __subscript__(int argCount, Value* args) {
+  Value arg = pop();
+  pop();  // native fn.
+  Value obj = pop();
+
+  switch (OBJ_TYPE(obj)) {
+    case OBJ_MAP: {
+      Value val;
+      if (!__mapGet__(arg, obj, &val)) return false;
+      push(val);
+      break;
+    }
+    default: {
+      runtimeError("Only maps support subscripts.");
+      return false;
+    }
+  }
+
   return true;
 }
 
 void initializeCore(VM* vm) {
   defineNative("__mapNew__", 0, __mapNew__);
   defineNative("__mapSet__", 2, __mapSet__);
+  defineNative("__subscript__", 1, __subscript__);
 }

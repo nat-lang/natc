@@ -1,8 +1,8 @@
 
 let foo = (a) => { return a + 1; };
 
-foo(1);
+let map = {"a":1, "b": 2};
+let a = "a";
 
-let map = {};
-
-print map;
+print map["a"] == map[a];
+print map[(() => { return "a"; })()] == map[a];

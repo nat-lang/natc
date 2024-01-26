@@ -451,7 +451,7 @@ static void dot(bool canAssign) {
   }
 }
 
-static void tree(bool canAssign) {}
+// static void tree(bool canAssign) {}
 
 static void literal(bool canAssign) {
   switch (parser.previous.type) {
@@ -600,72 +600,6 @@ static void unary(bool canAssign) {
   }
 }
 
-ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
-    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACE] = {map, NULL, PREC_NONE},
-    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACKET] = {tree, NULL, PREC_NONE},
-    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
-    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
-    [TOKEN_DOT] = {NULL, dot, PREC_CALL},
-    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
-    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
-    [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_BANG] = {unary, NULL, PREC_NONE},
-    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
-    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
-    [TOKEN_STRING] = {string, NULL, PREC_NONE},
-    [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
-    [TOKEN_AND] = {NULL, and_, PREC_AND},
-    [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
-    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
-    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_IF] = {NULL, NULL, PREC_NONE},
-    [TOKEN_NIL] = {literal, NULL, PREC_NONE},
-    [TOKEN_OR] = {NULL, or_, PREC_OR},
-    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
-    [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SUPER] = {super_, NULL, PREC_NONE},
-    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
-    [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
-    [TOKEN_LET] = {NULL, NULL, PREC_NONE},
-    [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
-};
-
-static void parsePrecedence(Precedence precedence) {
-  advance();
-  ParseFn prefixRule = getRule(parser.previous.type)->prefix;
-  if (prefixRule == NULL) {
-    error("Expect expression.");
-    return;
-  }
-
-  bool canAssign = precedence <= PREC_ASSIGNMENT;
-  prefixRule(canAssign);
-
-  while (precedence <= getRule(parser.current.type)->precedence) {
-    advance();
-    ParseFn infixRule = getRule(parser.previous.type)->infix;
-    infixRule(canAssign);
-  }
-
-  if (canAssign && match(TOKEN_EQUAL)) {
-    error("Invalid assignment target.");
-  }
-}
-
 static uint8_t parseVariable(const char* errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
   declareVariable();
@@ -690,10 +624,9 @@ static void defineVariable(uint8_t global) {
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
-static ParseRule* getRule(TokenType type) { return &rules[type]; }
-
-static bool scanSignature() {
+static bool peekSignature() {
   bool found;
+
   saveParser();
   consumeQuiet(TOKEN_LEFT_PAREN);
 
@@ -712,16 +645,8 @@ static bool scanSignature() {
   return found;
 }
 
-bool findSignature() {
-  saveParser();
-  bool found = scanSignature();
-  rewindParser();
-
-  return found;
-}
-
 static void boundExpression() {
-  if (scanSignature()) {
+  if (peekSignature()) {
     function(TYPE_FUNCTION);
     markInitialized();
   } else {
@@ -730,7 +655,7 @@ static void boundExpression() {
 }
 
 static void expression() {
-  if (scanSignature()) {
+  if (peekSignature()) {
     function(TYPE_ANONYMOUS);
     markInitialized();
   } else {
@@ -794,11 +719,9 @@ static void map(bool canAssign) {
   // Instantiate a new map.
   callNative("__mapNew__", 0);
 
-  // Compile the map elements. Each one is compiled to just invoke the
-  // subscript setter on the map.
+  // Compile the map elements. Just invoke the subscript
+  // setter on each key/val.
   do {
-    // Stop if we hit the end of the map.
-    // printf("%s", parser.current.start);
     if (parser.current.type == TOKEN_RIGHT_BRACE) break;
 
     nativeVariable("__mapSet__");
@@ -806,7 +729,6 @@ static void map(bool canAssign) {
     // The key.
     parsePrecedence(PREC_UNARY);
     consume(TOKEN_COLON, "Expect ':' after map key.");
-    // skipWhitespace();
 
     // The value.
     expression();
@@ -814,9 +736,19 @@ static void map(bool canAssign) {
     emitBytes(OP_CALL, 2);
   } while (match(TOKEN_COMMA));
 
-  // Allow newlines before the closing '}'.
-  skipWhitespace();
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after map entries.");
+}
+
+// Subscript or "array indexing" operator like `foo[bar]`.
+static void subscript(bool canAssign) {
+  nativeVariable("__subscript__");
+  expression();
+  emitBytes(OP_CALL, 1);
+  consume(TOKEN_RIGHT_BRACKET, "Expect ']' after arguments.");
+
+  // if (canAssign && match(TOKEN_EQUAL)) {
+  // expression();
+  // }
 }
 
 static void classDeclaration() {
@@ -1048,6 +980,75 @@ static void statement() {
     endScope();
   } else {
     expressionStatement();
+  }
+}
+
+ParseRule rules[] = {
+    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
+    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {map, NULL, PREC_NONE},
+    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_BRACKET] = {NULL, subscript, PREC_CALL},
+    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
+    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
+    [TOKEN_DOT] = {NULL, dot, PREC_CALL},
+    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
+    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
+    [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
+    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_BANG] = {unary, NULL, PREC_NONE},
+    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
+    [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
+    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
+    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
+    [TOKEN_STRING] = {string, NULL, PREC_NONE},
+    [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
+    [TOKEN_AND] = {NULL, and_, PREC_AND},
+    [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
+    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
+    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
+    [TOKEN_IF] = {NULL, NULL, PREC_NONE},
+    [TOKEN_NIL] = {literal, NULL, PREC_NONE},
+    [TOKEN_OR] = {NULL, or_, PREC_OR},
+    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
+    [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
+    [TOKEN_SUPER] = {super_, NULL, PREC_NONE},
+    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
+    [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
+    [TOKEN_LET] = {NULL, NULL, PREC_NONE},
+    [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
+    [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
+};
+
+static ParseRule* getRule(TokenType type) { return &rules[type]; }
+
+static void parsePrecedence(Precedence precedence) {
+  advance();
+
+  ParseFn prefixRule = getRule(parser.previous.type)->prefix;
+  if (prefixRule == NULL) {
+    error("Expect expression.");
+    return;
+  }
+
+  bool canAssign = precedence <= PREC_ASSIGNMENT;
+  prefixRule(canAssign);
+
+  while (precedence <= getRule(parser.current.type)->precedence) {
+    advance();
+    ParseFn infixRule = getRule(parser.previous.type)->infix;
+    infixRule(canAssign);
+  }
+
+  if (canAssign && match(TOKEN_EQUAL)) {
+    error("Invalid assignment target.");
   }
 }
 
