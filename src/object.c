@@ -204,6 +204,14 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   map->capacity = capacity;
 }
 
+bool mapHas(ObjMap* map, ObjString* key) {
+  if (map->count == 0) return false;
+
+  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
+
+  return entry->key != NULL;
+}
+
 bool mapGet(ObjMap* map, ObjString* key, Value* value) {
   if (map->count == 0) return false;
 

@@ -133,6 +133,7 @@ static inline bool isObjType(Value value, ObjType type) {
 
 void initMap(ObjMap *map);
 void freeMap(ObjMap *map);
+bool mapHas(ObjMap *map, ObjString *key);
 bool mapGet(ObjMap *map, ObjString *key, Value *value);
 bool mapSet(ObjMap *map, ObjString *key, Value value);
 bool mapDelete(ObjMap *map, ObjString *key);

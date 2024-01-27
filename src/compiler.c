@@ -445,6 +445,9 @@ static void binary(bool canAssign) {
     case TOKEN_SLASH:
       emitByte(OP_DIVIDE);
       break;
+    case TOKEN_IN:
+      emitByte(OP_MEMBER);
+      break;
     default:
       return;  // Unreachable.
   }
@@ -738,9 +741,7 @@ static void method() {
 
 static void finishMapVal() {
   consume(TOKEN_COLON, "Expect ':' after map key.");
-
-  expression();
-
+  expression();  // val
   emitBytes(OP_CALL, 2);
 }
 
@@ -771,26 +772,27 @@ static void finishSet() {
 static void braces(bool canAssign) {
   int newFn = callNative("__setNew__", 0);
 
-  // empty curlies is an empty set.
-  if (check(TOKEN_RIGHT_BRACE)) {
-    advance();
-    return;
-  }
+  // empty braces is an empty set.
+  if (check(TOKEN_RIGHT_BRACE)) return advance();
 
   int addFn = nativeVariable("__setAdd__");
 
-  // first element: could be a map key or a set element.
+  // first element: either a map key or a set element.
   expression();
 
   if (check(TOKEN_COMMA)) {
     advance();
     emitBytes(OP_CALL, 1);
     finishSet();
-  } else {
+  } else if (check(TOKEN_COLON)) {
     currentChunk()->constants.values[newFn] = identifier("__mapNew__");
     currentChunk()->constants.values[addFn] = identifier("__mapSet__");
 
+    // finish the first key/val pair, with optional comma
     finishMapVal();
+    match(TOKEN_COMMA);
+
+    // and any remaining elements.
     finishMap();
   }
 
@@ -1079,6 +1081,7 @@ ParseRule rules[] = {
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
+    [TOKEN_IN] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE},
     [TOKEN_OR] = {NULL, or_, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},

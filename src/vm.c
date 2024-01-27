@@ -544,6 +544,24 @@ static InterpretResult loop() {
       case OP_METHOD:
         defineMethod(READ_STRING());
         break;
+      case OP_MEMBER: {
+        Value map = pop();
+        Value key = pop();
+
+        if (!IS_MAP(map)) {
+          runtimeError("Only map may be tested for membership of key.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        if (!IS_STRING(key)) {
+          runtimeError("Only string may be tested for membership in map.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        bool mapHasKey = mapHas(AS_MAP(map), AS_STRING(key));
+        push(BOOL_VAL(mapHasKey));
+        break;
+      }
     }
   }
 

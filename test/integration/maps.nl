@@ -9,3 +9,5 @@ map["a"] = 3;
 
 print map["a"] == 2;
 print map["a"] == 3;
+
+print "a" in map;

@@ -123,7 +123,15 @@ static TokenType identifierType() {
       }
       break;
     case 'i':
-      return checkpointKeyword(1, 1, "f", TOKEN_IF);
+      if (scanner.current - scanner.start > 1) {
+        switch (scanner.start[1]) {
+          case 'f':
+            return checkpointKeyword(1, 1, "f", TOKEN_IF);
+          case 'n':
+            return checkpointKeyword(1, 1, "n", TOKEN_IN);
+        }
+      }
+      break;
     case 'l':
       return checkpointKeyword(1, 2, "et", TOKEN_LET);
     case 'n':
