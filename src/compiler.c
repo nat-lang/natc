@@ -757,18 +757,20 @@ static void finishMap(uint8_t setMethod) {
   while (match(TOKEN_COMMA)) {
     // the key.
     expression();
-    // the val.
+    // the val & instruction.
     finishMapVal(setMethod);
   }
 }
 
-static void finishSet() {
+static void finishSetVal(uint8_t addMethod) {
+  emitBytes(OP_INVOKE, addMethod);
+  emitByte(1);  // argcount.
+}
+
+static void finishSet(uint8_t addMethod) {
   do {
-    nativeVariable("__setAdd__");
-
     expression();
-
-    emitBytes(OP_CALL, 1);
+    finishSetVal(addMethod);
   } while (match(TOKEN_COMMA));
 }
 
@@ -780,16 +782,19 @@ static void braces(bool canAssign) {
   if (check(TOKEN_RIGHT_BRACE)) return advance();
 
   // first element: either a map key or a set element.
+  // we need to advance this far in order to check the
+  // next token.
   expression();
 
-  // then it's a set element.
+  // if comma then it's a set element.
   if (check(TOKEN_COMMA)) {
     advance();
-    emitBytes(OP_CALL, 1);
-    finishSet();
+    uint8_t addMethod = loadConstant("add");
+    finishSetVal(addMethod);
+    finishSet(addMethod);
   } else if (check(TOKEN_COLON)) {
+    // otherwise revise the operative class.
     currentChunk()->constants.values[klass] = identifier("Map");
-
     uint8_t setMethod = loadConstant("set");
 
     // finish the first key/val pair, then any remaining elements.
