@@ -1,23 +1,26 @@
-class Set {
-  init() {
-    this.elements = Map();
-  }
-  add(element) {
-    this.elements[element] = true;
-  }
-  del(element) {
-    this.elements.del(element);
-  }
-  call(element) {
-    return element in this.elements;
-  }
+class Sequence {}
 
-  union(x) {}
-  intersection(x) {}
-  complement(x) {}
+class Map {
+  set(key, val) => {
+    return this[key] = val;
+  }
+  get(key) => {
+    return this[key];
+  }
 }
 
+class Set {
+  add(element) => {
+    return this[element] = true;
+  }
+  call(element) => {
+    return element in this;
+  }
 
-class Sequence {}
+  union(x) => {}
+  intersection(x) => {}
+  complement(x) => {}
+}
+
 class Tree {}
 

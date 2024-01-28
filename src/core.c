@@ -3,19 +3,32 @@
 #include <string.h>
 #include <time.h>
 
+#include "compiler.h"
+#include "io.h"
 #include "object.h"
 #include "value.h"
 #include "vm.h"
 
-static void defineNative(const char* name, int arity, NativeFn function) {
-  // intern the name.
-  ObjString* strName = copyString(name, (int)strlen(name));
+static void defineNative(ObjString* name, Value native, ObjMap* dest) {
+  push(OBJ_VAL(name));
+  push(native);
+  mapSet(dest, AS_STRING(vm.stack[0]), vm.stack[1]);
+  pop();
+  pop();
+}
 
-  push(OBJ_VAL(strName));
-  push(OBJ_VAL(newNative(arity, strName, function)));
-  mapSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
-  pop();
-  pop();
+static void defineNativeFn(ObjString* name, int arity, NativeFn function,
+                           ObjMap* dest) {
+  Value fn = OBJ_VAL(newNative(arity, name, function));
+  defineNative(name, fn, dest);
+}
+
+ObjClass* defineNativeClass(ObjString* name, ObjMap* dest) {
+  ObjClass* klass = newClass(name);
+
+  defineNative(name, OBJ_VAL(klass), dest);
+
+  return klass;
 }
 
 static bool validateMapKey(Value key) {
@@ -26,58 +39,57 @@ static bool validateMapKey(Value key) {
   return true;
 }
 
-static bool validateMap(Value map, char* msg) {
-  if (!IS_MAP(map)) {
+static bool validateObj(Value obj, char* msg) {
+  if (!IS_INSTANCE(obj)) {
     runtimeError(msg);
     return false;
   }
   return true;
 }
 
-static bool __mapNew__(int argCount, Value* args) {
-  vm.stackTop -= argCount + 1;
-  push(OBJ_VAL(newMap()));
-  return true;
-}
-
-static bool __mapSet__(int argCount, Value* args) {
+static bool __objSet__(int argCount, Value* args) {
   Value val = pop();
   Value key = pop();
   pop();  // native fn.
-  Value map = pop();
+  Value obj = pop();
 
   if (!validateMapKey(key)) return false;
-  if (!validateMap(map, "Can only set property of a map.")) return false;
+  if (!validateObj(obj, "Can only set property of object.")) return false;
 
-  mapSet(AS_MAP(map), AS_STRING(key), val);
-
-  push(map);  // return the map.
+  mapSet(&AS_INSTANCE(obj)->fields, AS_STRING(key), val);
+  push(obj);  // return the object.
   return true;
 }
 
-static bool __mapGet__(Value key, Value map, Value* val) {
-  if (!validateMapKey(key)) return false;
-  if (!validateMap(map, "Can only get property of a map.")) return false;
+bool __objGet__(Value key, ObjInstance* obj) {
+  Value val;
 
-  mapGet(AS_MAP(map), AS_STRING(key), val);
+  if (!validateMapKey(key)) return false;
+
+  ObjMap fields = obj->fields;
+
+  if (mapGet(&fields, AS_STRING(key), &val))
+    push(val);
+  else
+    push(NIL_VAL);
 
   return true;
 }
 
 static bool __subscript__(int argCount, Value* args) {
-  Value arg = pop();
+  Value key = pop();
   pop();  // native fn.
   Value obj = pop();
 
+  if (!validateObj(obj, "Can only get property of an object.")) return false;
+
   switch (OBJ_TYPE(obj)) {
-    case OBJ_MAP: {
-      Value val;
-      if (!__mapGet__(arg, obj, &val)) return false;
-      push(val);
+    case OBJ_INSTANCE: {
+      __objGet__(key, AS_INSTANCE(obj));
       break;
     }
     default: {
-      runtimeError("Only maps support subscripts.");
+      runtimeError("Only objects support subscript.");
       return false;
     }
   }
@@ -85,8 +97,17 @@ static bool __subscript__(int argCount, Value* args) {
   return true;
 }
 
+static void defineNativeMap(VM* vm) {
+  // ObjClass* mapClass = defineNativeClass(intern("__Map__"), &vm->globals);
+
+  // defineNativeFn(vm->initString, 0, __mapInit__, &mapClass->methods);
+  // defineNativeFn(intern("set"), 2, __mapSet__, &mapClass->methods);
+}
+
 void initializeCore(VM* vm) {
-  defineNative("__mapNew__", 0, __mapNew__);
-  defineNative("__mapSet__", 2, __mapSet__);
-  defineNative("__subscript__", 1, __subscript__);
+  defineNativeMap(vm);
+  defineNativeFn(intern("__subscript__"), 1, __subscript__, &vm->globals);
+  defineNativeFn(intern("__objSet__"), 2, __objSet__, &vm->globals);
+
+  runFile("./src/core.nl");
 }

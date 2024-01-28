@@ -307,6 +307,10 @@ static uint8_t identifierConstant(Token* name) {
   return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
 }
 
+static uint8_t loadConstant(char* name) {
+  return makeConstant(identifier(name));
+}
+
 static bool identifiersEqual(Token* a, Token* b) {
   if (a->length != b->length) return false;
   return memcmp(a->start, b->start, a->length) == 0;
@@ -739,23 +743,23 @@ static void method() {
   emitBytes(OP_METHOD, constant);
 }
 
-static void finishMapVal() {
+static void finishMapVal(uint8_t setMethod) {
   consume(TOKEN_COLON, "Expect ':' after map key.");
-  expression();  // val
-  emitBytes(OP_CALL, 2);
+  expression();  // val.
+  emitBytes(OP_INVOKE, setMethod);
+  emitByte(2);  // argcount.
 }
 
 // A map literal.
-static void finishMap() {
+static void finishMap(uint8_t setMethod) {
   // Compile the map elements. Just invoke the map
   // setter on each key/val.
-  do {
-    nativeVariable("__mapSet__");
+  while (match(TOKEN_COMMA)) {
     // the key.
     expression();
     // the val.
-    finishMapVal();
-  } while (match(TOKEN_COMMA));
+    finishMapVal(setMethod);
+  }
 }
 
 static void finishSet() {
@@ -770,30 +774,27 @@ static void finishSet() {
 
 // A map or set literal.
 static void braces(bool canAssign) {
-  int newFn = callNative("__setNew__", 0);
+  int klass = callNative("Set", 0);
 
   // empty braces is an empty set.
   if (check(TOKEN_RIGHT_BRACE)) return advance();
 
-  int addFn = nativeVariable("__setAdd__");
-
   // first element: either a map key or a set element.
   expression();
 
+  // then it's a set element.
   if (check(TOKEN_COMMA)) {
     advance();
     emitBytes(OP_CALL, 1);
     finishSet();
   } else if (check(TOKEN_COLON)) {
-    currentChunk()->constants.values[newFn] = identifier("__mapNew__");
-    currentChunk()->constants.values[addFn] = identifier("__mapSet__");
+    currentChunk()->constants.values[klass] = identifier("Map");
 
-    // finish the first key/val pair, with optional comma
-    finishMapVal();
-    match(TOKEN_COMMA);
+    uint8_t setMethod = loadConstant("set");
 
-    // and any remaining elements.
-    finishMap();
+    // finish the first key/val pair, then any remaining elements.
+    finishMapVal(setMethod);
+    finishMap(setMethod);
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
@@ -809,7 +810,7 @@ static void subscript(bool canAssign) {
 
   // if it's assignment, revise the instruction.
   if (canAssign && match(TOKEN_EQUAL)) {
-    currentChunk()->constants.values[fn] = identifier("__mapSet__");
+    currentChunk()->constants.values[fn] = identifier("__objSet__");
 
     expression();
     emitBytes(OP_CALL, 2);

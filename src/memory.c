@@ -191,7 +191,9 @@ static void markRoots() {
   }
   markMap(&vm.globals);
   markCompilerRoots();
+
   markObject((Obj*)vm.initString);
+  markObject((Obj*)vm.callString);
 }
 
 static void traceReferences() {

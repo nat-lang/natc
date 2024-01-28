@@ -106,6 +106,14 @@ static bool call(ObjClosure* closure, int argCount) {
   return true;
 }
 
+static bool callNative(Value callee, int argCount) {
+  ObjNative* native = AS_NATIVE(callee);
+
+  if (!checkArity(native->arity, argCount)) return false;
+
+  return (native->function)(argCount, vm.stackTop - argCount);
+}
+
 static bool callValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
@@ -118,8 +126,13 @@ static bool callValue(Value callee, int argCount) {
         ObjClass* klass = AS_CLASS(callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
         Value initializer;
+
+        // core classes or their descendents may have a native initializer.
         if (mapGet(&klass->methods, vm.initString, &initializer)) {
-          return call(AS_CLOSURE(initializer), argCount);
+          if (IS_NATIVE(initializer))
+            return callNative(initializer, argCount);
+          else
+            return call(AS_CLOSURE(initializer), argCount);
         } else if (argCount != 0) {
           runtimeError("Expected 0 arguments but got %d.", argCount);
           return false;
@@ -129,11 +142,7 @@ static bool callValue(Value callee, int argCount) {
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
       case OBJ_NATIVE: {
-        ObjNative* native = AS_NATIVE(callee);
-
-        if (!checkArity(native->arity, argCount)) return false;
-
-        return (native->function)(argCount, vm.stackTop - argCount);
+        return callNative(callee, argCount);
       }
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);
@@ -545,20 +554,20 @@ static InterpretResult loop() {
         defineMethod(READ_STRING());
         break;
       case OP_MEMBER: {
-        Value map = pop();
+        Value obj = pop();
         Value key = pop();
 
-        if (!IS_MAP(map)) {
-          runtimeError("Only map may be tested for membership of key.");
+        if (!IS_INSTANCE(obj)) {
+          runtimeError("Only objects may be tested for membership of key.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
         if (!IS_STRING(key)) {
-          runtimeError("Only string may be tested for membership in map.");
+          runtimeError("Only string may be tested for membership in object.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        bool mapHasKey = mapHas(AS_MAP(map), AS_STRING(key));
+        bool mapHasKey = mapHas(&AS_INSTANCE(obj)->fields, AS_STRING(key));
         push(BOOL_VAL(mapHasKey));
         break;
       }

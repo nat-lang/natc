@@ -36,9 +36,6 @@ typedef enum {
   OBJ_NATIVE,
   OBJ_STRING,
   OBJ_UPVALUE,
-
-  // OBJ_SET,
-  // OBJ_SEQ,
 } ObjType;
 
 struct Obj {
@@ -124,6 +121,7 @@ ObjMap *newMap();
 ObjNative *newNative(int arity, ObjString *name, NativeFn function);
 ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
+ObjString *intern(const char *chars);
 ObjUpvalue *newUpvalue(Value *slot);
 void printObject(Value value);
 
