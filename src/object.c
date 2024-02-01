@@ -86,7 +86,7 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   string->hash = hash;
 
   push(OBJ_VAL(string));
-  mapSet(&vm.strings, string, NIL_VAL);
+  mapSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
   pop();
 
   return string;
@@ -99,6 +99,17 @@ static uint32_t hashString(const char* key, int length) {
     hash *= 16777619;
   }
   return hash;
+}
+
+// Generate a hash code for [object].
+uint32_t hashObject(Obj* object) {
+  switch (object->type) {
+    case OBJ_STRING:
+      return ((ObjString*)object)->hash;
+    default:
+      runtimeError("Only nil, bool, num, or string can be hashed.");
+      return 0;
+  }
 }
 
 ObjString* copyString(const char* chars, int length) {
@@ -159,8 +170,8 @@ ObjMap* newMap() {
   return map;
 }
 
-static MapEntry* mapFindEntry(MapEntry* entries, int capacity, ObjString* key) {
-  uint32_t index = key->hash & (capacity - 1);
+static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
+  uint32_t index = hashValue(key) & (capacity - 1);
   MapEntry* tombstone = NULL;
 
   for (;;) {
@@ -174,7 +185,7 @@ static MapEntry* mapFindEntry(MapEntry* entries, int capacity, ObjString* key) {
         // We found a tombstone.
         if (tombstone == NULL) tombstone = entry;
       }
-    } else if (entry->key == key) {
+    } else if (valuesEqual(OBJ_VAL(entry->key), key)) {
       // We found the key.
       return entry;
     }
@@ -197,7 +208,7 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
     MapEntry* entry = &map->entries[i];
     if (entry->key == NULL) continue;
 
-    MapEntry* dest = mapFindEntry(entries, capacity, entry->key);
+    MapEntry* dest = mapFindEntry(entries, capacity, OBJ_VAL(entry->key));
     dest->key = entry->key;
     dest->value = entry->value;
     map->count++;
@@ -208,7 +219,7 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   map->capacity = capacity;
 }
 
-bool mapHas(ObjMap* map, ObjString* key) {
+bool mapHas(ObjMap* map, Value key) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
@@ -216,7 +227,7 @@ bool mapHas(ObjMap* map, ObjString* key) {
   return entry->key != NULL;
 }
 
-bool mapGet(ObjMap* map, ObjString* key, Value* value) {
+bool mapGet(ObjMap* map, Value key, Value* value) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
@@ -226,7 +237,7 @@ bool mapGet(ObjMap* map, ObjString* key, Value* value) {
   return true;
 }
 
-bool mapSet(ObjMap* map, ObjString* key, Value value) {
+bool mapSet(ObjMap* map, Value key, Value value) {
   if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
     int capacity = GROW_CAPACITY(map->capacity);
     mapAdjustCapacity(map, capacity);
@@ -237,12 +248,12 @@ bool mapSet(ObjMap* map, ObjString* key, Value value) {
   bool isNewKey = entry->key == NULL;
   if (isNewKey && IS_NIL(entry->value)) map->count++;
 
-  entry->key = key;
+  entry->key = AS_STRING(key);  // fix me!
   entry->value = value;
   return isNewKey;
 }
 
-bool mapDelete(ObjMap* map, ObjString* key) {
+bool mapDelete(ObjMap* map, Value key) {
   if (map->count == 0) return false;
 
   // Find the entry.
@@ -259,7 +270,7 @@ void mapAddAll(ObjMap* from, ObjMap* to) {
   for (int i = 0; i < from->capacity; i++) {
     MapEntry* entry = &from->entries[i];
     if (entry->key != NULL) {
-      mapSet(to, entry->key, entry->value);
+      mapSet(to, OBJ_VAL(entry->key), entry->value);
     }
   }
 }
@@ -288,7 +299,7 @@ void mapRemoveWhite(ObjMap* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
     if (entry->key != NULL && !entry->key->obj.isMarked) {
-      mapDelete(map, entry->key);
+      mapDelete(map, OBJ_VAL(entry->key));
     }
   }
 }

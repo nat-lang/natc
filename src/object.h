@@ -131,14 +131,16 @@ static inline bool isObjType(Value value, ObjType type) {
 
 void initMap(ObjMap *map);
 void freeMap(ObjMap *map);
-bool mapHas(ObjMap *map, ObjString *key);
-bool mapGet(ObjMap *map, ObjString *key, Value *value);
-bool mapSet(ObjMap *map, ObjString *key, Value value);
-bool mapDelete(ObjMap *map, ObjString *key);
+bool mapHas(ObjMap *map, Value key);
+bool mapGet(ObjMap *map, Value key, Value *value);
+bool mapSet(ObjMap *map, Value key, Value value);
+bool mapDelete(ObjMap *map, Value key);
 void mapAddAll(ObjMap *from, ObjMap *to);
 ObjString *mapFindString(ObjMap *map, const char *chars, int length,
                          uint32_t hash);
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
+
+uint32_t hashObject(Obj *object);
 
 #endif

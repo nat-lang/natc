@@ -128,7 +128,7 @@ static bool callValue(Value callee, int argCount) {
         Value initializer;
 
         // core classes or their descendents may have a native initializer.
-        if (mapGet(&klass->methods, vm.initString, &initializer)) {
+        if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
           if (IS_NATIVE(initializer))
             return callNative(initializer, argCount);
           else
@@ -147,7 +147,8 @@ static bool callValue(Value callee, int argCount) {
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);
         Value callFn;
-        if (mapGet(&instance->klass->methods, vm.callString, &callFn)) {
+        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.callString),
+                   &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
         } else {
           runtimeError("Objects require a 'call' method to be called.");
@@ -164,16 +165,16 @@ static bool callValue(Value callee, int argCount) {
   return false;
 }
 
-static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
+static bool invokeFromClass(ObjClass* klass, Value name, int argCount) {
   Value method;
   if (!mapGet(&klass->methods, name, &method)) {
-    runtimeError("Undefined property '%s'.", name->chars);
+    runtimeError("Undefined property");  // '%s'.", name->chars);
     return false;
   }
   return call(AS_CLOSURE(method), argCount);
 }
 
-static bool invoke(ObjString* name, int argCount) {
+static bool invoke(Value name, int argCount) {
   Value receiver = peek(argCount);
 
   if (!IS_INSTANCE(receiver)) {
@@ -192,10 +193,10 @@ static bool invoke(ObjString* name, int argCount) {
   return invokeFromClass(instance->klass, name, argCount);
 }
 
-static bool bindMethod(ObjClass* klass, ObjString* name) {
+static bool bindMethod(ObjClass* klass, Value name) {
   Value method;
   if (!mapGet(&klass->methods, name, &method)) {
-    runtimeError("Undefined property '%s'.", name->chars);
+    runtimeError("Undefined property");  // '%s'.", name->chars);
     return false;
   }
 
@@ -238,7 +239,7 @@ static void closeUpvalues(Value* last) {
   }
 }
 
-static void defineMethod(ObjString* name) {
+static void defineMethod(Value name) {
   Value method = peek(0);
   ObjClass* klass = AS_CLASS(peek(1));
   mapSet(&klass->methods, name, method);
@@ -331,26 +332,26 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_GLOBAL: {
-        ObjString* name = READ_STRING();
+        Value name = READ_CONSTANT();
         Value value;
         if (!mapGet(&vm.globals, name, &value)) {
-          runtimeError("Undefined variable '%s'.", name->chars);
+          runtimeError("Undefined variable");  // '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
         push(value);
         break;
       }
       case OP_DEFINE_GLOBAL: {
-        ObjString* name = READ_STRING();
+        Value name = READ_CONSTANT();
         mapSet(&vm.globals, name, peek(0));
         pop();
         break;
       }
       case OP_SET_GLOBAL: {
-        ObjString* name = READ_STRING();
+        Value name = READ_CONSTANT();
         if (mapSet(&vm.globals, name, peek(0))) {
           mapDelete(&vm.globals, name);
-          runtimeError("Undefined variable '%s'.", name->chars);
+          runtimeError("Undefined variable");  // '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
         break;
@@ -362,7 +363,7 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(peek(0));
-        ObjString* name = READ_STRING();
+        Value name = READ_CONSTANT();
 
         Value value;
         if (mapGet(&instance->fields, name, &value)) {
@@ -383,7 +384,7 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(peek(1));
-        mapSet(&instance->fields, READ_STRING(), peek(0));
+        mapSet(&instance->fields, READ_CONSTANT(), peek(0));
         Value value = pop();
         pop();
         push(value);
@@ -396,7 +397,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_SUPER: {
-        ObjString* name = READ_STRING();
+        Value name = READ_CONSTANT();
         ObjClass* superclass = AS_CLASS(pop());
 
         if (!bindMethod(superclass, name)) {
@@ -483,7 +484,7 @@ static InterpretResult loop() {
       // "invocation" is a superinstruction: dotted property access
       // followed by a call.
       case OP_INVOKE: {
-        ObjString* method = READ_STRING();
+        Value method = READ_CONSTANT();
         int argCount = READ_BYTE();
         if (!invoke(method, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
@@ -492,7 +493,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_SUPER_INVOKE: {
-        ObjString* method = READ_STRING();
+        Value method = READ_CONSTANT();
         int argCount = READ_BYTE();
         ObjClass* superclass = AS_CLASS(pop());
         if (!invokeFromClass(superclass, method, argCount)) {
@@ -551,7 +552,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_METHOD:
-        defineMethod(READ_STRING());
+        defineMethod(READ_CONSTANT());
         break;
       case OP_MEMBER: {
         Value obj = pop();
@@ -567,7 +568,7 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        bool mapHasKey = mapHas(&AS_INSTANCE(obj)->fields, AS_STRING(key));
+        bool mapHasKey = mapHas(&AS_INSTANCE(obj)->fields, key);
         push(BOOL_VAL(mapHasKey));
         break;
       }

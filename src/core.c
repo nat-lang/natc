@@ -12,7 +12,7 @@
 static void defineNative(ObjString* name, Value native, ObjMap* dest) {
   push(OBJ_VAL(name));
   push(native);
-  mapSet(dest, AS_STRING(vm.stack[0]), vm.stack[1]);
+  mapSet(dest, vm.stack[0], vm.stack[1]);
   pop();
   pop();
 }
@@ -56,7 +56,7 @@ static bool __objSet__(int argCount, Value* args) {
   if (!validateMapKey(key)) return false;
   if (!validateObj(obj, "Can only set property of object.")) return false;
 
-  mapSet(&AS_INSTANCE(obj)->fields, AS_STRING(key), val);
+  mapSet(&AS_INSTANCE(obj)->fields, key, val);
   push(obj);  // return the object.
   return true;
 }
@@ -68,7 +68,7 @@ bool __objGet__(Value key, ObjInstance* obj) {
 
   ObjMap fields = obj->fields;
 
-  if (mapGet(&fields, AS_STRING(key), &val))
+  if (mapGet(&fields, key, &val))
     push(val);
   else
     push(NIL_VAL);
