@@ -193,6 +193,14 @@ static bool invoke(Value name, int argCount) {
   return invokeFromClass(instance->klass, name, argCount);
 }
 
+bool validateMapKey(Value key) {
+  if (!isHashable(key)) {
+    runtimeError("Map key must be a hashable type: num, nil, bool, or string.");
+    return false;
+  }
+  return true;
+}
+
 static bool bindMethod(ObjClass* klass, Value name) {
   Value method;
   if (!mapGet(&klass->methods, name, &method)) {
@@ -563,8 +571,7 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        if (!IS_STRING(key)) {
-          runtimeError("Only string may be tested for membership in object.");
+        if (!validateMapKey(key)) {
           return INTERPRET_RUNTIME_ERROR;
         }
 

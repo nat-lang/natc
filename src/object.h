@@ -83,7 +83,7 @@ typedef struct {
 } ObjClosure;
 
 typedef struct {
-  ObjString *key;
+  Value key;
   Value value;
 } MapEntry;
 

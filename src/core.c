@@ -31,14 +31,6 @@ ObjClass* defineNativeClass(ObjString* name, ObjMap* dest) {
   return klass;
 }
 
-static bool validateMapKey(Value key) {
-  if (!IS_STRING(key)) {
-    runtimeError("Map key must be a string.");
-    return false;
-  }
-  return true;
-}
-
 static bool validateObj(Value obj, char* msg) {
   if (!IS_INSTANCE(obj)) {
     runtimeError(msg);

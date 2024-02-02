@@ -177,7 +177,7 @@ static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
   for (;;) {
     MapEntry* entry = &entries[index];
 
-    if (entry->key == NULL) {
+    if (IS_UNDEF(entry->key)) {
       if (IS_NIL(entry->value)) {
         // Empty entry.
         return tombstone != NULL ? tombstone : entry;
@@ -185,7 +185,7 @@ static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
         // We found a tombstone.
         if (tombstone == NULL) tombstone = entry;
       }
-    } else if (valuesEqual(OBJ_VAL(entry->key), key)) {
+    } else if (valuesEqual(entry->key, key)) {
       // We found the key.
       return entry;
     }
@@ -198,7 +198,7 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   MapEntry* entries = ALLOCATE(MapEntry, capacity);
 
   for (int i = 0; i < capacity; i++) {
-    entries[i].key = NULL;
+    entries[i].key = UNDEF_VAL;
     entries[i].value = NIL_VAL;
   }
 
@@ -206,9 +206,9 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
 
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
-    if (entry->key == NULL) continue;
+    if (IS_UNDEF(entry->key)) continue;
 
-    MapEntry* dest = mapFindEntry(entries, capacity, OBJ_VAL(entry->key));
+    MapEntry* dest = mapFindEntry(entries, capacity, entry->key);
     dest->key = entry->key;
     dest->value = entry->value;
     map->count++;
@@ -224,14 +224,14 @@ bool mapHas(ObjMap* map, Value key) {
 
   MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
 
-  return entry->key != NULL;
+  return !IS_UNDEF(entry->key);
 }
 
 bool mapGet(ObjMap* map, Value key, Value* value) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
-  if (entry->key == NULL) return false;
+  if (IS_UNDEF(entry->key)) return false;
 
   *value = entry->value;
   return true;
@@ -245,10 +245,10 @@ bool mapSet(ObjMap* map, Value key, Value value) {
 
   MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
 
-  bool isNewKey = entry->key == NULL;
+  bool isNewKey = IS_UNDEF(entry->key);
   if (isNewKey && IS_NIL(entry->value)) map->count++;
 
-  entry->key = AS_STRING(key);  // fix me!
+  entry->key = key;
   entry->value = value;
   return isNewKey;
 }
@@ -258,10 +258,10 @@ bool mapDelete(ObjMap* map, Value key) {
 
   // Find the entry.
   MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
-  if (entry->key == NULL) return false;
+  if (IS_UNDEF(entry->key)) return false;
 
   // Place a tombstone in the entry.
-  entry->key = NULL;
+  entry->key = UNDEF_VAL;
   entry->value = BOOL_VAL(true);
   return true;
 }
@@ -269,8 +269,8 @@ bool mapDelete(ObjMap* map, Value key) {
 void mapAddAll(ObjMap* from, ObjMap* to) {
   for (int i = 0; i < from->capacity; i++) {
     MapEntry* entry = &from->entries[i];
-    if (entry->key != NULL) {
-      mapSet(to, OBJ_VAL(entry->key), entry->value);
+    if (!IS_UNDEF(entry->key)) {
+      mapSet(to, entry->key, entry->value);
     }
   }
 }
@@ -282,13 +282,15 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
   uint32_t index = hash & (map->capacity - 1);
   for (;;) {
     MapEntry* entry = &map->entries[index];
-    if (entry->key == NULL) {
+    if (IS_UNDEF(entry->key)) {
       // Stop if we find an empty non-tombstone entry.
       if (IS_NIL(entry->value)) return NULL;
-    } else if (entry->key->length == length && entry->key->hash == hash &&
-               memcmp(entry->key->chars, chars, length) == 0) {
+    } else if (IS_STRING(entry->key) &&
+               AS_STRING(entry->key)->length == length &&
+               AS_STRING(entry->key)->hash == hash &&
+               memcmp(AS_STRING(entry->key)->chars, chars, length) == 0) {
       // We found it.
-      return entry->key;
+      return AS_STRING(entry->key);
     }
 
     index = (index + 1) & (map->capacity - 1);
@@ -298,8 +300,9 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
 void mapRemoveWhite(ObjMap* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
-    if (entry->key != NULL && !entry->key->obj.isMarked) {
-      mapDelete(map, OBJ_VAL(entry->key));
+    if (!IS_UNDEF(entry->key) && IS_OBJ(entry->key) &&
+        !AS_OBJ(entry->key)->isMarked) {
+      mapDelete(map, entry->key);
     }
   }
 }
@@ -307,7 +310,7 @@ void mapRemoveWhite(ObjMap* map) {
 void markMap(ObjMap* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
-    markObject((Obj*)entry->key);
+    if (IS_OBJ(entry->key)) markObject(AS_OBJ(entry->key));
     markValue(entry->value);
   }
 }

@@ -43,6 +43,9 @@ void printValue(Value value) {
     case VAL_OBJ:
       printObject(value);
       break;
+    case VAL_UNDEF:
+      printf("undefined");
+      break;
   }
 }
 
@@ -94,6 +97,11 @@ static inline uint32_t hashNumber(double num) {
   return hashBits(doubleToBits(num));
 }
 
+bool isHashable(Value value) {
+  return (value.type == VAL_BOOL || value.type == VAL_NIL ||
+          value.type == VAL_NUMBER || value.type == VAL_OBJ);
+}
+
 // Generates a hash code for [value], which must be one of
 // nil, bool, num, or string.
 uint32_t hashValue(Value value) {
@@ -106,6 +114,8 @@ uint32_t hashValue(Value value) {
       return hashNumber(AS_NUMBER(value));
     case VAL_OBJ:
       return hashObject(AS_OBJ(value));
+    case VAL_UNDEF:
+      return 3;
   }
 
   return 0;

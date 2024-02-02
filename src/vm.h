@@ -54,5 +54,6 @@ InterpretResult interpret(const char* source);
 void push(Value value);
 Value pop();
 Value peek(int distance);
+bool validateMapKey(Value value);
 
 #endif
