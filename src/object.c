@@ -79,6 +79,13 @@ ObjNative* newNative(int arity, ObjString* name, NativeFn function) {
   return native;
 }
 
+ObjSequence* newSequence() {
+  ObjSequence* sequence = ALLOCATE_OBJ(ObjSequence, OBJ_SEQUENCE);
+  sequence->values = NULL;
+  sequence->length = 0;
+  return sequence;
+}
+
 static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
@@ -345,6 +352,9 @@ void printObject(Value value) {
       break;
     case OBJ_UPVALUE:
       printf("upvalue");
+      break;
+    case OBJ_SEQUENCE:
+      printf("sequence");
       break;
   }
 }

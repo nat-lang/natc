@@ -15,17 +15,18 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-  CallFrame frames[FRAMES_MAX];
-  int frameCount;
-
+  // the tape and its machinery.
   Value stack[STACK_MAX];
   Value* stackTop;
+
+  CallFrame frames[FRAMES_MAX];
+  int frameCount;
   ObjMap strings;
   ObjMap globals;
   Obj* objects;
   ObjUpvalue* openUpvalues;
 
-  // memory management.
+  // memory.
   int grayCount;
   int grayCapacity;
   Obj** grayStack;
@@ -36,6 +37,8 @@ typedef struct {
   // methods with special semantics.
   ObjString* initString;
   ObjString* callString;
+  ObjString* iterString;
+  ObjString* nextString;
 } VM;
 
 typedef enum {

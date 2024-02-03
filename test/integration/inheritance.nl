@@ -1,4 +1,3 @@
-
 // resolve an immediate super call.
 
 class A {

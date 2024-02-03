@@ -39,6 +39,14 @@ static bool validateObj(Value obj, char* msg) {
   return true;
 }
 
+static bool validateSeq(Value seq) {
+  if (!IS_SEQUENCE(seq)) {
+    runtimeError("Expecting sequence.");
+    return false;
+  }
+  return true;
+}
+
 static bool __objSet__(int argCount, Value* args) {
   Value val = pop();
   Value key = pop();
@@ -68,6 +76,41 @@ bool __objGet__(Value key, ObjInstance* obj) {
   return true;
 }
 
+bool __seqInit__() {
+  pop();  // native fn.
+
+  ObjSequence* seq = newSequence();
+
+  push(OBJ_VAL(seq));
+}
+
+bool __seqAdd__() {
+  Value val = pop();
+  pop();  // native fn.
+  Value seq = pop();
+}
+
+/*
+bool __length__() {}
+
+bool __objKeys__(int argCount, Value* args) {
+  pop();  // native fn.
+  Value obj = pop();
+
+  if (!validateObj(obj, "Can only get keys of an object.")) return false;
+
+
+  ObjMap fields = obj->fields;
+
+  if (mapGet(&fields, key, &val))
+    push(val);
+  else
+    push(NIL_VAL);
+
+  return true;
+}
+*/
+
 static bool __subscript__(int argCount, Value* args) {
   Value key = pop();
   pop();  // native fn.
@@ -89,17 +132,15 @@ static bool __subscript__(int argCount, Value* args) {
   return true;
 }
 
-static void defineNativeMap(VM* vm) {
-  // ObjClass* mapClass = defineNativeClass(intern("__Map__"), &vm->globals);
-
-  // defineNativeFn(vm->initString, 0, __mapInit__, &mapClass->methods);
-  // defineNativeFn(intern("set"), 2, __mapSet__, &mapClass->methods);
-}
-
 void initializeCore(VM* vm) {
   defineNativeMap(vm);
   defineNativeFn(intern("__subscript__"), 1, __subscript__, &vm->globals);
   defineNativeFn(intern("__objSet__"), 2, __objSet__, &vm->globals);
+
+  ObjClass* seqClass = defineNativeClass(intern("Seq"), &vm->globals);
+
+  defineNativeFn(vm->initString, 0, __seqInit__, &seqClass->methods);
+  defineNativeFn(intern("__add__"), 1, __seqAdd__, &seqClass->methods);
 
   runFile("./src/core.nl");
 }

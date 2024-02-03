@@ -56,10 +56,16 @@ void initVM() {
   initMap(&vm.strings);
 
   vm.initString = NULL;
-  vm.initString = copyString("init", 4);
+  vm.initString = intern("init");
 
   vm.callString = NULL;
-  vm.callString = copyString("call", 4);
+  vm.callString = intern("call");
+
+  vm.iterString = NULL;
+  vm.iterString = intern("iterator");
+
+  vm.nextString = NULL;
+  vm.nextString = intern("next");
 
   initializeCore(&vm);
 }

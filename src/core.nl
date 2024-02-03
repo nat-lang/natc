@@ -22,5 +22,9 @@ class Set {
   complement(x) => {}
 }
 
-class Tree {}
+class Tree {
+  init(*children) => {
+
+  }
+}
 

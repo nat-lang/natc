@@ -121,6 +121,12 @@ static void blackenObject(Obj* object) {
     case OBJ_NATIVE:
     case OBJ_STRING:
       break;
+    case OBJ_SEQUENCE: {
+      ObjSequence* seq = (ObjSequence*)object;
+      for (int i = 0; i < seq->length; i++) {
+        markObject((Obj*)seq->values[i].as.obj);
+      }
+    }
   }
 }
 
@@ -175,6 +181,11 @@ static void freeObject(Obj* object) {
     case OBJ_UPVALUE:
       FREE(ObjUpvalue, object);
       break;
+    case OBJ_SEQUENCE: {
+      ObjSequence* seq = (ObjSequence*)object;
+      FREE_ARRAY(Value, seq->values, seq->length);
+      FREE(ObjSequence, seq);
+    }
   }
 }
 
