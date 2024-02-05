@@ -1,6 +1,5 @@
-class Sequence < __seq__ {
 
-}
+class Sequence < __seq__ {}
 
 class Map {
   set(key, val) => {
@@ -9,6 +8,8 @@ class Map {
   get(key) => {
     return this[key];
   }
+  keys() => {}
+  values() => {}
 }
 
 class Set {
@@ -18,13 +19,14 @@ class Set {
   call(element) => {
     return element in this;
   }
-
   union(x) => {}
   intersection(x) => {}
   complement(x) => {}
 }
 
 class Tree {
-  // init(*children) => {}
+  init(children) => {
+    this.children = children;
+  }
 }
 

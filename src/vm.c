@@ -130,9 +130,7 @@ static bool callMethod(Value fn, int argCount) {
     return call(AS_CLOSURE(fn), argCount);
 }
 
-bool callClass(ObjClass* klass, int argCount) {
-  vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
-
+bool initClass(ObjClass* klass, int argCount) {
   Value initializer;
   // core classes or their descendents may have a native initializer.
   if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
@@ -154,7 +152,9 @@ static bool callValue(Value callee, int argCount) {
       }
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
-        return callClass(klass, argCount);
+        vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+        initClass(klass, argCount);
+        return true;
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);

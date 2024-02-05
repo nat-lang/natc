@@ -111,14 +111,10 @@ static bool __subscriptGet__(int argCount, Value* args) {
   return true;
 }
 
-void seqInit(ObjInstance* obj) {
-  mapSet(&obj->fields, OBJ_VAL(intern("values")), OBJ_VAL(newSequence()));
-  push(OBJ_VAL(obj));
-}
-
 bool __seqInit__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(pop());
-  seqInit(obj);
+  mapSet(&obj->fields, OBJ_VAL(intern("values")), OBJ_VAL(newSequence()));
+  push(OBJ_VAL(obj));
   return true;
 }
 
@@ -156,62 +152,36 @@ bool __seqIn__(int argCount, Value* args) {
   return true;
 }
 
+static void seqInstance() {
+  ObjInstance* seq = newInstance(vm.seqClass);
+  push(OBJ_VAL(seq));
+  initClass(vm.seqClass, 0);
+}
+
 bool __mapEntries__(int argCount, Value* args) {
-  printf("-> 0 \n");
   ObjInstance* map = AS_INSTANCE(pop());
 
-  // sequence of entries.
-  callClass(vm.seqClass, 0);
-
-  printf("-> 1 \n");
+  // the entry sequence.
+  seqInstance();
 
   for (int i = 0; i < map->fields.capacity; i++) {
     MapEntry* entry = &map->fields.entries[i];
     if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
 
-    printf("-> 3\n");
-
     // key/val sequence.
-    callClass(vm.seqClass, 0);
-
-    printf("-> 4 \n");
+    seqInstance();
 
     push(entry->key);
-    __seqAdd__(1, NULL);
+    invoke(intern("add"), 1);
     push(entry->value);
-    __seqAdd__(1, NULL);
+    invoke(intern("add"), 1);
 
-    printf("-> 5 \n");
-
-    disassembleStack();
-    // add key/val seq to entries seq.
-    __seqAdd__(1, NULL);
-    printf("-> 6 \n");
+    // add key/val seq to entry seq.
+    invoke(intern("add"), 1);
   }
 
   return true;
 }
-
-/*
-bool __length__() {}
-
-bool __objKeys__(int argCount, Value* args) {
-  pop();  // native fn.
-  Value obj = pop();
-
-  if (!validateObj(obj, "Can only get keys of an object.")) return false;
-
-
-  ObjMap fields = obj->fields;
-
-  if (mapGet(&fields, key, &val))
-    push(val);
-  else
-    push(NIL_VAL);
-
-  return true;
-}
-*/
 
 void initializeCore() {
   // core functions.

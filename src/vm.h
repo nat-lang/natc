@@ -62,6 +62,7 @@ void push(Value value);
 Value pop();
 Value peek(int distance);
 bool validateMapKey(Value value);
-bool callClass(ObjClass* klass, int argCount);
+bool initClass(ObjClass* klass, int argCount);
+bool invoke(ObjString* name, int argCount);
 
 #endif
