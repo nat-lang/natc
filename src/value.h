@@ -45,6 +45,7 @@ void writeValueArray(ValueArray* array, Value value);
 void freeValueArray(ValueArray* array);
 bool findInValueArray(ValueArray* array, Value value);
 void printValue(Value value);
+void printValueArray(ValueArray* array);
 uint32_t hashValue(Value value);
 bool isHashable(Value value);
 

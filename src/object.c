@@ -353,7 +353,7 @@ void printObject(Value value) {
       printf("upvalue");
       break;
     case OBJ_SEQUENCE:
-      printf("sequence");
+      printValueArray(&AS_SEQUENCE(value)->values);
       break;
   }
 }

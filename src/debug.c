@@ -4,6 +4,7 @@
 
 #include "object.h"
 #include "value.h"
+#include "vm.h"
 
 void disassembleChunk(Chunk* chunk, const char* name) {
   printf("== %s ==\n", name);
@@ -154,5 +155,13 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
+  }
+}
+
+void disassembleStack() {
+  for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+    printf("[ ");
+    printValue(*slot);
+    printf(" ]");
   }
 }

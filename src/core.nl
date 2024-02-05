@@ -1,4 +1,6 @@
-class Sequence {}
+class Sequence < __seq__ {
+
+}
 
 class Map {
   set(key, val) => {

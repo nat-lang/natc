@@ -39,6 +39,10 @@ typedef struct {
   ObjString* callString;
   ObjString* iterString;
   ObjString* nextString;
+  ObjString* memberString;
+
+  ObjClass* seqClass;
+  ObjClass* mapClass;
 } VM;
 
 typedef enum {
@@ -58,5 +62,6 @@ void push(Value value);
 Value pop();
 Value peek(int distance);
 bool validateMapKey(Value value);
+bool callClass(ObjClass* klass, int argCount);
 
 #endif

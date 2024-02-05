@@ -57,15 +57,17 @@ void initVM() {
 
   vm.initString = NULL;
   vm.initString = intern("init");
-
   vm.callString = NULL;
   vm.callString = intern("call");
-
   vm.iterString = NULL;
   vm.iterString = intern("iterator");
-
   vm.nextString = NULL;
   vm.nextString = intern("next");
+  vm.memberString = NULL;
+  vm.memberString = intern("in");
+
+  vm.seqClass = NULL;
+  vm.mapClass = NULL;
 
   initializeCore(&vm);
 }
@@ -75,6 +77,9 @@ void freeVM() {
   freeMap(&vm.strings);
   vm.initString = NULL;
   vm.callString = NULL;
+  vm.iterString = NULL;
+  vm.nextString = NULL;
+  vm.memberString = NULL;
   freeObjects();
 }
 
@@ -112,12 +117,31 @@ static bool call(ObjClosure* closure, int argCount) {
   return true;
 }
 
-static bool callNative(Value callee, int argCount) {
-  ObjNative* native = AS_NATIVE(callee);
-
+static bool callNative(ObjNative* native, int argCount) {
   if (!checkArity(native->arity, argCount)) return false;
 
   return (native->function)(argCount, vm.stackTop - argCount);
+}
+
+static bool callMethod(Value fn, int argCount) {
+  if (IS_NATIVE(fn))
+    return callNative(AS_NATIVE(fn), argCount);
+  else
+    return call(AS_CLOSURE(fn), argCount);
+}
+
+bool callClass(ObjClass* klass, int argCount) {
+  vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+
+  Value initializer;
+  // core classes or their descendents may have a native initializer.
+  if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
+    callMethod(initializer, argCount);
+  } else if (argCount != 0) {
+    runtimeError("Expected 0 arguments but got %d.", argCount);
+    return false;
+  }
+  return true;
 }
 
 static bool callValue(Value callee, int argCount) {
@@ -130,26 +154,12 @@ static bool callValue(Value callee, int argCount) {
       }
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
-        vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
-        Value initializer;
-
-        // core classes or their descendents may have a native initializer.
-        if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
-          if (IS_NATIVE(initializer))
-            return callNative(initializer, argCount);
-          else
-            return call(AS_CLOSURE(initializer), argCount);
-        } else if (argCount != 0) {
-          runtimeError("Expected 0 arguments but got %d.", argCount);
-          return false;
-        }
-        return true;
+        return callClass(klass, argCount);
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
-      case OBJ_NATIVE: {
-        return callNative(callee, argCount);
-      }
+      case OBJ_NATIVE:
+        return callNative(AS_NATIVE(callee), argCount);
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);
         Value callFn;
@@ -174,13 +184,15 @@ static bool callValue(Value callee, int argCount) {
 static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
   Value method;
   if (!mapGet(&klass->methods, OBJ_VAL(name), &method)) {
-    runtimeError("Undefined property '%s'.", name->chars);
+    runtimeError("Undefined property '%s' for class '%s'.", name->chars,
+                 klass->name->chars);
     return false;
   }
-  return call(AS_CLOSURE(method), argCount);
+
+  return callMethod(method, argCount);
 }
 
-static bool invoke(ObjString* name, int argCount) {
+bool invoke(ObjString* name, int argCount) {
   Value receiver = peek(argCount);
 
   if (!IS_INSTANCE(receiver)) {
@@ -304,11 +316,7 @@ static InterpretResult loop() {
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     printf("          ");
-    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
-      printf("[ ");
-      printValue(*slot);
-      printf(" ]");
-    }
+    disassembleStack();
     printf("\n");
     disassembleInstruction(
         &frame->closure->function->chunk,
@@ -346,10 +354,10 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_GLOBAL: {
-        Value name = READ_CONSTANT();
+        ObjString* name = READ_STRING();
         Value value;
-        if (!mapGet(&vm.globals, name, &value)) {
-          runtimeError("Undefined variable");  // '%s'.", name->chars);
+        if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
+          runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
         push(value);
@@ -495,11 +503,12 @@ static InterpretResult loop() {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
-      // "invocation" is a superinstruction: dotted property access
-      // followed by a call.
+      // invocation is a composite instruction:
+      // property access followed by a call.
       case OP_INVOKE: {
         ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
+
         if (!invoke(method, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -573,11 +582,24 @@ static InterpretResult loop() {
         Value val = pop();
 
         if (IS_INSTANCE(obj)) {
+          ObjInstance* instance = AS_INSTANCE(obj);
+
+          // classes can override the membership predicate.
+          Value memFn;
+          if (mapGet(&instance->klass->methods, OBJ_VAL(vm.memberString),
+                     &memFn)) {
+            push(val);
+            push(obj);
+            callMethod(memFn, 1);
+            break;
+          }
+
+          // otherwise just check the fields.
           if (!validateMapKey(val)) {
             return INTERPRET_RUNTIME_ERROR;
           }
 
-          bool mapHasKey = mapHas(&AS_INSTANCE(obj)->fields, val);
+          bool mapHasKey = mapHas(&instance->fields, val);
           push(BOOL_VAL(mapHasKey));
           break;
         }

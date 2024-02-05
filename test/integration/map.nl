@@ -13,12 +13,4 @@ print "a" in map;
 
 map = {1: 1, 2: 2};
 
-print map[1];
-
-map = {true: 1, false: 0};
-
-print map[true];
-
-map = {nil: 1};
-
-print map[nil];
+print map.entries();

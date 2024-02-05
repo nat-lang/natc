@@ -799,7 +799,7 @@ static void braces(bool canAssign) {
     finishSetVal(addMethod);
     finishSet(addMethod);
   } else if (check(TOKEN_COLON)) {
-    // otherwise revise the operative class.
+    // otherwise it's a map: revise the operative class.
     currentChunk()->constants.values[klass] = identifier("Map");
     uint8_t setMethod = loadConstant("set");
 
@@ -828,14 +828,14 @@ static void brackets(bool canAssign) {
 // Subscript or "array indexing" operator like `foo[bar]`.
 static void subscript(bool canAssign) {
   // store the address of the function identifier.
-  int fn = nativeVariable("__subscript__");
+  int fn = nativeVariable("__subscriptGet__");
 
   expression();
   consume(TOKEN_RIGHT_BRACKET, "Expect ']' after arguments.");
 
   // if it's assignment, revise the instruction.
   if (canAssign && match(TOKEN_EQUAL)) {
-    currentChunk()->constants.values[fn] = identifier("__objSet__");
+    currentChunk()->constants.values[fn] = identifier("__subscriptSet__");
 
     expression();
     emitBytes(OP_CALL, 2);
