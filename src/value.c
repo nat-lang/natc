@@ -29,6 +29,13 @@ void freeValueArray(ValueArray* array) {
   initValueArray(array);
 }
 
+bool findInValueArray(ValueArray* array, Value value) {
+  for (int i = 0; i < array->count; i++) {
+    if (valuesEqual(array->values[i], value)) return true;
+  }
+  return false;
+}
+
 void printValue(Value value) {
   switch (value.type) {
     case VAL_BOOL:

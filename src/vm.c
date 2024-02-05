@@ -171,16 +171,16 @@ static bool callValue(Value callee, int argCount) {
   return false;
 }
 
-static bool invokeFromClass(ObjClass* klass, Value name, int argCount) {
+static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
   Value method;
-  if (!mapGet(&klass->methods, name, &method)) {
-    runtimeError("Undefined property");  // '%s'.", name->chars);
+  if (!mapGet(&klass->methods, OBJ_VAL(name), &method)) {
+    runtimeError("Undefined property '%s'.", name->chars);
     return false;
   }
   return call(AS_CLOSURE(method), argCount);
 }
 
-static bool invoke(Value name, int argCount) {
+static bool invoke(ObjString* name, int argCount) {
   Value receiver = peek(argCount);
 
   if (!IS_INSTANCE(receiver)) {
@@ -191,7 +191,7 @@ static bool invoke(Value name, int argCount) {
   ObjInstance* instance = AS_INSTANCE(receiver);
 
   Value value;
-  if (mapGet(&instance->fields, name, &value)) {
+  if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
     vm.stackTop[-argCount - 1] = value;
     return callValue(value, argCount);
   }
@@ -207,10 +207,10 @@ bool validateMapKey(Value key) {
   return true;
 }
 
-static bool bindMethod(ObjClass* klass, Value name) {
+static bool bindMethod(ObjClass* klass, ObjString* name) {
   Value method;
-  if (!mapGet(&klass->methods, name, &method)) {
-    runtimeError("Undefined property");  // '%s'.", name->chars);
+  if (!mapGet(&klass->methods, OBJ_VAL(name), &method)) {
+    runtimeError("Undefined property '%s'.", name->chars);
     return false;
   }
 
@@ -377,10 +377,10 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(peek(0));
-        Value name = READ_CONSTANT();
+        ObjString* name = READ_STRING();
 
         Value value;
-        if (mapGet(&instance->fields, name, &value)) {
+        if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
           pop();  // Instance.
           push(value);
           break;
@@ -411,7 +411,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_SUPER: {
-        Value name = READ_CONSTANT();
+        ObjString* name = READ_STRING();
         ObjClass* superclass = AS_CLASS(pop());
 
         if (!bindMethod(superclass, name)) {
@@ -498,7 +498,7 @@ static InterpretResult loop() {
       // "invocation" is a superinstruction: dotted property access
       // followed by a call.
       case OP_INVOKE: {
-        Value method = READ_CONSTANT();
+        ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
         if (!invoke(method, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
@@ -507,7 +507,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_SUPER_INVOKE: {
-        Value method = READ_CONSTANT();
+        ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
         ObjClass* superclass = AS_CLASS(pop());
         if (!invokeFromClass(superclass, method, argCount)) {
@@ -570,20 +570,26 @@ static InterpretResult loop() {
         break;
       case OP_MEMBER: {
         Value obj = pop();
-        Value key = pop();
+        Value val = pop();
 
-        if (!IS_INSTANCE(obj)) {
-          runtimeError("Only objects may be tested for membership of key.");
-          return INTERPRET_RUNTIME_ERROR;
+        if (IS_INSTANCE(obj)) {
+          if (!validateMapKey(val)) {
+            return INTERPRET_RUNTIME_ERROR;
+          }
+
+          bool mapHasKey = mapHas(&AS_INSTANCE(obj)->fields, val);
+          push(BOOL_VAL(mapHasKey));
+          break;
         }
 
-        if (!validateMapKey(key)) {
-          return INTERPRET_RUNTIME_ERROR;
+        if (IS_SEQUENCE(obj)) {
+          bool seqHasVal = findInValueArray(&AS_SEQUENCE(obj)->values, val);
+          push(BOOL_VAL(seqHasVal));
+          break;
         }
 
-        bool mapHasKey = mapHas(&AS_INSTANCE(obj)->fields, key);
-        push(BOOL_VAL(mapHasKey));
-        break;
+        runtimeError("Only objects or sequences may be tested for membership.");
+        return INTERPRET_RUNTIME_ERROR;
       }
     }
   }

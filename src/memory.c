@@ -123,9 +123,7 @@ static void blackenObject(Obj* object) {
       break;
     case OBJ_SEQUENCE: {
       ObjSequence* seq = (ObjSequence*)object;
-      for (int i = 0; i < seq->length; i++) {
-        markObject((Obj*)seq->values[i].as.obj);
-      }
+      markArray(&seq->values);
     }
   }
 }
@@ -183,7 +181,7 @@ static void freeObject(Obj* object) {
       break;
     case OBJ_SEQUENCE: {
       ObjSequence* seq = (ObjSequence*)object;
-      FREE_ARRAY(Value, seq->values, seq->length);
+      freeValueArray(&seq->values);
       FREE(ObjSequence, seq);
     }
   }

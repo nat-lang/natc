@@ -78,16 +78,23 @@ bool __objGet__(Value key, ObjInstance* obj) {
 
 bool __seqInit__() {
   pop();  // native fn.
-
   ObjSequence* seq = newSequence();
-
   push(OBJ_VAL(seq));
+  return true;
 }
 
 bool __seqAdd__() {
   Value val = pop();
   pop();  // native fn.
-  Value seq = pop();
+  Value obj = pop();
+
+  if (!validateSeq(obj)) return false;
+
+  ObjSequence* seq = AS_SEQUENCE(obj);
+  writeValueArray(&seq->values, val);
+  push(OBJ_VAL(seq));
+
+  return true;
 }
 
 /*
@@ -133,14 +140,12 @@ static bool __subscript__(int argCount, Value* args) {
 }
 
 void initializeCore(VM* vm) {
-  defineNativeMap(vm);
   defineNativeFn(intern("__subscript__"), 1, __subscript__, &vm->globals);
   defineNativeFn(intern("__objSet__"), 2, __objSet__, &vm->globals);
 
-  ObjClass* seqClass = defineNativeClass(intern("Seq"), &vm->globals);
-
+  ObjClass* seqClass = defineNativeClass(intern("Sequence"), &vm->globals);
   defineNativeFn(vm->initString, 0, __seqInit__, &seqClass->methods);
-  defineNativeFn(intern("__add__"), 1, __seqAdd__, &seqClass->methods);
+  defineNativeFn(intern("add"), 1, __seqAdd__, &seqClass->methods);
 
   runFile("./src/core.nl");
 }

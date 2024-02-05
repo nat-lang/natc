@@ -567,6 +567,12 @@ static int callNative(char* name, int argCount) {
   return address;
 }
 
+static void callMethod(char* name, int argCount) {
+  uint8_t method = loadConstant(name);
+  emitBytes(OP_INVOKE, method);
+  emitByte(argCount);
+}
+
 static void variable(bool canAssign) {
   namedVariable(parser.previous, canAssign);
 }
@@ -803,6 +809,20 @@ static void braces(bool canAssign) {
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
+}
+
+// A sequence literal.
+static void brackets(bool canAssign) {
+  callNative("Sequence", 0);
+  // Empty brackets is an empty sequence.
+  if (check(TOKEN_RIGHT_BRACKET)) return advance();
+
+  do {
+    expression();
+    callMethod("add", 1);
+  } while (match(TOKEN_COMMA));
+
+  consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }
 
 // Subscript or "array indexing" operator like `foo[bar]`.
@@ -1061,7 +1081,7 @@ ParseRule rules[] = {
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {braces, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACKET] = {NULL, subscript, PREC_CALL},
+    [TOKEN_LEFT_BRACKET] = {brackets, subscript, PREC_CALL},
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, dot, PREC_CALL},

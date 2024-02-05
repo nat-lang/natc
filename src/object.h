@@ -117,8 +117,7 @@ typedef struct {
 
 typedef struct {
   Obj obj;
-  Value *values;
-  int length;
+  ValueArray values;
 } ObjSequence;
 
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);

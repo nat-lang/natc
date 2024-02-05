@@ -23,8 +23,6 @@ class Set {
 }
 
 class Tree {
-  init(*children) => {
-
-  }
+  // init(*children) => {}
 }
 

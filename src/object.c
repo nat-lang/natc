@@ -81,8 +81,7 @@ ObjNative* newNative(int arity, ObjString* name, NativeFn function) {
 
 ObjSequence* newSequence() {
   ObjSequence* sequence = ALLOCATE_OBJ(ObjSequence, OBJ_SEQUENCE);
-  sequence->values = NULL;
-  sequence->length = 0;
+  initValueArray(&sequence->values);
   return sequence;
 }
 
