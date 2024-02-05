@@ -60,9 +60,7 @@ void initVM() {
   vm.callString = NULL;
   vm.callString = intern("call");
   vm.iterString = NULL;
-  vm.iterString = intern("iterator");
-  vm.nextString = NULL;
-  vm.nextString = intern("next");
+  vm.iterString = intern("iterate");
   vm.memberString = NULL;
   vm.memberString = intern("in");
 
@@ -78,7 +76,6 @@ void freeVM() {
   vm.initString = NULL;
   vm.callString = NULL;
   vm.iterString = NULL;
-  vm.nextString = NULL;
   vm.memberString = NULL;
   freeObjects();
 }

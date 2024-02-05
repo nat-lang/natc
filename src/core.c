@@ -32,19 +32,6 @@ ObjClass* defineNativeClass(ObjString* name, ObjMap* dest) {
   return klass;
 }
 
-ObjClass* getClass(char* name) {
-  Value value;
-  if (!mapGet(&vm.globals, OBJ_VAL(intern(name)), &value)) {
-    runtimeError("Undefined class '%s'.", name);
-    return NULL;
-  }
-  if (!IS_CLASS(value)) {
-    runtimeError("Expected class for '%s'.", name);
-    return NULL;
-  }
-  return AS_CLASS(value);
-}
-
 static bool validateObj(Value obj, char* msg) {
   if (!IS_INSTANCE(obj)) {
     runtimeError(msg);
@@ -184,20 +171,19 @@ bool __mapEntries__(int argCount, Value* args) {
 }
 
 void initializeCore() {
-  // core functions.
+  // native functions.
   defineNativeFn(intern("__subscriptGet__"), 1, __subscriptGet__, &vm.globals);
   defineNativeFn(intern("__subscriptSet__"), 2, __subscriptSet__, &vm.globals);
 
-  // core classes.
+  // native classes.
   vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals);
   defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
   defineNativeFn(intern("add"), 1, __seqAdd__, &vm.seqClass->methods);
   defineNativeFn(intern("in"), 1, __seqIn__, &vm.seqClass->methods);
 
-  // native definitions.
-  runFile("./src/core.nl");
-
-  // augment native definitions.
-  vm.mapClass = getClass("Map");
+  vm.mapClass = defineNativeClass(intern("__map__"), &vm.globals);
   defineNativeFn(intern("entries"), 0, __mapEntries__, &vm.mapClass->methods);
+
+  // core definitions.
+  runFile("./src/core.nl");
 }

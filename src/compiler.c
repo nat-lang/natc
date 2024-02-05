@@ -897,7 +897,7 @@ static void classDeclaration() {
 }
 
 static void letDeclaration() {
-  uint8_t global = parseVariable("Expect variable name.");
+  uint8_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
     boundExpression();
@@ -906,7 +906,7 @@ static void letDeclaration() {
   }
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
-  defineVariable(global);
+  defineVariable(var);
 }
 
 static void expressionStatement() {
@@ -915,11 +915,24 @@ static void expressionStatement() {
   emitByte(OP_POP);
 }
 
+static void forInStatement() {
+  // consume the identifier.
+  declareVariable();
+  // delimit.
+  consume(TOKEN_IN, "Expect 'in' between variable and sequence.");
+  // an expression that must reduce to an object
+  // implementing the iterator protocol.
+  expression();
+  emitByte(OP_ITERATE);
+}
+
 static void forStatement() {
   beginScope();
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
-  if (match(TOKEN_SEMICOLON)) {
+  if (match(TOKEN_IDENTIFIER)) {
+    forInStatement();
+  } else if (match(TOKEN_SEMICOLON)) {
     // No initializer.
   } else if (match(TOKEN_LET)) {
     letDeclaration();
