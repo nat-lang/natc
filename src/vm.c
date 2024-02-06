@@ -69,6 +69,8 @@ void initVM() {
   vm.subscriptGetString = intern("__get__");
   vm.subscriptSetString = NULL;
   vm.subscriptSetString = intern("__set__");
+  vm.lengthString = NULL;
+  vm.lengthString = intern("__length__");
 
   vm.seqClass = NULL;
   vm.mapClass = NULL;
@@ -86,6 +88,7 @@ void freeVM() {
   vm.memberString = NULL;
   vm.subscriptGetString = NULL;
   vm.subscriptSetString = NULL;
+  vm.lengthString = NULL;
   freeObjects();
 }
 

@@ -135,7 +135,7 @@ static bool __subscriptSet__(int argCount, Value* args) {
   runtimeError(
       "Only objects, sequences, and instances with a '%s' method support "
       "assignment by subscript.",
-      vm.subscriptSetString);
+      vm.subscriptSetString->chars);
   return false;
 }
 
@@ -170,7 +170,7 @@ static bool __subscriptGet__(int argCount, Value* args) {
   runtimeError(
       "Only objects, sequences, and instances with a '%s' method support "
       "access by subscript.",
-      vm.subscriptGetString);
+      vm.subscriptGetString->chars);
   return false;
 }
 
@@ -246,10 +246,41 @@ bool __mapEntries__(int argCount, Value* args) {
   return true;
 }
 
+bool __length__(int argCount, Value* args) {
+  Value val = pop();
+
+  if (IS_SEQUENCE(val)) {
+    ObjSequence* seq = AS_SEQUENCE(val);
+    push(NUMBER_VAL(seq->values.count));
+    return true;
+  }
+
+  if (IS_INSTANCE(val)) {
+    ObjInstance* instance = AS_INSTANCE(val);
+    Value lenFn;
+    if (mapGet(&instance->klass->methods, OBJ_VAL(vm.lengthString), &lenFn)) {
+      // set up the context for the function call.
+      push(val);  // receiver.
+      callMethod(lenFn, 0);
+      return true;
+    }
+  }
+
+  runtimeError("Only sequences and objects with a '%s' method have length.",
+               vm.lengthString->chars);
+  return false;
+}
+
 void initializeCore() {
   // native functions.
+
+  // these two primarily used be the compiler.
+  // maybe this indicates they deserve an op code.
   defineNativeFn(intern("__subscriptGet__"), 1, __subscriptGet__, &vm.globals);
   defineNativeFn(intern("__subscriptSet__"), 2, __subscriptSet__, &vm.globals);
+
+  // user land.
+  defineNativeFn(intern("length"), 1, __length__, &vm.globals);
 
   // native classes.
   vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals);

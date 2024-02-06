@@ -42,6 +42,7 @@ typedef struct {
   ObjString* memberString;
   ObjString* subscriptGetString;
   ObjString* subscriptSetString;
+  ObjString* lengthString;
 
   ObjClass* seqClass;
   ObjClass* mapClass;

@@ -12,8 +12,8 @@ class Sequence < __seq__ {
     return this.values[idx];
   }
 
-  __set__(idx, val) => { return this.values[idx] = val; }
-  // __len__() => { return this.values.length; }
+  __set__(idx, val) => { this.values[idx] = val; }
+  __len__() => { return this.values.length; }
 }
 
 class Iterator < Sequence {
