@@ -944,16 +944,27 @@ static void forInStatement() {
   int loopStart = currentChunk()->count;
 
   // consume the identifier.
-  declareVariable();
+  uint8_t constant = parseVariable("Expect identifier.");
+  defineVariable(constant);
+
   // delimit.
-  consume(TOKEN_IN, "Expect 'in' between variable and sequence.");
+  consume(TOKEN_IN,
+          "Expect 'in' between identifier and sequence of for clause.");
   // an expression that must reduce to an object
   // implementing the iterator protocol.
   expression();
-  emitByte(OP_ITERATE);
+  emitBytes(OP_ITERATE, constant);
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+  int exitJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+
   // body.
   statement();
   emitLoop(loopStart);
+
+  patchJump(exitJump);
+  emitByte(OP_POP);
 }
 
 static void forConditionStatement() {
@@ -984,7 +995,7 @@ static void forStatement() {
   beginScope();
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
-  if (match(TOKEN_IDENTIFIER)) {
+  if (check(TOKEN_IDENTIFIER)) {
     forInStatement();
   } else {
     forConditionStatement();

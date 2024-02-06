@@ -302,6 +302,12 @@ static void concatenate() {
   push(OBJ_VAL(result));
 }
 
+static int iterationError() {
+  runtimeError("Only objects with '%s' and '%s' methods may be interated over.",
+               vm.nextString->chars, vm.currString->chars);
+  return INTERPRET_RUNTIME_ERROR;
+}
+
 static InterpretResult loop() {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
@@ -621,6 +627,47 @@ static InterpretResult loop() {
 
         runtimeError("Only objects or sequences may be tested for membership.");
         return INTERPRET_RUNTIME_ERROR;
+      }
+      case OP_ITERATE: {
+        Value var = READ_CONSTANT();
+        Value value = peek(0);
+
+        // make sure we have a valid iterator; find the
+        // iteration methods.
+        if (!IS_INSTANCE(value)) return iterationError();
+
+        ObjInstance* instance = AS_INSTANCE(value);
+
+        Value nextFn;
+        Value currFn;
+        if (!mapGet(&instance->klass->methods, OBJ_VAL(vm.nextString), &nextFn))
+          return iterationError();
+        if (!mapGet(&instance->klass->methods, OBJ_VAL(vm.currString), &currFn))
+          return iterationError();
+
+        // now put the methods to work.
+
+        printf("------------------");
+        printValue(var);
+        printf("------------------");
+        printValue(value);
+        printf("------------------");
+
+        break;
+
+        // ctx for the `next` fn.
+        push(value);
+        push(var);
+        printf("0");
+        if (!callMethod(nextFn, 1)) return INTERPRET_RUNTIME_ERROR;
+
+        // stop iteration
+        if (IS_BOOL(peek(0)) && AS_BOOL(peek(0)) == false) break;
+
+        printf("1");
+        if (!callMethod(currFn, 1)) return INTERPRET_RUNTIME_ERROR;
+
+        break;
       }
     }
   }

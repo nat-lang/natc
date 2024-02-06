@@ -13,16 +13,15 @@ class Sequence < __seq__ {
   }
 
   __set__(idx, val) => { this.values[idx] = val; }
-  __len__() => { return this.values.length; }
-}
+  __length__() => { return this.values.length; }
 
-class Iterator < Sequence {
   next(idx) => {
     if (idx == nil) { return 0; }
-    if (idx == this.length) { return false; }
+    if (idx == this.length - 2) { return false; }
 
     return idx + 1;
   }
+
   curr(idx) => { return this[idx]; }
 }
 
