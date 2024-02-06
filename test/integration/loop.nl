@@ -10,6 +10,6 @@ while (i < 20) {
   i = i + 1;
 }
 
-for (x in [1,2,3]) {
-  print x;
-}
+// for (x in [1,2,3]) {
+//   print x;
+// }

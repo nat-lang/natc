@@ -59,10 +59,16 @@ void initVM() {
   vm.initString = intern("init");
   vm.callString = NULL;
   vm.callString = intern("call");
-  vm.iterString = NULL;
-  vm.iterString = intern("iterate");
+  vm.nextString = NULL;
+  vm.nextString = intern("next");
+  vm.currString = NULL;
+  vm.currString = intern("curr");
   vm.memberString = NULL;
   vm.memberString = intern("in");
+  vm.subscriptGetString = NULL;
+  vm.subscriptGetString = intern("__get__");
+  vm.subscriptSetString = NULL;
+  vm.subscriptSetString = intern("__set__");
 
   vm.seqClass = NULL;
   vm.mapClass = NULL;
@@ -75,8 +81,11 @@ void freeVM() {
   freeMap(&vm.strings);
   vm.initString = NULL;
   vm.callString = NULL;
-  vm.iterString = NULL;
+  vm.nextString = NULL;
+  vm.currString = NULL;
   vm.memberString = NULL;
+  vm.subscriptGetString = NULL;
+  vm.subscriptSetString = NULL;
   freeObjects();
 }
 
@@ -120,7 +129,7 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
-static bool callMethod(Value fn, int argCount) {
+bool callMethod(Value fn, int argCount) {
   if (IS_NATIVE(fn))
     return callNative(AS_NATIVE(fn), argCount);
   else

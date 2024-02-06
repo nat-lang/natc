@@ -32,14 +32,6 @@ ObjClass* defineNativeClass(ObjString* name, ObjMap* dest) {
   return klass;
 }
 
-static bool validateObj(Value obj, char* msg) {
-  if (!IS_INSTANCE(obj)) {
-    runtimeError(msg);
-    return false;
-  }
-  return true;
-}
-
 static bool validateSeq(Value seq) {
   if (!IS_SEQUENCE(seq)) {
     runtimeError("Expecting sequence.");
@@ -48,7 +40,23 @@ static bool validateSeq(Value seq) {
   return true;
 }
 
-static bool __objGet__(Value key, ObjInstance* obj) {
+static bool validateSeqIdx(ObjSequence* seq, Value idx) {
+  if (!IS_INTEGER(idx)) {
+    runtimeError("Sequences must be indexed by integer.");
+    return false;
+  }
+
+  int intIdx = AS_NUMBER(idx);
+
+  if (intIdx > seq->values.count || intIdx < 0) {
+    runtimeError("Index %i out of bounds.", intIdx);
+    return false;
+  }
+
+  return true;
+}
+
+static bool __objGet__(ObjInstance* obj, Value key) {
   Value val;
 
   if (!validateMapKey(key)) return false;
@@ -63,18 +71,72 @@ static bool __objGet__(Value key, ObjInstance* obj) {
   return true;
 }
 
+static bool __objSet__(ObjInstance* obj, Value key, Value val) {
+  if (!validateMapKey(key)) return false;
+
+  if (mapSet(&obj->fields, key, val)) {
+    push(OBJ_VAL(obj));  // return the object.
+    return true;
+  }
+
+  return false;
+}
+
+static bool __seqGet__(ObjSequence* seq, Value key) {
+  if (!validateSeqIdx(seq, key)) return false;
+
+  int idx = AS_NUMBER(key);
+
+  push(seq->values.values[idx]);
+  return true;
+}
+
+static bool __seqSet__(ObjSequence* seq, Value key, Value val) {
+  if (!validateSeqIdx(seq, key)) return false;
+
+  int idx = AS_NUMBER(key);
+
+  seq->values.values[idx] = val;
+  push(OBJ_VAL(seq));  // return the sequence.
+
+  return true;
+}
+
 static bool __subscriptSet__(int argCount, Value* args) {
   Value val = pop();
   Value key = pop();
   pop();  // native fn.
   Value obj = pop();
 
-  if (!validateMapKey(key)) return false;
-  if (!validateObj(obj, "Can only set property of object.")) return false;
+  // indexed assignment to sequences.
+  if (IS_SEQUENCE(obj)) {
+    return __seqSet__(AS_SEQUENCE(obj), key, val);
+  }
 
-  mapSet(&AS_INSTANCE(obj)->fields, key, val);
-  push(obj);  // return the object.
-  return true;
+  // classes may define their own subscript setting
+  // operator, otherwise fall back to property setting.
+  if (IS_INSTANCE(obj)) {
+    ObjInstance* instance = AS_INSTANCE(obj);
+
+    Value setFn;
+    if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptSetString),
+               &setFn)) {
+      // set up the context for the function call.
+      push(obj);  // receiver.
+      push(key);
+      push(val);
+      callMethod(setFn, 2);
+      return true;
+    }
+
+    return __objSet__(instance, key, val);
+  }
+
+  runtimeError(
+      "Only objects, sequences, and instances with a '%s' method support "
+      "assignment by subscript.",
+      vm.subscriptSetString);
+  return false;
 }
 
 static bool __subscriptGet__(int argCount, Value* args) {
@@ -82,20 +144,34 @@ static bool __subscriptGet__(int argCount, Value* args) {
   pop();  // native fn.
   Value obj = pop();
 
-  if (!validateObj(obj, "Can only get property of an object.")) return false;
-
-  switch (OBJ_TYPE(obj)) {
-    case OBJ_INSTANCE: {
-      __objGet__(key, AS_INSTANCE(obj));
-      break;
-    }
-    default: {
-      runtimeError("Only objects support subscript.");
-      return false;
-    }
+  // indexed access to sequences.
+  if (IS_SEQUENCE(obj)) {
+    return __seqGet__(AS_SEQUENCE(obj), key);
   }
 
-  return true;
+  // classes may define their own subscript access
+  // operator, otherwise fall back to property access.
+  if (IS_INSTANCE(obj)) {
+    ObjInstance* instance = AS_INSTANCE(obj);
+
+    Value getFn;
+    if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptGetString),
+               &getFn)) {
+      // set up the context for the function call.
+      push(obj);  // receiver.
+      push(key);
+      callMethod(getFn, 1);
+      return true;
+    }
+
+    return __objGet__(instance, key);
+  }
+
+  runtimeError(
+      "Only objects, sequences, and instances with a '%s' method support "
+      "access by subscript.",
+      vm.subscriptGetString);
+  return false;
 }
 
 bool __seqInit__(int argCount, Value* args) {

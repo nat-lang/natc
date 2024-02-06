@@ -1,6 +1,8 @@
 #ifndef nat_value_h
 #define nat_value_h
 
+#include <math.h>
+
 #include "common.h"
 
 typedef struct Obj Obj;
@@ -20,6 +22,8 @@ typedef struct {
 #define IS_BOOL(value) ((value).type == VAL_BOOL)
 #define IS_NIL(value) ((value).type == VAL_NIL)
 #define IS_NUMBER(value) ((value).type == VAL_NUMBER)
+#define IS_INTEGER(value) \
+  ((value).type == VAL_NUMBER && ceilf((value).as.number) == (value).as.number)
 #define IS_OBJ(value) ((value).type == VAL_OBJ)
 #define IS_UNDEF(value) ((value).type == VAL_UNDEF)
 

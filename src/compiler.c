@@ -561,13 +561,13 @@ static uint8_t nativeVariable(char* name) {
   return var;
 }
 
-static int callNative(char* name, int argCount) {
+static int nativeCall(char* name, int argCount) {
   int address = nativeVariable(name);
   emitBytes(OP_CALL, argCount);
   return address;
 }
 
-static void callMethod(char* name, int argCount) {
+static void methodCall(char* name, int argCount) {
   uint8_t method = loadConstant(name);
   emitBytes(OP_INVOKE, method);
   emitByte(argCount);
@@ -782,7 +782,7 @@ static void finishSet(uint8_t addMethod) {
 
 // A map or set literal.
 static void braces(bool canAssign) {
-  int klass = callNative("Set", 0);
+  int klass = nativeCall("Set", 0);
 
   // empty braces is an empty set.
   if (check(TOKEN_RIGHT_BRACE)) return advance();
@@ -813,13 +813,13 @@ static void braces(bool canAssign) {
 
 // A sequence literal.
 static void brackets(bool canAssign) {
-  callNative("Sequence", 0);
+  nativeCall("Sequence", 0);
   // Empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
 
   do {
     expression();
-    callMethod("add", 1);
+    methodCall("add", 1);
   } while (match(TOKEN_COMMA));
 
   consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
@@ -915,7 +915,34 @@ static void expressionStatement() {
   emitByte(OP_POP);
 }
 
+static int loopCondition() {
+  expression();
+  consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+  // Jump out of the loop if the condition is false.
+  int exitJump = emitJump(OP_JUMP_IF_FALSE);
+  // Condition.
+  emitByte(OP_POP);
+
+  return exitJump;
+}
+
+static int loopIncrement(int loopStart) {
+  int bodyJump = emitJump(OP_JUMP);
+  int incrementStart = currentChunk()->count;
+  expression();
+  emitByte(OP_POP);
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+  emitLoop(loopStart);
+  patchJump(bodyJump);
+
+  return incrementStart;
+}
+
 static void forInStatement() {
+  int loopStart = currentChunk()->count;
+
   // consume the identifier.
   declareVariable();
   // delimit.
@@ -924,15 +951,13 @@ static void forInStatement() {
   // implementing the iterator protocol.
   expression();
   emitByte(OP_ITERATE);
+  // body.
+  statement();
+  emitLoop(loopStart);
 }
 
-static void forStatement() {
-  beginScope();
-  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
-
-  if (match(TOKEN_IDENTIFIER)) {
-    forInStatement();
-  } else if (match(TOKEN_SEMICOLON)) {
+static void forConditionStatement() {
+  if (match(TOKEN_SEMICOLON)) {
     // No initializer.
   } else if (match(TOKEN_LET)) {
     letDeclaration();
@@ -941,28 +966,9 @@ static void forStatement() {
   }
 
   int loopStart = currentChunk()->count;
-  int exitJump = -1;
-  if (!match(TOKEN_SEMICOLON)) {
-    expression();
-    consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+  int exitJump = match(TOKEN_SEMICOLON) ? -1 : loopCondition();
 
-    // Jump out of the loop if the condition is false.
-    exitJump = emitJump(OP_JUMP_IF_FALSE);
-    // Condition.
-    emitByte(OP_POP);
-  }
-
-  if (!match(TOKEN_RIGHT_PAREN)) {
-    int bodyJump = emitJump(OP_JUMP);
-    int incrementStart = currentChunk()->count;
-    expression();
-    emitByte(OP_POP);
-    consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
-
-    emitLoop(loopStart);
-    loopStart = incrementStart;
-    patchJump(bodyJump);
-  }
+  if (!match(TOKEN_RIGHT_PAREN)) loopStart = loopIncrement(loopStart);
 
   statement();
   emitLoop(loopStart);
@@ -971,6 +977,17 @@ static void forStatement() {
     patchJump(exitJump);
     // Condition.
     emitByte(OP_POP);
+  }
+}
+
+static void forStatement() {
+  beginScope();
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+  if (match(TOKEN_IDENTIFIER)) {
+    forInStatement();
+  } else {
+    forConditionStatement();
   }
 
   endScope();

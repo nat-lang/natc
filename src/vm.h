@@ -37,8 +37,11 @@ typedef struct {
   // methods with special semantics.
   ObjString* initString;
   ObjString* callString;
-  ObjString* iterString;
+  ObjString* nextString;
+  ObjString* currString;
   ObjString* memberString;
+  ObjString* subscriptGetString;
+  ObjString* subscriptSetString;
 
   ObjClass* seqClass;
   ObjClass* mapClass;
@@ -63,5 +66,6 @@ Value peek(int distance);
 bool validateMapKey(Value value);
 bool initClass(ObjClass* klass, int argCount);
 bool invoke(ObjString* name, int argCount);
+bool callMethod(Value fn, int argCount);
 
 #endif
