@@ -127,6 +127,8 @@ static TokenType identifierType() {
         switch (scanner.start[1]) {
           case 'f':
             return checkpointKeyword(1, 1, "f", TOKEN_IF);
+          case 'm':
+            return checkpointKeyword(2, 4, "port", TOKEN_IMPORT);
           case 'n':
             return checkpointKeyword(1, 1, "n", TOKEN_IN);
         }

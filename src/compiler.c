@@ -222,7 +222,7 @@ static void patchJump(int offset) {
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
-static ObjString* functionName(FunctionType type) {
+static ObjString* functionName(FunctionType type, char* name) {
   switch (type) {
     case TYPE_INITIALIZER:
     case TYPE_METHOD:
@@ -232,11 +232,11 @@ static ObjString* functionName(FunctionType type) {
     case TYPE_ANONYMOUS:
       return copyString("lambda", 6);
     case TYPE_SCRIPT:
-      return copyString("script", 6);
+      return intern(name);
   }
 }
 
-static void initCompiler(Compiler* compiler, FunctionType type) {
+static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
   compiler->enclosing = current;
   compiler->function = NULL;
   compiler->type = type;
@@ -245,7 +245,7 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
   compiler->function = newFunction();
 
   current = compiler;
-  current->function->name = functionName(type);
+  current->function->name = functionName(type, name);
 
   Local* local = &current->locals[current->localCount++];
   local->depth = 0;
@@ -710,7 +710,7 @@ static void block() {
 
 static void function(FunctionType type) {
   Compiler compiler;
-  initCompiler(&compiler, type);
+  initCompiler(&compiler, type, NULL);
   beginScope();
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
@@ -1047,6 +1047,13 @@ static void ifStatement() {
   patchJump(elseJump);
 }
 
+static void importStatement() {
+  consume(TOKEN_STRING, "Expect path to import.");
+  string(false);
+  consume(TOKEN_SEMICOLON, "Expect ';' after import statement.");
+  emitByte(OP_IMPORT);
+}
+
 static void printStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after value.");
@@ -1123,7 +1130,9 @@ static void declaration() {
 }
 
 static void statement() {
-  if (match(TOKEN_PRINT)) {
+  if (match(TOKEN_IMPORT)) {
+    importStatement();
+  } else if (match(TOKEN_PRINT)) {
     printStatement();
   } else if (match(TOKEN_FOR)) {
     forStatement();
@@ -1212,10 +1221,10 @@ static void parsePrecedence(Precedence precedence) {
   }
 }
 
-ObjFunction* compile(const char* source) {
+ObjFunction* compile(const char* source, char* path) {
   initScanner(source);
   Compiler compiler;
-  initCompiler(&compiler, TYPE_SCRIPT);
+  initCompiler(&compiler, TYPE_SCRIPT, path);
   initParser();
 
   while (!match(TOKEN_EOF)) {

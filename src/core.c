@@ -304,5 +304,5 @@ void initializeCore() {
   defineNativeFn(intern("entries"), 0, __mapEntries__, &vm.mapClass->methods);
 
   // core definitions.
-  runFile("./src/core.nl");
+  runFile("./src/core/__index__");
 }

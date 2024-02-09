@@ -2,9 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common.h"
 #include "compiler.h"
 #include "debug.h"
 #include "vm.h"
+
+char* qualifyPath(const char* path) {
+  static char buf[256];
+
+  snprintf(buf, sizeof(buf), "%s%s", path, NL_EXT);
+
+  return buf;
+}
 
 char* readFile(const char* path) {
   FILE* file = fopen(path, "rb");
@@ -38,15 +47,15 @@ char* readFile(const char* path) {
 // Load and compile module at [path] without executing.
 void compileFile(const char* path) {
   char* source = readFile(path);
-  compile(source);
+  compile(source, (char*)path);
   free(source);
 }
 
 // Load, compile, and execute module at [path].
 void runFile(const char* path) {
-  char* source = readFile(path);
-  InterpretResult result = interpret(source);
-  compile(source);
+  char* extPath = qualifyPath(path);
+  char* source = readFile(extPath);
+  InterpretResult result = interpret((char*)path, source);
   free(source);
 
   if (result == INTERPRET_COMPILE_ERROR) exit(65);

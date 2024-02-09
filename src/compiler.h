@@ -4,7 +4,7 @@
 #include "object.h"
 #include "vm.h"
 
-ObjFunction* compile(const char* source);
+ObjFunction* compile(const char* source, char* path);
 void markCompilerRoots();
 
 #endif

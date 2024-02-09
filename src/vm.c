@@ -8,6 +8,7 @@
 #include "compiler.h"
 #include "core.h"
 #include "debug.h"
+#include "io.h"
 #include "memory.h"
 #include "object.h"
 
@@ -300,12 +301,6 @@ static void concatenate() {
   pop();
 
   push(OBJ_VAL(result));
-}
-
-static int iterationError() {
-  runtimeError("Only objects with '%s' and '%s' methods may be interated over.",
-               vm.nextString->chars, vm.currString->chars);
-  return INTERPRET_RUNTIME_ERROR;
 }
 
 static InterpretResult loop() {
@@ -634,56 +629,13 @@ static InterpretResult loop() {
         runtimeError("Only objects or sequences may be tested for membership.");
         return INTERPRET_RUNTIME_ERROR;
       }
-      case OP_ITERATE: {
-        int varSlot = READ_BYTE();
-        Value value = pop();
-
-        // make sure we have a valid iterator; find the
-        // iteration methods.
-        if (!IS_INSTANCE(value)) return iterationError();
-
-        ObjInstance* instance = AS_INSTANCE(value);
-
-        Value nextFn;
-        Value currFn;
-        if (!mapGet(&instance->klass->methods, OBJ_VAL(vm.nextString), &nextFn))
-          return iterationError();
-        if (!mapGet(&instance->klass->methods, OBJ_VAL(vm.currString), &currFn))
-          return iterationError();
-
-        // now put the methods to work.
-
-        printf("\n------------------\n");
-        printf("%i", varSlot);
-        printf("\n------------------\n");
-        printValue(value);
-        printf("\n------------------\n");
-        printValue(nextFn);
-        printf("\n------------------\n");
-
-        // ctx for the `next` fn.
-        push(value);                  // receiver.
-        push(frame->slots[varSlot]);  //
-
-        if (!callMethod(nextFn, 1)) return INTERPRET_RUNTIME_ERROR;
-
-        Value idx = pop();
-
-        printf("\n------POPPED------\n");
-        printValue(idx);
-        printf("\n------------------\n");
-
-        // stop iteration.
-        if (IS_BOOL(idx) && AS_BOOL(idx) == false) {
-          push(idx);
-          break;
+      case OP_IMPORT: {
+        Value path = pop();
+        if (!IS_STRING(path)) {
+          runtimeError("Import path must be a string.");
+          return INTERPRET_RUNTIME_ERROR;
         }
-
-        push(value);  // receiver.
-        push(idx);    //
-        if (!callMethod(currFn, 1)) return INTERPRET_RUNTIME_ERROR;
-
-        break;
+        runFile(AS_STRING(path)->chars);
       }
     }
   }
@@ -695,8 +647,8 @@ static InterpretResult loop() {
 #undef BINARY_OP
 }
 
-InterpretResult interpret(const char* source) {
-  ObjFunction* function = compile(source);
+InterpretResult interpret(char* path, const char* source) {
+  ObjFunction* function = compile(source, path);
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
   push(OBJ_VAL(function));

@@ -48,6 +48,7 @@ typedef enum {
   TOKEN_THIS,
   TOKEN_TRUE,
   TOKEN_WHILE,
+  TOKEN_IMPORT,
 
   TOKEN_ERROR,
   TOKEN_EOF

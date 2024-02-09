@@ -152,8 +152,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_METHOD", chunk, offset);
     case OP_MEMBER:
       return simpleInstruction("OP_MEMBER", offset);
-    case OP_ITERATE:
-      return byteInstruction("OP_ITERATE", chunk, offset);
+    case OP_IMPORT:
+      return simpleInstruction("OP_IMPORT", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
