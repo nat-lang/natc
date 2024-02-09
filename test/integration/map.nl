@@ -22,3 +22,11 @@ print map[true];
 map = {nil: 1};
 
 print map[nil];
+
+map = {1: "a", 2: "b", 3: "c", 4: "d"};
+for (x in map) {
+  print x.values;
+}
+
+print map.keys().values;
+print map.values().values;

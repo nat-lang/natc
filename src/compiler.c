@@ -942,10 +942,12 @@ static int loopIncrement(int loopStart) {
   return incrementStart;
 }
 
+// Invokes the iteration protocol.
 static void forInStatement() {
   // consume the identifier.
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
   int var = declareVariable();
+  emitConstant(NIL_VAL);
   markInitialized();
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
@@ -953,27 +955,33 @@ static void forInStatement() {
   // keep track of the sequence.
   int seq = addLocal(syntheticToken("#seq"));
   expression();
-  emitBytes(OP_SET_LOCAL, seq);
 
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
 
   // initialize the index to nil.
   int idx = addLocal(syntheticToken("#idx"));
   emitConstant(NIL_VAL);
-  emitBytes(OP_SET_LOCAL, idx);
 
   int loopStart = currentChunk()->count;
 
   // call "next" on the sequence, passing #idx.
+  nativeVariable(vm.nextString->chars);
   emitBytes(OP_GET_LOCAL, seq);
   emitBytes(OP_GET_LOCAL, idx);
-  methodCall(vm.nextString->chars, 1);
-  emitBytes(OP_SET_LOCAL, idx);
-  // call "curr" on the sequence, passing #idx.
-  methodCall(vm.currString->chars, 1);
-  emitBytes(OP_SET_LOCAL, var);
+  emitBytes(OP_CALL, 2);
 
+  // revise #idx. bail if #idx == false.
+  emitBytes(OP_SET_LOCAL, idx);
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+
+  // call "curr" on the sequence, passing #idx.
+  nativeVariable(vm.currString->chars);
+  emitBytes(OP_GET_LOCAL, seq);
+  emitBytes(OP_GET_LOCAL, idx);
+  emitBytes(OP_CALL, 2);
+
+  emitBytes(OP_SET_LOCAL, var);
   emitByte(OP_POP);
 
   // body.

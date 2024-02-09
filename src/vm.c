@@ -70,7 +70,7 @@ void initVM() {
   vm.subscriptSetString = NULL;
   vm.subscriptSetString = intern("__set__");
   vm.lengthString = NULL;
-  vm.lengthString = intern("__length__");
+  vm.lengthString = intern("__len__");
 
   vm.seqClass = NULL;
   vm.mapClass = NULL;
@@ -361,17 +361,17 @@ static InterpretResult loop() {
       case OP_GET_LOCAL: {
         uint8_t slot = READ_BYTE();
         push(frame->slots[slot]);
-        printf("\nGET SLOT %i: ", slot);
-        printValue(frame->slots[slot]);
-        printf("\n");
+        // printf("\nGET SLOT %i: ", slot);
+        // printValue(frame->slots[slot]);
+        // printf("\n");
         break;
       }
       case OP_SET_LOCAL: {
         uint8_t slot = READ_BYTE();
         frame->slots[slot] = peek(0);
-        printf("\nSET SLOT %i to ", slot);
-        printValue(peek(0));
-        printf("\n");
+        // printf("\nSET SLOT %i to ", slot);
+        // printValue(peek(0));
+        // printf("\n");
         break;
       }
       case OP_GET_GLOBAL: {
@@ -521,6 +521,7 @@ static InterpretResult loop() {
         if (!callValue(peek(argCount), argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
+
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -615,12 +616,11 @@ static InterpretResult loop() {
             break;
           }
 
-          // otherwise just check the fields.
-          if (!validateMapKey(val)) {
-            return INTERPRET_RUNTIME_ERROR;
-          }
+          // otherwise check the fields & methods.
+          if (!validateMapKey(val)) return INTERPRET_RUNTIME_ERROR;
 
-          bool mapHasKey = mapHas(&instance->fields, val);
+          bool mapHasKey = mapHas(&instance->fields, val) ||
+                           mapHas(&instance->klass->methods, val);
           push(BOOL_VAL(mapHasKey));
           break;
         }

@@ -1,9 +1,4 @@
 
-let bar = 1;
-let bam = 2;
+let seq = ["a","b","c"];
 
-let seq = [1,2,3];
-
-for (x in seq) {
-  print x;
-}
+for (x in seq) { print x; }

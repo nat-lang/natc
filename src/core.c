@@ -74,12 +74,9 @@ static bool __objGet__(ObjInstance* obj, Value key) {
 static bool __objSet__(ObjInstance* obj, Value key, Value val) {
   if (!validateMapKey(key)) return false;
 
-  if (mapSet(&obj->fields, key, val)) {
-    push(OBJ_VAL(obj));  // return the object.
-    return true;
-  }
-
-  return false;
+  mapSet(&obj->fields, key, val);
+  push(OBJ_VAL(obj));  // return the object.
+  return true;
 }
 
 static bool __seqGet__(ObjSequence* seq, Value key) {
@@ -125,8 +122,7 @@ static bool __subscriptSet__(int argCount, Value* args) {
       push(obj);  // receiver.
       push(key);
       push(val);
-      callMethod(setFn, 2);
-      return true;
+      return callMethod(setFn, 2);
     }
 
     return __objSet__(instance, key, val);
@@ -160,8 +156,7 @@ static bool __subscriptGet__(int argCount, Value* args) {
       // set up the context for the function call.
       push(obj);  // receiver.
       push(key);
-      callMethod(getFn, 1);
-      return true;
+      return callMethod(getFn, 1);
     }
 
     return __objGet__(instance, key);
@@ -215,8 +210,24 @@ bool __seqIn__(int argCount, Value* args) {
   return true;
 }
 
+static ObjClass* getClass(char* name) {
+  Value obj;
+
+  if (!mapGet(&vm.globals, OBJ_VAL(intern(name)), &obj)) {
+    runtimeError("Couldn't find class %s", name);
+    return NULL;
+  }
+
+  if (!IS_CLASS(obj)) {
+    runtimeError("Not a class: %s", name);
+    return NULL;
+  }
+
+  return AS_CLASS(obj);
+}
+
 static void seqInstance() {
-  ObjInstance* seq = newInstance(vm.seqClass);
+  ObjInstance* seq = newInstance(getClass("Sequence"));
   push(OBJ_VAL(seq));
   initClass(vm.seqClass, 0);
 }
@@ -248,6 +259,7 @@ bool __mapEntries__(int argCount, Value* args) {
 
 bool __length__(int argCount, Value* args) {
   Value val = pop();
+  pop();  // native fn.
 
   if (IS_SEQUENCE(val)) {
     ObjSequence* seq = AS_SEQUENCE(val);
@@ -275,12 +287,12 @@ void initializeCore() {
   // native functions.
 
   // these two primarily used be the compiler.
-  // maybe this indicates they deserve an op code.
+  // maybe this indicates they deserve op codes.
   defineNativeFn(intern("__subscriptGet__"), 1, __subscriptGet__, &vm.globals);
   defineNativeFn(intern("__subscriptSet__"), 2, __subscriptSet__, &vm.globals);
 
   // user land.
-  defineNativeFn(intern("length"), 1, __length__, &vm.globals);
+  defineNativeFn(intern("len"), 1, __length__, &vm.globals);
 
   // native classes.
   vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals);
