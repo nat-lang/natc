@@ -1,7 +1,8 @@
 
-let seq = [1,2,3];
+let bar = 1;
+let bam = 2;
 
-print 1;
+let seq = [1,2,3];
 
 for (x in seq) {
   print x;

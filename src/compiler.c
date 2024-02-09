@@ -299,9 +299,7 @@ static void classDeclaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
-static Value identifier(char* name) {
-  return OBJ_VAL(copyString(name, strlen(name)));
-}
+static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
 
 static uint8_t identifierConstant(Token* name) {
   return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
@@ -368,22 +366,26 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
   return -1;
 }
 
-static void addLocal(Token name) {
+static int addLocal(Token name) {
   if (current->localCount == UINT8_COUNT) {
     error("Too many local variables in function.");
-    return;
+    return 0;
   }
 
   Local* local = &current->locals[current->localCount++];
+
   local->name = name;
   local->depth = -1;
   local->isCaptured = false;
+
+  return current->localCount - 1;
 }
 
-static void declareVariable() {
-  if (current->scopeDepth == 0) return;
+static int declareVariable() {
+  if (current->scopeDepth == 0) return 0;
 
   Token* name = &parser.previous;
+
   for (int i = current->localCount - 1; i >= 0; i--) {
     Local* local = &current->locals[i];
     if (local->depth != -1 && local->depth < current->scopeDepth) {
@@ -395,7 +397,7 @@ static void declareVariable() {
     }
   }
 
-  addLocal(*name);
+  return addLocal(*name);
 }
 
 static uint8_t argumentList() {
@@ -941,20 +943,35 @@ static int loopIncrement(int loopStart) {
 }
 
 static void forInStatement() {
+  // consume the identifier.
+  consume(TOKEN_IDENTIFIER, "Expect variable name.");
+  int var = declareVariable();
+  markInitialized();
+
+  consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
+
+  // keep track of the sequence.
+  int seq = addLocal(syntheticToken("#seq"));
+  expression();
+  emitBytes(OP_SET_LOCAL, seq);
+
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+  // initialize the index to nil.
+  int idx = addLocal(syntheticToken("#idx"));
+  emitConstant(NIL_VAL);
+  emitBytes(OP_SET_LOCAL, idx);
+
   int loopStart = currentChunk()->count;
 
-  // consume the identifier.
-  uint8_t constant = parseVariable("Expect identifier.");
-  defineVariable(constant);
-
-  // delimit.
-  consume(TOKEN_IN,
-          "Expect 'in' between identifier and sequence of for clause.");
-  // an expression that must reduce to an object
-  // implementing the iterator protocol.
-  expression();
-  emitBytes(OP_ITERATE, constant);
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+  // call "next" on the sequence, passing #idx.
+  emitBytes(OP_GET_LOCAL, seq);
+  emitBytes(OP_GET_LOCAL, idx);
+  methodCall(vm.nextString->chars, 1);
+  emitBytes(OP_SET_LOCAL, idx);
+  // call "curr" on the sequence, passing #idx.
+  methodCall(vm.currString->chars, 1);
+  emitBytes(OP_SET_LOCAL, var);
 
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);

@@ -361,11 +361,17 @@ static InterpretResult loop() {
       case OP_GET_LOCAL: {
         uint8_t slot = READ_BYTE();
         push(frame->slots[slot]);
+        printf("\nGET SLOT %i: ", slot);
+        printValue(frame->slots[slot]);
+        printf("\n");
         break;
       }
       case OP_SET_LOCAL: {
         uint8_t slot = READ_BYTE();
         frame->slots[slot] = peek(0);
+        printf("\nSET SLOT %i to ", slot);
+        printValue(peek(0));
+        printf("\n");
         break;
       }
       case OP_GET_GLOBAL: {
@@ -629,8 +635,8 @@ static InterpretResult loop() {
         return INTERPRET_RUNTIME_ERROR;
       }
       case OP_ITERATE: {
-        Value var = READ_CONSTANT();
-        Value value = peek(0);
+        int varSlot = READ_BYTE();
+        Value value = pop();
 
         // make sure we have a valid iterator; find the
         // iteration methods.
@@ -647,24 +653,34 @@ static InterpretResult loop() {
 
         // now put the methods to work.
 
-        printf("------------------");
-        printValue(var);
-        printf("------------------");
+        printf("\n------------------\n");
+        printf("%i", varSlot);
+        printf("\n------------------\n");
         printValue(value);
-        printf("------------------");
-
-        break;
+        printf("\n------------------\n");
+        printValue(nextFn);
+        printf("\n------------------\n");
 
         // ctx for the `next` fn.
-        push(value);
-        push(var);
-        printf("0");
+        push(value);                  // receiver.
+        push(frame->slots[varSlot]);  //
+
         if (!callMethod(nextFn, 1)) return INTERPRET_RUNTIME_ERROR;
 
-        // stop iteration
-        if (IS_BOOL(peek(0)) && AS_BOOL(peek(0)) == false) break;
+        Value idx = pop();
 
-        printf("1");
+        printf("\n------POPPED------\n");
+        printValue(idx);
+        printf("\n------------------\n");
+
+        // stop iteration.
+        if (IS_BOOL(idx) && AS_BOOL(idx) == false) {
+          push(idx);
+          break;
+        }
+
+        push(value);  // receiver.
+        push(idx);    //
         if (!callMethod(currFn, 1)) return INTERPRET_RUNTIME_ERROR;
 
         break;
