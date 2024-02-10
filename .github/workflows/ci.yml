@@ -1,4 +1,4 @@
-name: deploy
+name: ci
 
 on:
   push:
@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
+      - name: Run tests
+        run: make nat && make tests
       - name: Login to ECR
         run: docker login -u AWS -p $(aws ecr get-login-password --region us-east-2) ${{ secrets.ECR_REPOSITORY }}
         env:

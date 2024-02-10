@@ -1,7 +1,7 @@
 BUILD_DIR := build
 CURRENT_DIR := $(shell pwd)
 
-default: nat
+default: clean nat
 
 # Remove all build outputs and intermediate files.
 clean:
@@ -21,3 +21,6 @@ debug:
 debug-gc:
 	@ $(MAKE) -f util/c.make NAME=nat MODE=debug-gc SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
+
+tests:
+	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "all tests passed."

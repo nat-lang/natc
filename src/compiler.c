@@ -243,6 +243,7 @@ static ObjString* functionName(FunctionType type, char* name) {
     case TYPE_ANONYMOUS:
       return copyString("lambda", 6);
     case TYPE_SCRIPT:
+    default:
       return intern(name);
   }
 }
