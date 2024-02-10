@@ -56,7 +56,7 @@ typedef enum {
 
 extern VM vm;
 
-void initVM();
+bool initVM();
 void freeVM();
 void runtimeError(const char* format, ...);
 

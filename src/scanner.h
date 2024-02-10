@@ -73,5 +73,6 @@ void rewindScanner();
 void printScanner();
 void skipWhitespace();
 Token scanToken();
+Token dottedIdentifier();
 
 #endif

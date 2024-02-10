@@ -52,12 +52,12 @@ void compileFile(const char* path) {
 }
 
 // Load, compile, and execute module at [path].
-void runFile(const char* path) {
-  char* extPath = qualifyPath(path);
-  char* source = readFile(extPath);
+InterpretResult interpretFile(const char* path) {
+  char* qualifiedPath = qualifyPath(path);
+  char* source = readFile(qualifiedPath);
+
   InterpretResult result = interpret((char*)path, source);
   free(source);
 
-  if (result == INTERPRET_COMPILE_ERROR) exit(65);
-  if (result == INTERPRET_RUNTIME_ERROR) exit(70);
+  return result;
 }

@@ -283,7 +283,7 @@ bool __length__(int argCount, Value* args) {
   return false;
 }
 
-void initializeCore() {
+InterpretResult initializeCore() {
   // native functions.
 
   // these two primarily used be the compiler.
@@ -304,5 +304,5 @@ void initializeCore() {
   defineNativeFn(intern("entries"), 0, __mapEntries__, &vm.mapClass->methods);
 
   // core definitions.
-  runFile("./src/core/__index__");
+  return interpretFile("src/core/__index__");
 }

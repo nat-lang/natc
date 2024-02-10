@@ -42,7 +42,7 @@ void runtimeError(const char* format, ...) {
   resetStack();
 }
 
-void initVM() {
+bool initVM() {
   resetStack();
   vm.objects = NULL;
 
@@ -76,7 +76,7 @@ void initVM() {
   vm.seqClass = NULL;
   vm.mapClass = NULL;
 
-  initializeCore(&vm);
+  return initializeCore(&vm) == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -629,8 +629,7 @@ static InterpretResult loop() {
           runtimeError("Import path must be a string.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        runFile(AS_STRING(path)->chars);
-        return INTERPRET_OK;
+        return interpretFile(AS_STRING(path)->chars);
       }
     }
   }

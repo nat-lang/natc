@@ -129,12 +129,22 @@ static void initParser() {
   parser.next = scanToken();
 }
 
-static void advance() {
+static void shiftParser() {
   parser.penult = parser.previous;
   parser.previous = parser.current;
   parser.current = parser.next;
+}
+
+static void advance() {
+  shiftParser();
 
   parser.next = scanToken();
+  if (parser.current.type == TOKEN_ERROR) errorAtCurrent(parser.current.start);
+}
+
+static void advanceDottedIdentifier() {
+  shiftParser();
+  parser.next = dottedIdentifier();
   if (parser.current.type == TOKEN_ERROR) errorAtCurrent(parser.current.start);
 }
 
@@ -531,6 +541,11 @@ static void or_(bool canAssign) {
 static void string(bool canAssign) {
   emitConstant(OBJ_VAL(
       copyString(parser.previous.start + 1, parser.previous.length - 2)));
+}
+
+static void bareString() {
+  emitConstant(
+      OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
 
 static void namedVariable(Token name, bool canAssign) {
@@ -1048,9 +1063,10 @@ static void ifStatement() {
 }
 
 static void importStatement() {
-  consume(TOKEN_STRING, "Expect path to import.");
-  string(false);
-  consume(TOKEN_SEMICOLON, "Expect ';' after import statement.");
+  advanceDottedIdentifier();
+  consume(TOKEN_IDENTIFIER, "Expect path to import.");
+  advance();
+  bareString();
   emitByte(OP_IMPORT);
 }
 
@@ -1130,7 +1146,7 @@ static void declaration() {
 }
 
 static void statement() {
-  if (match(TOKEN_IMPORT)) {
+  if (check(TOKEN_IMPORT)) {
     importStatement();
   } else if (match(TOKEN_PRINT)) {
     printStatement();

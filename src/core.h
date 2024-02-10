@@ -3,6 +3,6 @@
 
 #include "vm.h"
 
-void initializeCore(VM* vm);
+InterpretResult initializeCore(VM* vm);
 
 #endif

@@ -168,6 +168,12 @@ static Token identifier() {
   return makeToken(identifierType());
 }
 
+Token dottedIdentifier() {
+  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
+  return scanner.current == scanner.start ? errorToken("Unexpected character.")
+                                          : makeToken(TOKEN_IDENTIFIER);
+}
+
 static Token number() {
   while (isDigit(peek())) advance();
 
