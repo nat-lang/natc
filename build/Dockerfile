@@ -8,8 +8,8 @@ COPY Makefile Makefile
 COPY util util
 COPY src src
 
-RUN make && \
+RUN make nat && \
     apk del make build-base && \
-    rm -rf src util Makefile release
+    rm -rf src util Makefile build
 
 CMD ["./nat"]
