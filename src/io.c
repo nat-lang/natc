@@ -10,7 +10,7 @@
 char* qualifyPath(const char* path) {
   static char buf[256];
 
-  snprintf(buf, sizeof(buf), "%s%s", path, NL_EXT);
+  snprintf(buf, sizeof(buf), "%s%s", path, NAT_EXT);
 
   return buf;
 }

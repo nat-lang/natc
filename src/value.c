@@ -39,7 +39,6 @@ bool findInValueArray(ValueArray* array, Value value) {
 void printValue(Value value) {
   switch (value.type) {
     case VAL_BOOL: {
-      // printf("printinf bool...");
       printf(AS_BOOL(value) ? "true" : "false");
       break;
     }

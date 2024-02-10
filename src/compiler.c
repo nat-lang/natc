@@ -102,7 +102,8 @@ static void errorAt(Token* token, const char* message) {
   else
     parser.panicMode = true;
 
-  fprintf(stderr, "[line %d] Error", token->line);
+  fprintf(stderr, "[line %d] in %s, Error", token->line,
+          current->function->name->chars);
 
   if (token->type == TOKEN_EOF) {
     fprintf(stderr, " at end");
@@ -1094,6 +1095,12 @@ static void returnStatement() {
   }
 }
 
+static void throwStatement() {
+  expression();
+  emitByte(OP_THROW);
+  consume(TOKEN_SEMICOLON, "Expect ';' after statement.");
+}
+
 static void whileStatement() {
   int loopStart = currentChunk()->count;
 
@@ -1146,22 +1153,24 @@ static void declaration() {
 }
 
 static void statement() {
-  if (check(TOKEN_IMPORT)) {
-    importStatement();
-  } else if (match(TOKEN_PRINT)) {
-    printStatement();
-  } else if (match(TOKEN_FOR)) {
+  if (match(TOKEN_FOR)) {
     forStatement();
   } else if (match(TOKEN_IF)) {
     ifStatement();
-  } else if (match(TOKEN_RETURN)) {
-    returnStatement();
-  } else if (match(TOKEN_WHILE)) {
-    whileStatement();
+  } else if (check(TOKEN_IMPORT)) {
+    importStatement();
   } else if (match(TOKEN_LEFT_BRACE)) {
     beginScope();
     block();
     endScope();
+  } else if (match(TOKEN_PRINT)) {
+    printStatement();
+  } else if (match(TOKEN_RETURN)) {
+    returnStatement();
+  } else if (match(TOKEN_THROW)) {
+    throwStatement();
+  } else if (match(TOKEN_WHILE)) {
+    whileStatement();
   } else {
     expressionStatement();
   }

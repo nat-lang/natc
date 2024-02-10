@@ -1,0 +1,10 @@
+let a = "a";
+let b = "b";
+
+// identity.
+
+assert(a != b);
+
+// concatenation.
+
+assert(a + b == "ab");

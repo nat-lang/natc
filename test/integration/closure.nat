@@ -1,0 +1,96 @@
+// function closure.
+
+let set;
+let get;
+
+let fnClosure = () => {
+  let a = 1;
+
+  set = (b) => { a = b; };
+  get = () => { return a; };
+};
+
+fnClosure();
+assert(get() == 1);
+set(2);
+assert(get() == 2);
+
+// for-condition-loop closure. `a` is the same variable
+// for the duration of the loop.
+
+let get1;
+let set1;
+let get2;
+let set2;
+
+let loopConditionClosure = () => {
+  for (let a = 1; a <= 2; a = a + 1) {
+    let get = () => {
+      return a;
+    };
+    let set = (b) => {
+      a = b;
+    };
+
+    if (get1 == nil) {
+      get1 = get;
+      set1 = set;
+    } else {
+      get2 = get;
+      set2 = set;
+    }
+  }
+};
+
+loopConditionClosure();
+
+assert(get1() == 3);
+assert(get1() == get2());
+
+set1(4);
+
+assert(get2() == 4);
+assert(get1() == get2());
+
+set2(5);
+
+assert(get2() == 5);
+assert(get1() == get2());
+
+// for-in-loop closure. same deal.
+
+get1 = set1 = get2 = set2 = nil;
+
+let loopInClosure = () => {
+  for (a in [1,2,3]) {
+    let get = () => {
+      return a;
+    };
+    let set = (b) => {
+      a = b;
+    };
+
+    if (get1 == nil) {
+      get1 = get;
+      set1 = set;
+    } else {
+      get2 = get;
+      set2 = set;
+    }
+  }
+};
+
+loopInClosure();
+
+assert(get1() == 3);
+assert(get1() == get2());
+
+set1(4);
+
+assert(get2() == 4);
+assert(get1() == get2());
+
+set2(5);
+
+assert(get2() == 5);
+assert(get1() == get2());

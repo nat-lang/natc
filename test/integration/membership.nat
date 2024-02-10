@@ -1,0 +1,14 @@
+
+
+// native support.
+
+let seq = [1,2,3];
+
+assert(1 in seq);
+assert(1 in seq.values);
+
+assert(2 in seq);
+assert(2 in seq.values);
+
+assert(!(4 in seq));
+assert(!(4 in seq.values));

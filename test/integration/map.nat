@@ -1,0 +1,53 @@
+
+// declaration and access.
+
+let map = {"a":1, "b": 2};
+
+let a = "a";
+
+assert(map["a"] == 1);
+assert(map[a] == 1);
+assert(map[(() => { return "a"; })()] == 1);
+
+let b = "b";
+
+assert(map["b"] == 2);
+assert(map[b] == 2);
+assert(map[(() => { return "b"; })()] == 2);
+
+// assignment.
+
+map["a"] = 3;
+
+assert(map["a"] == 3);
+
+// membership.
+
+assert("a" in map);
+
+map["c"] = 3;
+
+assert("c" in map);
+
+// key types.
+
+map = {1: 1, 2: 2};
+assert(map[1] == 1);
+
+map = {true: 1, false: 0};
+assert(map[true] == 1);
+
+map = {nil: 1};
+assert(map[nil] == 1);
+
+// native methods.
+
+map = map = {"a":1, "b": 2};
+
+for (key in map.keys()) {
+  assert(key == "a" or key == "b");
+}
+
+for (val in map.values()) {
+  assert(val == 1 or val == 2);
+}

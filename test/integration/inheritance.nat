@@ -1,0 +1,64 @@
+
+// override method.
+
+class A {
+  begin() => {
+    return 1;
+  }
+
+  conclude() => {
+    return 2;
+  }
+
+  compose() => {
+    return this.begin() + this.conclude();
+  }
+}
+
+class B < A {
+  conclude() => {
+    return 1;
+  }
+}
+
+assert(B().compose() == 2);
+
+// resolve super call in a parent.
+
+class A {
+  method() => {
+    return "A";
+  }
+}
+
+class B < A {
+  method() => {
+    return "B";
+  }
+
+  test() => {
+    return super.method();
+  }
+}
+
+class C < B {}
+
+assert(C().test() == "A");
+
+// close over a super method.
+
+class A {
+  method() => {
+    return "A";
+  }
+}
+
+class B < A {
+  method() => {
+    let closure = super.method;
+    
+    return closure;
+  }
+}
+
+assert(B().method()() == "A");

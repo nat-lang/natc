@@ -46,12 +46,13 @@ typedef enum {
   TOKEN_RETURN,
   TOKEN_SUPER,
   TOKEN_THIS,
+  TOKEN_THROW,
   TOKEN_TRUE,
   TOKEN_WHILE,
   TOKEN_IMPORT,
 
   TOKEN_ERROR,
-  TOKEN_EOF
+  TOKEN_EOF,
 } TokenType;
 
 typedef struct {

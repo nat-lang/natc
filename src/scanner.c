@@ -149,13 +149,21 @@ static TokenType identifierType() {
     case 't':
       if (scanner.current - scanner.start > 1) {
         switch (scanner.start[1]) {
-          case 'h':
-            return checkpointKeyword(2, 2, "is", TOKEN_THIS);
+          case 'h': {
+            if (scanner.current - scanner.start > 2) {
+              switch (scanner.start[2]) {
+                case 'i':
+                  return checkpointKeyword(2, 2, "is", TOKEN_THIS);
+                case 'r':
+                  return checkpointKeyword(2, 3, "row", TOKEN_THROW);
+              }
+            }
+          }
           case 'r':
             return checkpointKeyword(2, 2, "ue", TOKEN_TRUE);
         }
+        break;
       }
-      break;
     case 'w':
       return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
   }

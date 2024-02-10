@@ -144,7 +144,7 @@ bool initClass(ObjClass* klass, int argCount) {
   Value initializer;
   // core classes or their descendents may have a native initializer.
   if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
-    callMethod(initializer, argCount);
+    return callMethod(initializer, argCount);
   } else if (argCount != 0) {
     runtimeError("Expected 0 arguments but got %d.", argCount);
     return false;
@@ -163,8 +163,7 @@ static bool callValue(Value callee, int argCount) {
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
-        initClass(klass, argCount);
-        return true;
+        return initClass(klass, argCount);
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
@@ -630,6 +629,17 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
         return interpretFile(AS_STRING(path)->chars);
+      }
+      case OP_THROW: {
+        Value value = pop();
+
+        if (!IS_CLASS(value)) {
+          runtimeError("Can only throw classes.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        runtimeError("Exception: %s", AS_CLASS(value)->name->chars);
+        return INTERPRET_RUNTIME_ERROR;
       }
     }
   }

@@ -1,0 +1,105 @@
+
+// property assignment and access.
+
+class A {}
+
+let a = A();
+a.first = 1;
+a.second = 2;
+
+assert(a.first + a.second == 3);
+
+// methods.
+
+class B {
+  join(first, second) => {
+    return first + second;
+  }
+}
+
+let b = B();
+b.join("one", "two");
+
+assert(b.join("one", "two") == "onetwo");
+
+// initialization.
+
+class C {
+  init(one, two) => {
+    this.one = one;
+    this.two = two;
+  }
+}
+
+let c = C(1, 2);
+
+assert(c.one == 1);
+assert(c.two == 2);
+
+// synthetic `this`.
+
+class D {
+  self() => {
+    return this;
+  }
+}
+
+let d = D();
+
+assert(d.self() == d);
+
+// functions declared in methods.
+
+class E {
+  method(a) => {
+    let function = () => {
+      return a + 1;
+    };
+
+    return function;
+  }
+}
+
+let e = E();
+
+assert(e.method(1)() == 2);
+
+// classes declared in methods.
+
+class F {
+  init(value) => {
+    this.value = value;
+  }
+
+  g(value) => {
+    let self = this;
+
+    class G {
+      init(value) => {
+        this.value = value;
+      }
+
+      method() => {
+        return self.value + this.value;
+      }
+    }
+
+    return G(value);
+  }
+}
+
+let f = F(1);
+let g = f.g(1);
+
+assert(g.method() == 2);
+
+// callability.
+
+class H {
+  init(x) => { this.x = x; }
+  call(y) => { return this.x + y; }
+}
+
+let h = H(1);
+
+assert(h(1) == 2);

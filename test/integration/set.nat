@@ -1,0 +1,13 @@
+
+let nulSet = {};
+let numSet = {1, 2, 3};
+let strSet = {"a", "b", "c"};
+
+// membership.
+
+assert("a" in strSet and "b" in strSet);
+assert(1 in numSet);
+
+// as characteristic function.
+
+assert(numSet(1));

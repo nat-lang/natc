@@ -1,0 +1,16 @@
+import test/block
+import test/class
+import test/closure
+import test/exception
+import test/inheritance
+import test/iteration
+import test/lambda
+import test/length
+import test/loop
+import test/map
+import test/membership
+import test/recursion
+import test/sequence
+import test/set
+import test/string
+import test/tree

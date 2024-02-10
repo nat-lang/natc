@@ -1,11 +1,16 @@
 
+
+// native length.
+
 let seq = [1,2,3].values;
 
-print len(seq) == 3;
+assert(len(seq) == 3);
+
+// length protocol.
 
 class Lengthy {
   init(a) => { this.length = a; }
   __len__() => { return this.length; }
 }
 
-print len(Lengthy(0)) == 0;
+assert(len(Lengthy(0)) == 0);
