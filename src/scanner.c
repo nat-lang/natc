@@ -158,12 +158,13 @@ static TokenType identifierType() {
                   return checkpointKeyword(2, 3, "row", TOKEN_THROW);
               }
             }
+            break;
           }
           case 'r':
             return checkpointKeyword(2, 2, "ue", TOKEN_TRUE);
         }
-        break;
       }
+      break;
     case 'w':
       return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
   }
