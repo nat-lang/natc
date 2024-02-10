@@ -1,2 +1,6 @@
 build/**/*
+
+!build/Dockerfile
+!build/c.make
+
 **/*/.DS_Store

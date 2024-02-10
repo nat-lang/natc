@@ -11,15 +11,15 @@ clean:
 
 # Compile the interpreter.
 nat:
-	@ $(MAKE) -f util/c.make NAME=nat MODE=release SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
 
 debug:
-	@ $(MAKE) -f util/c.make NAME=nat MODE=debug SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
 
 debug-gc:
-	@ $(MAKE) -f util/c.make NAME=nat MODE=debug-gc SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-gc SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
 
 tests:

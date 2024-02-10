@@ -5,8 +5,8 @@ WORKDIR /app
 RUN apk update && apk add make build-base
 
 COPY Makefile Makefile
-COPY util util
 COPY src src
+COPY build build
 
 RUN make nat && \
     apk del make build-base && \
