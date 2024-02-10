@@ -24,4 +24,4 @@ jobs:
           context: .
           file: ./build/Dockerfile
           push: true
-          tags: ${{ secrets.ECR_REPOSITORY }}/natc:latest
+          tags: ${{ secrets.ECR_REPOSITORY }}/nat:latest
