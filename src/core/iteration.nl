@@ -1,4 +1,3 @@
-
 let next = (seq, idx) => {
   if ("__next__" in seq) { return seq.__next__(idx); }
 

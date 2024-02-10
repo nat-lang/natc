@@ -35,7 +35,7 @@ void runtimeError(const char* format, ...) {
     if (function->name == NULL) {
       fprintf(stderr, "script\n");
     } else {
-      fprintf(stderr, "%s()\n", function->name->chars);
+      fprintf(stderr, "%s\n", function->name->chars);
     }
   }
 
@@ -356,17 +356,11 @@ static InterpretResult loop() {
       case OP_GET_LOCAL: {
         uint8_t slot = READ_BYTE();
         push(frame->slots[slot]);
-        // printf("\nGET SLOT %i: ", slot);
-        // printValue(frame->slots[slot]);
-        // printf("\n");
         break;
       }
       case OP_SET_LOCAL: {
         uint8_t slot = READ_BYTE();
         frame->slots[slot] = peek(0);
-        // printf("\nSET SLOT %i to ", slot);
-        // printValue(peek(0));
-        // printf("\n");
         break;
       }
       case OP_GET_GLOBAL: {
@@ -636,6 +630,7 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
         runFile(AS_STRING(path)->chars);
+        return INTERPRET_OK;
       }
     }
   }
