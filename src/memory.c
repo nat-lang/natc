@@ -78,6 +78,16 @@ static void blackenObject(Obj* object) {
 #endif
 
   switch (object->type) {
+    case OBJ_BINDER: {
+      ObjBinder* binder = (ObjBinder*)object;
+      markArray(&binder->params);
+      break;
+    }
+    case OBJ_BLOCK: {
+      ObjBlock* block = (ObjBlock*)object;
+      blackenObject(&block->body->obj);
+      break;
+    }
     case OBJ_BOUND_METHOD: {
       ObjBoundMethod* bound = (ObjBoundMethod*)object;
       markValue(bound->receiver);
@@ -134,6 +144,17 @@ static void freeObject(Obj* object) {
 #endif
 
   switch (object->type) {
+    case OBJ_BINDER: {
+      ObjBinder* binder = (ObjBinder*)object;
+      freeValueArray(&binder->params);
+      FREE(ObjBinder, object);
+      break;
+    }
+    case OBJ_BLOCK: {
+      ObjBlock* block = (ObjBlock*)object;
+      freeObject(&block->body->obj);
+      break;
+    }
     case OBJ_BOUND_METHOD:
       FREE(ObjBoundMethod, object);
       break;
@@ -146,7 +167,6 @@ static void freeObject(Obj* object) {
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
-
       FREE(ObjClosure, object);
       break;
     }

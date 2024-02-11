@@ -155,6 +155,21 @@ bool initClass(ObjClass* klass, int argCount) {
 static bool callValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
+      case OBJ_BINDER: {
+        if (argCount != 1) {
+          runtimeError("Binder must be called with exactly 1 argument.");
+          return false;
+        }
+        if (!IS_BLOCK(peek(0))) {
+          runtimeError("Argument of binder must be a block.");
+          return false;
+        }
+        ObjBlock* block = AS_BLOCK(pop());
+        ObjBinder* binder = AS_BINDER(callee);
+        ObjFunction* function = newFunction();
+
+        return true;
+      }
       case OBJ_BOUND_METHOD: {
         ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
         vm.stackTop[-argCount - 1] = bound->receiver;
@@ -186,7 +201,8 @@ static bool callValue(Value callee, int argCount) {
     }
   }
   runtimeError(
-      "Can only call functions, classes, and objects with a 'call' method.");
+      "Can only call functions, classes, binders, and objects with a 'call' "
+      "method.");
   return false;
 }
 

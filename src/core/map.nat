@@ -7,8 +7,22 @@ class Map < __map__ {
   }
   
   __len__() => len(this.entries())
-  __curr__(idx) => this.entries()[1]
+  __curr__(idx) => this.entries()[idx]
 
-  keys() => fmap(this, fst)
-  values() => fmap(this, snd)
+  keys() => {
+    let seq = [];
+    for (entry in this) {
+      seq.add(entry[0]);
+    }
+    return seq;
+  }
+
+  values() => {
+    let seq = [];
+    for (entry in this) {
+      seq.add(entry[1]);
+    }
+    return seq;
+  }
+
 }

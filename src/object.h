@@ -7,6 +7,8 @@
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
+#define IS_BINDER(value) isObjType(value, OBJ_BINDER)
+#define IS_BLOCK(value) isObjType(value, OBJ_BLOCK)
 #define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
@@ -17,6 +19,8 @@
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
 
+#define AS_BINDER(value) ((ObjBinder *)AS_OBJ(value))
+#define AS_BLOCK(value) ((ObjBlock *)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
@@ -29,6 +33,8 @@
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
 
 typedef enum {
+  OBJ_BINDER,
+  OBJ_BLOCK,
   OBJ_BOUND_METHOD,
   OBJ_CLASS,
   OBJ_CLOSURE,
@@ -120,6 +126,18 @@ typedef struct {
   ValueArray values;
 } ObjSequence;
 
+typedef struct {
+  Obj obj;
+  ValueArray params;
+} ObjBinder;
+
+typedef struct {
+  Obj obj;
+  ObjClosure *body;
+} ObjBlock;
+
+ObjBinder *newBinder(ValueArray params);
+ObjBlock *newBlock(ObjClosure *body);
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);

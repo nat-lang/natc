@@ -6,4 +6,17 @@ class Sequence < __seq__ {
     return this;
   }
   __len__() => len(this.values)
+
+  // The cartesian product of [this] x [other].
+  product(other) => {
+    let seq = [];
+
+    for (x in this) {
+      for (y in other) {
+        seq.add([x, y]);
+      }
+    }
+
+    return seq;
+  }
 }

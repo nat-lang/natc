@@ -28,6 +28,18 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
+ObjBinder* newBinder(ValueArray params) {
+  ObjBinder* binder = ALLOCATE_OBJ(ObjBinder, OBJ_BINDER);
+  binder->params = params;
+  return binder;
+}
+
+ObjBlock* newBlock(ObjClosure* body) {
+  ObjBlock* block = ALLOCATE_OBJ(ObjBlock, OBJ_BLOCK);
+  block->body = body;
+  return block;
+}
+
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
   ObjBoundMethod* bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
   bound->receiver = receiver;
@@ -325,6 +337,12 @@ static void printMap(ObjMap* map) { printf("<map>"); }
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
+    case OBJ_BINDER: {
+      printf("<binder>");
+    }
+    case OBJ_BLOCK: {
+      printf("<block>");
+    }
     case OBJ_BOUND_METHOD:
       printFunction(AS_BOUND_METHOD(value)->method->function);
       break;

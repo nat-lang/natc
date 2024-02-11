@@ -1,0 +1,43 @@
+class Generator {
+  init() => {
+    this.body = nil;
+    this.sources = [];
+    this.predicates = [];
+  }
+
+  addBody(body) => {
+    this.body = body;
+    return this;
+  }
+  addSource(source) => {
+    this.sources.add(source);
+    return this;
+  }
+  addPredicate(pred) => {
+    this.predicates.add(pred);
+    return this;
+  }
+}
+
+class SeqGenerator < Generator {
+  generate() => {
+    let seq = [];
+
+    for (source in this.sources) {
+      for (element in source) {
+        for (pred in this.predicates) {
+          if (pred(element)) {
+            seq.add(this.body(element))
+          }
+        }
+      }
+    }
+
+    return seq;
+  }
+}
+
+class MapGenerator < Generator {}
+
+class SetGenerator < Generator {}
+

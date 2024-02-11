@@ -1,9 +1,9 @@
 let fst = (seq) => seq[0];
 let snd = (seq) => seq[1];
 
+// Map [fn] over the elements of [seq].
 let fmap = (seq, fn) => {
   let ret = [];
   for (x in seq) { ret.add(fn(x)); }
   return ret;
 };
-

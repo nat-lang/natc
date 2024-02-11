@@ -17,3 +17,5 @@ assert(seq[2] == 0);
 // index out of bounds.
 // seq[3];
 // seq[-1];
+
+// TODO product.

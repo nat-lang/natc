@@ -1,0 +1,23 @@
+
+let seq;
+
+// literal body.
+
+seq = [true | a in [1,2,3]];
+
+// variable body.
+
+seq = [a | a in [1,2,3]];
+
+// expression body.
+
+seq = [(a + 1) | a in seq];
+
+// multiple sources.
+
+// cartesian product of a and b.
+// seq = [[a, b] | a in [1,2,3], b in [3,2,1]];
+
+// predicates.
+
+// seq = [a | a in [1,2,3], a != 3];

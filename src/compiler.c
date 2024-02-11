@@ -865,14 +865,21 @@ static void brackets(bool canAssign) {
   // first datum.
   whiteDelimitedExpression();
 
-  // it's a sequence.
   if (check(TOKEN_COMMA)) {
+    // it's a simple sequence.
     methodCall("add", 1);
 
     while (match(TOKEN_COMMA)) {
       expression();
       methodCall("add", 1);
     }
+  } else if (check(TOKEN_PIPE)) {
+    // it's a sequence comprehension.
+    currentChunk()->constants.values[klass] = identifier("SeqGenerator");
+    advance();
+
+    do {
+    } while (match(TOKEN_COMMA));
   } else {
     // it's a tree.
     currentChunk()->constants.values[klass] = identifier("Tree");
