@@ -11,3 +11,4 @@ import test/integration/recursion
 import test/integration/sequence
 import test/integration/set
 import test/integration/string
+import test/integration/tree
