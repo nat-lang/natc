@@ -136,17 +136,20 @@ static void shiftParser() {
   parser.current = parser.next;
 }
 
+static void checkError() {
+  if (parser.current.type == TOKEN_ERROR) errorAtCurrent(parser.current.start);
+}
+
 static void advance() {
   shiftParser();
-
   parser.next = scanToken();
-  if (parser.current.type == TOKEN_ERROR) errorAtCurrent(parser.current.start);
+  checkError();
 }
 
 static void advanceDottedIdentifier() {
   shiftParser();
   parser.next = dottedIdentifier();
-  if (parser.current.type == TOKEN_ERROR) errorAtCurrent(parser.current.start);
+  checkError();
 }
 
 static void consume(TokenType type, const char* message) {
@@ -309,7 +312,7 @@ static void statement();
 static void declaration();
 static void classDeclaration();
 static ParseRule* getRule(TokenType type);
-static void parsePrecedence(Precedence precedence);
+static void parsePrecedence(Precedence precedence, bool whiteSensitive);
 
 static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
 
@@ -430,7 +433,7 @@ static uint8_t argumentList() {
 static void binary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
   ParseRule* rule = getRule(operatorType);
-  parsePrecedence((Precedence)(rule->precedence + 1));
+  parsePrecedence((Precedence)(rule->precedence + 1), false);
 
   switch (operatorType) {
     case TOKEN_BANG_EQUAL:
@@ -492,8 +495,6 @@ static void dot(bool canAssign) {
   }
 }
 
-// static void tree(bool canAssign) {}
-
 static void literal(bool canAssign) {
   switch (parser.previous.type) {
     case TOKEN_FALSE:
@@ -524,7 +525,7 @@ static void and_(bool canAssign) {
   int endJump = emitJump(OP_JUMP_IF_FALSE);
 
   emitByte(OP_POP);
-  parsePrecedence(PREC_AND);
+  parsePrecedence(PREC_AND, false);
 
   patchJump(endJump);
 }
@@ -536,7 +537,7 @@ static void or_(bool canAssign) {
   patchJump(elseJump);
   emitByte(OP_POP);
 
-  parsePrecedence(PREC_OR);
+  parsePrecedence(PREC_OR, false);
   patchJump(endJump);
 }
 
@@ -639,7 +640,7 @@ static void unary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
   // Compile the operand.
-  parsePrecedence(PREC_UNARY);
+  parsePrecedence(PREC_UNARY, false);
 
   // Emit the operator instruction.
   switch (operatorType) {
@@ -699,22 +700,31 @@ static bool peekSignature() {
   return found;
 }
 
-static void boundExpression() {
+static bool tryFn(FunctionType fnType) {
   if (peekSignature()) {
-    function(TYPE_FUNCTION);
+    function(fnType);
     markInitialized();
-  } else {
-    parsePrecedence(PREC_ASSIGNMENT);
+    return true;
   }
+  return false;
+}
+
+static void boundExpression() {
+  if (tryFn(TYPE_FUNCTION)) return;
+
+  parsePrecedence(PREC_ASSIGNMENT, false);
+}
+
+static void whiteSensitiveExpression() {
+  if (tryFn(TYPE_ANONYMOUS)) return;
+
+  parsePrecedence(PREC_ASSIGNMENT, true);
 }
 
 static void expression() {
-  if (peekSignature()) {
-    function(TYPE_ANONYMOUS);
-    markInitialized();
-  } else {
-    parsePrecedence(PREC_ASSIGNMENT);
-  }
+  if (tryFn(TYPE_ANONYMOUS)) return;
+
+  parsePrecedence(PREC_ASSIGNMENT, false);
 }
 
 static void block() {
@@ -831,7 +841,8 @@ static void braces(bool canAssign) {
 }
 
 // A sequence literal.
-static void brackets(bool canAssign) {
+/*
+static void sequence(bool canAssign) {
   nativeCall("Sequence", 0);
   // Empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
@@ -840,6 +851,40 @@ static void brackets(bool canAssign) {
     expression();
     methodCall("add", 1);
   } while (match(TOKEN_COMMA));
+
+  consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
+}
+*/
+
+// A sequence or tree literal.
+static void brackets(bool canAssign) {
+  int klass = nativeCall("Sequence", 0);
+
+  // empty brackets is an empty sequence.
+  if (check(TOKEN_RIGHT_BRACKET)) return advance();
+  // first datum.
+  whiteSensitiveExpression();
+
+  // it's a sequence.
+  if (check(TOKEN_COMMA)) {
+    methodCall("add", 1);
+
+    while (match(TOKEN_COMMA)) {
+      expression();
+      methodCall("add", 1);
+    }
+  } else {
+    // it's a tree.
+    currentChunk()->constants.values[klass] = identifier("Tree");
+    methodCall("setData", 1);
+
+    // and it may have branches.
+    while (!check(TOKEN_RIGHT_BRACKET)) {
+      whiteSensitiveExpression();
+      printf("complete ... %s", parser.previous.start);
+      methodCall("addChild", 1);
+    }
+  }
 
   consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }
@@ -1224,7 +1269,17 @@ ParseRule rules[] = {
 
 static ParseRule* getRule(TokenType type) { return &rules[type]; }
 
-static void parsePrecedence(Precedence precedence) {
+static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
+  bool whiteNext = peekWhitespace();
+
+  if (whiteSensitive) {
+    if (whiteNext)
+      printf("white next: (%i) %s", parser.current.length,
+             parser.current.start);
+    else
+      printf("no white: (%i) %s", parser.current.length, parser.current.start);
+  }
+
   advance();
 
   ParseFn prefixRule = getRule(parser.previous.type)->prefix;
@@ -1235,6 +1290,11 @@ static void parsePrecedence(Precedence precedence) {
 
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   prefixRule(canAssign);
+
+  if (whiteSensitive && whiteNext) {
+    printf("returning early at %s", parser.current.start);
+    return;
+  }
 
   while (precedence <= getRule(parser.current.type)->precedence) {
     advance();

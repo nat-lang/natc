@@ -1,6 +1,8 @@
 #ifndef nat_scanner_h
 #define nat_scanner_h
 
+#include "common.h"
+
 typedef enum {
   // Single-character tokens.
   TOKEN_LEFT_PAREN,
@@ -75,5 +77,6 @@ void printScanner();
 void skipWhitespace();
 Token scanToken();
 Token dottedIdentifier();
+bool peekWhitespace();
 
 #endif

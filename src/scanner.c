@@ -67,6 +67,11 @@ static Token errorToken(const char *message) {
   return token;
 }
 
+bool peekWhitespace() {
+  char c = peekNext();
+  return c == ' ' || c == '\r' || c == '\t' || c == '\n';
+}
+
 void skipWhitespace() {
   for (;;) {
     char c = peek();
