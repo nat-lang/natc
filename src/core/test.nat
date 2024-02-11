@@ -9,21 +9,15 @@ class Be {
     this.val = val;
   }
 
-  true_() => {
-    assert(this.va);
-  }
-  false_() => {
-    assert(!this.val);
-  }
+  true_() => assert(this.val)
+  false_() => assert(!this.val)
 }
 
 class Eq {
   init(val) => {
     this.val = val;
   }
-  call(val) => {
-    assert(this.val == val);
-  }
+  call(val) => assert(this.val == val)
 }
 
 class To {
@@ -39,6 +33,4 @@ class Expectation {
   }
 }
 
-let expect = (val) => {
-  return Expectation(val);
-};
+let expect = (val) => Expectation(val);

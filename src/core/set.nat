@@ -1,11 +1,10 @@
 
 class Set < __map__ {
   add(element) => {
-    return this[element] = true;
+    this[element] = true;
+    return this;
   }
-  call(element) => {
-    return element in this;
-  }
+  call(element) => element in this
   union(x) => {}
   intersection(x) => {}
   complement(x) => {}

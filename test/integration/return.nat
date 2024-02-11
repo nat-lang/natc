@@ -1,5 +1,5 @@
 
-// implicit return.
+// implicit return for functions.
 
 let fn;
 
@@ -8,3 +8,17 @@ assert(fn());
 
 fn = (a) => (b) => a + b;
 assert(fn(1)(1) == 2);
+
+// implicit return for methods.
+
+class A {
+  one() => 1
+  two() => 2
+  thr(a) => (b) => a + b
+}
+
+let a = A();
+
+assert(a.one() == 1);
+assert(a.two() == 2);
+assert(a.thr(1)(1) == 2);

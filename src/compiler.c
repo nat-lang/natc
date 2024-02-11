@@ -741,7 +741,7 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
-static void blockOrExpr() {
+static void blockOrExpression() {
   if (check(TOKEN_LEFT_BRACE)) {
     advance();
     block();
@@ -770,7 +770,7 @@ static void function(FunctionType type) {
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(TOKEN_ARROW, "Expect '=>' after signature.");
 
-  blockOrExpr();
+  blockOrExpression();
 
   ObjFunction* function = endCompiler();
   emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));

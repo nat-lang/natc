@@ -1,14 +1,14 @@
 
 class Map < __map__ {
-  set(key, val) => { return this[key] = val; }
-  get(key) => { return this[key]; }
-
-  __len__() => { return len(this.entries()); }
-
-  __curr__(idx) => {
-    return this.entries()[idx];
+  get(key) => this[key]
+  set(key, val) => {
+    this[key] = val;
+    return this;
   }
+  
+  __len__() => len(this.entries())
+  __curr__(idx) => this.entries()[1]
 
-  keys() => { return fmap(this, fst); }
-  values() => { return fmap(this, snd); }
+  keys() => fmap(this, fst)
+  values() => fmap(this, snd)
 }
