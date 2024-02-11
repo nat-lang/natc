@@ -77,6 +77,7 @@ void printScanner();
 void skipWhitespace();
 Token scanToken();
 Token dottedIdentifier();
-bool peekWhitespace();
+char charAt(int i);
+bool isWhite(char c);
 
 #endif

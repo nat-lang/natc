@@ -42,6 +42,8 @@ static char peekNext() {
 
 static char peek() { return *scanner.current; }
 
+char charAt(int i) { return scanner.current[i]; }
+
 static bool match(char expected) {
   if (isAtEnd()) return false;
   if (*scanner.current != expected) return false;
@@ -67,10 +69,7 @@ static Token errorToken(const char *message) {
   return token;
 }
 
-bool peekWhitespace() {
-  char c = peekNext();
-  return c == ' ' || c == '\r' || c == '\t' || c == '\n';
-}
+bool isWhite(char c) { return c == ' ' || c == '\r' || c == '\t' || c == '\n'; }
 
 void skipWhitespace() {
   for (;;) {

@@ -174,6 +174,12 @@ static bool match(TokenType type) {
   return true;
 }
 
+static bool prevWhite() {
+  int offset = parser.previous.length + parser.current.length + 1;
+
+  return isWhite(charAt(-offset));
+}
+
 static void emitByte(uint8_t byte) {
   writeChunk(currentChunk(), byte, parser.previous.line);
 }
@@ -715,7 +721,7 @@ static void boundExpression() {
   parsePrecedence(PREC_ASSIGNMENT, false);
 }
 
-static void whiteSensitiveExpression() {
+static void whiteDelimitedExpression() {
   if (tryFn(TYPE_ANONYMOUS)) return;
 
   parsePrecedence(PREC_ASSIGNMENT, true);
@@ -840,22 +846,6 @@ static void braces(bool canAssign) {
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
-// A sequence literal.
-/*
-static void sequence(bool canAssign) {
-  nativeCall("Sequence", 0);
-  // Empty brackets is an empty sequence.
-  if (check(TOKEN_RIGHT_BRACKET)) return advance();
-
-  do {
-    expression();
-    methodCall("add", 1);
-  } while (match(TOKEN_COMMA));
-
-  consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
-}
-*/
-
 // A sequence or tree literal.
 static void brackets(bool canAssign) {
   int klass = nativeCall("Sequence", 0);
@@ -863,7 +853,7 @@ static void brackets(bool canAssign) {
   // empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
   // first datum.
-  whiteSensitiveExpression();
+  whiteDelimitedExpression();
 
   // it's a sequence.
   if (check(TOKEN_COMMA)) {
@@ -880,8 +870,7 @@ static void brackets(bool canAssign) {
 
     // and it may have branches.
     while (!check(TOKEN_RIGHT_BRACKET)) {
-      whiteSensitiveExpression();
-      printf("complete ... %s", parser.previous.start);
+      whiteDelimitedExpression();
       methodCall("addChild", 1);
     }
   }
@@ -1270,16 +1259,6 @@ ParseRule rules[] = {
 static ParseRule* getRule(TokenType type) { return &rules[type]; }
 
 static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
-  bool whiteNext = peekWhitespace();
-
-  if (whiteSensitive) {
-    if (whiteNext)
-      printf("white next: (%i) %s", parser.current.length,
-             parser.current.start);
-    else
-      printf("no white: (%i) %s", parser.current.length, parser.current.start);
-  }
-
   advance();
 
   ParseFn prefixRule = getRule(parser.previous.type)->prefix;
@@ -1291,10 +1270,7 @@ static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   prefixRule(canAssign);
 
-  if (whiteSensitive && whiteNext) {
-    printf("returning early at %s", parser.current.start);
-    return;
-  }
+  if (whiteSensitive && prevWhite()) return;
 
   while (precedence <= getRule(parser.current.type)->precedence) {
     advance();
