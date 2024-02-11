@@ -57,7 +57,7 @@ typedef struct {
 
 typedef enum {
   TYPE_ANONYMOUS,
-  TYPE_FUNCTION,
+  TYPE_BOUND,
   TYPE_METHOD,
   TYPE_SCRIPT,
   TYPE_INITIALIZER,
@@ -247,7 +247,7 @@ static ObjString* functionName(FunctionType type, char* name) {
     case TYPE_INITIALIZER:
     case TYPE_METHOD:
       return copyString(parser.previous.start, parser.previous.length);
-    case TYPE_FUNCTION:
+    case TYPE_BOUND:
       return copyString(parser.penult.start, parser.penult.length);
     case TYPE_ANONYMOUS:
       return copyString("lambda", 6);
@@ -716,7 +716,7 @@ static bool tryFn(FunctionType fnType) {
 }
 
 static void boundExpression() {
-  if (tryFn(TYPE_FUNCTION)) return;
+  if (tryFn(TYPE_BOUND)) return;
 
   parsePrecedence(PREC_ASSIGNMENT, false);
 }
@@ -741,6 +741,16 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
+static void blockOrExpr() {
+  if (check(TOKEN_LEFT_BRACE)) {
+    advance();
+    block();
+  } else {
+    expression();
+    emitByte(OP_RETURN);
+  }
+}
+
 static void function(FunctionType type) {
   Compiler compiler;
   initCompiler(&compiler, type, NULL);
@@ -759,8 +769,8 @@ static void function(FunctionType type) {
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(TOKEN_ARROW, "Expect '=>' after signature.");
-  consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
-  block();
+
+  blockOrExpr();
 
   ObjFunction* function = endCompiler();
   emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));

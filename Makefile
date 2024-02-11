@@ -23,4 +23,4 @@ debug-gc:
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
 
 tests:
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "all tests passed."
+	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
