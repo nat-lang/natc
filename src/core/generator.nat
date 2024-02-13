@@ -27,7 +27,7 @@ class SeqGenerator < Generator {
       for (element in source) {
         for (pred in this.predicates) {
           if (pred(element)) {
-            seq.add(this.body(element))
+            seq.add(this.body(element));
           }
         }
       }

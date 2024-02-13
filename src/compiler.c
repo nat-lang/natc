@@ -878,6 +878,8 @@ static void brackets(bool canAssign) {
     currentChunk()->constants.values[klass] = identifier("SeqGenerator");
     advance();
 
+    methodCall("addBody", 1);
+
     do {
     } while (match(TOKEN_COMMA));
   } else {

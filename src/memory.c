@@ -85,7 +85,7 @@ static void blackenObject(Obj* object) {
     }
     case OBJ_BLOCK: {
       ObjBlock* block = (ObjBlock*)object;
-      blackenObject(&block->body->obj);
+      markArray(&block->chunk.constants);
       break;
     }
     case OBJ_BOUND_METHOD: {
@@ -152,7 +152,7 @@ static void freeObject(Obj* object) {
     }
     case OBJ_BLOCK: {
       ObjBlock* block = (ObjBlock*)object;
-      freeObject(&block->body->obj);
+      freeChunk(&block->chunk);
       break;
     }
     case OBJ_BOUND_METHOD:
@@ -223,6 +223,12 @@ static void markRoots() {
 
   markObject((Obj*)vm.initString);
   markObject((Obj*)vm.callString);
+  markObject((Obj*)vm.currString);
+  markObject((Obj*)vm.lengthString);
+  markObject((Obj*)vm.memberString);
+  markObject((Obj*)vm.nextString);
+  markObject((Obj*)vm.subscriptGetString);
+  markObject((Obj*)vm.subscriptSetString);
 }
 
 static void traceReferences() {

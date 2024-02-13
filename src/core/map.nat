@@ -9,6 +9,7 @@ class Map < __map__ {
   __len__() => len(this.entries())
   __curr__(idx) => this.entries()[idx]
 
+  //keys() => [entry[0] | entry in this.entries()]
   keys() => {
     let seq = [];
     for (entry in this) {
@@ -17,6 +18,7 @@ class Map < __map__ {
     return seq;
   }
 
+  //values() => => [entry[1] | entry in this.entries()]
   values() => {
     let seq = [];
     for (entry in this) {
@@ -24,5 +26,4 @@ class Map < __map__ {
     }
     return seq;
   }
-
 }

@@ -55,6 +55,12 @@ struct Obj {
 
 typedef struct {
   Obj obj;
+  int upvalueCount;
+  Chunk chunk;
+} ObjBlock;
+
+typedef struct {
+  Obj obj;
   int arity;
   int upvalueCount;
   Chunk chunk;
@@ -131,13 +137,8 @@ typedef struct {
   ValueArray params;
 } ObjBinder;
 
-typedef struct {
-  Obj obj;
-  ObjClosure *body;
-} ObjBlock;
-
 ObjBinder *newBinder(ValueArray params);
-ObjBlock *newBlock(ObjClosure *body);
+ObjBlock *newBlock();
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);

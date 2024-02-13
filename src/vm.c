@@ -157,16 +157,31 @@ static bool callValue(Value callee, int argCount) {
     switch (OBJ_TYPE(callee)) {
       case OBJ_BINDER: {
         if (argCount != 1) {
-          runtimeError("Binder must be called with exactly 1 argument.");
+          runtimeError("Binder expects exactly one argument.");
           return false;
         }
         if (!IS_BLOCK(peek(0))) {
           runtimeError("Argument of binder must be a block.");
           return false;
         }
-        ObjBlock* block = AS_BLOCK(pop());
+
+        // ObjBlock* block = AS_BLOCK(pop());
         ObjBinder* binder = AS_BINDER(callee);
         ObjFunction* function = newFunction();
+
+        // don't allow the fn to be collected
+        // while we're allocating the closure.
+        push(OBJ_VAL(function));
+
+        function->name = intern("<d-bound>");
+        function->arity = binder->params.count;
+
+        ObjClosure* closure = newClosure(function);
+
+        // the fn obj.
+        pop();
+        // leave the new closure on the stack.
+        push(OBJ_VAL(closure));
 
         return true;
       }
@@ -644,6 +659,9 @@ static InterpretResult loop() {
           runtimeError("Import path must be a string.");
           return INTERPRET_RUNTIME_ERROR;
         }
+        // this line is more complex than it looks:
+        // we're handing off the rest of interpretation,
+        // not just the interpretation of the imported file.
         return interpretFile(AS_STRING(path)->chars);
       }
       case OP_THROW: {

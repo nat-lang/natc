@@ -34,9 +34,10 @@ ObjBinder* newBinder(ValueArray params) {
   return binder;
 }
 
-ObjBlock* newBlock(ObjClosure* body) {
+ObjBlock* newBlock() {
   ObjBlock* block = ALLOCATE_OBJ(ObjBlock, OBJ_BLOCK);
-  block->body = body;
+  block->upvalueCount = 0;
+  initChunk(&block->chunk);
   return block;
 }
 
