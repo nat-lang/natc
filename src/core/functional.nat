@@ -7,3 +7,5 @@ let fmap = (seq, fn) => {
   for (x in seq) { ret.add(fn(x)); }
   return ret;
 };
+
+// let fmap = (seq, fn) => [fn(x) | x in seq];

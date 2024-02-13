@@ -55,12 +55,6 @@ struct Obj {
 
 typedef struct {
   Obj obj;
-  int upvalueCount;
-  Chunk chunk;
-} ObjBlock;
-
-typedef struct {
-  Obj obj;
   int arity;
   int upvalueCount;
   Chunk chunk;
@@ -98,6 +92,18 @@ typedef struct {
 } ObjClosure;
 
 typedef struct {
+  Obj obj;
+  uint8_t slot;
+  ObjString *name;
+} ObjBinder;
+
+typedef struct {
+  Obj obj;
+  ValueArray binders;
+  ObjClosure *closure;
+} ObjBlock;
+
+typedef struct {
   Value key;
   Value value;
 } MapEntry;
@@ -131,11 +137,6 @@ typedef struct {
   Obj obj;
   ValueArray values;
 } ObjSequence;
-
-typedef struct {
-  Obj obj;
-  ValueArray params;
-} ObjBinder;
 
 ObjBinder *newBinder(ValueArray params);
 ObjBlock *newBlock();

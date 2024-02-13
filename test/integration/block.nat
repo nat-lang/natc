@@ -25,3 +25,12 @@ assert(a == 0);
 assert(a == 0);
 a = 5;
 assert(a == 5);
+
+
+let f = () => {
+  print c;
+};
+
+let c = 1;
+
+f();

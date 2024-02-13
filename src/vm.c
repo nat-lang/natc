@@ -127,6 +127,32 @@ static bool call(ObjClosure* closure, int argCount) {
   return true;
 }
 
+static bool binderIdx(ValueArray binders, uint8_t slot) {
+  for (int i = 0; i < binders.count; i++) {
+    if (IS_BINDER(binders.values[i]) &&
+        AS_BINDER(binders.values[i])->slot == slot)
+      return i;
+  }
+  return -1;
+}
+
+static bool callBlock(ObjBlock* block, int argCount) {
+  if (!checkArity(block->binders.count, argCount)) return false;
+
+  Value arguments[block->closure->function->arity];
+
+  for (int i = 0; i < block->closure->function->arity; i++) {
+    int idx = binderIdx(block->binders, i);
+    arguments[i] = idx == -1 ? UNDEF_VAL : peek(idx);
+  }
+
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->closure = block->closure;
+  frame->ip = block->closure->function->chunk.code;
+  frame->slots = vm.stackTop - argCount - 1;
+  return true;
+}
+
 static bool callNative(ObjNative* native, int argCount) {
   if (!checkArity(native->arity, argCount)) return false;
 
@@ -165,23 +191,22 @@ static bool callValue(Value callee, int argCount) {
           return false;
         }
 
-        // ObjBlock* block = AS_BLOCK(pop());
+        ObjBlock* block = AS_BLOCK(peek(0));
         ObjBinder* binder = AS_BINDER(callee);
-        ObjFunction* function = newFunction();
 
-        // don't allow the fn to be collected
-        // while we're allocating the closure.
-        push(OBJ_VAL(function));
+        // the following two requirements can be relaxed
+        // if they're handled appropriately in [callBlock].
+        if (block->binders.count == block->closure->function->arity) {
+          runtimeError("No more parameters to bind in block.");
+          return false;
+        }
 
-        function->name = intern("<d-bound>");
-        function->arity = binder->params.count;
+        if (binder->slot > block->closure->function->arity) {
+          runtimeError("Vacuous bind.");
+          return false;
+        }
 
-        ObjClosure* closure = newClosure(function);
-
-        // the fn obj.
-        pop();
-        // leave the new closure on the stack.
-        push(OBJ_VAL(closure));
+        writeValueArray(&block->binders, OBJ_VAL(binder));
 
         return true;
       }

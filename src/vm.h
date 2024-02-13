@@ -15,10 +15,8 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-  // the tape and its machinery.
   Value stack[STACK_MAX];
   Value* stackTop;
-
   CallFrame frames[FRAMES_MAX];
   int frameCount;
   ObjMap strings;
