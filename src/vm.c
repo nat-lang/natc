@@ -115,6 +115,14 @@ static bool checkArity(int paramCount, int argCount) {
 static bool call(ObjClosure* closure, int argCount) {
   if (!checkArity(closure->function->arity, argCount)) return false;
 
+  if (closure->function->arity != closure->function->params.count) {
+    runtimeError("Unbound variables in %s: %i vs %i",
+                 closure->function->name->chars, closure->function->arity,
+                 closure->function->params.count);
+    // AS_PARAM(closure->function->params.values[0])->name->chars);
+    return false;
+  }
+
   if (vm.frameCount == FRAMES_MAX) {
     runtimeError("Stack overflow.");
     return false;
@@ -124,32 +132,34 @@ static bool call(ObjClosure* closure, int argCount) {
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
   frame->slots = vm.stackTop - argCount - 1;
-  return true;
-}
 
-static bool binderIdx(ValueArray binders, uint8_t slot) {
-  for (int i = 0; i < binders.count; i++) {
-    if (IS_BINDER(binders.values[i]) &&
-        AS_BINDER(binders.values[i])->slot == slot)
-      return i;
-  }
-  return -1;
-}
+  // accommodate any parameters that have been
+  // rebound out of order.
 
-static bool callBlock(ObjBlock* block, int argCount) {
-  if (!checkArity(block->binders.count, argCount)) return false;
+  Value sorted[argCount];
+  for (int i = 0; i < argCount; i++) {
+    Value value = closure->function->params.values[i];
 
-  Value arguments[block->closure->function->arity];
+    if (!IS_PARAM(value)) {
+      runtimeError("Unexpected value for param.");
+      return false;
+    }
 
-  for (int i = 0; i < block->closure->function->arity; i++) {
-    int idx = binderIdx(block->binders, i);
-    arguments[i] = idx == -1 ? UNDEF_VAL : peek(idx);
+    ObjParam* param = AS_PARAM(value);
+    sorted[i] = frame->slots[param->index + 1];
   }
 
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = block->closure;
-  frame->ip = block->closure->function->chunk.code;
-  frame->slots = vm.stackTop - argCount - 1;
+  for (int i = 0; i < argCount; i++) {
+    printf("in %s, \n", closure->function->name->chars);
+    printf("setting: ");
+    printValue(frame->slots[i + 1]);
+
+    printf(" to ");
+    printValue(sorted[i]);
+    printf("\n");
+    frame->slots[i + 1] = sorted[i];
+  }
+
   return true;
 }
 
@@ -186,27 +196,27 @@ static bool callValue(Value callee, int argCount) {
           runtimeError("Binder expects exactly one argument.");
           return false;
         }
-        if (!IS_BLOCK(peek(0))) {
-          runtimeError("Argument of binder must be a block.");
+        if (!IS_CLOSURE(peek(0))) {
+          runtimeError("Argument of binder must be a function.");
           return false;
         }
 
-        ObjBlock* block = AS_BLOCK(peek(0));
+        ObjClosure* closure = AS_CLOSURE(peek(0));
         ObjBinder* binder = AS_BINDER(callee);
 
-        // the following two requirements can be relaxed
-        // if they're handled appropriately in [callBlock].
-        if (block->binders.count == block->closure->function->arity) {
-          runtimeError("No more parameters to bind in block.");
-          return false;
+        for (int i = 0; i < closure->function->params.count; i++) {
+          if (!IS_PARAM(closure->function->params.values[i])) {
+            runtimeError("Unexpected param.");
+            return false;
+          }
+          ObjParam* param = AS_PARAM(closure->function->params.values[i]);
+
+          if (valuesEqual(OBJ_VAL(param->name), OBJ_VAL(binder->name))) {
+            param->index = 0;
+          }
         }
 
-        if (binder->slot > block->closure->function->arity) {
-          runtimeError("Vacuous bind.");
-          return false;
-        }
-
-        writeValueArray(&block->binders, OBJ_VAL(binder));
+        closure->function->arity++;
 
         return true;
       }

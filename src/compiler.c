@@ -242,6 +242,13 @@ static void patchJump(int offset) {
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
+static void storeParam(ObjString* name, int index) {
+  ObjParam* param = newParam(name, index);
+  writeValueArray(&current->function->params, OBJ_VAL(param));
+
+  printf("storing: %s\n", name->chars);
+}
+
 static ObjString* functionName(FunctionType type, char* name) {
   switch (type) {
     case TYPE_INITIALIZER:
@@ -757,6 +764,8 @@ static void function(FunctionType type) {
   beginScope();
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+
+  int idx = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       current->function->arity++;
@@ -765,6 +774,8 @@ static void function(FunctionType type) {
       }
       uint8_t constant = parseVariable("Expect parameter name.");
       defineVariable(constant);
+      storeParam(copyString(parser.previous.start, parser.previous.length),
+                 idx++);
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
@@ -943,6 +954,7 @@ static void classDeclaration() {
     // class declarations in order not to clash.
     beginScope();
     addLocal(syntheticToken("super"));
+
     defineVariable(0);
 
     namedVariable(className, false);

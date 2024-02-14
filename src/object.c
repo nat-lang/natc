@@ -30,15 +30,15 @@ static Obj* allocateObject(size_t size, ObjType type) {
 
 ObjBinder* newBinder(ValueArray params) {
   ObjBinder* binder = ALLOCATE_OBJ(ObjBinder, OBJ_BINDER);
-  binder->params = params;
+  binder->name = NULL;
   return binder;
 }
 
-ObjBlock* newBlock() {
-  ObjBlock* block = ALLOCATE_OBJ(ObjBlock, OBJ_BLOCK);
-  block->upvalueCount = 0;
-  initChunk(&block->chunk);
-  return block;
+ObjParam* newParam(ObjString* name, int index) {
+  ObjParam* param = ALLOCATE_OBJ(ObjParam, OBJ_PARAM);
+  param->name = name;
+  param->index = index;
+  return param;
 }
 
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
@@ -74,6 +74,7 @@ ObjFunction* newFunction() {
   function->upvalueCount = 0;
   function->name = NULL;
   initChunk(&function->chunk);
+  initValueArray(&function->params);
   return function;
 }
 
@@ -338,12 +339,12 @@ static void printMap(ObjMap* map) { printf("<map>"); }
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
-    case OBJ_BINDER: {
+    case OBJ_BINDER:
       printf("<binder>");
-    }
-    case OBJ_BLOCK: {
-      printf("<block>");
-    }
+      break;
+    case OBJ_PARAM:
+      printf("<param: %i>", AS_PARAM(value)->index);
+      break;
     case OBJ_BOUND_METHOD:
       printFunction(AS_BOUND_METHOD(value)->method->function);
       break;

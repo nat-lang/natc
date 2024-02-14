@@ -8,25 +8,25 @@
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
 #define IS_BINDER(value) isObjType(value, OBJ_BINDER)
-#define IS_BLOCK(value) isObjType(value, OBJ_BLOCK)
 #define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_MAP(value) isObjType(value, OBJ_MAP)
+#define IS_PARAM(value) isObjType(value, OBJ_PARAM)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
 
 #define AS_BINDER(value) ((ObjBinder *)AS_OBJ(value))
-#define AS_BLOCK(value) ((ObjBlock *)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
 #define AS_INSTANCE(value) ((ObjInstance *)AS_OBJ(value))
 #define AS_MAP(value) ((ObjMap *)AS_OBJ(value))
+#define AS_PARAM(value) ((ObjParam *)AS_OBJ(value))
 #define AS_NATIVE(value) (((ObjNative *)AS_OBJ(value)))
 #define AS_STRING(value) ((ObjString *)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
@@ -34,7 +34,6 @@
 
 typedef enum {
   OBJ_BINDER,
-  OBJ_BLOCK,
   OBJ_BOUND_METHOD,
   OBJ_CLASS,
   OBJ_CLOSURE,
@@ -42,6 +41,7 @@ typedef enum {
   OBJ_INSTANCE,
   OBJ_MAP,
   OBJ_NATIVE,
+  OBJ_PARAM,
   OBJ_SEQUENCE,
   OBJ_STRING,
   OBJ_UPVALUE,
@@ -52,14 +52,6 @@ struct Obj {
   bool isMarked;
   struct Obj *next;
 };
-
-typedef struct {
-  Obj obj;
-  int arity;
-  int upvalueCount;
-  Chunk chunk;
-  ObjString *name;
-} ObjFunction;
 
 typedef bool (*NativeFn)(int argCount, Value *args);
 
@@ -77,6 +69,38 @@ struct ObjString {
   uint32_t hash;
 };
 
+typedef struct {
+  Value key;
+  Value value;
+} MapEntry;
+
+typedef struct {
+  Obj obj;
+  int count;
+  int capacity;
+  MapEntry *entries;
+} ObjMap;
+
+typedef struct {
+  Obj obj;
+  ObjString *name;
+} ObjBinder;
+
+typedef struct {
+  Obj obj;
+  int index;
+  ObjString *name;
+} ObjParam;
+
+typedef struct {
+  Obj obj;
+  int arity;
+  int upvalueCount;
+  Chunk chunk;
+  ObjString *name;
+  ValueArray params;
+} ObjFunction;
+
 typedef struct ObjUpvalue {
   Obj obj;
   Value *location;
@@ -90,30 +114,6 @@ typedef struct {
   ObjUpvalue **upvalues;
   int upvalueCount;
 } ObjClosure;
-
-typedef struct {
-  Obj obj;
-  uint8_t slot;
-  ObjString *name;
-} ObjBinder;
-
-typedef struct {
-  Obj obj;
-  ValueArray binders;
-  ObjClosure *closure;
-} ObjBlock;
-
-typedef struct {
-  Value key;
-  Value value;
-} MapEntry;
-
-typedef struct {
-  Obj obj;
-  int count;
-  int capacity;
-  MapEntry *entries;
-} ObjMap;
 
 typedef struct {
   Obj obj;
@@ -139,7 +139,6 @@ typedef struct {
 } ObjSequence;
 
 ObjBinder *newBinder(ValueArray params);
-ObjBlock *newBlock();
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
@@ -147,6 +146,7 @@ ObjFunction *newFunction();
 ObjInstance *newInstance(ObjClass *klass);
 ObjMap *newMap();
 ObjNative *newNative(int arity, ObjString *name, NativeFn function);
+ObjParam *newParam(ObjString *name, int index);
 ObjSequence *newSequence();
 ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);

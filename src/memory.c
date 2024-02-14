@@ -80,12 +80,7 @@ static void blackenObject(Obj* object) {
   switch (object->type) {
     case OBJ_BINDER: {
       ObjBinder* binder = (ObjBinder*)object;
-      markArray(&binder->params);
-      break;
-    }
-    case OBJ_BLOCK: {
-      ObjBlock* block = (ObjBlock*)object;
-      markArray(&block->chunk.constants);
+      markObject((Obj*)binder->name);
       break;
     }
     case OBJ_BOUND_METHOD: {
@@ -121,6 +116,7 @@ static void blackenObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
       markArray(&function->chunk.constants);
+      markArray(&function->params);
       break;
     }
     case OBJ_MAP: {
@@ -129,6 +125,7 @@ static void blackenObject(Obj* object) {
       break;
     }
     case OBJ_NATIVE:
+    case OBJ_PARAM:
     case OBJ_STRING:
       break;
     case OBJ_SEQUENCE: {
@@ -144,17 +141,6 @@ static void freeObject(Obj* object) {
 #endif
 
   switch (object->type) {
-    case OBJ_BINDER: {
-      ObjBinder* binder = (ObjBinder*)object;
-      freeValueArray(&binder->params);
-      FREE(ObjBinder, object);
-      break;
-    }
-    case OBJ_BLOCK: {
-      ObjBlock* block = (ObjBlock*)object;
-      freeChunk(&block->chunk);
-      break;
-    }
     case OBJ_BOUND_METHOD:
       FREE(ObjBoundMethod, object);
       break;
@@ -173,6 +159,7 @@ static void freeObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
+      freeValueArray(&function->params);
       FREE(ObjFunction, object);
       break;
     }
@@ -182,14 +169,15 @@ static void freeObject(Obj* object) {
       FREE(ObjInstance, object);
       break;
     }
-    case OBJ_NATIVE:
-      FREE(ObjNative, object);
-      break;
     case OBJ_MAP: {
       ObjMap* map = (ObjMap*)object;
       freeMap(map);
       break;
     }
+    case OBJ_NATIVE:
+      FREE(ObjNative, object);
+      break;
+
     case OBJ_STRING: {
       ObjString* string = (ObjString*)object;
       FREE_ARRAY(char, string->chars, string->length + 1);
@@ -204,6 +192,9 @@ static void freeObject(Obj* object) {
       freeValueArray(&seq->values);
       FREE(ObjSequence, seq);
     }
+    case OBJ_BINDER:
+    case OBJ_PARAM:
+      break;
   }
 }
 
