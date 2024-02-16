@@ -1,8 +1,6 @@
 import src/core/exception
 import src/core/assertion
-
 import src/core/functional
-import src/core/generator
 import src/core/iteration
 import src/core/map
 import src/core/sequence

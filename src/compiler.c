@@ -13,6 +13,18 @@
 #endif
 
 typedef struct {
+  // local address of the bound variable.
+  int var;
+  // address of the object that implements
+  // the protocol.
+  int seq;
+  // current iteration index.
+  int idx;
+  // address of the first instruction of
+  int loopStart;
+} Iterator;
+
+typedef struct {
   Token next;
   Token current;
   Token previous;
@@ -80,18 +92,19 @@ typedef struct ClassCompiler {
 } ClassCompiler;
 
 Parser parser;
-Parser checkpoint;
+Parser checkpointA;
+Parser checkpointB;
 Compiler* current = NULL;
 ClassCompiler* currentClass = NULL;
 
 static Chunk* currentChunk() { return &current->function->chunk; }
 
-static void saveParser() {
+static void saveParser(Parser checkpoint) {
   saveScanner();
   checkpoint = parser;
 }
 
-static void rewindParser() {
+static void gotoParser(Parser checkpoint) {
   rewindScanner();
   parser = checkpoint;
 }
@@ -121,6 +134,13 @@ static void error(const char* message) { errorAt(&parser.previous, message); }
 
 static void errorAtCurrent(const char* message) {
   errorAt(&parser.current, message);
+}
+
+static void initIterator(Iterator* iter) {
+  iter->idx = 0;
+  iter->seq = 0;
+  iter->var = 0;
+  iter->loopStart = 0;
 }
 
 static void initParser() {
@@ -698,7 +718,7 @@ static void defineVariable(uint8_t global) {
 static bool peekSignature() {
   bool found;
 
-  saveParser();
+  saveParser(checkpointA);
   consumeQuiet(TOKEN_LEFT_PAREN);
 
   if (!check(TOKEN_RIGHT_PAREN)) {
@@ -711,7 +731,7 @@ static bool peekSignature() {
 
   found = !parser.hadError;
 
-  rewindParser();
+  gotoParser(checkpointA);
 
   return found;
 }
@@ -883,133 +903,6 @@ static void braces(bool canAssign) {
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
-static bool advanceToPipe() {
-  int bracketDepth;
-
-  for (;;) {
-    if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
-
-    if (bracketDepth == 0) {
-      if (check(TOKEN_PIPE)) return true;
-      if (check(TOKEN_RIGHT_BRACKET)) return false;
-    }
-  }
-}
-
-static void seqBody(Token params[], int paramCount) {
-  Compiler compiler = beginFunction(TYPE_ANONYMOUS);
-
-  for (int i = 0; i < paramCount; i++) {
-    uint8_t constant = parseVariable("Expect parameter name.");
-    defineVariable(constant);
-    storeParam(copyString(parser.previous.start, parser.previous.length), i);
-  }
-
-  expression();
-  endFunction(compiler);
-}
-
-// return true if we've found an iterable and are binding
-// a variable.
-static bool seqCondition(Token* param) {
-  if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
-    nativeVariable("GeneratorIterable");
-
-    bareString();
-    consume(TOKEN_IN, "Expect 'in' in generator iterable.");
-    expression();
-    emitBytes(OP_CALL, 2);
-
-    methodCall("addBody", 1);
-  }
-
-  Compiler compiler = beginFunction(TYPE_ANONYMOUS);
-}
-
-static void seqGenerator(int klass) {}
-
-static bool trySeqGenerator(int klass) {
-  saveParser();
-  if (advanceToPipe()) {
-    int paramCount = 0;
-    Token* params[MAX_PARAMS];
-
-    beginScope();
-    currentChunk()->constants.values[klass] = identifier("SeqGenerator");
-
-    // we'll parse the conditions first, since they
-    // declare the variables bound in the body.
-    do {
-      Token* boundVar;
-      if (seqCondition(boundVar)) {
-        if (paramCount == MAX_PARAMS) {
-          error("Can't have more than 255 parameters.");
-        }
-
-        methodCall("addIterable", 1);
-        params[paramCount++] = boundVar;
-      } else {
-        methodCall("addPredicate", 1);
-      }
-    } while (match(TOKEN_COMMA));
-
-    if (paramCount == 0) {
-      error("Expect at least one iterable in sequence generator.");
-    }
-
-    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
-
-    // now we parse the body.
-    rewindParser();
-    seqBody(params, paramCount);
-    methodCall("addBody", 1);
-    endScope();
-
-    // finally we
-
-    return true;
-  }
-
-  rewindParser();
-  return false;
-}
-
-// A tree literal, a sequence literal, or a sequence
-// generator.
-static void brackets(bool canAssign) {
-  int klass = nativeCall("Sequence", 0);
-
-  // empty brackets is an empty sequence.
-  if (check(TOKEN_RIGHT_BRACKET)) return advance();
-
-  if (trySeqGenerator(klass)) return advance();
-
-  // first datum of a tree or seq literal.
-  whiteDelimitedExpression();
-
-  if (check(TOKEN_COMMA)) {
-    // then it's a simple sequence.
-    methodCall("add", 1);
-
-    while (match(TOKEN_COMMA)) {
-      expression();
-      methodCall("add", 1);
-    }
-  } else {
-    // it's a tree.
-    currentChunk()->constants.values[klass] = identifier("Tree");
-    methodCall("setData", 1);
-
-    // and it may have branches.
-    while (!check(TOKEN_RIGHT_BRACKET)) {
-      whiteDelimitedExpression();
-      methodCall("addChild", 1);
-    }
-  }
-
-  consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
-}
-
 // Subscript or "array indexing" operator like `foo[bar]`.
 static void subscript(bool canAssign) {
   // store the address of the function identifier.
@@ -1126,52 +1019,175 @@ static int loopIncrement(int loopStart) {
   return incrementStart;
 }
 
-// Invokes the iteration protocol.
-static void forInStatement() {
+// Parse an iterator.
+static Iterator iterator() {
+  Iterator iter;
+  initIterator(&iter);
+
   // consume the identifier.
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
-  int var = declareVariable();
+  iter.var = declareVariable();
   emitConstant(NIL_VAL);
   markInitialized();
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
 
   // keep track of the sequence.
-  int seq = addLocal(syntheticToken("#seq"));
+  iter.seq = addLocal(syntheticToken("#seq"));
   expression();
 
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
-
   // initialize the index to nil.
-  int idx = addLocal(syntheticToken("#idx"));
+  iter.idx = addLocal(syntheticToken("#idx"));
   emitConstant(NIL_VAL);
 
-  int loopStart = currentChunk()->count;
+  iter.loopStart = currentChunk()->count;
 
+  return iter;
+}
+
+static int iterationNext(Iterator iter) {
   // call "next" on the sequence, passing #idx.
   nativeVariable(vm.nextString->chars);
-  emitBytes(OP_GET_LOCAL, seq);
-  emitBytes(OP_GET_LOCAL, idx);
+  emitBytes(OP_GET_LOCAL, iter.seq);
+  emitBytes(OP_GET_LOCAL, iter.idx);
   emitBytes(OP_CALL, 2);
 
   // revise #idx. bail if #idx == false.
-  emitBytes(OP_SET_LOCAL, idx);
+  emitBytes(OP_SET_LOCAL, iter.idx);
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);
 
+  return exitJump;
+}
+
+static void iterationCurr(Iterator iter) {
   // call "curr" on the sequence, passing #idx.
   nativeVariable(vm.currString->chars);
-  emitBytes(OP_GET_LOCAL, seq);
-  emitBytes(OP_GET_LOCAL, idx);
+  emitBytes(OP_GET_LOCAL, iter.seq);
+  emitBytes(OP_GET_LOCAL, iter.idx);
   emitBytes(OP_CALL, 2);
 
-  emitBytes(OP_SET_LOCAL, var);
+  emitBytes(OP_SET_LOCAL, iter.var);
   emitByte(OP_POP);
+}
 
-  // body.
+static bool advanceToPipe() {
+  int bracketDepth = 0;
+
+  for (;;) {
+    if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
+    if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
+
+    if (bracketDepth == 0) {
+      if (check(TOKEN_PIPE)) return true;
+      if (check(TOKEN_RIGHT_BRACKET)) return false;
+    }
+
+    advance();
+  }
+}
+
+static void seqCondition() {
+  Iterator iter;
+  initIterator(&iter);
+  int exitJump = 0;
+  bool isIteration = false;
+
+  if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
+    isIteration = true;
+
+    beginScope();
+    iter = iterator();
+    exitJump = iterationNext(iter);
+    iterationCurr(iter);
+    statement();
+  } else {
+  }
+
+  if (match(TOKEN_COMMA)) {
+    seqCondition();
+  } else {
+    // now we parse the body.
+    saveParser(checkpointB);
+    gotoParser(checkpointA);
+
+    whiteDelimitedExpression();
+  }
+
+  if (isIteration) {
+    emitLoop(iter.loopStart);
+    patchJump(exitJump);
+    emitByte(OP_POP);
+    endScope();
+  }
+}
+
+static bool trySeqGenerator() {
+  saveParser(checkpointA);
+
+  if (advanceToPipe()) {
+    beginScope();
+
+    // we'll parse the conditions first, since they
+    // declare the variables bound in the body.
+    seqCondition();
+    endScope();
+
+    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
+
+    // finally we pick up at the end of the expression.
+    gotoParser(checkpointB);
+
+    return true;
+  }
+
+  gotoParser(checkpointA);
+  return false;
+}
+
+// A tree literal, a sequence literal, or a sequence
+// generator.
+static void brackets(bool canAssign) {
+  int klass = nativeCall("Sequence", 0);
+
+  // empty brackets is an empty sequence.
+  if (check(TOKEN_RIGHT_BRACKET)) return advance();
+  if (trySeqGenerator()) return;
+
+  // first datum of a tree or seq literal.
+  whiteDelimitedExpression();
+
+  if (check(TOKEN_COMMA)) {
+    // then it's a simple sequence.
+    methodCall("add", 1);
+
+    while (match(TOKEN_COMMA)) {
+      expression();
+      methodCall("add", 1);
+    }
+  } else {
+    // it's a tree.
+    currentChunk()->constants.values[klass] = identifier("Tree");
+    methodCall("setData", 1);
+
+    // and it may have branches.
+    while (!check(TOKEN_RIGHT_BRACKET)) {
+      whiteDelimitedExpression();
+      methodCall("addChild", 1);
+    }
+  }
+
+  consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
+}
+
+// Invokes the iteration protocol.
+static void forInStatement() {
+  Iterator iter = iterator();
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+  int exitJump = iterationNext(iter);
+  iterationCurr(iter);
   statement();
-  emitLoop(loopStart);
-
+  emitLoop(iter.loopStart);
   patchJump(exitJump);
   emitByte(OP_POP);
 }

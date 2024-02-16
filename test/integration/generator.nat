@@ -72,3 +72,9 @@ assert(seq == [
   [true],
   [true, true]
 ]);
+
+seq = [a + b | a in [1,2,3], a != 3, b in [1,2,3]];
+assert(seq == [
+  2,3,4,
+  3,4,5
+]);
