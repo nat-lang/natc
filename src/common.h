@@ -7,5 +7,6 @@
 
 #define UINT8_COUNT (UINT8_MAX + 1)
 #define NAT_EXT ".nat"
+#define MAX_PARAMS 255
 
 #endif

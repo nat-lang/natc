@@ -138,7 +138,7 @@ typedef struct {
   ValueArray values;
 } ObjSequence;
 
-ObjBinder *newBinder(ValueArray params);
+ObjBinder *newBinder(ObjString *name);
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);

@@ -204,6 +204,7 @@ static bool callValue(Value callee, int argCount) {
         ObjClosure* closure = AS_CLOSURE(peek(0));
         ObjBinder* binder = AS_BINDER(callee);
 
+        bool found = false;
         for (int i = 0; i < closure->function->params.count; i++) {
           if (!IS_PARAM(closure->function->params.values[i])) {
             runtimeError("Unexpected param.");
@@ -213,7 +214,15 @@ static bool callValue(Value callee, int argCount) {
 
           if (valuesEqual(OBJ_VAL(param->name), OBJ_VAL(binder->name))) {
             param->index = 0;
+            found = true;
           }
+        }
+
+        // 1/2 of the implementation for binding vars free in the
+        // closure that were *never* bound.
+        if (!found) {
+          ObjParam* param = newParam(binder->name, 0);
+          writeValueArray(&closure->function->params, OBJ_VAL(param));
         }
 
         closure->function->arity++;
@@ -697,6 +706,8 @@ static InterpretResult loop() {
         // this line is more complex than it looks:
         // we're handing off the rest of interpretation,
         // not just the interpretation of the imported file.
+        // note that this leaves a nil on the stack for each
+        // import. that may not be what we want.
         return interpretFile(AS_STRING(path)->chars);
       }
       case OP_THROW: {
@@ -709,6 +720,17 @@ static InterpretResult loop() {
 
         runtimeError("Exception: %s", AS_CLASS(value)->name->chars);
         return INTERPRET_RUNTIME_ERROR;
+      }
+      case OP_BINDER: {
+        Value value = pop();
+
+        if (!IS_STRING(value)) {
+          runtimeError("Can only construct binder from a string.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjBinder* binder = newBinder(AS_STRING(value));
+        push(OBJ_VAL(binder));
       }
     }
   }

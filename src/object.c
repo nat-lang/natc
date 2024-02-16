@@ -28,7 +28,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
-ObjBinder* newBinder(ValueArray params) {
+ObjBinder* newBinder(ObjString* name) {
   ObjBinder* binder = ALLOCATE_OBJ(ObjBinder, OBJ_BINDER);
   binder->name = NULL;
   return binder;

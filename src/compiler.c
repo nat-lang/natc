@@ -80,7 +80,7 @@ typedef struct ClassCompiler {
 } ClassCompiler;
 
 Parser parser;
-static Parser checkpoint;
+Parser checkpoint;
 Compiler* current = NULL;
 ClassCompiler* currentClass = NULL;
 
@@ -167,6 +167,7 @@ static void consumeQuiet(TokenType type) {
 }
 
 static bool check(TokenType type) { return parser.current.type == type; }
+static bool peek(TokenType type) { return parser.next.type == type; }
 
 static bool match(TokenType type) {
   if (!check(type)) return false;
@@ -434,7 +435,7 @@ static uint8_t argumentList() {
     do {
       expression();
 
-      if (argCount == 255) error("Can't have more than 255 arguments.");
+      if (argCount == MAX_PARAMS) error("Can't have more than 255 arguments.");
 
       argCount++;
     } while (match(TOKEN_COMMA));
@@ -692,6 +693,8 @@ static void defineVariable(uint8_t global) {
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
+// this could prob just check if parser.next is
+// TOKEN_LEFT_PAREN and call it a day.
 static bool peekSignature() {
   bool found;
 
@@ -758,18 +761,14 @@ static void blockOrExpression() {
   }
 }
 
-static void function(FunctionType type) {
-  Compiler compiler;
-  initCompiler(&compiler, type, NULL);
-  beginScope();
-
-  consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+static void signature() {
+  consume(TOKEN_LEFT_PAREN, "Expect '(' at beginning of signature.");
 
   int idx = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       current->function->arity++;
-      if (current->function->arity > 255) {
+      if (current->function->arity > MAX_PARAMS) {
         errorAtCurrent("Can't have more than 255 parameters.");
       }
       uint8_t constant = parseVariable("Expect parameter name.");
@@ -780,16 +779,33 @@ static void function(FunctionType type) {
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(TOKEN_ARROW, "Expect '=>' after signature.");
+}
 
-  blockOrExpression();
-
-  ObjFunction* function = endCompiler();
-  emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
-
-  for (int i = 0; i < function->upvalueCount; i++) {
+static void upvalues(Compiler compiler) {
+  for (int i = 0; i < compiler.function->upvalueCount; i++) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
     emitByte(compiler.upvalues[i].index);
   }
+}
+
+static Compiler beginFunction(FunctionType type) {
+  Compiler compiler;
+  initCompiler(&compiler, type, NULL);
+  beginScope();
+  return compiler;
+}
+
+static void endFunction(Compiler compiler) {
+  ObjFunction* function = endCompiler();
+  emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+  upvalues(compiler);
+}
+
+static void function(FunctionType type) {
+  Compiler compiler = beginFunction(type);
+  signature();
+  blockOrExpression();
+  endFunction(compiler);
 }
 
 static void method() {
@@ -867,32 +883,118 @@ static void braces(bool canAssign) {
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
-// A sequence or tree literal.
+static bool advanceToPipe() {
+  int bracketDepth;
+
+  for (;;) {
+    if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
+
+    if (bracketDepth == 0) {
+      if (check(TOKEN_PIPE)) return true;
+      if (check(TOKEN_RIGHT_BRACKET)) return false;
+    }
+  }
+}
+
+static void seqBody(Token params[], int paramCount) {
+  Compiler compiler = beginFunction(TYPE_ANONYMOUS);
+
+  for (int i = 0; i < paramCount; i++) {
+    uint8_t constant = parseVariable("Expect parameter name.");
+    defineVariable(constant);
+    storeParam(copyString(parser.previous.start, parser.previous.length), i);
+  }
+
+  expression();
+  endFunction(compiler);
+}
+
+// return true if we've found an iterable and are binding
+// a variable.
+static bool seqCondition(Token* param) {
+  if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
+    nativeVariable("GeneratorIterable");
+
+    bareString();
+    consume(TOKEN_IN, "Expect 'in' in generator iterable.");
+    expression();
+    emitBytes(OP_CALL, 2);
+
+    methodCall("addBody", 1);
+  }
+
+  Compiler compiler = beginFunction(TYPE_ANONYMOUS);
+}
+
+static void seqGenerator(int klass) {}
+
+static bool trySeqGenerator(int klass) {
+  saveParser();
+  if (advanceToPipe()) {
+    int paramCount = 0;
+    Token* params[MAX_PARAMS];
+
+    beginScope();
+    currentChunk()->constants.values[klass] = identifier("SeqGenerator");
+
+    // we'll parse the conditions first, since they
+    // declare the variables bound in the body.
+    do {
+      Token* boundVar;
+      if (seqCondition(boundVar)) {
+        if (paramCount == MAX_PARAMS) {
+          error("Can't have more than 255 parameters.");
+        }
+
+        methodCall("addIterable", 1);
+        params[paramCount++] = boundVar;
+      } else {
+        methodCall("addPredicate", 1);
+      }
+    } while (match(TOKEN_COMMA));
+
+    if (paramCount == 0) {
+      error("Expect at least one iterable in sequence generator.");
+    }
+
+    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
+
+    // now we parse the body.
+    rewindParser();
+    seqBody(params, paramCount);
+    methodCall("addBody", 1);
+    endScope();
+
+    // finally we
+
+    return true;
+  }
+
+  rewindParser();
+  return false;
+}
+
+// A tree literal, a sequence literal, or a sequence
+// generator.
 static void brackets(bool canAssign) {
   int klass = nativeCall("Sequence", 0);
 
   // empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
-  // first datum.
+
+  if (trySeqGenerator(klass)) return advance();
+
+  // first datum of a tree or seq literal.
   whiteDelimitedExpression();
 
   if (check(TOKEN_COMMA)) {
-    // it's a simple sequence.
+    // then it's a simple sequence.
     methodCall("add", 1);
 
     while (match(TOKEN_COMMA)) {
       expression();
       methodCall("add", 1);
     }
-  } else if (check(TOKEN_PIPE)) {
-    // it's a sequence comprehension.
-    currentChunk()->constants.values[klass] = identifier("SeqGenerator");
-    advance();
-
-    methodCall("addBody", 1);
-
-    do {
-    } while (match(TOKEN_COMMA));
   } else {
     // it's a tree.
     currentChunk()->constants.values[klass] = identifier("Tree");

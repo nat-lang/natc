@@ -156,6 +156,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_IMPORT", offset);
     case OP_THROW:
       return simpleInstruction("OP_THROW", offset);
+    case OP_BINDER:
+      return simpleInstruction("OP_BINDER", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

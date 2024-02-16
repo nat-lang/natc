@@ -14,3 +14,19 @@ let curr = (seq, idx) => {
 
   return seq[idx];
 };
+
+class Iter {
+  init() {
+    this.seq = [];
+    this.binder = nil;
+  }
+  setSeq(seq) {
+    this.seq = seq;
+  }
+  setBinder(binder) {
+    this.binder = binder;
+  }
+  __bool__() {
+
+  }
+}
