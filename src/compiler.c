@@ -245,6 +245,7 @@ static uint8_t makeConstant(Value value) {
   int constant = addConstant(currentChunk(), value);
   if (constant > UINT8_MAX) {
     error("Too many constants in one chunk.");
+    printf("CONSTANT COUNT: %i\n", constant);
     return 0;
   }
 
@@ -960,7 +961,7 @@ static void iterationCurr(Iterator iter) {
 static void iterationEnd(Iterator iter, int exitJump) {
   emitLoop(iter.loopStart);
   patchJump(exitJump);
-  emitByte(OP_POP);  // last jump condition.
+  emitByte(OP_POP);  // jump condition.
 }
 
 Parser seqGenerator(Parser checkpointA, int seq) {
@@ -968,12 +969,15 @@ Parser seqGenerator(Parser checkpointA, int seq) {
   initIterator(&iter);
 
   int exitJump = 0;
+  int predJump = 0;
   bool isIteration = false;
+  bool isPredicate = false;
   Parser checkpointB = checkpointA;
 
   fprintf(stderr, "parsing generator\n");
 
   if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
+    // bound variable and iterable to draw from.
     fprintf(stderr, "parsing iterable\n");
     isIteration = true;
 
@@ -982,21 +986,31 @@ Parser seqGenerator(Parser checkpointA, int seq) {
     exitJump = iterationNext(iter);
     iterationCurr(iter);
   } else {
+    isPredicate = true;
     fprintf(stderr, "parsing predicate\n");
-    // predicate
+    // the predicate to test against.
+    expression();
+
+    predJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
   }
 
   fprintf(stderr, "... \n");
 
   if (match(TOKEN_COMMA)) {
+    // parse the conditions recursively, since this
+    // makes scope management simple. in particular,
+    // variables will be in scope in every condition
+    // to their right.
     checkpointB = seqGenerator(checkpointA, seq);
   } else if (check(TOKEN_RIGHT_BRACKET)) {
     fprintf(stderr, "parsing body\n");
-    // now we parse the body.
+    // now we parse the body, first saving the point
+    // where the generator ends.
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    // load the seq instance.
+    // load the seq instance and append the expression.
     emitBytes(OP_GET_LOCAL, seq);
     expression();
     methodCall("add", 1);
@@ -1007,6 +1021,13 @@ Parser seqGenerator(Parser checkpointA, int seq) {
   if (isIteration) {
     iterationEnd(iter, exitJump);
     endScope();
+  } else if (isPredicate) {
+    // we need to jump over this last condition pop
+    // if the condition was truthy.
+    int elseJump = emitJump(OP_JUMP);
+    patchJump(predJump);
+    emitByte(OP_POP);
+    patchJump(elseJump);
   }
 
   return checkpointB;
@@ -1037,7 +1058,8 @@ static bool trySeqGenerator() {
 
     // the sequence instance is on top of the stack now;
     // we'll need to refer to it when we hit the bottom
-    // of the condition clauses. we also want
+    // of the condition clauses. we'll also need the local
+    // slots to be offset by 1.
     int seq = addLocal(syntheticToken("#seq"));
     markInitialized();
 
