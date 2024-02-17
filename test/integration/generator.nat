@@ -1,0 +1,6 @@
+let seq;
+
+// literal body.
+
+seq = [true | a in [1,2,3]];
+assert(seq == [true,true,true]);

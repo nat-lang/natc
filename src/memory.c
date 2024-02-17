@@ -203,6 +203,12 @@ static void markRoots() {
 
   markObject((Obj*)vm.initString);
   markObject((Obj*)vm.callString);
+  markObject((Obj*)vm.currString);
+  markObject((Obj*)vm.lengthString);
+  markObject((Obj*)vm.memberString);
+  markObject((Obj*)vm.nextString);
+  markObject((Obj*)vm.subscriptGetString);
+  markObject((Obj*)vm.subscriptSetString);
 }
 
 static void traceReferences() {

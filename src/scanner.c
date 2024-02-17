@@ -6,21 +6,25 @@
 #include "common.h"
 
 Scanner scanner;
-static Scanner checkpoint;
 
-void initScanner(const char *source) {
+Scanner initScanner(const char *source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
+
+  return scanner;
 }
 
 void printScanner(Scanner sc) {
   fprintf(stderr, "(scanner current): %s\n", scanner.current);
 }
 
-void saveScanner() { checkpoint = scanner; }
+Scanner saveScanner() {
+  Scanner checkpoint = scanner;
+  return checkpoint;
+}
 
-void rewindScanner() { scanner = checkpoint; }
+void gotoScanner(Scanner checkpoint) { scanner = checkpoint; }
 
 static bool isAlpha(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
@@ -254,6 +258,8 @@ Token scanToken() {
       return makeToken(TOKEN_SLASH);
     case '*':
       return makeToken(TOKEN_STAR);
+    case '|':
+      return makeToken(TOKEN_PIPE);
     case '!':
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=':

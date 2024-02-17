@@ -37,3 +37,7 @@ for (x in Iterable()) {
     (x == "a") or (x == "b") or (x == "c")
   );
 }
+
+for (x in [1,2,3]) {
+  assert(x == 1 || x == 2 || x == 3);
+}
