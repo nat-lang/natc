@@ -1,6 +1,17 @@
 let seq;
 
-// literal body.
-
 seq = [true | a in [1,2,3]];
-assert(seq == [true,true,true]);
+
+print seq.values;
+
+seq = [a | a in [1,2,3]];
+
+print seq.values;
+
+seq = [(a + 1) | a in [1,2,3]];
+
+print seq.values;
+
+seq = [[a, b] | a in [1,2,3], b in [3,2,1]];
+
+print seq.values;

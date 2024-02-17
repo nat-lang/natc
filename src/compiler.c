@@ -326,6 +326,9 @@ static void beginScope() { current->scopeDepth++; }
 static void endScope() {
   current->scopeDepth--;
 
+  printf("END SCOPE at %i; local count: %i\n", current->scopeDepth,
+         current->localCount);
+
   while (current->localCount > 0 &&
          current->locals[current->localCount - 1].depth > current->scopeDepth) {
     if (current->locals[current->localCount - 1].isCaptured) {
@@ -333,6 +336,12 @@ static void endScope() {
     } else {
       emitByte(OP_POP);
     }
+
+    Local* local = &current->locals[current->localCount - 1];
+    printf("POPPING LOCAL %s at depth: %i index: %i\n",
+           copyString(local->name.start, local->name.length)->chars,
+           current->scopeDepth, current->localCount);
+
     current->localCount--;
   }
 }
@@ -433,13 +442,21 @@ static int declareVariable() {
 
   Token* name = &parser.previous;
 
+  printf("CURRENT: %p; local count: %i \n", current, current->localCount - 1);
+
   for (int i = current->localCount - 1; i >= 0; i--) {
     Local* local = &current->locals[i];
     if (local->depth != -1 && local->depth < current->scopeDepth) {
       break;
     }
 
+    printf("CHECKING %s at depth: %i\n",
+           copyString(local->name.start, local->name.length)->chars,
+           current->scopeDepth);
+
     if (identifiersEqual(name, &local->name)) {
+      printf("ALREADY %s at depth: %i\n",
+             copyString(name->start, name->length)->chars, current->scopeDepth);
       error("Already a variable with this name in this scope.");
     }
   }
@@ -890,6 +907,10 @@ static Iterator iterator() {
 
   // consume the identifier.
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
+  printf("DECLARE (iter) iter %s at depth: %i\n",
+         copyString(parser.previous.start, parser.previous.length)->chars,
+         current->scopeDepth);
+  printf("---------------------\n");
   iter.var = declareVariable();
   emitConstant(NIL_VAL);
   markInitialized();
@@ -899,10 +920,12 @@ static Iterator iterator() {
   // keep track of the sequence.
   iter.seq = addLocal(syntheticToken("#seq"));
   expression();
+  markInitialized();
 
   // initialize the index to nil.
   iter.idx = addLocal(syntheticToken("#idx"));
   emitConstant(NIL_VAL);
+  markInitialized();
 
   iter.loopStart = currentChunk()->count;
 
@@ -935,7 +958,13 @@ static void iterationCurr(Iterator iter) {
   emitByte(OP_POP);
 }
 
-Parser seqGenerator(Parser checkpointA) {
+static void iterationEnd(Iterator iter, int exitJump) {
+  emitLoop(iter.loopStart);
+  patchJump(exitJump);
+  emitByte(OP_POP);  // last jump condition.
+}
+
+Parser seqGenerator(Parser checkpointA, int gen) {
   Iterator iter;
   initIterator(&iter);
 
@@ -943,7 +972,7 @@ Parser seqGenerator(Parser checkpointA) {
   bool isIteration = false;
   Parser checkpointB = checkpointA;
 
-  fprintf(stderr, "parsing generator:\n %s", parser.current.start);
+  fprintf(stderr, "parsing generator\n");
 
   if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
     fprintf(stderr, "parsing iterable\n");
@@ -958,24 +987,24 @@ Parser seqGenerator(Parser checkpointA) {
     // predicate
   }
 
-  fprintf(stderr, "... :%s\n", parser.current.start);
+  fprintf(stderr, "... \n");
 
   if (match(TOKEN_COMMA)) {
-    seqGenerator(checkpointA);
+    seqGenerator(checkpointA, gen);
   } else if (check(TOKEN_RIGHT_BRACKET)) {
     fprintf(stderr, "parsing body\n");
     // now we parse the body.
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    whiteDelimitedExpression();
+    emitBytes(OP_GET_LOCAL, gen);
+    expression();
     methodCall("add", 1);
+    emitByte(OP_POP);
   }
 
   if (isIteration) {
-    emitLoop(iter.loopStart);
-    patchJump(exitJump);
-    emitByte(OP_POP);
+    iterationEnd(iter, exitJump);
     endScope();
   }
 
@@ -998,16 +1027,25 @@ bool advanceToPipe() {
 }
 
 static bool trySeqGenerator() {
-  fprintf(stderr, "trying seq gen %s...", parser.current.start);
+  fprintf(stderr, "trying seq gen\n");
   Parser checkpointA = saveParser();
 
   if (advanceToPipe()) {
     fprintf(stderr, "advanced to pipe\n");
-    advance();
-    beginScope();
+    consume(TOKEN_PIPE, "Expect '|' between body and conditions.");
 
-    Parser checkpointB = seqGenerator(checkpointA);
-    endScope();
+    // the sequence instance is on top of the stack now;
+    // we'll need to refer to it when we hit the bottom
+    // of the condition clauses. we also want
+    int seq = addLocal(syntheticToken("#seq"));
+    markInitialized();
+
+    Parser checkpointB = seqGenerator(checkpointA, seq);
+
+    // reclaim the local slot but leave the sequence instance
+    // on the stack. can this be done without making the scope
+    // interface leaky?
+    current->localCount--;
 
     printf("1");
 
@@ -1131,6 +1169,11 @@ static void classDeclaration() {
 static void letDeclaration() {
   uint8_t var = parseVariable("Expect variable name.");
 
+  printf("DECLARE (let) iter %s at depth: %i\n",
+         copyString(parser.previous.start, parser.previous.length)->chars,
+         current->scopeDepth);
+  printf("---------------------\n");
+
   if (match(TOKEN_EQUAL)) {
     boundExpression();
   } else {
@@ -1179,9 +1222,7 @@ static void forInStatement() {
   int exitJump = iterationNext(iter);
   iterationCurr(iter);
   statement();
-  emitLoop(iter.loopStart);
-  patchJump(exitJump);
-  emitByte(OP_POP);
+  iterationEnd(iter, exitJump);
 }
 
 static void forConditionStatement() {
