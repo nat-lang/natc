@@ -66,14 +66,13 @@ typedef enum {
 } FunctionType;
 
 typedef struct {
-  // local address of the bound variable.
+  // local slot of the bound variable.
   int var;
-  // address of the object that implements
-  // the protocol.
+  // local slot of the object that implements the protocol.
   int seq;
-  // current iteration index.
+  // local slot of current iteration index.
   int idx;
-  // address of the first instruction of
+  // stack offset of the first instruction of the body.
   int loopStart;
 } Iterator;
 
@@ -964,7 +963,7 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitByte(OP_POP);  // last jump condition.
 }
 
-Parser seqGenerator(Parser checkpointA, int gen) {
+Parser seqGenerator(Parser checkpointA, int seq) {
   Iterator iter;
   initIterator(&iter);
 
@@ -990,16 +989,18 @@ Parser seqGenerator(Parser checkpointA, int gen) {
   fprintf(stderr, "... \n");
 
   if (match(TOKEN_COMMA)) {
-    seqGenerator(checkpointA, gen);
+    checkpointB = seqGenerator(checkpointA, seq);
   } else if (check(TOKEN_RIGHT_BRACKET)) {
     fprintf(stderr, "parsing body\n");
     // now we parse the body.
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    emitBytes(OP_GET_LOCAL, gen);
+    // load the seq instance.
+    emitBytes(OP_GET_LOCAL, seq);
     expression();
     methodCall("add", 1);
+    // pop the seq instance.
     emitByte(OP_POP);
   }
 
