@@ -887,22 +887,19 @@ static void braces(bool canAssign) {
 static Iterator iterator() {
   Iterator iter;
   initIterator(&iter);
-  fprintf(stderr, "0.1\n");
 
   // consume the identifier.
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
   iter.var = declareVariable();
   emitConstant(NIL_VAL);
   markInitialized();
-  fprintf(stderr, "0.2\n");
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
 
   // keep track of the sequence.
   iter.seq = addLocal(syntheticToken("#seq"));
-  fprintf(stderr, "0.25\n");
   expression();
-  fprintf(stderr, "0.3\n");
+
   // initialize the index to nil.
   iter.idx = addLocal(syntheticToken("#idx"));
   emitConstant(NIL_VAL);
@@ -938,7 +935,7 @@ static void iterationCurr(Iterator iter) {
   emitByte(OP_POP);
 }
 
-static Parser seqGenerator(Parser checkpointA) {
+Parser seqGenerator(Parser checkpointA) {
   Iterator iter;
   initIterator(&iter);
 
@@ -953,19 +950,15 @@ static Parser seqGenerator(Parser checkpointA) {
     isIteration = true;
 
     beginScope();
-    fprintf(stderr, "0\n");
     iter = iterator();
-    fprintf(stderr, "1\n");
     exitJump = iterationNext(iter);
-    fprintf(stderr, "2\n");
     iterationCurr(iter);
-    fprintf(stderr, "3\n");
   } else {
     fprintf(stderr, "parsing predicate\n");
     // predicate
   }
 
-  fprintf(stderr, "...\n");
+  fprintf(stderr, "... :%s\n", parser.current.start);
 
   if (match(TOKEN_COMMA)) {
     seqGenerator(checkpointA);
@@ -976,6 +969,7 @@ static Parser seqGenerator(Parser checkpointA) {
     gotoParser(checkpointA);
 
     whiteDelimitedExpression();
+    methodCall("add", 1);
   }
 
   if (isIteration) {
@@ -989,26 +983,26 @@ static Parser seqGenerator(Parser checkpointA) {
 }
 
 bool advanceToPipe() {
-  int bracketDepth = 0;
+  // assume we've already consumed one leading bracket.
+  int bracketDepth = 1;
 
   for (;;) {
     if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
     if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
 
-    if (bracketDepth == 0) {
-      if (check(TOKEN_PIPE)) return true;
-      if (check(TOKEN_RIGHT_BRACKET)) return false;
-    }
+    if (check(TOKEN_PIPE) && bracketDepth == 1) return true;
+    if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == 0) return false;
 
     advance();
   }
 }
 
 static bool trySeqGenerator() {
-  printf("trying seq gen...");
+  fprintf(stderr, "trying seq gen %s...", parser.current.start);
   Parser checkpointA = saveParser();
 
   if (advanceToPipe()) {
+    fprintf(stderr, "advanced to pipe\n");
     advance();
     beginScope();
 
@@ -1023,6 +1017,7 @@ static bool trySeqGenerator() {
 
     return true;
   }
+  fprintf(stderr, "no pipe\n");
 
   gotoParser(checkpointA);
   return false;

@@ -628,7 +628,9 @@ static InterpretResult loop() {
           runtimeError("Import path must be a string.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        return interpretFile(AS_STRING(path)->chars);
+        InterpretResult result = interpretFile(AS_STRING(path)->chars);
+        pop();
+        return result;
       }
       case OP_THROW: {
         Value value = pop();

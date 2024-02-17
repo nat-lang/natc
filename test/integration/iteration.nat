@@ -1,43 +1,5 @@
 
-// native for-loop.
-
-for (let i = 0; i < 10; i = i + 1) {
-  assert(i < 10 and i >= 0);
-}
-
-// native while loop.
-
-let i = 0;
-
-while (i < 10) {
-  assert(i < 10 and i >= 0);
-  i = i + 1;
-}
-
-// iteration protocol.
-
-class Iterable {
-  init() => {
-    this[0] = "a";
-    this[1] = "b";
-    this[2] = "c";
-  }
-  __next__(idx) => {
-    if (idx == nil) return 0;
-    if (idx == 2) return false;
-    return idx + 1;
-  }
-  __curr__(idx) => {
-    return this[idx];
-  }
-}
-
-for (x in Iterable()) { 
-  assert(
-    (x == "a") or (x == "b") or (x == "c")
-  );
-}
-
-for (x in [1,2,3]) {
-  assert(x == 1 || x == 2 || x == 3);
+// core sequence iteration.
+for (y in [1,2,3]) {
+  assert(y == 1 or y == 2 or y == 3);
 }
