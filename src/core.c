@@ -84,6 +84,11 @@ static bool __seqGet__(ObjSequence* seq, Value key) {
 
   int idx = AS_NUMBER(key);
 
+  if (idx > seq->values.count - 1 || idx < 0) {
+    runtimeError("Index %i out of bounds.", idx);
+    return false;
+  }
+
   push(seq->values.values[idx]);
   return true;
 }

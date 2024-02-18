@@ -382,7 +382,7 @@ static InterpretResult loop() {
         Value name = READ_CONSTANT();
         if (mapSet(&vm.globals, name, peek(0))) {
           mapDelete(&vm.globals, name);
-          runtimeError("Undefined variable");  // '%s'.", name->chars);
+          runtimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
         break;

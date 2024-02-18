@@ -3,116 +3,81 @@ let seq;
 // literal body.
 
 seq = [true | a in [1,2,3]];
-// assert(seq == [true,true,true]);
-print seq.values;
+assert(seq == [true,true,true]);
 
 // variable body.
 
 seq = [a | a in [1,2,3]];
-// assert(seq == [1,2,3]);
-print seq.values;
+
+print a.values;
+
+assert(seq == [1,2,3]);
 
 // expression body.
 
 seq = [(a + 1) | a in [1,2,3]];
-// assert(seq == [2,3,4]);
-print seq.values;
+assert(seq == [2,3,4]);
 
 // multiple iterable conditions.
 
 // cartesian product of a and b.
 seq = [[a, b] | a in [1,2,3], b in [3,2,1]];
-// assert(seq == [
-//   [1, 3],
-//   [1, 2],
-//   [1, 1],
-//   [2, 3],
-//   [2, 2],
-//   [2, 1],
-//   [3, 3],
-//   [3, 2],
-//   [3, 1]
-// ]);
-
-for (x in seq) {
-  print x.values;
-}
 
 // predicative condition.
 
 seq = [a | a in [1,2,3], a != 3];
-// assert(seq == [1,2]);
-print seq.values;
+assert(seq == [1,2]);
 
 seq = [a | a in [1,2,3], a != 3, a != 2];
-print seq.values;
-// assert(seq == [1]);
+assert(seq == [1]);
 
 // vacuous condition.
 
 seq = [a | a in [1,2,3], true];
-// assert(seq == [1,2,3]);
-print seq.values;
+assert(seq == [1,2,3]);
 
 seq = [a | a in [1,2,3], false];
-// assert(seq == []);
-print seq.values;
+assert(seq == []);
 
 // nested iterable conditions.
 
-seq = [a | b in [[1,2],[3,4],[5,6]], a in b];
-// assert(seq == [1,2,3,4,5,6]);
-print seq.values;
+seq = [a | a in b, b in [[1,2],[3,4],[5,6]]];
+assert(seq == [1,2,3,4,5,6]);
 
-seq = [a + c | b in [[1,2],[3,4]], a in b, c in [9,8,7]];
-// assert(seq == [
+seq = [a + c | a in b, b in [[1,2],[3,4]], c in [9,8,7]];
+assert(seq == [
   // 1,2,3,4,
   // 1,2,3,4,
   // 1,2,3,4,
   // 1,2,3,4,
-// ]);
-print seq.values;
+]);
 
+seq = [[a, b] | a in c, b in c, c in [[1,2],[3,4]]];
+assert(seq == [
+  [1,1],
+  [1,2],
+  [2,1],
+  [2,2],
+  [3,3],
+  [3,4],
+  [4,3],
+  [4,4]
+]);
 
-seq = [[a, b] | c in [[1,2],[3,4]], a in c, b in c];
-// assert(seq == [
-//   [1,1],
-//   [1,2],
-//   [2,1],
-//   [2,2],
-//   [3,3],
-//   [3,4],
-//   [4,3],
-//   [4,4]
-// ]);
-for (x in seq) {
-  print x.values;
-}
-
-seq = [[b, c] | a in [[1,2],[3,4]], b in a, c in [9,8,7]];
+seq = [[b, c] | b in a, a in [[1,2],[3,4]], c in [9,8,7]];
 // assert(seq == []);
-for (x in seq) {
-  print x.values;
-}
 
-// nested generator in body.
+// nested iterable bodies.
 
 seq = [[true | b in a] | a in [[1,2],[3], [4,5]]];
-// assert(seq == [
-//   [true,true],
-//   [true],
-//   [true, true]
-// ]);
-print seq.values;
-
-// nested generator in condition
-seq = [a| a in [a | a in [1,2,3]]];
-// assert(seq == [1,2,3]);
-print seq.values;
+assert(seq == [
+  [true,true],
+  [true],
+  [true, true]
+]);
 
 seq = [a + b | a in [1,2,3], a != 3, b in [1,2,3]];
-// assert(seq == [
-//   2,3,4,
-//   3,4,5
-// ]);
-print seq.values;
+assert(seq == [
+  2,3,4,
+  3,4,5
+]);
