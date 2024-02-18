@@ -209,6 +209,7 @@ static void markRoots() {
   markObject((Obj*)vm.nextString);
   markObject((Obj*)vm.subscriptGetString);
   markObject((Obj*)vm.subscriptSetString);
+  markObject((Obj*)vm.equalString);
 }
 
 static void traceReferences() {

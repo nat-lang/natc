@@ -200,8 +200,8 @@ bool __seqAdd__(int argCount, Value* args) {
 }
 
 bool __seqIn__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(pop());
   Value val = pop();
+  ObjInstance* obj = AS_INSTANCE(pop());
 
   Value seq;
   if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), &seq)) {
@@ -303,7 +303,7 @@ InterpretResult initializeCore() {
   vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals);
   defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
   defineNativeFn(intern("add"), 1, __seqAdd__, &vm.seqClass->methods);
-  defineNativeFn(intern("in"), 1, __seqIn__, &vm.seqClass->methods);
+  defineNativeFn(vm.memberString, 1, __seqIn__, &vm.seqClass->methods);
 
   vm.mapClass = defineNativeClass(intern("__map__"), &vm.globals);
   defineNativeFn(intern("entries"), 0, __mapEntries__, &vm.mapClass->methods);
