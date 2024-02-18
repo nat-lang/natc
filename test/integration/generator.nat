@@ -95,7 +95,7 @@ for (x in seq) {
   print x.values;
 }
 
-// nested iterable bodies.
+// nested generator in body.
 
 seq = [[true | b in a] | a in [[1,2],[3], [4,5]]];
 // assert(seq == [
@@ -103,6 +103,11 @@ seq = [[true | b in a] | a in [[1,2],[3], [4,5]]];
 //   [true],
 //   [true, true]
 // ]);
+print seq.values;
+
+// nested generator in condition
+seq = [a| a in [a | a in [1,2,3]]];
+// assert(seq == [1,2,3]);
 print seq.values;
 
 seq = [a + b | a in [1,2,3], a != 3, b in [1,2,3]];

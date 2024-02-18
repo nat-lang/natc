@@ -85,6 +85,8 @@ typedef struct Compiler {
   int localCount;
   Upvalue upvalues[UINT8_COUNT];
   int scopeDepth;
+
+  ObjMap* constants;
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -242,12 +244,23 @@ static void emitReturn() {
 }
 
 static uint8_t makeConstant(Value value) {
+  bool hashable = (value.type == VAL_BOOL || value.type == VAL_NIL ||
+                   value.type == VAL_NUMBER);
+  Value existing;
+
+  if (hashable && mapGet(current->constants, value, &existing) &&
+      IS_NUMBER(existing)) {
+    return (uint8_t)AS_NUMBER(existing);
+  }
+
   int constant = addConstant(currentChunk(), value);
   if (constant > UINT8_MAX) {
     error("Too many constants in one chunk.");
     printf("CONSTANT COUNT: %i\n", constant);
     return 0;
   }
+
+  if (hashable) mapSet(current->constants, value, NUMBER_VAL(constant));
 
   return (uint8_t)constant;
 }
@@ -289,7 +302,9 @@ static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
   compiler->type = type;
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
+  compiler->constants = NULL;
   compiler->function = newFunction();
+  compiler->constants = newMap();
 
   current = compiler;
   current->function->name = functionName(type, name);
@@ -888,7 +903,7 @@ static void braces(bool canAssign) {
     finishSetVal(addMethod);
     finishSet(addMethod);
   } else if (check(TOKEN_COLON)) {
-    // otherwise it's a map: revise the operative class.
+    // otherwise it's a map: backpatch the class.
     currentChunk()->constants.values[klass] = identifier("Map");
     uint8_t setMethod = loadConstant("set");
 
@@ -1012,9 +1027,11 @@ Parser seqGenerator(Parser checkpointA, int seq) {
 
     // load the seq instance and append the expression.
     emitBytes(OP_GET_LOCAL, seq);
+    current->localCount++;
     expression();
     methodCall("add", 1);
     // pop the seq instance.
+    current->localCount--;
     emitByte(OP_POP);
   }
 
@@ -1096,7 +1113,7 @@ static void brackets(bool canAssign) {
   whiteDelimitedExpression();
 
   // it's a sequence.
-  if (check(TOKEN_COMMA)) {
+  if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
     methodCall("add", 1);
 
     while (match(TOKEN_COMMA)) {
