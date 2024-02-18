@@ -11,6 +11,13 @@ class A {}
 
 assert(A == A);
 
+// core equality
+
+assert([1,2,3] == [1,2,3]);
+assert([1,2,3] != [1,2]);
+assert(["a", "b", "c"] == ["a", "b", "c"]);
+assert(["a", "b", "c"] != ["a", "b"]);
+
 // extensible equality.
 
 class Comparable {

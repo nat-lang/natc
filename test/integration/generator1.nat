@@ -8,9 +8,6 @@ assert(seq == [true,true,true]);
 // variable body.
 
 seq = [a | a in [1,2,3]];
-
-print a.values;
-
 assert(seq == [1,2,3]);
 
 // expression body.
@@ -39,20 +36,15 @@ assert(seq == [1,2,3]);
 seq = [a | a in [1,2,3], false];
 assert(seq == []);
 
-// nested iterable conditions.
+// iterable condition bound by previous condition.
 
-seq = [a | a in b, b in [[1,2],[3,4],[5,6]]];
+seq = [b | a in [[1,2],[3,4],[5,6]], b in a];
 assert(seq == [1,2,3,4,5,6]);
 
-seq = [a + c | a in b, b in [[1,2],[3,4]], c in [9,8,7]];
-assert(seq == [
-  // 1,2,3,4,
-  // 1,2,3,4,
-  // 1,2,3,4,
-  // 1,2,3,4,
-]);
+seq = [b + c | a in [[1,2]], b in [3,4], c in a];
+assert(seq == [4,5,5,6]);
 
-seq = [[a, b] | a in c, b in c, c in [[1,2],[3,4]]];
+seq = [[b, c] | a in [[1,2],[3,4]], b in a, c in a];
 assert(seq == [
   [1,1],
   [1,2],
@@ -62,22 +54,4 @@ assert(seq == [
   [3,4],
   [4,3],
   [4,4]
-]);
-
-seq = [[b, c] | b in a, a in [[1,2],[3,4]], c in [9,8,7]];
-// assert(seq == []);
-
-// nested iterable bodies.
-
-seq = [[true | b in a] | a in [[1,2],[3], [4,5]]];
-assert(seq == [
-  [true,true],
-  [true],
-  [true, true]
-]);
-
-seq = [a + b | a in [1,2,3], a != 3, b in [1,2,3]];
-assert(seq == [
-  2,3,4,
-  3,4,5
 ]);

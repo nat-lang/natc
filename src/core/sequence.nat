@@ -6,4 +6,13 @@ class Sequence < __seq__ {
     return this;
   }
   __len__() => len(this.values)
+  __eq__(seq) => {
+    if (len(this) != len(seq)) return false;
+
+    for (let i = 0; i < len(this); i = i + 1) {
+      if (this[i] != seq[i]) return false;
+    }
+
+    return true;
+  }
 }
