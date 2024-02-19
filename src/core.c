@@ -14,8 +14,8 @@ static void defineNative(ObjString* name, Value native, ObjMap* dest) {
   push(OBJ_VAL(name));
   push(native);
   mapSet(dest, vm.stack[0], vm.stack[1]);
-  pop();
-  pop();
+  vmPop();
+  vmPop();
 }
 
 static void defineNativeFn(ObjString* name, int arity, NativeFn function,
@@ -56,25 +56,73 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   return true;
 }
 
-static bool __objGet__(ObjInstance* obj, Value key) {
-  Value val;
+static bool __callMethod__(Value value, ObjString* name, int arity) {
+  if (IS_INSTANCE(value)) {
+    ObjInstance* instance = AS_INSTANCE(value);
+    Value method;
+    if (mapGet(&instance->klass->methods, OBJ_VAL(name), &method)) {
+      // set up the context for the function call.
+      push(value);  // receiver.
+      callMethod(method, arity);
+      return true;
+    }
+  }
+  return false;
+}
 
-  if (!validateMapKey(key)) return false;
+// Use the user-defined hash function if defined, otherwise if
+// the object supports it, fall back to the native hash, otherwise
+// throw an error. Assert that the hash is a number and leave it on
+// the stack.
+static bool __hashValue__(Value value) {
+  printf("value to hash: ");
+  printValue(value);
+  printf("\n-------------\n");
+  if (__callMethod__(value, vm.hashString, 0)) {
+    if (!IS_NUMBER(vmPeek(0))) {
+      printf("result of hash: ");
+      printValue(vmPeek(0));
+      printf("\n-------------\n");
+      // runtimeError("%s function must return a number.",
+      // vm.hashString->chars); return false;
+    }
 
-  ObjMap fields = obj->fields;
+    return true;
+  }
 
-  if (mapGet(&fields, key, &val))
-    push(val);
-  else
-    push(NIL_VAL);
+  if (!isHashable(value)) {
+    runtimeError(
+        "Must be a hashable type: num, nil, bool, string, or object with a "
+        "'%s' method.",
+        vm.hashString->chars);
+    return false;
+  }
+
+  uint32_t hash = hashValue(value);
+  push(NUMBER_VAL(hash));
 
   return true;
 }
 
-static bool __objSet__(ObjInstance* obj, Value key, Value val) {
-  if (!validateMapKey(key)) return false;
+static bool __objGet__(ObjInstance* obj, Value key) {
+  if (!__hashValue__(key)) return false;
+  uint32_t hash = AS_NUMBER(vmPop());
+  Value value;
 
-  mapSet(&obj->fields, key, val);
+  if (mapGetHash(&obj->fields, key, &value, hash)) {
+    push(value);
+  } else {
+    push(NIL_VAL);
+  }
+
+  return true;
+}
+
+static bool __objSet__(ObjInstance* obj, Value key, Value value) {
+  if (!__hashValue__(key)) return false;
+  uint32_t hash = AS_NUMBER(vmPop());
+
+  mapSetHash(&obj->fields, key, value, hash);
   push(OBJ_VAL(obj));  // return the object.
   return true;
 }
@@ -105,10 +153,10 @@ static bool __seqSet__(ObjSequence* seq, Value key, Value val) {
 }
 
 static bool __subscriptSet__(int argCount, Value* args) {
-  Value val = pop();
-  Value key = pop();
-  pop();  // native fn.
-  Value obj = pop();
+  Value val = vmPop();
+  Value key = vmPop();
+  vmPop();  // native fn.
+  Value obj = vmPop();
 
   // indexed assignment to sequences.
   if (IS_SEQUENCE(obj)) {
@@ -141,9 +189,9 @@ static bool __subscriptSet__(int argCount, Value* args) {
 }
 
 static bool __subscriptGet__(int argCount, Value* args) {
-  Value key = pop();
-  pop();  // native fn.
-  Value obj = pop();
+  Value key = vmPop();
+  vmPop();  // native fn.
+  Value obj = vmPop();
 
   // indexed access to sequences.
   if (IS_SEQUENCE(obj)) {
@@ -175,15 +223,15 @@ static bool __subscriptGet__(int argCount, Value* args) {
 }
 
 bool __seqInit__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(pop());
+  ObjInstance* obj = AS_INSTANCE(vmPop());
   mapSet(&obj->fields, OBJ_VAL(intern("values")), OBJ_VAL(newSequence()));
   push(OBJ_VAL(obj));
   return true;
 }
 
 bool __seqAdd__(int argCount, Value* args) {
-  Value val = pop();
-  ObjInstance* obj = AS_INSTANCE(pop());
+  Value val = vmPop();
+  ObjInstance* obj = AS_INSTANCE(vmPop());
 
   Value seq;
   if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), &seq)) {
@@ -200,8 +248,8 @@ bool __seqAdd__(int argCount, Value* args) {
 }
 
 bool __seqIn__(int argCount, Value* args) {
-  Value val = pop();
-  ObjInstance* obj = AS_INSTANCE(pop());
+  Value val = vmPop();
+  ObjInstance* obj = AS_INSTANCE(vmPop());
 
   Value seq;
   if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), &seq)) {
@@ -238,7 +286,8 @@ static void seqInstance() {
 }
 
 bool __mapEntries__(int argCount, Value* args) {
-  ObjInstance* map = AS_INSTANCE(pop());
+  ObjInstance* map = AS_INSTANCE(vmPop());
+  ObjString* addMethod = intern("add");
 
   // the entry sequence.
   seqInstance();
@@ -251,53 +300,52 @@ bool __mapEntries__(int argCount, Value* args) {
     seqInstance();
 
     push(entry->key);
-    invoke(intern("add"), 1);
+    invoke(addMethod, 1);
     push(entry->value);
-    invoke(intern("add"), 1);
+    invoke(addMethod, 1);
 
     // add key/val seq to entry seq.
-    invoke(intern("add"), 1);
+    invoke(addMethod, 1);
   }
 
   return true;
 }
 
 bool __length__(int argCount, Value* args) {
-  Value val = pop();
-  pop();  // native fn.
+  Value value = vmPop();
+  vmPop();  // native fn.
 
-  if (IS_SEQUENCE(val)) {
-    ObjSequence* seq = AS_SEQUENCE(val);
+  if (IS_SEQUENCE(value)) {
+    ObjSequence* seq = AS_SEQUENCE(value);
     push(NUMBER_VAL(seq->values.count));
     return true;
   }
 
-  if (IS_INSTANCE(val)) {
-    ObjInstance* instance = AS_INSTANCE(val);
-    Value lenFn;
-    if (mapGet(&instance->klass->methods, OBJ_VAL(vm.lengthString), &lenFn)) {
-      // set up the context for the function call.
-      push(val);  // receiver.
-      callMethod(lenFn, 0);
-      return true;
-    }
-  }
+  if (__callMethod__(value, vm.lengthString, 0)) return true;
 
   runtimeError("Only sequences and objects with a '%s' method have length.",
                vm.lengthString->chars);
   return false;
 }
 
+bool __hash__(int argCount, Value* args) {
+  Value value = vmPop();
+  vmPop();  // native fn.
+
+  return __hashValue__(value);
+}
+
 InterpretResult initializeCore() {
   // native functions.
 
   // these two primarily used be the compiler.
-  // maybe this indicates they deserve op codes.
+  // they probably deserve their own instructions.
   defineNativeFn(intern("__subscriptGet__"), 1, __subscriptGet__, &vm.globals);
   defineNativeFn(intern("__subscriptSet__"), 2, __subscriptSet__, &vm.globals);
 
   // user land.
   defineNativeFn(intern("len"), 1, __length__, &vm.globals);
+  defineNativeFn(intern("hash"), 1, __hash__, &vm.globals);
 
   // native classes.
   vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals);

@@ -9,7 +9,9 @@ assert(len(seq) == 3);
 
 class Lengthy {
   init(a) => { this.length = a; }
-  __len__() => { return this.length; }
+  __len__() => this.length
 }
+
+print len(Lengthy(500));
 
 assert(len(Lengthy(0)) == 0);

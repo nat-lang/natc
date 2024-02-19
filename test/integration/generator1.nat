@@ -12,7 +12,7 @@ assert(seq == [1,2,3]);
 
 // expression body.
 
-seq = [(a + 1) | a in [1,2,3]];
+seq = [a + 1 | a in [1,2,3]];
 assert(seq == [2,3,4]);
 
 // multiple iterable conditions.

@@ -5,6 +5,7 @@
 
 #include "memory.h"
 #include "object.h"
+#include "vm.h"
 
 void initValueArray(ValueArray* array) {
   array->values = NULL;

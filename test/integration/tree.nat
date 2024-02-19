@@ -22,7 +22,7 @@ assert(tree.data == 2);
 assert(tree.children[0] == 3);
 assert(tree.children[1] == 4);
 
-let id = (a) => { return a; };
+let id = (a) => a;
 
 tree = [id(1) id(2) id(3)];
 

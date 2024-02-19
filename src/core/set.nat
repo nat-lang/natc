@@ -4,8 +4,56 @@ class Set < __map__ {
     this[element] = true;
     return this;
   }
+
+  // Calling a set is shorthand for the membership predicate,
+  // so that we may pretend the set is its characteristic function.
   call(element) => element in this
-  union(x) => {}
+
+  // The elements are the keys of the underlying map.
+  elements() => [entry[0] | entry in this.entries()]
+
+  // Iteration is over elements.
+  __curr__(idx) => this.elements[idx]
+
+  // Hash the elements, sort them lexicographically, and concatenate
+  // them.
+  __hash__() => {
+    let hashes = [element.__hash__() | element in this];
+
+    
+
+  }
+
+  // Is [this] a subset of or equal to [other]?
+  subsetEq(other) => {
+    if (len(this) > len(other))
+      return false;
+
+    for (x in this)
+      if (!x in other)
+        return false;
+  
+    return true;
+  }
+
+  // Is [this] a proper subset of [other]?
+  subset(other) => {
+    if (len(this) == len(other))
+      return false;
+
+    return this.subsetEq(other);
+  }
+
+  // Is [this] a proper superset of [other]?
+  supset(other) => other.subset(this)
+
+  // Is [this] a superset of or equal to [other]?
+  supsetEq(other) => other.subsetEq(this) 
+
+  // Is [this] equal to [other]?
+  __eq__(other) => this.subsetEq(other) and other.subsetEq(this)
+
+  union(other) => {}
   intersection(x) => {}
   complement(x) => {}
 }

@@ -43,6 +43,7 @@ typedef struct {
   ObjString* subscriptSetString;
   ObjString* lengthString;
   ObjString* equalString;
+  ObjString* hashString;
 
   ObjClass* seqClass;
   ObjClass* mapClass;
@@ -62,10 +63,11 @@ void runtimeError(const char* format, ...);
 
 InterpretResult interpret(char* path, const char* source);
 void push(Value value);
-Value pop();
-bool validateMapKey(Value value);
+Value vmPop();
+Value vmPeek();
 bool initClass(ObjClass* klass, int argCount);
 bool invoke(ObjString* name, int argCount);
 bool callMethod(Value fn, int argCount);
+bool assertHashable(Value value);
 
 #endif

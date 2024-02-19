@@ -3,7 +3,9 @@
 
 assert(nil == nil);
 assert(1 == 1);
+assert(1 != 2);
 assert("a" == "a");
+assert("a" != "b");
 assert(true == true);
 assert(false == false);
 
@@ -11,7 +13,7 @@ class A {}
 
 assert(A == A);
 
-// core equality
+// core equality.
 
 assert([1,2,3] == [1,2,3]);
 assert([1,2,3] != [1,2]);
@@ -35,4 +37,3 @@ let c = Comparable(2);
 
 assert(a == b);
 assert(a != c);
-
