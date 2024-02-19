@@ -1,6 +1,4 @@
-
-
-// native support.
+// native membership.
 
 let seq = [1,2,3];
 
@@ -12,3 +10,16 @@ assert(2 in seq.values);
 
 assert(!(4 in seq));
 assert(!(4 in seq.values));
+
+// extensible membership.
+
+class Inhabitable {
+  init(datum) => {
+    this.datum = datum;
+  }
+  __in__(value) => {
+    return this.datum == value;
+  }
+}
+
+assert(1 in Inhabitable(1));

@@ -65,13 +65,15 @@ bool initVM() {
   vm.currString = NULL;
   vm.currString = intern("curr");
   vm.memberString = NULL;
-  vm.memberString = intern("in");
+  vm.memberString = intern("__in__");
   vm.subscriptGetString = NULL;
   vm.subscriptGetString = intern("__get__");
   vm.subscriptSetString = NULL;
   vm.subscriptSetString = intern("__set__");
   vm.lengthString = NULL;
   vm.lengthString = intern("__len__");
+  vm.equalString = NULL;
+  vm.equalString = intern("__eq__");
 
   vm.seqClass = NULL;
   vm.mapClass = NULL;
@@ -90,6 +92,7 @@ void freeVM() {
   vm.subscriptGetString = NULL;
   vm.subscriptSetString = NULL;
   vm.lengthString = NULL;
+  vm.equalString = NULL;
   freeObjects();
 }
 
@@ -124,6 +127,7 @@ static bool call(ObjClosure* closure, int argCount) {
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
   frame->slots = vm.stackTop - argCount - 1;
+
   return true;
 }
 
@@ -142,7 +146,7 @@ bool callMethod(Value fn, int argCount) {
 
 bool initClass(ObjClass* klass, int argCount) {
   Value initializer;
-  // core classes or their descendents may have a native initializer.
+
   if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
     return callMethod(initializer, argCount);
   } else if (argCount != 0) {
@@ -176,6 +180,7 @@ static bool callValue(Value callee, int argCount) {
                    &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
         } else {
+          printValue(callee);
           runtimeError("Objects require a 'call' method to be called.");
           return false;
         }
@@ -211,10 +216,10 @@ bool invoke(ObjString* name, int argCount) {
 
   ObjInstance* instance = AS_INSTANCE(receiver);
 
-  Value value;
-  if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
-    vm.stackTop[-argCount - 1] = value;
-    return callValue(value, argCount);
+  Value field;
+  if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
+    vm.stackTop[-argCount - 1] = field;
+    return callValue(field, argCount);
   }
 
   return invokeFromClass(instance->klass, name, argCount);
@@ -382,7 +387,7 @@ static InterpretResult loop() {
         Value name = READ_CONSTANT();
         if (mapSet(&vm.globals, name, peek(0))) {
           mapDelete(&vm.globals, name);
-          runtimeError("Undefined variable");  // '%s'.", name->chars);
+          runtimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
         break;
@@ -422,8 +427,28 @@ static InterpretResult loop() {
         break;
       }
       case OP_EQUAL: {
-        Value b = pop();
         Value a = pop();
+        Value b = pop();
+
+        // classes can override the equality relation.
+        if (IS_INSTANCE(a) && IS_INSTANCE(b)) {
+          ObjInstance* instanceA = AS_INSTANCE(a);
+          ObjInstance* instanceB = AS_INSTANCE(b);
+
+          Value equalFn;
+          if (valuesEqual(OBJ_VAL(instanceA->klass),
+                          OBJ_VAL(instanceB->klass)) &&
+              mapGet(&instanceA->klass->methods, OBJ_VAL(vm.equalString),
+                     &equalFn)) {
+            push(a);
+            push(b);
+            if (!callMethod(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
+
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+          }
+        }
+
         push(BOOL_VAL(valuesEqual(a, b)));
         break;
       }
@@ -598,9 +623,12 @@ static InterpretResult loop() {
           Value memFn;
           if (mapGet(&instance->klass->methods, OBJ_VAL(vm.memberString),
                      &memFn)) {
-            push(val);
             push(obj);
-            callMethod(memFn, 1);
+            push(val);
+
+            if (!callMethod(memFn, 1)) return INTERPRET_RUNTIME_ERROR;
+
+            frame = &vm.frames[vm.frameCount - 1];
             break;
           }
 
@@ -628,7 +656,9 @@ static InterpretResult loop() {
           runtimeError("Import path must be a string.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        return interpretFile(AS_STRING(path)->chars);
+        InterpretResult result = interpretFile(AS_STRING(path)->chars);
+        pop();
+        return result;
       }
       case OP_THROW: {
         Value value = pop();

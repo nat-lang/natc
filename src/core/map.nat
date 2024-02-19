@@ -5,10 +5,10 @@ class Map < __map__ {
     this[key] = val;
     return this;
   }
-  
+
   __len__() => len(this.entries())
   __curr__(idx) => this.entries()[1]
 
-  keys() => fmap(this, fst)
-  values() => fmap(this, snd)
+  keys() => [entry[0] | entry in this.entries()]
+  values() => [entry[1] | entry in this.entries()]
 }

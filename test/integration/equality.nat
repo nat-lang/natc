@@ -1,0 +1,38 @@
+
+// native equality.
+
+assert(nil == nil);
+assert(1 == 1);
+assert("a" == "a");
+assert(true == true);
+assert(false == false);
+
+class A {}
+
+assert(A == A);
+
+// core equality
+
+assert([1,2,3] == [1,2,3]);
+assert([1,2,3] != [1,2]);
+assert(["a", "b", "c"] == ["a", "b", "c"]);
+assert(["a", "b", "c"] != ["a", "b"]);
+
+// extensible equality.
+
+class Comparable {
+  init(datum) => {
+    this.datum = datum;
+  }
+  __eq__(other) => {
+    return this.datum == other.datum;
+  }
+}
+
+let a = Comparable(1);
+let b = Comparable(1);
+let c = Comparable(2);
+
+assert(a == b);
+assert(a != c);
+

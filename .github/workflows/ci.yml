@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches:
-      - main
+      - '**'
 
 jobs:
   deploy:
@@ -12,16 +12,3 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run tests
         run: make nat && make tests
-      - name: Login to ECR
-        run: docker login -u AWS -p $(aws ecr get-login-password --region us-east-2) ${{ secrets.ECR_REPOSITORY }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-2
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: ./build/Dockerfile
-          push: true
-          tags: ${{ secrets.ECR_REPOSITORY }}/nat:latest

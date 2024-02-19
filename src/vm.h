@@ -15,7 +15,6 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-  // the tape and its machinery.
   Value stack[STACK_MAX];
   Value* stackTop;
 
@@ -43,6 +42,7 @@ typedef struct {
   ObjString* subscriptGetString;
   ObjString* subscriptSetString;
   ObjString* lengthString;
+  ObjString* equalString;
 
   ObjClass* seqClass;
   ObjClass* mapClass;
@@ -63,7 +63,6 @@ void runtimeError(const char* format, ...);
 InterpretResult interpret(char* path, const char* source);
 void push(Value value);
 Value pop();
-Value peek(int distance);
 bool validateMapKey(Value value);
 bool initClass(ObjClass* klass, int argCount);
 bool invoke(ObjString* name, int argCount);

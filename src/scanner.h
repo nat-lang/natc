@@ -19,6 +19,7 @@ typedef enum {
   TOKEN_SEMICOLON,
   TOKEN_SLASH,
   TOKEN_STAR,
+  TOKEN_PIPE,
   // One or two character tokens.
   TOKEN_ARROW,
   TOKEN_BANG,
@@ -70,9 +71,9 @@ typedef struct {
   int line;
 } Scanner;
 
-void initScanner(const char* source);
-void saveScanner();
-void rewindScanner();
+Scanner initScanner(const char* source);
+Scanner saveScanner();
+void gotoScanner(Scanner scanner);
 void printScanner();
 void skipWhitespace();
 Token scanToken();

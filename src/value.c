@@ -116,7 +116,7 @@ static inline uint32_t hashNumber(double num) {
 
 bool isHashable(Value value) {
   return (value.type == VAL_BOOL || value.type == VAL_NIL ||
-          value.type == VAL_NUMBER || value.type == VAL_OBJ);
+          value.type == VAL_NUMBER || IS_STRING(value));
 }
 
 // Generates a hash code for [value], which must be one of
