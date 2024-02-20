@@ -161,5 +161,7 @@ ObjString* typeValue(Value value) {
       }
     case VAL_UNDEF:
       return intern("undefined");
+    default:
+      return intern("untypable");
   }
 }
