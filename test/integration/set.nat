@@ -1,13 +1,79 @@
 
-let nulSet = {};
-let numSet = {1, 2, 3};
-let strSet = {"a", "b", "c"};
+// null set;
 
-// membership.
+assert(!(1 in {}));
+assert(!{}(1));
 
-assert("a" in strSet and "b" in strSet);
-assert(1 in numSet);
+assert({}.subsetEq({}));
+assert(!{}.subset({}));
 
-// as characteristic function.
+assert({}.supsetEq({}));
+assert(!{}.supset({}));
 
-assert(numSet(1));
+let set;
+
+// num set.
+
+set = {1,2,3};
+
+assert(set(1));
+
+assert(1 in set);
+assert(2 in set);
+assert(3 in set);
+assert(!(4 in set));
+  
+assert(set.subset({1,2,3,4}));
+assert(set.subsetEq({1,2,3,4}));
+
+assert(set.supset({1,2}));
+assert(set.supsetEq({1,2}));
+
+assert(set.subsetEq({1,2,3}));
+assert(set.supsetEq({1,2,3}));
+
+assert(set == {1,2,3});
+
+// string set.
+
+set = {"a","b","c"};
+
+assert(set("a"));
+
+assert("a" in set);
+assert("b" in set);
+assert("c" in set);
+assert(!("d" in set));
+
+assert(set.subset({"a","b","c","d"}));
+assert(set.subsetEq({"a","b","c","d"}));
+
+assert(set.supset({"a","b"}));
+assert(set.supsetEq({"a","b"}));
+
+assert(set.subsetEq({"a","b","c"}));
+assert(set.supsetEq({"a","b","c"}));
+
+assert(set == {"a","b","c"});
+
+// nested.
+
+set = {{1,2,3}, {3,4,5}};
+
+assert(set({1,2,3}));
+assert(!(set({6,7,8})));
+
+assert({1,2,3} in set);
+assert({3,4,5} in set);
+
+assert(set.subset({{1,2,3}, {3,4,5}, {6,7,8}}));
+assert(set.subsetEq({{1,2,3}, {3,4,5}, {6,7,8}}));
+
+assert(set.supset({{1,2,3}}));
+assert(set.supsetEq({{1,2,3}}));
+
+assert(set.subsetEq({{1,2,3}, {3,4,5}}));
+assert(set.supsetEq({{1,2,3}, {3,4,5}}));
+
+assert(set == {{1,2,3}, {3,4,5}});
+

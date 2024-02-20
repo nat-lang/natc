@@ -52,5 +52,6 @@ void printValue(Value value);
 void printValueArray(ValueArray* array);
 uint32_t hashValue(Value value);
 bool isHashable(Value value);
+ObjString* typeValue(Value value);
 
 #endif

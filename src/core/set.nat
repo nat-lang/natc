@@ -1,11 +1,55 @@
 
-class Set < __map__ {
-  add(element) => {
-    this[element] = true;
-    return this;
-  }
+class Set < Object {
+  // Calling a set is shorthand for the membership predicate,
+  // so that the set behaves like its characteristic function.
   call(element) => element in this
-  union(x) => {}
+
+  // The elements are the keys of the underlying map.
+  elements() => [entry[0] | entry in this.entries()]
+
+  // Iteration is over elements.
+  __curr__(idx) => this.elements()[idx]
+
+  // Hash the elements and sum them.
+  __hash__() => {
+    let sum = 0;
+
+    for (x in this.elements())
+      sum = sum + hash(x);
+
+    return sum;
+  }
+
+  // Is [this] a subset of or equal to [other]?
+  subsetEq(other) => {
+    if (len(this) > len(other))
+      return false;
+
+    for (x in this)
+      if (!x in other)
+        return false;
+  
+    return true;
+  }
+
+  // Is [this] a proper subset of [other]?
+  subset(other) => {
+    if (len(this) == len(other))
+      return false;
+
+    return this.subsetEq(other);
+  }
+
+  // Is [this] a proper superset of [other]?
+  supset(other) => other.subset(this)
+
+  // Is [this] a superset of or equal to [other]?
+  supsetEq(other) => other.subsetEq(this) 
+
+  // Is [this] equal to [other]?
+  __eq__(other) => this.subsetEq(other) and other.subsetEq(this)
+
+  union(other) => {}
   intersection(x) => {}
   complement(x) => {}
 }

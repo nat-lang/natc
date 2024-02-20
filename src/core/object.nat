@@ -1,0 +1,20 @@
+let tryHash = (value) => {
+  if (type(value) == "object" and "__hash__" in value)
+    return value.__hash__();
+
+  return value;
+};
+
+class Object < __obj__ {
+  __get__(key) => this.get(tryHash(key))
+
+  __set__(key, value) => {
+    key = tryHash(key);
+
+    this.set(key, value);
+
+    return this;
+  }
+  __in__(value) => this.has(tryHash(value))
+}
+

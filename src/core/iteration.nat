@@ -2,6 +2,7 @@ let next = (seq, idx) => {
   if ("__next__" in seq) return seq.__next__(idx);
 
   // first iteration.
+  if (len(seq) == 0) return false;
   if (idx == nil) return 0;
   // final iteration.
   if (idx == len(seq) - 1) return false;

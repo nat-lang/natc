@@ -1,13 +1,20 @@
 
-class Map < __map__ {
-  get(key) => this[key]
-  set(key, val) => {
-    this[key] = val;
-    return this;
+class Map < Object {
+  __curr__(idx) => this.entries()[1]
+
+  subMap(other) => {
+    for (key in this.keys()) {
+      if (!key in other) return false;
+      if (other[key] != this[key]) return false;
+    }
+    return true;
   }
 
-  __len__() => len(this.entries())
-  __curr__(idx) => this.entries()[1]
+  __eq__(other) => {
+    if (len(this) != len(other)) return false;
+
+    return this.subMap(other) and other.subMap(this);
+  }
 
   keys() => [entry[0] | entry in this.entries()]
   values() => [entry[1] | entry in this.entries()]

@@ -42,6 +42,14 @@ void runtimeError(const char* format, ...) {
   resetStack();
 }
 
+bool assertHashable(Value value) {
+  if (!isHashable(value)) {
+    runtimeError("Must be a hashable type: num, nil, bool, or string.");
+    return false;
+  }
+  return true;
+}
+
 bool initVM() {
   resetStack();
   vm.objects = NULL;
@@ -74,9 +82,11 @@ bool initVM() {
   vm.lengthString = intern("__len__");
   vm.equalString = NULL;
   vm.equalString = intern("__eq__");
+  vm.hashString = NULL;
+  vm.hashString = intern("__hash__");
 
   vm.seqClass = NULL;
-  vm.mapClass = NULL;
+  vm.objClass = NULL;
 
   return initializeCore(&vm) == INTERPRET_OK;
 }
@@ -93,20 +103,21 @@ void freeVM() {
   vm.subscriptSetString = NULL;
   vm.lengthString = NULL;
   vm.equalString = NULL;
+  vm.hashString = NULL;
   freeObjects();
 }
 
-void push(Value value) {
+void vmPush(Value value) {
   *vm.stackTop = value;
   vm.stackTop++;
 }
 
-Value pop() {
+Value vmPop() {
   vm.stackTop--;
   return *vm.stackTop;
 }
 
-Value peek(int distance) { return vm.stackTop[-1 - distance]; }
+Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
 static bool checkArity(int paramCount, int argCount) {
   if (argCount == paramCount) return true;
@@ -137,26 +148,7 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
-bool callMethod(Value fn, int argCount) {
-  if (IS_NATIVE(fn))
-    return callNative(AS_NATIVE(fn), argCount);
-  else
-    return call(AS_CLOSURE(fn), argCount);
-}
-
-bool initClass(ObjClass* klass, int argCount) {
-  Value initializer;
-
-  if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
-    return callMethod(initializer, argCount);
-  } else if (argCount != 0) {
-    runtimeError("Expected 0 arguments but got %d.", argCount);
-    return false;
-  }
-  return true;
-}
-
-static bool callValue(Value callee, int argCount) {
+bool vmCallValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
       case OBJ_BOUND_METHOD: {
@@ -190,9 +182,22 @@ static bool callValue(Value callee, int argCount) {
         break;  // Non-callable object type.
     }
   }
+
   runtimeError(
       "Can only call functions, classes, and objects with a 'call' method.");
   return false;
+}
+
+bool initClass(ObjClass* klass, int argCount) {
+  Value initializer;
+
+  if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
+    return vmCallValue(initializer, argCount);
+  } else if (argCount != 0) {
+    runtimeError("Expected 0 arguments but got %d.", argCount);
+    return false;
+  }
+  return true;
 }
 
 static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
@@ -203,11 +208,11 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
     return false;
   }
 
-  return callMethod(method, argCount);
+  return vmCallValue(method, argCount);
 }
 
 bool invoke(ObjString* name, int argCount) {
-  Value receiver = peek(argCount);
+  Value receiver = vmPeek(argCount);
 
   if (!IS_INSTANCE(receiver)) {
     runtimeError("Only instances have methods.");
@@ -219,18 +224,10 @@ bool invoke(ObjString* name, int argCount) {
   Value field;
   if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
     vm.stackTop[-argCount - 1] = field;
-    return callValue(field, argCount);
+    return vmCallValue(field, argCount);
   }
 
   return invokeFromClass(instance->klass, name, argCount);
-}
-
-bool validateMapKey(Value key) {
-  if (!isHashable(key)) {
-    runtimeError("Map key must be a hashable type: num, nil, bool, or string.");
-    return false;
-  }
-  return true;
 }
 
 static bool bindMethod(ObjClass* klass, ObjString* name) {
@@ -240,9 +237,9 @@ static bool bindMethod(ObjClass* klass, ObjString* name) {
     return false;
   }
 
-  ObjBoundMethod* bound = newBoundMethod(peek(0), AS_CLOSURE(method));
-  pop();
-  push(OBJ_VAL(bound));
+  ObjBoundMethod* bound = newBoundMethod(vmPeek(0), AS_CLOSURE(method));
+  vmPop();
+  vmPush(OBJ_VAL(bound));
   return true;
 }
 
@@ -280,10 +277,10 @@ static void closeUpvalues(Value* last) {
 }
 
 static void defineMethod(Value name) {
-  Value method = peek(0);
-  ObjClass* klass = AS_CLASS(peek(1));
+  Value method = vmPeek(0);
+  ObjClass* klass = AS_CLASS(vmPeek(1));
   mapSet(&klass->methods, name, method);
-  pop();
+  vmPop();
 }
 
 static bool isFalsey(Value value) {
@@ -291,8 +288,8 @@ static bool isFalsey(Value value) {
 }
 
 static void concatenate() {
-  ObjString* b = AS_STRING(peek(0));
-  ObjString* a = AS_STRING(peek(1));
+  ObjString* b = AS_STRING(vmPeek(0));
+  ObjString* a = AS_STRING(vmPeek(1));
 
   int length = a->length + b->length;
   char* chars = ALLOCATE(char, length + 1);
@@ -301,10 +298,35 @@ static void concatenate() {
   chars[length] = '\0';
 
   ObjString* result = takeString(chars, length);
-  pop();
-  pop();
+  vmPop();
+  vmPop();
 
-  push(OBJ_VAL(result));
+  vmPush(OBJ_VAL(result));
+}
+
+static bool validateSeqIdx(ObjSequence* seq, Value idx) {
+  if (!IS_INTEGER(idx)) {
+    runtimeError("Sequences must be indexed by integer.");
+    return false;
+  }
+
+  int intIdx = AS_NUMBER(idx);
+
+  if (intIdx > seq->values.count - 1 || intIdx < 0) {
+    runtimeError("Index %i out of bounds.", intIdx);
+    return false;
+  }
+
+  return true;
+}
+
+bool vmInstanceHas(ObjInstance* instance, Value value) {
+  if (!assertHashable(value)) return false;
+
+  bool hasKey = mapHas(&instance->fields, value) ||
+                mapHas(&instance->klass->methods, value);
+  vmPush(BOOL_VAL(hasKey));
+  return true;
 }
 
 static InterpretResult loop() {
@@ -316,15 +338,15 @@ static InterpretResult loop() {
 #define READ_CONSTANT() \
   (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
-#define BINARY_OP(valueType, op)                      \
-  do {                                                \
-    if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
-      runtimeError("Operands must be numbers.");      \
-      return INTERPRET_RUNTIME_ERROR;                 \
-    }                                                 \
-    double b = AS_NUMBER(pop());                      \
-    double a = AS_NUMBER(pop());                      \
-    push(valueType(a op b));                          \
+#define BINARY_OP(valueType, op)                          \
+  do {                                                    \
+    if (!IS_NUMBER(vmPeek(0)) || !IS_NUMBER(vmPeek(1))) { \
+      runtimeError("Operands must be numbers.");          \
+      return INTERPRET_RUNTIME_ERROR;                     \
+    }                                                     \
+    double b = AS_NUMBER(vmPop());                        \
+    double a = AS_NUMBER(vmPop());                        \
+    vmPush(valueType(a op b));                            \
   } while (false)
 
   for (;;) {
@@ -342,29 +364,29 @@ static InterpretResult loop() {
     switch (instruction = READ_BYTE()) {
       case OP_CONSTANT: {
         Value constant = READ_CONSTANT();
-        push(constant);
+        vmPush(constant);
         break;
       }
       case OP_NIL:
-        push(NIL_VAL);
+        vmPush(NIL_VAL);
         break;
       case OP_TRUE:
-        push(BOOL_VAL(true));
+        vmPush(BOOL_VAL(true));
         break;
       case OP_FALSE:
-        push(BOOL_VAL(false));
+        vmPush(BOOL_VAL(false));
         break;
       case OP_POP:
-        pop();
+        vmPop();
         break;
       case OP_GET_LOCAL: {
         uint8_t slot = READ_BYTE();
-        push(frame->slots[slot]);
+        vmPush(frame->slots[slot]);
         break;
       }
       case OP_SET_LOCAL: {
         uint8_t slot = READ_BYTE();
-        frame->slots[slot] = peek(0);
+        frame->slots[slot] = vmPeek(0);
         break;
       }
       case OP_GET_GLOBAL: {
@@ -374,18 +396,18 @@ static InterpretResult loop() {
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
-        push(value);
+        vmPush(value);
         break;
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.globals, name, peek(0));
-        pop();
+        mapSet(&vm.globals, name, vmPeek(0));
+        vmPop();
         break;
       }
       case OP_SET_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (mapSet(&vm.globals, name, peek(0))) {
+        if (mapSet(&vm.globals, name, vmPeek(0))) {
           mapDelete(&vm.globals, name);
           runtimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
@@ -393,18 +415,18 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_PROPERTY: {
-        if (!IS_INSTANCE(peek(0))) {
+        if (!IS_INSTANCE(vmPeek(0))) {
           runtimeError("Only objects have properties.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(peek(0));
+        ObjInstance* instance = AS_INSTANCE(vmPeek(0));
         ObjString* name = READ_STRING();
 
         Value value;
         if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
-          pop();  // Instance.
-          push(value);
+          vmPop();  // Instance.
+          vmPush(value);
           break;
         }
 
@@ -414,21 +436,123 @@ static InterpretResult loop() {
         break;
       }
       case OP_SET_PROPERTY: {
-        if (!IS_INSTANCE(peek(1))) {
+        if (!IS_INSTANCE(vmPeek(1))) {
           runtimeError("Only objects have properties.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(peek(1));
-        mapSet(&instance->fields, READ_CONSTANT(), peek(0));
-        Value value = pop();
-        pop();
-        push(value);
+        ObjInstance* instance = AS_INSTANCE(vmPeek(1));
+        mapSet(&instance->fields, READ_CONSTANT(), vmPeek(0));
+        Value value = vmPop();
+        vmPop();
+        vmPush(value);
+        break;
+      }
+      case OP_SUBSCRIPT_GET: {
+        Value key = vmPop();
+        Value obj = vmPop();
+
+        // indexed access to sequences.
+        if (IS_SEQUENCE(obj)) {
+          ObjSequence* seq = AS_SEQUENCE(obj);
+
+          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
+
+          int idx = AS_NUMBER(key);
+
+          vmPush(seq->values.values[idx]);
+          break;
+        }
+
+        if (!IS_INSTANCE(obj)) {
+          runtimeError(
+              "Only objects, sequences, and instances with a '%s' method "
+              "support "
+              "access by subscript.",
+              vm.subscriptGetString->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(obj);
+
+        // classes may define their own subscript access operator.
+        Value getFn;
+        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptGetString),
+                   &getFn)) {
+          // set up the context for the function call.
+          vmPush(obj);  // receiver.
+          vmPush(key);
+
+          if (!vmCallValue(getFn, 1)) return INTERPRET_RUNTIME_ERROR;
+          frame = &vm.frames[vm.frameCount - 1];
+          break;
+        }
+
+        // otherwise fall back to property access.
+        Value value;
+        if (mapGet(&instance->fields, key, &value)) {
+          vmPush(value);
+        } else {
+          // we don't throw an error if the property doesn't exist.
+          vmPush(NIL_VAL);
+        }
+        break;
+      }
+      case OP_SUBSCRIPT_SET: {
+        Value val = vmPop();
+        Value key = vmPop();
+        Value obj = vmPop();
+
+        // indexed assignment to sequences.
+        if (IS_SEQUENCE(obj)) {
+          ObjSequence* seq = AS_SEQUENCE(obj);
+
+          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
+
+          int idx = AS_NUMBER(key);
+
+          seq->values.values[idx] = val;
+
+          // leave the sequence on the stack.
+          vmPush(OBJ_VAL(seq));
+          break;
+        }
+
+        if (!IS_INSTANCE(obj)) {
+          runtimeError(
+              "Only objects, sequences, and instances with a '%s' method "
+              "support "
+              "assignment by subscript.",
+              vm.subscriptSetString->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(obj);
+
+        // classes may define their own subscript setting operator.
+        Value setFn;
+        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptSetString),
+                   &setFn)) {
+          // set up the context for the function call.
+          vmPush(obj);  // receiver.
+          vmPush(key);
+          vmPush(val);
+
+          if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
+          frame = &vm.frames[vm.frameCount - 1];
+          break;
+        }
+
+        // otherwise fall back to property setting.
+        if (!assertHashable(key)) return INTERPRET_RUNTIME_ERROR;
+        mapSet(&instance->fields, key, val);
+        // leave the object on the stack.
+        vmPush(obj);
         break;
       }
       case OP_EQUAL: {
-        Value a = pop();
-        Value b = pop();
+        Value a = vmPop();
+        Value b = vmPop();
 
         // classes can override the equality relation.
         if (IS_INSTANCE(a) && IS_INSTANCE(b)) {
@@ -440,21 +564,21 @@ static InterpretResult loop() {
                           OBJ_VAL(instanceB->klass)) &&
               mapGet(&instanceA->klass->methods, OBJ_VAL(vm.equalString),
                      &equalFn)) {
-            push(a);
-            push(b);
-            if (!callMethod(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
+            vmPush(a);
+            vmPush(b);
+            if (!vmCallValue(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
 
             frame = &vm.frames[vm.frameCount - 1];
             break;
           }
         }
 
-        push(BOOL_VAL(valuesEqual(a, b)));
+        vmPush(BOOL_VAL(valuesEqual(a, b)));
         break;
       }
       case OP_GET_SUPER: {
         ObjString* name = READ_STRING();
-        ObjClass* superclass = AS_CLASS(pop());
+        ObjClass* superclass = AS_CLASS(vmPop());
 
         if (!bindMethod(superclass, name)) {
           return INTERPRET_RUNTIME_ERROR;
@@ -463,12 +587,12 @@ static InterpretResult loop() {
       }
       case OP_GET_UPVALUE: {
         uint8_t slot = READ_BYTE();
-        push(*frame->closure->upvalues[slot]->location);
+        vmPush(*frame->closure->upvalues[slot]->location);
         break;
       }
       case OP_SET_UPVALUE: {
         uint8_t slot = READ_BYTE();
-        *frame->closure->upvalues[slot]->location = peek(0);
+        *frame->closure->upvalues[slot]->location = vmPeek(0);
         break;
       }
       case OP_GREATER:
@@ -478,12 +602,12 @@ static InterpretResult loop() {
         BINARY_OP(BOOL_VAL, <);
         break;
       case OP_ADD: {
-        if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+        if (IS_STRING(vmPeek(0)) && IS_STRING(vmPeek(1))) {
           concatenate();
-        } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
-          double b = AS_NUMBER(pop());
-          double a = AS_NUMBER(pop());
-          push(NUMBER_VAL(a + b));
+        } else if (IS_NUMBER(vmPeek(0)) && IS_NUMBER(vmPeek(1))) {
+          double b = AS_NUMBER(vmPop());
+          double a = AS_NUMBER(vmPop());
+          vmPush(NUMBER_VAL(a + b));
         } else {
           runtimeError("Operands must be two numbers or two strings.");
           return INTERPRET_RUNTIME_ERROR;
@@ -500,17 +624,17 @@ static InterpretResult loop() {
         BINARY_OP(NUMBER_VAL, /);
         break;
       case OP_NOT:
-        push(BOOL_VAL(isFalsey(pop())));
+        vmPush(BOOL_VAL(isFalsey(vmPop())));
         break;
       case OP_NEGATE:
-        if (!IS_NUMBER(peek(0))) {
+        if (!IS_NUMBER(vmPeek(0))) {
           runtimeError("Operand must be a number.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        push(NUMBER_VAL(-AS_NUMBER(pop())));
+        vmPush(NUMBER_VAL(-AS_NUMBER(vmPop())));
         break;
       case OP_PRINT: {
-        printValue(pop());
+        printValue(vmPop());
         printf("\n");
         break;
       }
@@ -521,7 +645,7 @@ static InterpretResult loop() {
       }
       case OP_JUMP_IF_FALSE: {
         uint16_t offset = READ_SHORT();
-        if (isFalsey(peek(0))) frame->ip += offset;
+        if (isFalsey(vmPeek(0))) frame->ip += offset;
         break;
       }
       case OP_LOOP: {
@@ -531,7 +655,7 @@ static InterpretResult loop() {
       }
       case OP_CALL: {
         int argCount = READ_BYTE();
-        if (!callValue(peek(argCount), argCount)) {
+        if (!vmCallValue(vmPeek(argCount), argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -553,7 +677,7 @@ static InterpretResult loop() {
       case OP_SUPER_INVOKE: {
         ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
-        ObjClass* superclass = AS_CLASS(pop());
+        ObjClass* superclass = AS_CLASS(vmPop());
         if (!invokeFromClass(superclass, method, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -563,7 +687,7 @@ static InterpretResult loop() {
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
-        push(OBJ_VAL(closure));
+        vmPush(OBJ_VAL(closure));
         for (int i = 0; i < closure->upvalueCount; i++) {
           uint8_t isLocal = READ_BYTE();
           uint8_t index = READ_BYTE();
@@ -577,91 +701,88 @@ static InterpretResult loop() {
       }
       case OP_CLOSE_UPVALUE:
         closeUpvalues(vm.stackTop - 1);
-        pop();
+        vmPop();
         break;
       case OP_RETURN: {
-        Value result = pop();
+        Value result = vmPop();
         closeUpvalues(frame->slots);
         vm.frameCount--;
         if (vm.frameCount == 0) {
-          pop();
+          vmPop();
           return INTERPRET_OK;
         }
 
         vm.stackTop = frame->slots;
-        push(result);
+        vmPush(result);
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
       case OP_CLASS:
-        push(OBJ_VAL(newClass(READ_STRING())));
+        vmPush(OBJ_VAL(newClass(READ_STRING())));
         break;
       case OP_INHERIT: {
-        Value superclass = peek(1);
+        Value superclass = vmPeek(1);
 
         if (!IS_CLASS(superclass)) {
           runtimeError("Superclass must be a class.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjClass* subclass = AS_CLASS(peek(0));
+        ObjClass* subclass = AS_CLASS(vmPeek(0));
         mapAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
-        pop();  // Subclass.
+        vmPop();  // Subclass.
         break;
       }
       case OP_METHOD:
         defineMethod(READ_CONSTANT());
         break;
       case OP_MEMBER: {
-        Value obj = pop();
-        Value val = pop();
-
-        if (IS_INSTANCE(obj)) {
-          ObjInstance* instance = AS_INSTANCE(obj);
-
-          // classes can override the membership predicate.
-          Value memFn;
-          if (mapGet(&instance->klass->methods, OBJ_VAL(vm.memberString),
-                     &memFn)) {
-            push(obj);
-            push(val);
-
-            if (!callMethod(memFn, 1)) return INTERPRET_RUNTIME_ERROR;
-
-            frame = &vm.frames[vm.frameCount - 1];
-            break;
-          }
-
-          // otherwise check the fields & methods.
-          if (!validateMapKey(val)) return INTERPRET_RUNTIME_ERROR;
-
-          bool mapHasKey = mapHas(&instance->fields, val) ||
-                           mapHas(&instance->klass->methods, val);
-          push(BOOL_VAL(mapHasKey));
-          break;
-        }
+        Value obj = vmPop();
+        Value val = vmPop();
 
         if (IS_SEQUENCE(obj)) {
           bool seqHasVal = findInValueArray(&AS_SEQUENCE(obj)->values, val);
-          push(BOOL_VAL(seqHasVal));
+          vmPush(BOOL_VAL(seqHasVal));
           break;
         }
 
-        runtimeError("Only objects or sequences may be tested for membership.");
-        return INTERPRET_RUNTIME_ERROR;
+        if (!IS_INSTANCE(obj)) {
+          runtimeError(
+              "Only objects or sequences may be tested for membership.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(obj);
+
+        // classes can override the membership predicate.
+        Value memFn;
+        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.memberString),
+                   &memFn)) {
+          vmPush(obj);
+          vmPush(val);
+
+          if (!vmCallValue(memFn, 1)) return INTERPRET_RUNTIME_ERROR;
+
+          frame = &vm.frames[vm.frameCount - 1];
+          break;
+        }
+
+        if (!vmInstanceHas(instance, val)) return INTERPRET_RUNTIME_ERROR;
+
+        break;
       }
       case OP_IMPORT: {
-        Value path = pop();
+        Value path = vmPop();
         if (!IS_STRING(path)) {
           runtimeError("Import path must be a string.");
           return INTERPRET_RUNTIME_ERROR;
         }
         InterpretResult result = interpretFile(AS_STRING(path)->chars);
-        pop();
+        vmPop();
         return result;
       }
       case OP_THROW: {
-        Value value = pop();
+        Value value = vmPop();
 
         if (!IS_CLASS(value)) {
           runtimeError("Can only throw classes.");
@@ -685,10 +806,10 @@ InterpretResult interpret(char* path, const char* source) {
   ObjFunction* function = compile(source, path);
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
-  push(OBJ_VAL(function));
+  vmPush(OBJ_VAL(function));
   ObjClosure* closure = newClosure(function);
-  pop();
-  push(OBJ_VAL(closure));
+  vmPop();
+  vmPush(OBJ_VAL(closure));
   call(closure, 0);
 
   return loop();

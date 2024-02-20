@@ -19,6 +19,10 @@ for (y in [1,2,3]) {
   assert(y == 1 or y == 2 or y == 3);
 }
 
+for (y in []) {
+  assert(false);
+}
+
 // iteration protocol.
 
 class Iterable {

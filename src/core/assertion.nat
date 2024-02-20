@@ -1,7 +1,7 @@
 class AssertionFailure < Exception {}
 
 let assert = (condition) => {
-  if (!condition) { throw AssertionFailure; }
+  if (!condition) throw AssertionFailure;
 };
 
 class Be {
