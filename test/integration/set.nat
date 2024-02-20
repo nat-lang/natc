@@ -11,3 +11,13 @@ assert(1 in numSet);
 // as characteristic function.
 
 assert(numSet(1));
+
+// nested.
+
+let set = {{1,2,3}, {3,4,5}};
+
+assert({1,2,3} in set);
+assert({3,4,5} in set);
+
+assert(!({1} in set));
+assert(!({3} in set));

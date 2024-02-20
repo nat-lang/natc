@@ -46,7 +46,7 @@ typedef struct {
   ObjString* hashString;
 
   ObjClass* seqClass;
-  ObjClass* mapClass;
+  ObjClass* objClass;
 } VM;
 
 typedef enum {
@@ -62,12 +62,13 @@ void freeVM();
 void runtimeError(const char* format, ...);
 
 InterpretResult interpret(char* path, const char* source);
-void push(Value value);
+void vmPush(Value value);
 Value vmPop();
 Value vmPeek();
 bool initClass(ObjClass* klass, int argCount);
 bool invoke(ObjString* name, int argCount);
-bool callMethod(Value fn, int argCount);
 bool assertHashable(Value value);
+bool vmCallValue(Value value, int argCount);
+bool vmInstanceHas(ObjInstance* instance, Value value);
 
 #endif

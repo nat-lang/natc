@@ -43,6 +43,7 @@ class B < A {
 
 class C < B {}
 
+assert(C().method() == "B");
 assert(C().test() == "A");
 
 // close over a super method.

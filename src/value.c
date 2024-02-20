@@ -5,7 +5,6 @@
 
 #include "memory.h"
 #include "object.h"
-#include "vm.h"
 
 void initValueArray(ValueArray* array) {
   array->values = NULL;
@@ -137,4 +136,30 @@ uint32_t hashValue(Value value) {
   }
 
   return 0;
+}
+
+ObjString* typeValue(Value value) {
+  switch (value.type) {
+    case VAL_BOOL:
+      return intern("bool");
+    case VAL_NIL:
+      return intern("nil");
+    case VAL_NUMBER:
+      return intern("number");
+    case VAL_OBJ:
+      switch (AS_OBJ(value)->type) {
+        case OBJ_CLASS:
+          return AS_CLASS(value)->name;
+        case OBJ_CLOSURE:
+          return intern("function");
+        case OBJ_STRING:
+          return intern("string");
+        case OBJ_INSTANCE:
+          return intern("object");
+        default:
+          return intern("untypable");
+      }
+    case VAL_UNDEF:
+      return intern("undefined");
+  }
 }

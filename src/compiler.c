@@ -836,35 +836,16 @@ static void method() {
   emitBytes(OP_METHOD, constant);
 }
 
-static void finishMapVal(uint8_t setMethod) {
+static void finishMapVal() {
   consume(TOKEN_COLON, "Expect ':' after map key.");
-  expression();  // val.
-  emitBytes(OP_INVOKE, setMethod);
-  emitByte(2);  // argcount.
+  // value.
+  expression();
+  emitByte(OP_SUBSCRIPT_SET);
 }
 
-// A map literal.
-static void finishMap(uint8_t setMethod) {
-  // Compile the map elements. Just invoke the map
-  // setter on each key/val.
-  while (match(TOKEN_COMMA)) {
-    // the key.
-    expression();
-    // the val & instruction.
-    finishMapVal(setMethod);
-  }
-}
-
-static void finishSetVal(uint8_t addMethod) {
-  emitBytes(OP_INVOKE, addMethod);
-  emitByte(1);  // argcount.
-}
-
-static void finishSet(uint8_t addMethod) {
-  do {
-    expression();
-    finishSetVal(addMethod);
-  } while (match(TOKEN_COMMA));
+static void finishSetVal() {
+  emitConstant(BOOL_VAL(true));
+  emitByte(OP_SUBSCRIPT_SET);
 }
 
 // A map or set literal.
@@ -879,20 +860,31 @@ static void braces(bool canAssign) {
   // next token.
   expression();
 
-  // if comma then it's a set element.
-  if (check(TOKEN_COMMA)) {
+  // it's a singleton set.
+  if (check(TOKEN_RIGHT_BRACE)) {
+    finishSetVal();
+
+  } else if (check(TOKEN_COMMA)) {
+    // it's a |set| > 1 .
     advance();
-    uint8_t addMethod = loadConstant("add");
-    finishSetVal(addMethod);
-    finishSet(addMethod);
+
+    finishSetVal();
+    do {
+      expression();
+      finishSetVal();
+    } while (match(TOKEN_COMMA));
+
   } else if (check(TOKEN_COLON)) {
     // otherwise it's a map: backpatch the class.
     currentChunk()->constants.values[klass] = identifier("Map");
-    uint8_t setMethod = loadConstant("set");
 
     // finish the first key/val pair, then any remaining elements.
-    finishMapVal(setMethod);
-    finishMap(setMethod);
+    finishMapVal();
+
+    while (match(TOKEN_COMMA)) {
+      expression();
+      finishMapVal();
+    }
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
@@ -990,7 +982,8 @@ Parser seqGenerator(Parser checkpointA, int seq) {
     // parse the conditions recursively, since this
     // makes scope management simple. in particular,
     // variables will be in scope in every condition
-    // to their right.
+    // to their right, and all we have to do is conclude
+    // the scope at the end of this function.
     checkpointB = seqGenerator(checkpointA, seq);
   } else if (check(TOKEN_RIGHT_BRACKET)) {
     // now we parse the body, first saving the point
@@ -1105,20 +1098,15 @@ static void brackets(bool canAssign) {
 
 // Subscript or "array indexing" operator like `foo[bar]`.
 static void subscript(bool canAssign) {
-  // store the address of the function identifier.
-  int fn = nativeVariable("__subscriptGet__");
-
   expression();
   consume(TOKEN_RIGHT_BRACKET, "Expect ']' after arguments.");
 
   // if it's assignment, revise the instruction.
   if (canAssign && match(TOKEN_EQUAL)) {
-    currentChunk()->constants.values[fn] = identifier("__subscriptSet__");
-
     expression();
-    emitBytes(OP_CALL, 2);
+    emitByte(OP_SUBSCRIPT_SET);
   } else {
-    emitBytes(OP_CALL, 1);
+    emitByte(OP_SUBSCRIPT_GET);
   }
 }
 

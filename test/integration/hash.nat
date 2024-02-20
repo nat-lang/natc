@@ -9,6 +9,10 @@ assert(hash(1) != hash(2));
 assert(hash("abc") == hash("abc"));
 assert(hash("abc") != hash("cba"));
 
+// core hash.
+
+assert(hash({1,2,3}) != 0);
+
 // extensible hash.
 
 class Hashable {
@@ -25,12 +29,10 @@ let a = Hashable(1);
 let b = Hashable(1);
 let c = Hashable(2);
 
-print (a.__hash__());
-
 assert(hash(a) == hash(b));
 assert(hash(a) != hash(c));
 
-// as hash keys.
+// as hash keys for compilation.
 
 let mapA = {a: 1, b: 1, c: 2};
 let mapB = {b: 1, c: 2};
@@ -42,3 +44,12 @@ let setB = {b,c};
 
 assert(setA == setB);
 
+// as hash keys for access.
+
+assert(mapA[a] == 1);
+assert(a in setA);
+
+// as hash keys for assignment.
+
+mapA[b] = 5;
+assert(mapA[b] == 5);

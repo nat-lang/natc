@@ -1,28 +1,27 @@
 
-class Set < __map__ {
-  add(element) => {
-    this[element] = true;
-    return this;
-  }
-
+class Set < Object {
   // Calling a set is shorthand for the membership predicate,
-  // so that we may pretend the set is its characteristic function.
+  // so that the set behaves like its characteristic function.
   call(element) => element in this
 
   // The elements are the keys of the underlying map.
   elements() => [entry[0] | entry in this.entries()]
 
   // Iteration is over elements.
-  __curr__(idx) => this.elements[idx]
+  __curr__(idx) => this.elements()[idx]
 
-  // Hash the elements, sort them lexicographically, and concatenate
-  // them.
+  // Hash the elements and sum them.
   __hash__() => {
-    let hashes = [element.__hash__() | element in this];
+    let sum = 0;
 
-    
+    for (x in this.elements())
+      sum = sum + hash(x);
 
+    return sum;
   }
+
+  // Cardinality.
+  __len__() => len(this.elements())
 
   // Is [this] a subset of or equal to [other]?
   subsetEq(other) => {

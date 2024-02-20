@@ -42,7 +42,7 @@ assert(map[nil] == 1);
 
 // native methods.
 
-map = map = {"a":1, "b": 2};
+map = {"a":1, "b": 2};
 
 for (key in map.keys()) {
   assert(key == "a" or key == "b");
