@@ -1,6 +1,5 @@
 
 class Map < Object {
-  __len__() => len(this.entries())
   __curr__(idx) => this.entries()[1]
 
   subMap(other) => {

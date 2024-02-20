@@ -172,17 +172,24 @@ bool __length__(int argCount, Value* args) {
     return true;
   }
 
+  if (!IS_INSTANCE(value)) {
+    runtimeError("Only sequences and objects with a '%s' method have length.",
+                 vm.lengthString->chars);
+    return false;
+  }
+
+  ObjInstance* instance = AS_INSTANCE(value);
+
   Value method;
-  if (IS_INSTANCE(value) && mapGet(&AS_INSTANCE(value)->klass->methods,
-                                   OBJ_VAL(vm.lengthString), &method)) {
+  if (mapGet(&instance->klass->methods, OBJ_VAL(vm.lengthString), &method)) {
     // set up the context for the function call.
     vmPush(value);  // receiver.
     return vmCallValue(method, 0);
   }
 
-  runtimeError("Only sequences and objects with a '%s' method have length.",
-               vm.lengthString->chars);
-  return false;
+  // default to the instance's field count.
+  vmPush(NUMBER_VAL(instance->fields.count));
+  return true;
 }
 
 // Use the user-defined hash function if defined, otherwise if

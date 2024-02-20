@@ -20,9 +20,6 @@ class Set < Object {
     return sum;
   }
 
-  // Cardinality.
-  __len__() => len(this.elements())
-
   // Is [this] a subset of or equal to [other]?
   subsetEq(other) => {
     if (len(this) > len(other))
