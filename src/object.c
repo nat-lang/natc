@@ -176,9 +176,8 @@ ObjMap* newMap() {
   return map;
 }
 
-static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
-                             uint32_t hash) {
-  uint32_t index = hash & (capacity - 1);
+static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
+  uint32_t index = hashValue(key) & (capacity - 1);
   MapEntry* tombstone = NULL;
 
   for (;;) {
@@ -199,10 +198,6 @@ static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
 
     index = (index + 1) & (capacity - 1);
   }
-}
-
-static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
-  return mapFindHash(entries, capacity, key, hashValue(key));
 }
 
 static void mapAdjustCapacity(ObjMap* map, int capacity) {
@@ -238,27 +233,23 @@ bool mapHas(ObjMap* map, Value key) {
   return !IS_UNDEF(entry->key);
 }
 
-bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
+bool mapGet(ObjMap* map, Value key, Value* value) {
   if (map->count == 0) return false;
 
-  MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
+  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
   if (IS_UNDEF(entry->key)) return false;
 
   *value = entry->value;
   return true;
 }
 
-bool mapGet(ObjMap* map, Value key, Value* value) {
-  return mapGetHash(map, key, value, hashValue(key));
-}
-
-bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
+bool mapSet(ObjMap* map, Value key, Value value) {
   if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
     int capacity = GROW_CAPACITY(map->capacity);
     mapAdjustCapacity(map, capacity);
   }
 
-  MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
+  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
 
   bool isNewKey = IS_UNDEF(entry->key);
   if (isNewKey && IS_NIL(entry->value)) map->count++;
@@ -266,10 +257,6 @@ bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
   entry->key = key;
   entry->value = value;
   return isNewKey;
-}
-
-bool mapSet(ObjMap* map, Value key, Value value) {
-  return mapSetHash(map, key, value, hashValue(key));
 }
 
 bool mapDelete(ObjMap* map, Value key) {
