@@ -73,5 +73,6 @@ bool vmCallValue(Value value, int argCount);
 bool vmInstanceHas(ObjInstance* instance, Value value);
 bool vmObjGet(ObjInstance* instance, Value key);
 bool vmObjSet(ObjInstance* instance, Value key, Value value);
-
+bool vmAssertInstanceSubscriptGet(Value obj);
+bool vmAssertInstanceSubscriptSet(Value obj);
 #endif

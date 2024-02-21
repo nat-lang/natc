@@ -5,13 +5,7 @@ class Set < Object {
   call(element) => element in this
 
   // The compiler calls this method when building a set comprehension.
-  add(element) => {
-    element = tryHash(element);
-
-    this.set(element, true);
-
-    return this;
-  }
+  add(element) => this.__set__(element, true)
 
   // The elements are the keys of the underlying map.
   elements() => [entry[0] | entry in this.entries()]

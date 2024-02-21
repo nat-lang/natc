@@ -332,23 +332,57 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
-bool vmObjGet(ObjInstance* instance, Value key) {
-  // first, if there's a "hash" field on the key, use it.
+static bool getFieldHash(Value key, uint32_t* p_hash) {
   Value valueHash;
-  uint32_t hash;
 
+  // if there's a "hash" field on the key, use it.
   if (IS_INSTANCE(key) && mapGet(&AS_INSTANCE(key)->fields,
                                  OBJ_VAL(vm.hashFieldString), &valueHash)) {
-    if (!IS_NUMBER(valueHash)) {
-      runtimeError("%s must be a number.", vm.hashFieldString);
-      return false;
+    if (IS_NUMBER(valueHash) && AS_NUMBER(valueHash) >= 0) {
+      p_hash = (uint32_t*)&AS_NUMBER(valueHash);
+      return true;
     }
-    hash = AS_NUMBER(valueHash);
+    runtimeError("%s must be a positive number.", vm.hashFieldString);
   } else {
     // use the native hash.
     if (!assertHashable(key)) return false;
-    hash = hashValue(key);
+
+    uint32_t nativeHash = hashValue(key);
+    p_hash = &nativeHash;
+
+    return true;
   }
+
+  return false;
+}
+
+bool vmAssertInstanceSubscriptGet(Value obj) {
+  if (!IS_INSTANCE(obj)) {
+    runtimeError(
+        "Only objects, sequences, and instances with a '%s' method "
+        "support "
+        "access by subscript.",
+        vm.subscriptGetString->chars);
+    return false;
+  }
+  return true;
+}
+
+bool vmAssertInstanceSubscriptSet(Value obj) {
+  if (!IS_INSTANCE(obj)) {
+    runtimeError(
+        "Only objects, sequences, and instances with a '%s' method "
+        "support "
+        "assignment by subscript.",
+        vm.subscriptSetString->chars);
+    return false;
+  }
+  return true;
+}
+
+bool vmObjGet(ObjInstance* instance, Value key) {
+  uint32_t hash;
+  if (!getFieldHash(key, &hash)) return false;
 
   Value value;
   if (mapGetHash(&instance->fields, key, &value, hash)) {
@@ -357,6 +391,18 @@ bool vmObjGet(ObjInstance* instance, Value key) {
     // we don't throw an error if the property doesn't exist.
     vmPush(NIL_VAL);
   };
+
+  return true;
+}
+
+bool vmObjSet(ObjInstance* instance, Value key, Value value) {
+  uint32_t hash;
+  if (!getFieldHash(key, &hash)) return false;
+
+  mapSetHash(&instance->fields, key, value, hash);
+
+  // leave the object on the stack.
+  vmPush(OBJ_VAL(instance));
 
   return true;
 }
@@ -496,15 +542,7 @@ static InterpretResult loop() {
           break;
         }
 
-        if (!IS_INSTANCE(obj)) {
-          runtimeError(
-              "Only objects, sequences, and instances with a '%s' method "
-              "support "
-              "access by subscript.",
-              vm.subscriptGetString->chars);
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
+        if (!vmAssertInstanceSubscriptGet(obj)) return INTERPRET_RUNTIME_ERROR;
         ObjInstance* instance = AS_INSTANCE(obj);
 
         // classes may define their own subscript access operator.
@@ -521,7 +559,7 @@ static InterpretResult loop() {
         }
 
         // otherwise fall back to property access.
-        if (!objGet(instance, key)) return INTERPRET_RUNTIME_ERROR;
+        if (!vmObjGet(instance, key)) return INTERPRET_RUNTIME_ERROR;
 
         break;
       }
@@ -545,15 +583,7 @@ static InterpretResult loop() {
           break;
         }
 
-        if (!IS_INSTANCE(obj)) {
-          runtimeError(
-              "Only objects, sequences, and instances with a '%s' method "
-              "support "
-              "assignment by subscript.",
-              vm.subscriptSetString->chars);
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
+        if (!vmAssertInstanceSubscriptSet(obj)) return INTERPRET_RUNTIME_ERROR;
         ObjInstance* instance = AS_INSTANCE(obj);
 
         // classes may define their own subscript setting operator.
@@ -571,24 +601,7 @@ static InterpretResult loop() {
         }
 
         // otherwise fall back to property setting.
-
-        // first, if there's a "hash" field on the key, use it.
-        Value hash;
-        if (IS_INSTANCE(key) && mapGet(&AS_INSTANCE(key)->fields,
-                                       OBJ_VAL(vm.hashFieldString), &hash)) {
-          if (!IS_NUMBER(hash)) {
-            runtimeError("%s must be a number.", vm.hashFieldString);
-            return INTERPRET_RUNTIME_ERROR;
-          }
-          mapSetHash(&instance->fields, key, val, AS_NUMBER(hash));
-        } else {
-          // use the native hash.
-          if (!assertHashable(key)) return INTERPRET_RUNTIME_ERROR;
-          mapSet(&instance->fields, key, val);
-        }
-
-        // leave the object on the stack.
-        vmPush(obj);
+        if (!vmObjSet(instance, key, val)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_EQUAL: {

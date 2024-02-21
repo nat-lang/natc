@@ -128,16 +128,9 @@ bool __objGet__(int argCount, Value* args) {
   Value key = vmPop();
   Value obj = vmPop();
 
-  if (!assertHashable(key)) return false;
-
-  Value value;
-  if (mapGet(&AS_INSTANCE(obj)->fields, key, &value)) {
-    vmPush(value);
-  } else {
-    vmPush(NIL_VAL);
-  }
-
-  return true;
+  if (!vmAssertInstanceSubscriptGet(obj)) return false;
+  ObjInstance* instance = AS_INSTANCE(obj);
+  return vmObjGet(instance, key);
 }
 
 bool __objSet__(int argCount, Value* args) {
@@ -145,10 +138,9 @@ bool __objSet__(int argCount, Value* args) {
   Value key = vmPop();
   Value obj = vmPop();
 
-  if (!assertHashable(key)) return false;
-
-  mapSet(&AS_INSTANCE(obj)->fields, key, val);
-  return true;
+  if (!vmAssertInstanceSubscriptSet(obj)) return false;
+  ObjInstance* instance = AS_INSTANCE(obj);
+  return vmObjSet(instance, key, val);
 }
 
 bool __objHas__(int argCount, Value* args) {

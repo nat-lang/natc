@@ -6,6 +6,7 @@ class Object < __obj__ {
   }
 
   __get__(key) => {
+    // needs to be a subtype test!
     if (type(key) == Object) key.setHash();
 
     return this.get(key);
