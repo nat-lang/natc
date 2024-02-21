@@ -897,8 +897,8 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitByte(OP_POP);  // jump condition.
 }
 
-// Parse a comprehension.
-Parser comprehension(Parser checkpointA, int seq) {
+// Parse a comprehension, given
+Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   Iterator iter;
   initIterator(&iter);
 
@@ -931,8 +931,8 @@ Parser comprehension(Parser checkpointA, int seq) {
     // variables will be in scope in every condition
     // to their right, and all we have to do is conclude
     // the scope at the end of this function.
-    checkpointB = comprehension(checkpointA, seq);
-  } else if (check(TOKEN_RIGHT_BRACKET)) {
+    checkpointB = comprehension(checkpointA, var, closingToken);
+  } else if (check(closingToken)) {
     // now we parse the body, first saving the point
     // where the generator ends.
     checkpointB = saveParser();
@@ -940,7 +940,7 @@ Parser comprehension(Parser checkpointA, int seq) {
 
     // load the comprehension instance, offsetting the local
     // count appropriately, and append the expression.
-    emitBytes(OP_GET_LOCAL, seq);
+    emitBytes(OP_GET_LOCAL, var);
     current->localCount++;
     expression();
     methodCall("add", 1);
@@ -965,28 +965,40 @@ Parser comprehension(Parser checkpointA, int seq) {
 }
 
 // Find an occurance of '|' that isn't nested within
-// another mixfix (surfix?) operator, given [left] and
-// [right] token types that mark its boundaries.
-bool advanceToPipe(TokenType left, TokenType right) {
-  // assume we've already consumed one leading depth
-  // denoting token.
-  int depth = 1;
+// braces or brackets, given some [initialBraceDepth]
+// and [initialBracketDepth].
+bool advanceToPipe(int initialBraceDepth, int initialBracketDepth) {
+  int braceDepth = initialBraceDepth;
+  int bracketDepth = initialBracketDepth;
+
+  bool nested;
 
   for (;;) {
-    if (check(left)) depth++;
-    if (check(right)) depth--;
+    if (check(TOKEN_LEFT_BRACE)) braceDepth++;
+    if (check(TOKEN_RIGHT_BRACE)) braceDepth--;
 
-    if (check(TOKEN_PIPE) && depth == 1) return true;
-    if (check(right) && depth == 0) return false;
+    if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
+    if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
+
+    nested = (braceDepth > initialBraceDepth) ||
+             (bracketDepth > initialBracketDepth);
+
+    if (check(TOKEN_PIPE) && !nested) return true;
+
+    if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1)
+      return false;
+    if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == initialBracketDepth - 1)
+      return false;
 
     advance();
   }
 }
 
-static bool tryComprehension(TokenType left, TokenType right) {
+static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
+                             int initialBracketDepth) {
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe(left, right)) {
+  if (advanceToPipe(initialBraceDepth, initialBracketDepth)) {
     consume(TOKEN_PIPE, "Expect '|' between body and conditions.");
 
     // the comprehension instance is on top of the stack now;
@@ -996,7 +1008,7 @@ static bool tryComprehension(TokenType left, TokenType right) {
     int var = addLocal(syntheticToken("#comprehension"));
     markInitialized();
 
-    Parser checkpointB = comprehension(checkpointA, var);
+    Parser checkpointB = comprehension(checkpointA, var, closingToken);
 
     // reclaim the local slot but leave the sequence instance
     // on the stack.
@@ -1010,6 +1022,14 @@ static bool tryComprehension(TokenType left, TokenType right) {
 
   gotoParser(checkpointA);
   return false;
+}
+
+static bool trySetComprehension() {
+  return tryComprehension(TOKEN_RIGHT_BRACE, 1, 0);
+}
+
+static bool trySeqComprehension() {
+  return tryComprehension(TOKEN_RIGHT_BRACKET, 0, 1);
 }
 
 static void finishMapVal() {
@@ -1030,7 +1050,10 @@ static void braces(bool canAssign) {
 
   // empty braces is an empty set.
   if (check(TOKEN_RIGHT_BRACE)) return advance();
-
+  if (trySetComprehension()) {
+    consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
+    return;
+  }
   // first element: either a map key or a set element.
   // we need to advance this far in order to check the
   // next token.
@@ -1072,7 +1095,7 @@ static void brackets(bool canAssign) {
 
   // empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
-  if (tryComprehension(TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET)) {
+  if (trySeqComprehension()) {
     consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
     return;
   }
