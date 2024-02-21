@@ -15,7 +15,7 @@ assert(hash({1,2,3}) != 0);
 
 // extensible hash.
 
-class Hashable {
+class Hashable < Object {
   init(x) => {
     this.x = x;
   }

@@ -54,6 +54,7 @@ bool __seqAdd__(int argCount, Value* args) {
   }
 
   writeValueArray(&AS_SEQUENCE(seq)->values, val);
+  // leave the sequence on the stack.
   vmPush(OBJ_VAL(obj));
 
   return true;
@@ -226,7 +227,7 @@ bool __type__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
 
-  vmPush(OBJ_VAL(typeValue(value)));
+  vmPush(typeValue(value));
   return true;
 }
 

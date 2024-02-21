@@ -18,3 +18,4 @@ import test/integration/set
 import test/integration/set_comprehension
 import test/integration/string
 import test/integration/tree
+import test/integration/type

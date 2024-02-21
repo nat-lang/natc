@@ -211,6 +211,7 @@ static void markRoots() {
   markObject((Obj*)vm.subscriptSetString);
   markObject((Obj*)vm.equalString);
   markObject((Obj*)vm.hashString);
+  markObject((Obj*)vm.hashFieldString);
 
   markObject((Obj*)vm.seqClass);
   markObject((Obj*)vm.objClass);

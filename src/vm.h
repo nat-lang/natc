@@ -44,6 +44,7 @@ typedef struct {
   ObjString* lengthString;
   ObjString* equalString;
   ObjString* hashString;
+  ObjString* hashFieldString;
 
   ObjClass* seqClass;
   ObjClass* objClass;
@@ -70,5 +71,7 @@ bool invoke(ObjString* name, int argCount);
 bool assertHashable(Value value);
 bool vmCallValue(Value value, int argCount);
 bool vmInstanceHas(ObjInstance* instance, Value value);
+bool vmObjGet(ObjInstance* instance, Value key);
+bool vmObjSet(ObjInstance* instance, Value key, Value value);
 
 #endif

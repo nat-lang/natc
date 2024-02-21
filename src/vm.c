@@ -84,6 +84,8 @@ bool initVM() {
   vm.equalString = intern("__eq__");
   vm.hashString = NULL;
   vm.hashString = intern("__hash__");
+  vm.hashFieldString = NULL;
+  vm.hashFieldString = intern("hash");
 
   vm.seqClass = NULL;
   vm.objClass = NULL;
@@ -104,6 +106,7 @@ void freeVM() {
   vm.lengthString = NULL;
   vm.equalString = NULL;
   vm.hashString = NULL;
+  vm.hashFieldString = NULL;
   freeObjects();
 }
 
@@ -329,6 +332,35 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
+bool vmObjGet(ObjInstance* instance, Value key) {
+  // first, if there's a "hash" field on the key, use it.
+  Value valueHash;
+  uint32_t hash;
+
+  if (IS_INSTANCE(key) && mapGet(&AS_INSTANCE(key)->fields,
+                                 OBJ_VAL(vm.hashFieldString), &valueHash)) {
+    if (!IS_NUMBER(valueHash)) {
+      runtimeError("%s must be a number.", vm.hashFieldString);
+      return false;
+    }
+    hash = AS_NUMBER(valueHash);
+  } else {
+    // use the native hash.
+    if (!assertHashable(key)) return false;
+    hash = hashValue(key);
+  }
+
+  Value value;
+  if (mapGetHash(&instance->fields, key, &value, hash)) {
+    vmPush(value);
+  } else {
+    // we don't throw an error if the property doesn't exist.
+    vmPush(NIL_VAL);
+  };
+
+  return true;
+}
+
 static InterpretResult loop() {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
@@ -489,13 +521,8 @@ static InterpretResult loop() {
         }
 
         // otherwise fall back to property access.
-        Value value;
-        if (mapGet(&instance->fields, key, &value)) {
-          vmPush(value);
-        } else {
-          // we don't throw an error if the property doesn't exist.
-          vmPush(NIL_VAL);
-        }
+        if (!objGet(instance, key)) return INTERPRET_RUNTIME_ERROR;
+
         break;
       }
       case OP_SUBSCRIPT_SET: {
@@ -544,8 +571,22 @@ static InterpretResult loop() {
         }
 
         // otherwise fall back to property setting.
-        if (!assertHashable(key)) return INTERPRET_RUNTIME_ERROR;
-        mapSet(&instance->fields, key, val);
+
+        // first, if there's a "hash" field on the key, use it.
+        Value hash;
+        if (IS_INSTANCE(key) && mapGet(&AS_INSTANCE(key)->fields,
+                                       OBJ_VAL(vm.hashFieldString), &hash)) {
+          if (!IS_NUMBER(hash)) {
+            runtimeError("%s must be a number.", vm.hashFieldString);
+            return INTERPRET_RUNTIME_ERROR;
+          }
+          mapSetHash(&instance->fields, key, val, AS_NUMBER(hash));
+        } else {
+          // use the native hash.
+          if (!assertHashable(key)) return INTERPRET_RUNTIME_ERROR;
+          mapSet(&instance->fields, key, val);
+        }
+
         // leave the object on the stack.
         vmPush(obj);
         break;

@@ -1,0 +1,4 @@
+
+class A {}
+
+assert(type(A()) == A);

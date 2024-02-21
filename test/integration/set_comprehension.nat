@@ -10,16 +10,24 @@ assert(set == {true});
 set = {a | a in [1,2,3]};
 assert(set == {1,2,3});
 
+set = {a | a in {1,2,3}};
+assert(set == {1,2,3});
+
 // nested body.
 
 set = {{true | b in a} | a in [[1,2], [3], [4,5]]};
-assert(set == {
-  {true},
-  {true},
-  {true}
-});
+assert(set == {{true}, {true}, {true}});
+
+set = {a | a in {{1,2}, {3}, {4,5}}};
+assert({1,2} in set);
+
+set = {{true | b in a} | a in {{1,2}, {3}, {4,5}}};
+assert(set == {{true}, {true}, {true}});
 
 // nested condition.
 
 set = {a | a in {a | a in [1,1,2,2,3,3]}};
+assert(set == {1,2,3});
+
+set = {a | a in {a | a in {1,1,2,2,3,3}}};
 assert(set == {1,2,3});
