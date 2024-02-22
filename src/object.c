@@ -35,10 +35,10 @@ ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
   return bound;
 }
 
-ObjClass* newClass(ObjString* name) {
+ObjClass* newClass(ObjString* name, ObjClass* metaclass) {
   ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
   klass->name = name;
-  initMap(&klass->fields);
+  klass->klass = metaclass;
   initMap(&klass->methods);
   return klass;
 }

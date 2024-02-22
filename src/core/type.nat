@@ -1,11 +1,15 @@
 class Type {}
 
-class TClass < Type {
-  sub(klass) => {
+class Metaclass < Type {
+  isSubclass(klass) => {
     while (klass) {
-      if (klass == this) return true;
-      klass = klass.type;
+      // invoke pointer equality so that `==` can bottom out.
+      if (klass is this) return true;
+
+      klass = klass.superclass;
     }
     return false;
   }
+
+  __eq__(klass) => this.isSubclass(klass) or klass.isSubclass(this)
 }

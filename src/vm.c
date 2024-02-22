@@ -87,9 +87,10 @@ bool initVM() {
   vm.hashFieldString = NULL;
   vm.hashFieldString = intern("hash");
 
+  vm.typeClass = NULL;
+  vm.metaClass = NULL;
   vm.seqClass = NULL;
   vm.objClass = NULL;
-  vm.typeClass = NULL;
 
   return initializeCore(&vm) == INTERPRET_OK;
 }
@@ -110,6 +111,7 @@ void freeVM() {
   vm.hashFieldString = NULL;
   vm.seqClass = NULL;
   vm.objClass = NULL;
+  vm.metaClass = NULL;
   vm.typeClass = NULL;
   freeObjects();
 }
@@ -166,7 +168,6 @@ bool vmCallValue(Value callee, int argCount) {
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
         ObjInstance* instance = newInstance(klass);
-        mapSet(&instance->fields, OBJ_VAL(intern("type")), callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(instance);
         return initClass(klass, argCount);
       }
@@ -610,6 +611,13 @@ static InterpretResult loop() {
         if (!vmObjSet(instance, key, val)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
+      case OP_IS: {
+        Value a = vmPop();
+        Value b = vmPop();
+
+        vmPush(BOOL_VAL(valuesEqual(a, b)));
+        break;
+      }
       case OP_EQUAL: {
         Value a = vmPop();
         Value b = vmPop();
@@ -778,9 +786,8 @@ static InterpretResult loop() {
         break;
       }
       case OP_CLASS: {
-        ObjClass* klass = newClass(READ_STRING());
+        ObjClass* klass = newClass(READ_STRING(), vm.metaClass);
         vmPush(OBJ_VAL(klass));
-        mapSet(&klass->fields, OBJ_VAL(intern("type")), OBJ_VAL(vm.typeClass));
         break;
       }
       case OP_INHERIT: {

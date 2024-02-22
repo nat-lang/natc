@@ -24,8 +24,9 @@ static void defineNativeFn(ObjString* name, int arity, NativeFn function,
   defineNative(name, fn, dest);
 }
 
-ObjClass* defineNativeClass(ObjString* name, ObjMap* dest) {
-  ObjClass* klass = newClass(name);
+ObjClass* defineNativeClass(ObjString* name, ObjMap* dest,
+                            ObjClass* metaclass) {
+  ObjClass* klass = newClass(name, metaclass);
 
   defineNative(name, OBJ_VAL(klass), dest);
 
@@ -231,12 +232,12 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("type"), 1, __type__, &vm.globals);
 
   // native classes.
-  vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals);
+  vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals, NULL);
   defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
   defineNativeFn(intern("add"), 1, __seqAdd__, &vm.seqClass->methods);
   defineNativeFn(vm.memberString, 1, __seqIn__, &vm.seqClass->methods);
 
-  vm.objClass = defineNativeClass(intern("__obj__"), &vm.globals);
+  vm.objClass = defineNativeClass(intern("__obj__"), &vm.globals, NULL);
   defineNativeFn(intern("get"), 1, __objGet__, &vm.objClass->methods);
   defineNativeFn(intern("set"), 2, __objSet__, &vm.objClass->methods);
   defineNativeFn(intern("has"), 1, __objHas__, &vm.objClass->methods);
@@ -245,7 +246,10 @@ InterpretResult initializeCore() {
   // core definitions.
   InterpretResult coreInterpretation = interpretFile("src/core/__index__");
 
-  vm.typeClass = getClass("TClass");
+  vm.metaClass = getClass("Metaclass");
+
+  vm.seqClass->klass = vm.metaClass;
+  vm.objClass->klass = vm.metaClass;
 
   return coreInterpretation;
 }

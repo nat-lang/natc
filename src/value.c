@@ -142,6 +142,8 @@ Value typeValue(Value value) {
   switch (value.type) {
     case VAL_OBJ:
       switch (AS_OBJ(value)->type) {
+        case OBJ_CLASS:
+          return OBJ_VAL(AS_CLASS(value)->klass);
         case OBJ_INSTANCE:
           return OBJ_VAL(AS_INSTANCE(value)->klass);
         default:

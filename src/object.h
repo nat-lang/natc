@@ -97,11 +97,11 @@ typedef struct {
   MapEntry *entries;
 } ObjMap;
 
-typedef struct {
+typedef struct ObjClass {
   Obj obj;
   ObjString *name;
+  struct ObjClass *klass;
   ObjMap methods;
-  ObjMap fields;
 } ObjClass;
 
 typedef struct {
@@ -122,7 +122,7 @@ typedef struct {
 } ObjSequence;
 
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
-ObjClass *newClass(ObjString *name);
+ObjClass *newClass(ObjString *name, ObjClass *metaclass);
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjInstance *newInstance(ObjClass *klass);

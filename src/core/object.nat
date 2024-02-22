@@ -4,13 +4,24 @@ class Object < __obj__ {
   }
 
   __get__(key) => {
-    if (type(key).sub(Object)) key.setHash();
+    if (type(key) == (Object)) key.setHash();
 
     return this.get(key);
   }
 
   __set__(key, value) => {
-    if (type(key).sub(Object)) key.setHash();
+    print "setting ...";
+    print key;
+    print type(key);
+    print "--------------";
+    if (type(key) == (Object)) {
+      print "eq!";
+      key.setHash();
+    } else {
+      print "neq!";
+    }
+    print "----------------------";
+
 
     this.set(key, value);
 

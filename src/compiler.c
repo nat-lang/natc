@@ -495,6 +495,9 @@ static void binary(bool canAssign) {
     case TOKEN_GREATER_EQUAL:
       emitBytes(OP_LESS, OP_NOT);
       break;
+    case TOKEN_IS:
+      emitByte(OP_IS);
+      break;
     case TOKEN_LESS:
       emitByte(OP_LESS);
       break;

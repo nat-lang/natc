@@ -46,7 +46,8 @@ typedef enum {
   OP_IMPORT,
   OP_THROW,
   OP_SUBSCRIPT_GET,
-  OP_SUBSCRIPT_SET
+  OP_SUBSCRIPT_SET,
+  OP_IS,
 } OpCode;
 
 typedef struct {

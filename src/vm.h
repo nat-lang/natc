@@ -46,9 +46,10 @@ typedef struct {
   ObjString* hashString;
   ObjString* hashFieldString;
 
+  ObjClass* typeClass;
+  ObjClass* metaClass;
   ObjClass* seqClass;
   ObjClass* objClass;
-  ObjClass* typeClass;
 } VM;
 
 typedef enum {

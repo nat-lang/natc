@@ -139,6 +139,8 @@ static TokenType identifierType() {
             return checkpointKeyword(2, 4, "port", TOKEN_IMPORT);
           case 'n':
             return checkpointKeyword(1, 1, "n", TOKEN_IN);
+          case 's':
+            return checkpointKeyword(1, 1, "s", TOKEN_IS);
         }
       }
       break;
