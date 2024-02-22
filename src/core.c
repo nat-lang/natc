@@ -243,5 +243,9 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("entries"), 0, __objEntries__, &vm.objClass->methods);
 
   // core definitions.
-  return interpretFile("src/core/__index__");
+  InterpretResult coreInterpretation = interpretFile("src/core/__index__");
+
+  vm.typeClass = getClass("TClass");
+
+  return coreInterpretation;
 }

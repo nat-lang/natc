@@ -87,6 +87,7 @@ static void blackenObject(Obj* object) {
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
       markObject((Obj*)klass->name);
+      markMap(&klass->fields);
       markMap(&klass->methods);
       break;
     }
@@ -140,6 +141,7 @@ static void freeObject(Obj* object) {
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
       freeMap(&klass->methods);
+      freeMap(&klass->fields);
       FREE(ObjClass, object);
       break;
     }
@@ -215,6 +217,7 @@ static void markRoots() {
 
   markObject((Obj*)vm.seqClass);
   markObject((Obj*)vm.objClass);
+  markObject((Obj*)vm.typeClass);
 }
 
 static void traceReferences() {

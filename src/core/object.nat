@@ -1,19 +1,16 @@
-
-
 class Object < __obj__ {
   init() => {
     this.hash = nil;
   }
 
   __get__(key) => {
-    // needs to be a subtype test!
-    if (type(key) == Object) key.setHash();
+    if (type(key).sub(Object)) key.setHash();
 
     return this.get(key);
   }
 
   __set__(key, value) => {
-    if (type(key) == Object) key.setHash();
+    if (type(key).sub(Object)) key.setHash();
 
     this.set(key, value);
 
@@ -21,7 +18,7 @@ class Object < __obj__ {
   }
 
   __in__(value) => {
-    if (type(value) == Object) value.setHash();
+    if (type(value).sub(Object)) value.setHash();
 
     return this.has(value);
   }
@@ -30,7 +27,6 @@ class Object < __obj__ {
     this.hash = this.__hash__();
   }
 
-  // 
   __hash__() => {}
 }
 

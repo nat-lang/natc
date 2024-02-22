@@ -1,0 +1,11 @@
+class Type {}
+
+class TClass < Type {
+  sub(klass) => {
+    while (klass) {
+      if (klass == this) return true;
+      klass = klass.type;
+    }
+    return false;
+  }
+}

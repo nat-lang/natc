@@ -89,6 +89,7 @@ bool initVM() {
 
   vm.seqClass = NULL;
   vm.objClass = NULL;
+  vm.typeClass = NULL;
 
   return initializeCore(&vm) == INTERPRET_OK;
 }
@@ -107,6 +108,9 @@ void freeVM() {
   vm.equalString = NULL;
   vm.hashString = NULL;
   vm.hashFieldString = NULL;
+  vm.seqClass = NULL;
+  vm.objClass = NULL;
+  vm.typeClass = NULL;
   freeObjects();
 }
 
@@ -161,7 +165,9 @@ bool vmCallValue(Value callee, int argCount) {
       }
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
-        vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+        ObjInstance* instance = newInstance(klass);
+        mapSet(&instance->fields, OBJ_VAL(intern("type")), callee);
+        vm.stackTop[-argCount - 1] = OBJ_VAL(instance);
         return initClass(klass, argCount);
       }
       case OBJ_CLOSURE:
@@ -771,9 +777,12 @@ static InterpretResult loop() {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
-      case OP_CLASS:
-        vmPush(OBJ_VAL(newClass(READ_STRING())));
+      case OP_CLASS: {
+        ObjClass* klass = newClass(READ_STRING());
+        vmPush(OBJ_VAL(klass));
+        mapSet(&klass->fields, OBJ_VAL(intern("type")), OBJ_VAL(vm.typeClass));
         break;
+      }
       case OP_INHERIT: {
         Value superclass = vmPeek(1);
 
