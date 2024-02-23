@@ -11,6 +11,8 @@ assert(hash("abc") != hash("cba"));
 
 // core hash.
 
+print {1,2,3};
+
 assert(hash({1,2,3}) != 0);
 
 // extensible hash.
@@ -32,15 +34,20 @@ let c = Hashable(2);
 assert(hash(a) == hash(b));
 assert(hash(a) != hash(c));
 
-// as hash keys for compilation.
+// as hash keys for maps.
 
 let mapA = {a: 1, b: 1, c: 2};
 let mapB = {b: 1, c: 2};
 
-// assert(mapA == mapB);
+assert(mapA == mapB);
 
 let setA = {a,b,c};
 let setB = {b,c};
+
+print"+";
+for (x in setA)
+  print x;
+print"+";
 
 assert(setA == setB);
 

@@ -1,43 +1,27 @@
+class Unhashable < Exception {}
+
 class Object < __obj__ {
   init() => {
     this.hash = nil;
+    this.internal = ["hash", "internal"];
   }
 
-  __get__(key) => {
-    if (type(key) == Object) key.setHash();
-
-    return this.get(key);
+  entries() => {
+    this.internal;
+    return [entry | entry in super.entries(), !(entry[0] in this.internal)];
   }
 
-  __set__(key, value) => {
-    print "setting ...";
-    print key;
-    print type(key);
-    print "--------------";
-    if (type(key) == Object) {
-      print "eq!";
-      key.setHash();
-    } else {
-      print "neq!";
-    }
-    print "----------------------";
+  __len__() => len(this.entries())
 
-
-    this.set(key, value);
-
-    return this;
-  }
-
-  __in__(value) => {
-    if (type(value) == Object) value.setHash();
-
-    return this.has(value);
-  }
+  __next__(idx) => next(this.entries(), idx)
+  __curr__(idx) => curr(this.entries(), idx)
 
   setHash() => {
     this.hash = this.__hash__();
   }
 
-  __hash__() => {}
+  __hash__() => {
+    throw Unhashable;
+  }
 }
 

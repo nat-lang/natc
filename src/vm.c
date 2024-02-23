@@ -238,6 +238,10 @@ bool invoke(ObjString* name, int argCount) {
     return invokeFromClass(AS_CLASS(receiver)->klass, name, argCount);
   }
 
+  fprintf(stderr, "BANGBANG ");
+  printValue(receiver);
+  fprintf(stderr, " BANGBANG ");
+
   runtimeError("Only instances and classes have methods.");
   return false;
 }
@@ -341,28 +345,22 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
-static bool getFieldHash(Value key, uint32_t* p_hash) {
+static double getFieldHash(Value key) {
   Value valueHash;
 
   // if there's a "hash" field on the key, use it.
   if (IS_INSTANCE(key) && mapGet(&AS_INSTANCE(key)->fields,
                                  OBJ_VAL(vm.hashFieldString), &valueHash)) {
     if (IS_NUMBER(valueHash) && AS_NUMBER(valueHash) >= 0) {
-      p_hash = (uint32_t*)&AS_NUMBER(valueHash);
-      return true;
+      return AS_NUMBER(valueHash);
+    } else {
+      return -1;
     }
-    runtimeError("%s must be a positive number.", vm.hashFieldString);
-  } else {
-    // use the native hash.
-    if (!assertHashable(key)) return false;
-
-    uint32_t nativeHash = hashValue(key);
-    p_hash = &nativeHash;
-
-    return true;
   }
 
-  return false;
+  // use the native hash.
+  if (!assertHashable(key)) return -1;
+  return hashValue(key);
 }
 
 bool vmAssertInstanceSubscriptGet(Value obj) {
@@ -390,8 +388,7 @@ bool vmAssertInstanceSubscriptSet(Value obj) {
 }
 
 bool vmObjGet(ObjInstance* instance, Value key) {
-  uint32_t hash;
-  if (!getFieldHash(key, &hash)) return false;
+  int hash = getFieldHash(key);
 
   Value value;
   if (mapGetHash(&instance->fields, key, &value, hash)) {
@@ -405,8 +402,7 @@ bool vmObjGet(ObjInstance* instance, Value key) {
 }
 
 bool vmObjSet(ObjInstance* instance, Value key, Value value) {
-  uint32_t hash;
-  if (!getFieldHash(key, &hash)) return false;
+  int hash = getFieldHash(key);
 
   mapSetHash(&instance->fields, key, value, hash);
 
@@ -647,17 +643,10 @@ static InterpretResult loop() {
           }
         }
 
-        printf("\n-----EQ-----\n");
-        // printValue(a);
-        // printValue(b);
-        printf("\n-------EQ1-------\n");
         if (IS_CLASS(a) && IS_CLASS(b)) {
-          printf("\n-------EQ1.5-------\n");
-          fprintf(stderr, "yes %i", AS_CLASS(a)->klass == NULL);
           Value equalFn;
           if (mapGet(&AS_CLASS(a)->klass->methods, OBJ_VAL(vm.equalString),
                      &equalFn)) {
-            printf("\n-------EQ1.6-------\n");
             vmPush(a);
             vmPush(b);
             if (!vmCallValue(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
@@ -666,7 +655,6 @@ static InterpretResult loop() {
             break;
           }
         }
-        printf("\n-------EQ2-------\n");
 
         vmPush(BOOL_VAL(valuesEqual(a, b)));
         break;
@@ -773,6 +761,7 @@ static InterpretResult loop() {
         ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
         ObjClass* superclass = AS_CLASS(vmPop());
+
         if (!invokeFromClass(superclass, method, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }

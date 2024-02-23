@@ -1,14 +1,13 @@
 
 class Map < Object {
-  __curr__(idx) => this.entries()[1]
-
-  subMap(other) => {
-    for (key in this.keys()) {
-      if (!key in other) return false;
-      if (other[key] != this[key]) return false;
-    }
-    return true;
+  init() => {
+    this.elements = Object();
+    super.init();
   }
+
+  __curr__(idx) => curr(this.elements, idx)
+
+  __len__() => len(this.elements)
 
   __eq__(other) => {
     if (len(this) != len(other)) return false;
@@ -16,6 +15,38 @@ class Map < Object {
     return this.subMap(other) and other.subMap(this);
   }
 
-  keys() => [entry[0] | entry in this.entries()]
-  values() => [entry[1] | entry in this.entries()]
+  // Subscript access used by the compiler.
+  __get__(key) => {
+    if (type(key) == Object) key.setHash();
+
+    return this.elements.get(key);
+  }
+
+  // Subscript assignment used by the compiler.
+  __set__(key, value) => {
+    if (type(key) == Object) key.setHash();
+
+    this.elements.set(key, value);
+
+    return this;
+  }
+
+  __in__(value) => {
+    if (type(value) == Object) value.setHash();
+
+    return (value in this.keys());
+  }
+
+  keys() => [entry[0] | entry in this.elements]
+  values() => [entry[1] | entry in this.elements]
+
+  subMap(other) => {
+    if (type(other) != Map) return false;
+
+    for (key in this.keys()) {
+      if (!key in other) return false;
+      if (other[key] != this[key]) return false;
+    }
+    return true;
+  }
 }

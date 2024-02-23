@@ -5,6 +5,7 @@
 
 #include "memory.h"
 #include "object.h"
+#include "vm.h"
 
 void initValueArray(ValueArray* array) {
   array->values = NULL;
@@ -66,6 +67,17 @@ void printValueArray(ValueArray* array) {
   printf("]");
 }
 
+// Is there a hash field on the instance?
+int instanceHash(ObjInstance* instance) {
+  Value valueHash;
+  if (mapGet(&instance->fields, OBJ_VAL(vm.hashFieldString), &valueHash)) {
+    if (IS_NUMBER(valueHash) && AS_NUMBER(valueHash) >= 0) {
+      return AS_NUMBER(valueHash);
+    }
+  }
+  return -1;
+}
+
 bool valuesEqual(Value a, Value b) {
   if (a.type != b.type) return false;
   switch (a.type) {
@@ -75,8 +87,18 @@ bool valuesEqual(Value a, Value b) {
       return true;
     case VAL_NUMBER:
       return AS_NUMBER(a) == AS_NUMBER(b);
-    case VAL_OBJ:
-      return AS_OBJ(a) == AS_OBJ(b);
+    case VAL_OBJ: {
+      if (OBJ_TYPE(a) != OBJ_TYPE(b)) return false;
+      switch (OBJ_TYPE(a)) {
+        case OBJ_INSTANCE: {
+          int aHash = instanceHash(AS_INSTANCE(a));
+          int bHash = instanceHash(AS_INSTANCE(b));
+          if (aHash > 0 && bHash > 0) return aHash == bHash;
+        }
+        default:
+          return AS_OBJ(a) == AS_OBJ(b);
+      }
+    }
     default:
       return false;  // Unreachable.
   }

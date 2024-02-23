@@ -1,23 +1,28 @@
 
-class Set < Object {
+class Set < Map {
+  // A Set is a Map whose important elements are its keys.
+
   // Calling a set is shorthand for the membership predicate,
   // so that the set behaves like its characteristic function.
-  call(element) => element in this
+  call(element) => this[element] == true
 
   // The compiler calls this method when building a set comprehension.
-  add(element) => this.__set__(element, true)
+  add(element) => this[element] = true
 
-  // The elements are the keys of the underlying map.
-  elements() => [entry[0] | entry in this.entries()]
+  __in__(element) => element in this.keys()
 
-  // Iteration is over elements.
-  __curr__(idx) => this.elements()[idx]
+  // Iteration is over keys.
+  __next__(idx) => {
+    print "CHE CATSO";
+    return next(this.keys(),idx);
+  } 
+  __curr__(idx) => curr(this.keys(), idx)
 
-  // Hash the elements and sum them.
+  // Hash the keys and sum them.
   __hash__() => {
     let sum = 0;
 
-    for (x in this.elements())
+    for (x in this.keys())
       sum = sum + hash(x);
 
     return sum;
@@ -28,10 +33,12 @@ class Set < Object {
     if (len(this) > len(other))
       return false;
 
-    for (x in this)
-      if (!x in other)
+    for (x in this.keys()) {
+      if (!(x in other)) {
         return false;
-  
+      }
+    }
+
     return true;
   }
 
