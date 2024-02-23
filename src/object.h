@@ -100,8 +100,9 @@ typedef struct {
 typedef struct ObjClass {
   Obj obj;
   ObjString *name;
-  struct ObjClass *klass;
   ObjMap methods;
+  ObjMap fields;
+  struct ObjClass *klass;
 } ObjClass;
 
 typedef struct {

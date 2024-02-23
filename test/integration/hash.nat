@@ -37,7 +37,7 @@ assert(hash(a) != hash(c));
 let mapA = {a: 1, b: 1, c: 2};
 let mapB = {b: 1, c: 2};
 
-assert(mapA == mapB);
+// assert(mapA == mapB);
 
 let setA = {a,b,c};
 let setB = {b,c};

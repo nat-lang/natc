@@ -40,6 +40,7 @@ ObjClass* newClass(ObjString* name, ObjClass* metaclass) {
   klass->name = name;
   klass->klass = metaclass;
   initMap(&klass->methods);
+  initMap(&klass->fields);
   return klass;
 }
 

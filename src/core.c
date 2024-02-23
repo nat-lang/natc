@@ -231,6 +231,11 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("hash"), 1, __hash__, &vm.globals);
   defineNativeFn(intern("type"), 1, __type__, &vm.globals);
 
+  // load the types first.
+  InterpretResult coreTypeInterpretation = interpretFile("src/core/type");
+  if (coreTypeInterpretation != INTERPRET_OK) return coreTypeInterpretation;
+  vm.metaClass = getClass("Metaclass");
+
   // native classes.
   vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals, NULL);
   defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
@@ -244,12 +249,5 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("entries"), 0, __objEntries__, &vm.objClass->methods);
 
   // core definitions.
-  InterpretResult coreInterpretation = interpretFile("src/core/__index__");
-
-  vm.metaClass = getClass("Metaclass");
-
-  vm.seqClass->klass = vm.metaClass;
-  vm.objClass->klass = vm.metaClass;
-
-  return coreInterpretation;
+  return interpretFile("src/core/__index__");
 }

@@ -3,7 +3,8 @@ class Type {}
 class Metaclass < Type {
   isSubclass(klass) => {
     while (klass) {
-      // invoke pointer equality so that `==` can bottom out.
+      // pointer equality so that we can 
+      // define `==` in terms of subclass.
       if (klass is this) return true;
 
       klass = klass.superclass;

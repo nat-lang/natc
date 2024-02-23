@@ -7,6 +7,8 @@ class Sequence < __seq__ {
   }
   __len__() => len(this.values)
   __eq__(seq) => {
+    print "?";
+    print seq;
     if (len(this) != len(seq)) return false;
 
     for (let i = 0; i < len(this); i = i + 1) {

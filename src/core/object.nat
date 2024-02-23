@@ -4,7 +4,7 @@ class Object < __obj__ {
   }
 
   __get__(key) => {
-    if (type(key) == (Object)) key.setHash();
+    if (type(key) == Object) key.setHash();
 
     return this.get(key);
   }
@@ -14,7 +14,7 @@ class Object < __obj__ {
     print key;
     print type(key);
     print "--------------";
-    if (type(key) == (Object)) {
+    if (type(key) == Object) {
       print "eq!";
       key.setHash();
     } else {
@@ -29,7 +29,7 @@ class Object < __obj__ {
   }
 
   __in__(value) => {
-    if (type(value).sub(Object)) value.setHash();
+    if (type(value) == Object) value.setHash();
 
     return this.has(value);
   }

@@ -224,20 +224,22 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
 bool invoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
 
-  if (!IS_INSTANCE(receiver)) {
-    runtimeError("Only instances have methods.");
-    return false;
+  if (IS_INSTANCE(receiver)) {
+    ObjInstance* instance = AS_INSTANCE(receiver);
+
+    Value field;
+    if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
+      vm.stackTop[-argCount - 1] = field;
+      return vmCallValue(field, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+  } else if (IS_CLASS(receiver)) {
+    return invokeFromClass(AS_CLASS(receiver)->klass, name, argCount);
   }
 
-  ObjInstance* instance = AS_INSTANCE(receiver);
-
-  Value field;
-  if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
-    vm.stackTop[-argCount - 1] = field;
-    return vmCallValue(field, argCount);
-  }
-
-  return invokeFromClass(instance->klass, name, argCount);
+  runtimeError("Only instances and classes have methods.");
+  return false;
 }
 
 static bool bindMethod(ObjClass* klass, ObjString* name) {
@@ -500,25 +502,34 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_PROPERTY: {
-        if (!IS_INSTANCE(vmPeek(0))) {
-          runtimeError("Only objects have properties.");
+        ObjMap* fields;
+        ObjClass* klass;
+
+        ObjString* name = READ_STRING();
+
+        if (IS_INSTANCE(vmPeek(0))) {
+          ObjInstance* instance = AS_INSTANCE(vmPeek(0));
+          fields = &instance->fields;
+          klass = instance->klass;
+        } else if (IS_CLASS(vmPeek(0))) {
+          ObjClass* classInstance = AS_CLASS(vmPeek(0));
+          fields = &classInstance->fields;
+          klass = classInstance->klass;
+        } else {
+          runtimeError("Only objects and classes have properties.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(vmPeek(0));
-        ObjString* name = READ_STRING();
-
         Value value;
-        if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
+        if (mapGet(fields, OBJ_VAL(name), &value)) {
           vmPop();  // Instance.
           vmPush(value);
           break;
         }
 
-        if (!bindMethod(instance->klass, name)) {
+        if (!bindMethod(klass, name)) {
           return INTERPRET_RUNTIME_ERROR;
         }
-        break;
       }
       case OP_SET_PROPERTY: {
         if (!IS_INSTANCE(vmPeek(1))) {
@@ -624,13 +635,8 @@ static InterpretResult loop() {
 
         // classes can override the equality relation.
         if (IS_INSTANCE(a) && IS_INSTANCE(b)) {
-          ObjInstance* instanceA = AS_INSTANCE(a);
-          ObjInstance* instanceB = AS_INSTANCE(b);
-
           Value equalFn;
-          if (valuesEqual(OBJ_VAL(instanceA->klass),
-                          OBJ_VAL(instanceB->klass)) &&
-              mapGet(&instanceA->klass->methods, OBJ_VAL(vm.equalString),
+          if (mapGet(&AS_INSTANCE(a)->klass->methods, OBJ_VAL(vm.equalString),
                      &equalFn)) {
             vmPush(a);
             vmPush(b);
@@ -640,6 +646,27 @@ static InterpretResult loop() {
             break;
           }
         }
+
+        printf("\n-----EQ-----\n");
+        // printValue(a);
+        // printValue(b);
+        printf("\n-------EQ1-------\n");
+        if (IS_CLASS(a) && IS_CLASS(b)) {
+          printf("\n-------EQ1.5-------\n");
+          fprintf(stderr, "yes %i", AS_CLASS(a)->klass == NULL);
+          Value equalFn;
+          if (mapGet(&AS_CLASS(a)->klass->methods, OBJ_VAL(vm.equalString),
+                     &equalFn)) {
+            printf("\n-------EQ1.6-------\n");
+            vmPush(a);
+            vmPush(b);
+            if (!vmCallValue(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
+
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+          }
+        }
+        printf("\n-------EQ2-------\n");
 
         vmPush(BOOL_VAL(valuesEqual(a, b)));
         break;
@@ -799,6 +826,7 @@ static InterpretResult loop() {
         }
 
         ObjClass* subclass = AS_CLASS(vmPeek(0));
+        mapSet(&subclass->fields, OBJ_VAL(intern("superclass")), superclass);
         mapAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
         vmPop();  // Subclass.
         break;
