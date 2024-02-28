@@ -140,8 +140,11 @@ static inline bool isObjType(Value value, ObjType type) {
 
 void initMap(ObjMap *map);
 void freeMap(ObjMap *map);
+bool mapHasHash(ObjMap *map, Value key, uint32_t hash);
 bool mapHas(ObjMap *map, Value key);
+bool mapGetHash(ObjMap *map, Value key, Value *value, uint32_t hash);
 bool mapGet(ObjMap *map, Value key, Value *value);
+bool mapSetHash(ObjMap *map, Value key, Value value, uint32_t);
 bool mapSet(ObjMap *map, Value key, Value value);
 bool mapDelete(ObjMap *map, Value key);
 void mapAddAll(ObjMap *from, ObjMap *to);

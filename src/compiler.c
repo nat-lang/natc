@@ -352,7 +352,7 @@ static void endScope() {
   }
 }
 
-static void function();
+static void function(FunctionType type);
 static void expression();
 static void boundExpression();
 static void statement();
@@ -836,60 +836,6 @@ static void method() {
   emitBytes(OP_METHOD, constant);
 }
 
-static void finishMapVal() {
-  consume(TOKEN_COLON, "Expect ':' after map key.");
-  // value.
-  expression();
-  emitByte(OP_SUBSCRIPT_SET);
-}
-
-static void finishSetVal() {
-  emitConstant(BOOL_VAL(true));
-  emitByte(OP_SUBSCRIPT_SET);
-}
-
-// A map or set literal.
-static void braces(bool canAssign) {
-  int klass = nativeCall("Set", 0);
-
-  // empty braces is an empty set.
-  if (check(TOKEN_RIGHT_BRACE)) return advance();
-
-  // first element: either a map key or a set element.
-  // we need to advance this far in order to check the
-  // next token.
-  expression();
-
-  // it's a singleton set.
-  if (check(TOKEN_RIGHT_BRACE)) {
-    finishSetVal();
-
-  } else if (check(TOKEN_COMMA)) {
-    // it's a |set| > 1 .
-    advance();
-
-    finishSetVal();
-    do {
-      expression();
-      finishSetVal();
-    } while (match(TOKEN_COMMA));
-
-  } else if (check(TOKEN_COLON)) {
-    // otherwise it's a map: backpatch the class.
-    currentChunk()->constants.values[klass] = identifier("Map");
-
-    // finish the first key/val pair, then any remaining elements.
-    finishMapVal();
-
-    while (match(TOKEN_COMMA)) {
-      expression();
-      finishMapVal();
-    }
-  }
-
-  consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
-}
-
 // Parse an iterator.
 static Iterator iterator() {
   Iterator iter;
@@ -951,7 +897,8 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitByte(OP_POP);  // jump condition.
 }
 
-Parser seqGenerator(Parser checkpointA, int seq) {
+// Parse a comprehension, given
+Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   Iterator iter;
   initIterator(&iter);
 
@@ -984,20 +931,20 @@ Parser seqGenerator(Parser checkpointA, int seq) {
     // variables will be in scope in every condition
     // to their right, and all we have to do is conclude
     // the scope at the end of this function.
-    checkpointB = seqGenerator(checkpointA, seq);
-  } else if (check(TOKEN_RIGHT_BRACKET)) {
+    checkpointB = comprehension(checkpointA, var, closingToken);
+  } else if (check(closingToken)) {
     // now we parse the body, first saving the point
     // where the generator ends.
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    // load the seq instance, offsetting the local
+    // load the comprehension instance, offsetting the local
     // count appropriately, and append the expression.
-    emitBytes(OP_GET_LOCAL, seq);
+    emitBytes(OP_GET_LOCAL, var);
     current->localCount++;
     expression();
     methodCall("add", 1);
-    // pop the seq instance.
+    // pop the comprehension instance.
     current->localCount--;
     emitByte(OP_POP);
   }
@@ -1017,35 +964,51 @@ Parser seqGenerator(Parser checkpointA, int seq) {
   return checkpointB;
 }
 
-bool advanceToPipe() {
-  // assume we've already consumed one leading bracket.
-  int bracketDepth = 1;
+// Find an occurance of '|' that isn't nested within
+// braces or brackets, given some [initialBraceDepth]
+// and [initialBracketDepth].
+bool advanceToPipe(int initialBraceDepth, int initialBracketDepth) {
+  int braceDepth = initialBraceDepth;
+  int bracketDepth = initialBracketDepth;
+
+  bool nested;
 
   for (;;) {
+    if (check(TOKEN_LEFT_BRACE)) braceDepth++;
+    if (check(TOKEN_RIGHT_BRACE)) braceDepth--;
+
     if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
     if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
 
-    if (check(TOKEN_PIPE) && bracketDepth == 1) return true;
-    if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == 0) return false;
+    nested = (braceDepth > initialBraceDepth) ||
+             (bracketDepth > initialBracketDepth);
+
+    if (check(TOKEN_PIPE) && !nested) return true;
+
+    if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1)
+      return false;
+    if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == initialBracketDepth - 1)
+      return false;
 
     advance();
   }
 }
 
-static bool trySeqGenerator() {
+static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
+                             int initialBracketDepth) {
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe()) {
+  if (advanceToPipe(initialBraceDepth, initialBracketDepth)) {
     consume(TOKEN_PIPE, "Expect '|' between body and conditions.");
 
-    // the sequence instance is on top of the stack now;
+    // the comprehension instance is on top of the stack now;
     // we'll need to refer to it when we hit the bottom
     // of the condition clauses. we'll also need the local
     // slots to be offset by 1.
-    int seq = addLocal(syntheticToken("#seq"));
+    int var = addLocal(syntheticToken("#comprehension"));
     markInitialized();
 
-    Parser checkpointB = seqGenerator(checkpointA, seq);
+    Parser checkpointB = comprehension(checkpointA, var, closingToken);
 
     // reclaim the local slot but leave the sequence instance
     // on the stack.
@@ -1053,7 +1016,6 @@ static bool trySeqGenerator() {
 
     // finally we pick up at the end of the expression.
     gotoParser(checkpointB);
-    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 
     return true;
   }
@@ -1062,13 +1024,81 @@ static bool trySeqGenerator() {
   return false;
 }
 
+static bool trySetComprehension() {
+  return tryComprehension(TOKEN_RIGHT_BRACE, 1, 0);
+}
+
+static bool trySeqComprehension() {
+  return tryComprehension(TOKEN_RIGHT_BRACKET, 0, 1);
+}
+
+static void finishMapVal() {
+  consume(TOKEN_COLON, "Expect ':' after map key.");
+  // value.
+  expression();
+  emitByte(OP_SUBSCRIPT_SET);
+}
+
+static void finishSetVal() {
+  emitConstant(BOOL_VAL(true));
+  emitByte(OP_SUBSCRIPT_SET);
+}
+
+// A map literal, set literal, or set comprehension.
+static void braces(bool canAssign) {
+  int klass = nativeCall("Set", 0);
+
+  // empty braces is an empty set.
+  if (check(TOKEN_RIGHT_BRACE)) return advance();
+  if (trySetComprehension()) {
+    consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
+    return;
+  }
+  // first element: either a map key or a set element.
+  // we need to advance this far in order to check the
+  // next token.
+  expression();
+
+  // it's a singleton set.
+  if (check(TOKEN_RIGHT_BRACE)) {
+    finishSetVal();
+
+  } else if (check(TOKEN_COMMA)) {
+    // it's a |set| > 1 .
+    advance();
+
+    finishSetVal();
+    do {
+      expression();
+      finishSetVal();
+    } while (match(TOKEN_COMMA));
+
+  } else if (check(TOKEN_COLON)) {
+    // otherwise it's a map: backpatch the class.
+    currentChunk()->constants.values[klass] = identifier("Map");
+
+    // finish the first key/val pair, then any remaining elements.
+    finishMapVal();
+
+    while (match(TOKEN_COMMA)) {
+      expression();
+      finishMapVal();
+    }
+  }
+
+  consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
+}
+
 // A tree literal, sequence literal, or sequence comprehension.
 static void brackets(bool canAssign) {
   int klass = nativeCall("Sequence", 0);
 
   // empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
-  if (trySeqGenerator()) return;
+  if (trySeqComprehension()) {
+    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
+    return;
+  }
 
   // first datum.
   whiteDelimitedExpression();

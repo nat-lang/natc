@@ -4,14 +4,47 @@ class Set < Object {
   // so that the set behaves like its characteristic function.
   call(element) => element in this
 
-  // The elements are the keys of the underlying map.
-  elements() => [entry[0] | entry in this.entries()]
+  // Set elements define their own hash functions. Otherwise
+  // use the native hash.
+  keyFor(element) => {
+    if (type(element) == Set)
+      return element.hash();
+    else
+      return hash(element);
+  }
+
+  __in__(value) => {
+    // check sets, which we hash in userland.
+    if (type(value) == Set) {
+      let key = value.hash();
+      return this.has(key);
+    }
+    
+    // or check (a) arbitrary values, which we also
+    // hash in userland, or (b) the object's fields.
+    return this.has(hash(value)) or !!this.get(value);
+  }
+
+  __set__(element, _) => this.add(element)
+
+  // The compiler calls this method when building a set comprehension.
+  add(element) => {
+    let key = this.keyFor(element);
+
+    this.set(key, element);
+
+    return this;
+  }
+
+  elements() => this.values()
+
+  __next__(idx) => next(this.elements(), idx)
 
   // Iteration is over elements.
   __curr__(idx) => this.elements()[idx]
 
   // Hash the elements and sum them.
-  __hash__() => {
+  hash() => {
     let sum = 0;
 
     for (x in this.elements())
@@ -25,8 +58,8 @@ class Set < Object {
     if (len(this) > len(other))
       return false;
 
-    for (x in this)
-      if (!x in other)
+    for (x in this) 
+      if (!other(x))
         return false;
   
     return true;
@@ -49,7 +82,35 @@ class Set < Object {
   // Is [this] equal to [other]?
   __eq__(other) => this.subsetEq(other) and other.subsetEq(this)
 
-  union(other) => {}
-  intersection(x) => {}
-  complement(x) => {}
+  union(other) => {
+    let set = {};
+
+    for (x in this)
+      set.add(x);
+
+    for (x in other)
+      set.add(x);
+
+    return set;
+  }
+
+  intersection(other) => {
+    let set = {};
+
+    for (x in this)
+      if (x in other)
+        set.add(x);
+    
+    return set;
+  }
+
+  complement(other) => {
+    let set = {};
+
+    for (x in this)
+      if (!other(x))
+        set.add(x);
+    
+    return set;
+  }
 }

@@ -1,20 +1,15 @@
-let tryHash = (value) => {
-  if (type(value) == "object" and "__hash__" in value)
-    return value.__hash__();
 
-  return value;
-};
 
 class Object < __obj__ {
-  __get__(key) => this.get(tryHash(key))
+  // wrap the native sequences in sequence instances.
+  entries() => {
+    let seq = [];
 
-  __set__(key, value) => {
-    key = tryHash(key);
+    for (entry in entries(this))
+      seq.add([entry[0], entry[1]]);
 
-    this.set(key, value);
-
-    return this;
+    return seq;
   }
-  __in__(value) => this.has(tryHash(value))
+  keys() => [entry[0] | entry in entries(this)]
+  values() => [entry[1] | entry in entries(this)]
 }
-

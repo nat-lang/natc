@@ -64,10 +64,10 @@ void runtimeError(const char* format, ...);
 InterpretResult interpret(char* path, const char* source);
 void vmPush(Value value);
 Value vmPop();
-Value vmPeek();
+Value vmPeek(int distance);
 bool initClass(ObjClass* klass, int argCount);
 bool invoke(ObjString* name, int argCount);
-bool assertHashable(Value value);
+bool validateHashable(Value value);
 bool vmCallValue(Value value, int argCount);
 bool vmInstanceHas(ObjInstance* instance, Value value);
 

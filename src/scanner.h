@@ -74,7 +74,7 @@ typedef struct {
 Scanner initScanner(const char* source);
 Scanner saveScanner();
 void gotoScanner(Scanner scanner);
-void printScanner();
+void printScanner(Scanner sc);
 void skipWhitespace();
 Token scanToken();
 Token dottedIdentifier();

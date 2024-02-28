@@ -2,6 +2,7 @@
 class Map < Object {
   __curr__(idx) => this.entries()[1]
 
+  // Does each key in [this] map to the same key in [other]?
   subMap(other) => {
     for (key in this.keys()) {
       if (!key in other) return false;
@@ -15,7 +16,4 @@ class Map < Object {
 
     return this.subMap(other) and other.subMap(this);
   }
-
-  keys() => [entry[0] | entry in this.entries()]
-  values() => [entry[1] | entry in this.entries()]
 }
