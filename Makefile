@@ -7,20 +7,23 @@ default: clean nat
 clean:
 	@ rm -rf $(BUILD_DIR)/release
 	@ rm -rf $(BUILD_DIR)/debug
-	@ rm $(BUILD_DIR)/nat /usr/local/bin/nat
+	@ rm $(BUILD_DIR)/nat $(HOME)/bin/nat
 
 # Compile the interpreter.
 nat:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
-	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
+	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(HOME)/bin/nat
 
 debug:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
-	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
+	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(HOME)/bin/nat
 
 debug-gc:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-gc SOURCE_DIR=src
-	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat /usr/local/bin/nat
+	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(HOME)/bin/nat
 
 tests:
 	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
+
+test-leaks:
+	@ leaks --atExit -- $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
