@@ -1,14 +1,16 @@
 
 // null set;
 
-assert(!(1 in {}));
-assert(!{}(1));
-
 assert({}.subsetEq({}));
 assert(!{}.subset({}));
 
 assert({}.supsetEq({}));
 assert(!{}.supset({}));
+assert({}.union({}) == {});
+assert({}.intersection({}) == {});
+
+assert(!(1 in {}));
+assert(!{}(1));
 
 let set;
 
@@ -34,6 +36,9 @@ assert(set.supsetEq({1,2,3}));
 
 assert(set == {1,2,3});
 
+assert(set.union({4,5,6}) == {1,2,3,4,5,6});
+assert(set.intersection({2,3,4}) == {2,3});
+
 // string set.
 
 set = {"a","b","c"};
@@ -55,6 +60,7 @@ assert(set.subsetEq({"a","b","c"}));
 assert(set.supsetEq({"a","b","c"}));
 
 assert(set == {"a","b","c"});
+assert(set.union({"d","e","f"}) == {"a","b","c","d","e","f"});
 
 // nested.
 
@@ -77,3 +83,5 @@ assert(set.supsetEq({{1,2,3}, {3,4,5}}));
 
 assert(set == {{1,2,3}, {3,4,5}});
 
+assert(set.union({{6,7,8}}) == {{1,2,3}, {3,4,5}, {6,7,8}});
+assert(set.intersection({{3,4,5}, {6,7,8}}) == {{3,4,5}});

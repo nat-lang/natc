@@ -175,9 +175,9 @@ ObjMap* newMap() {
   initMap(map);
   return map;
 }
-
-static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
-  uint32_t index = hashValue(key) & (capacity - 1);
+static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
+                             uint32_t hash) {
+  uint32_t index = hash & (capacity - 1);
   MapEntry* tombstone = NULL;
 
   for (;;) {
@@ -198,6 +198,10 @@ static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
 
     index = (index + 1) & (capacity - 1);
   }
+}
+
+static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
+  return mapFindHash(entries, capacity, key, hashValue(key));
 }
 
 static void mapAdjustCapacity(ObjMap* map, int capacity) {
@@ -225,31 +229,39 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   map->capacity = capacity;
 }
 
-bool mapHas(ObjMap* map, Value key) {
+bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
   if (map->count == 0) return false;
 
-  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
+  MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
 
   return !IS_UNDEF(entry->key);
 }
 
-bool mapGet(ObjMap* map, Value key, Value* value) {
+bool mapHas(ObjMap* map, Value key) {
+  return mapHasHash(map, key, hashValue(key));
+}
+
+bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
   if (map->count == 0) return false;
 
-  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
+  MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
   if (IS_UNDEF(entry->key)) return false;
 
   *value = entry->value;
   return true;
 }
 
-bool mapSet(ObjMap* map, Value key, Value value) {
+bool mapGet(ObjMap* map, Value key, Value* value) {
+  return mapGetHash(map, key, value, hashValue(key));
+}
+
+bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
   if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
     int capacity = GROW_CAPACITY(map->capacity);
     mapAdjustCapacity(map, capacity);
   }
 
-  MapEntry* entry = mapFindEntry(map->entries, map->capacity, key);
+  MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
 
   bool isNewKey = IS_UNDEF(entry->key);
   if (isNewKey && IS_NIL(entry->value)) map->count++;
@@ -257,6 +269,10 @@ bool mapSet(ObjMap* map, Value key, Value value) {
   entry->key = key;
   entry->value = value;
   return isNewKey;
+}
+
+bool mapSet(ObjMap* map, Value key, Value value) {
+  return mapSetHash(map, key, value, hashValue(key));
 }
 
 bool mapDelete(ObjMap* map, Value key) {

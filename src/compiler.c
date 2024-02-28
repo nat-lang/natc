@@ -352,7 +352,7 @@ static void endScope() {
   }
 }
 
-static void function();
+static void function(FunctionType type);
 static void expression();
 static void boundExpression();
 static void statement();

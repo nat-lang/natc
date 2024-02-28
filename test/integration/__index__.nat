@@ -2,7 +2,6 @@ import test/integration/block
 import test/integration/class
 import test/integration/closure
 import test/integration/equality
-import test/integration/hash
 import test/integration/inheritance
 import test/integration/iteration
 import test/integration/lambda

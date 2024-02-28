@@ -40,7 +40,7 @@ assert(map[true] == 1);
 map = {nil: 1};
 assert(map[nil] == 1);
 
-// native methods.
+// core methods.
 
 map = {"a":1, "b": 2};
 
@@ -51,3 +51,8 @@ for (key in map.keys()) {
 for (val in map.values()) {
   assert(val == 1 or val == 2);
 }
+
+assert(map.subMap(map));
+assert(map.subMap({"a":1, "b": 2, "c": 3}));
+assert(map.subMap({"a":1, "b": 2, "c": 4}));
+assert(!map.subMap({"a":1, "b": 1}));

@@ -42,7 +42,7 @@ void runtimeError(const char* format, ...) {
   resetStack();
 }
 
-bool assertHashable(Value value) {
+bool validateHashable(Value value) {
   if (!isHashable(value)) {
     runtimeError("Must be a hashable type: num, nil, bool, or string.");
     return false;
@@ -321,7 +321,7 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
 }
 
 bool vmInstanceHas(ObjInstance* instance, Value value) {
-  if (!assertHashable(value)) return false;
+  if (!validateHashable(value)) return false;
 
   bool hasKey = mapHas(&instance->fields, value) ||
                 mapHas(&instance->klass->methods, value);
@@ -544,7 +544,7 @@ static InterpretResult loop() {
         }
 
         // otherwise fall back to property setting.
-        if (!assertHashable(key)) return INTERPRET_RUNTIME_ERROR;
+        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
         mapSet(&instance->fields, key, val);
         // leave the object on the stack.
         vmPush(obj);
