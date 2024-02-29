@@ -43,8 +43,16 @@ void runtimeError(const char* format, ...) {
 }
 
 bool validateHashable(Value value) {
+  if (IS_OBJ(value) && !IS_STRING(value)) {
+    if (AS_OBJ(value)->hash == 0) {
+      runtimeError("Object lacks a valid hash.");
+      return false;
+    }
+    return true;
+  }
+
   if (!isHashable(value)) {
-    runtimeError("Must be a hashable type: num, nil, bool, or string.");
+    runtimeError("Not a hashable type: num, nil, bool, or string.");
     return false;
   }
   return true;
@@ -487,6 +495,8 @@ static InterpretResult loop() {
           frame = &vm.frames[vm.frameCount - 1];
           break;
         }
+
+        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
 
         // otherwise fall back to property access.
         Value value;

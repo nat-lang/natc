@@ -13,13 +13,19 @@ assert(set == {1,2,3});
 // nested body.
 
 set = {{true | b in a} | a in [[1,2], [3], [4,5]]};
-assert(set == {{true}, {true}, {true}});
+assert(set == {{true}});
+
+set = {{b | b in a} | a in [[1,2], [3], [4,5,5]]};
+assert(set == {{1,2}, {3}, {4,5}});
 
 set = {a | a in {{1,2}, {3}, {4,5}}};
 assert({1,2} in set);
 
+set = {{b | b in a} | a in {{1,2}, {3}, {4,5,5}}};
+assert(set == {{1,2}, {3}, {4,5}});
+
 set = {{true | b in a} | a in {{1,2}, {3}, {4,5}}};
-assert(set == {{true}, {true}, {true}});
+assert(set == {{true}});
 
 // nested condition.
 

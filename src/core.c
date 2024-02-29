@@ -50,7 +50,6 @@ bool __seqAdd__(int argCount, Value* args) {
     return false;
   }
   if (!IS_SEQUENCE(seq)) {
-    // printValue(seq);
     runtimeError("Expecting sequence.");
     return false;
   }
@@ -124,7 +123,7 @@ bool __objEntries__(int argCount, Value* args) {
     writeValueArray(&entries->values, OBJ_VAL(entrySeq));
   }
 
-  // pop the map (and native fn) now that we're done,
+  // pop the map (and native fn) now that we're done
   // with them and leave the entries on the stack.
   vmPop();
   vmPop();
@@ -163,10 +162,9 @@ bool __objSet__(int argCount, Value* args) {
   Value key = vmPop();
   Value obj = vmPop();
 
-  if (!validateHash(key)) return false;
+  if (!validateHashable(key)) return false;
 
-  mapSetHash(&AS_INSTANCE(obj)->fields, key, val, AS_NUMBER(key));
-
+  mapSet(&AS_INSTANCE(obj)->fields, key, val);
   return true;
 }
 
@@ -174,16 +172,12 @@ bool __objHas__(int argCount, Value* args) {
   Value key = vmPop();
   Value obj = vmPop();
 
-  if (!IS_INSTANCE(obj)) {
-    runtimeError("Only objects or sequences may be tested for membership.");
-    return false;
-  }
-
-  if (!validateHash(key)) return false;
+  if (!validateHashable(key)) return false;
 
   bool hasKey =
-      mapHasHash(&AS_INSTANCE(obj)->fields, key, AS_NUMBER(key)) ||
-      mapHasHash(&AS_INSTANCE(obj)->klass->methods, key, AS_NUMBER(key));
+      mapHas(&AS_INSTANCE(obj)->fields, key) ||
+      mapHas(&AS_INSTANCE(obj)->klass->methods, key);
+
   vmPush(BOOL_VAL(hasKey));
   return true;
 }
@@ -218,14 +212,36 @@ bool __length__(int argCount, Value* args) {
   return true;
 }
 
-bool __hash__(int argCount, Value* args) {
+bool __getHash__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
 
-  if (!validateHashable(value)) return false;
-
   uint32_t hash = hashValue(value);
   vmPush(NUMBER_VAL(hash));
+
+  return true;
+}
+
+bool __setHash__(int argCount, Value* args) {
+  Value hash = vmPop();
+  Value obj = vmPop();
+  vmPop();  // native fn.
+
+  if (IS_STRING(obj)) {
+    runtimeError("Can't set hash of a string.");
+    return false;
+  }
+  if (!IS_OBJ(obj)) {
+    runtimeError("Can only set hash of an object.");
+    return false;
+  }
+
+  if (!validateHash(hash)) return false;
+
+  obj.as.obj->hash = AS_NUMBER(hash);
+
+  // return nothing.
+  vmPush(NIL_VAL);
 
   return true;
 }
@@ -242,7 +258,8 @@ InterpretResult initializeCore() {
   // native functions.
 
   defineNativeFn(intern("len"), 1, __length__, &vm.globals);
-  defineNativeFn(intern("hash"), 1, __hash__, &vm.globals);
+  defineNativeFn(intern("getHash"), 1, __getHash__, &vm.globals);
+  defineNativeFn(intern("setHash"), 2, __setHash__, &vm.globals);
   defineNativeFn(intern("type"), 1, __type__, &vm.globals);
   defineNativeFn(intern("entries"), 1, __objEntries__, &vm.globals);
 
@@ -256,7 +273,6 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("get"), 1, __objGet__, &vm.objClass->methods);
   defineNativeFn(intern("set"), 2, __objSet__, &vm.objClass->methods);
   defineNativeFn(intern("has"), 1, __objHas__, &vm.objClass->methods);
-
 
   // core definitions.
   return interpretFile("src/core/__index__");

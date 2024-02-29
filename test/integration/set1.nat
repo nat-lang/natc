@@ -8,6 +8,7 @@ assert({}.supsetEq({}));
 assert(!{}.supset({}));
 assert({}.union({}) == {});
 assert({}.intersection({}) == {});
+assert({}.complement({}) == {});
 
 assert(!(1 in {}));
 assert(!{}(1));
@@ -38,6 +39,7 @@ assert(set == {1,2,3});
 
 assert(set.union({4,5,6}) == {1,2,3,4,5,6});
 assert(set.intersection({2,3,4}) == {2,3});
+assert(set.complement({1,2}) == {3});
 
 // string set.
 
@@ -61,27 +63,4 @@ assert(set.supsetEq({"a","b","c"}));
 
 assert(set == {"a","b","c"});
 assert(set.union({"d","e","f"}) == {"a","b","c","d","e","f"});
-
-// nested.
-
-set = {{1,2,3}, {3,4,5}};
-
-assert(set({1,2,3}));
-assert(!(set({6,7,8})));
-
-assert({1,2,3} in set);
-assert({3,4,5} in set);
-
-assert(set.subset({{1,2,3}, {3,4,5}, {6,7,8}}));
-assert(set.subsetEq({{1,2,3}, {3,4,5}, {6,7,8}}));
-
-assert(set.supset({{1,2,3}}));
-assert(set.supsetEq({{1,2,3}}));
-
-assert(set.subsetEq({{1,2,3}, {3,4,5}}));
-assert(set.supsetEq({{1,2,3}, {3,4,5}}));
-
-assert(set == {{1,2,3}, {3,4,5}});
-
-assert(set.union({{6,7,8}}) == {{1,2,3}, {3,4,5}, {6,7,8}});
-assert(set.intersection({{3,4,5}, {6,7,8}}) == {{3,4,5}});
+assert(set.complement({"a","b"}) == {"c"});

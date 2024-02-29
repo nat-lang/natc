@@ -4,51 +4,53 @@ class Set < Object {
   // so that the set behaves like its characteristic function.
   call(element) => element in this
 
-  // Set elements define their own hash functions. Otherwise
-  // use the native hash.
-  keyFor(element) => {
-    if (type(element) == Set)
-      return element.hash();
-    else
-      return hash(element);
+  setKeyHash(key) => {
+    if (type(key) == Set) 
+      setHash(key, key.hash());
   }
 
-  __in__(value) => {
-    // check sets, which we hash in userland.
-    if (type(value) == Set) {
-      let key = value.hash();
-      return this.has(key);
-    }
-    
-    // or check (a) arbitrary values, which we also
-    // hash in userland, or (b) the object's fields.
-    return this.has(hash(value)) or !!this.get(value);
-  }
+  __set__(key, value) => {
+    this.setKeyHash(key);
 
-  __set__(element, _) => this.add(element)
-
-  // The compiler calls this method when building a set comprehension.
-  add(element) => {
-    let key = this.keyFor(element);
-
-    this.set(key, element);
-
+    this.set(key, value);
     return this;
   }
 
-  elements() => this.values()
+  __get__(key) => {
+    this.setKeyHash(key);
 
-  __next__(idx) => next(this.elements(), idx)
+    return this.get(key);
+  }
+
+  __in__(key) => {
+    this.setKeyHash(key);
+
+    return this.has(key);
+  }
+
+  // The compiler calls this method when building a set comprehension.
+  add(element) => this.__set__(element, true)
+
+  elements() => this.keys()
 
   // Iteration is over elements.
+  __next__(idx) => next(this.elements(), idx)
   __curr__(idx) => this.elements()[idx]
+
+  hashFor(element) => {
+    if (type(element) == Set)
+      return element.hash();
+    else
+      return getHash(element);
+  }
 
   // Hash the elements and sum them.
   hash() => {
-    let sum = 0;
+    // begin with an offset, so that hash(1) != {1}.hash() != {{1}}.hash().
+    let sum = 1;
 
     for (x in this.elements())
-      sum = sum + hash(x);
+      sum = sum + this.hashFor(x);
 
     return sum;
   }
@@ -104,6 +106,7 @@ class Set < Object {
     return set;
   }
 
+  // Relative complement of [other] in [this].
   complement(other) => {
     let set = {};
 
@@ -112,5 +115,23 @@ class Set < Object {
         set.add(x);
     
     return set;
+  }
+
+  cp() => ({x | x in this})
+
+  powerset() => {
+    let powerset = {};
+
+    for (element in this) {
+      for (set in powerset) {
+        let x = set.cp().add(element);
+        powerset.add(x);
+      }
+      powerset.add({element});
+    }
+
+    powerset.add({});
+
+    return powerset;
   }
 }
