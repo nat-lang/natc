@@ -9,6 +9,7 @@ COPY src src
 COPY build build
 
 RUN make nat && \
+    cp build/nat /bin/nat && \
     apk del make build-base && \
     rm -rf src util Makefile build
 

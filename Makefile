@@ -2,7 +2,7 @@ BUILD_DIR := build
 CURRENT_DIR := $(shell pwd)
 BIN := $(HOME)/bin
 
-default: clean nat
+default: clean dev
 
 # Remove all build outputs and intermediate files.
 clean:
@@ -12,6 +12,10 @@ clean:
 
 # Compile the interpreter.
 nat:
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
+
+# Compile and symlink to local bin.
+dev:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(BIN)/nat
 
