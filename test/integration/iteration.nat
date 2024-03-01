@@ -1,6 +1,5 @@
 
 // native for-loop.
-
 for (let i = 0; i < 10; i = i + 1) {
   assert(i < 10 and i >= 0);
 }
@@ -15,6 +14,7 @@ while (i < 10) {
 }
 
 // core sequence iteration.
+
 for (y in [1,2,3]) {
   assert(y == 1 or y == 2 or y == 3);
 }
@@ -31,14 +31,8 @@ class Iterable {
     this[1] = "b";
     this[2] = "c";
   }
-  __next__(idx) => {
-    if (idx == nil) return 0;
-    if (idx == 2) return false;
-    return idx + 1;
-  }
-  __curr__(idx) => {
-    return this[idx];
-  }
+
+  __iter__() => Iterator([this[0], this[1], this[2]], 0, 3)
 }
 
 for (x in Iterable()) { 
@@ -46,3 +40,16 @@ for (x in Iterable()) {
     (x == "a") or (x == "b") or (x == "c")
   );
 }
+
+let iterator = iter(Iterable());
+
+assert(len(iterator) == 3);
+
+assert(iterator.next() == "a");
+assert(len(iterator) == 2);
+
+assert(iterator.next() == "b");
+assert(len(iterator) == 1);
+
+assert(iterator.next() == "c");
+assert(len(iterator) == 0);

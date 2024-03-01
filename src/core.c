@@ -60,25 +60,6 @@ bool __seqAdd__(int argCount, Value* args) {
   return true;
 }
 
-bool __seqIn__(int argCount, Value* args) {
-  Value val = vmPeek(0);
-  ObjInstance* obj = AS_INSTANCE(vmPeek(1));
-
-  Value seq;
-  if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), &seq)) {
-    runtimeError("Sequence instance missing its values!");
-    return false;
-  }
-
-  bool seqHasVal = findInValueArray(&AS_SEQUENCE(seq)->values, val);
-
-  vmPop();
-  vmPop();
-  vmPush(BOOL_VAL(seqHasVal));
-
-  return true;
-}
-
 static ObjClass* getClass(char* name) {
   Value obj;
 
@@ -263,17 +244,19 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("type"), 1, __type__, &vm.globals);
   defineNativeFn(intern("entries"), 1, __objEntries__, &vm.globals);
 
-  // native classes.
-  vm.seqClass = defineNativeClass(intern("__seq__"), &vm.globals);
-  defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
-  defineNativeFn(intern("add"), 1, __seqAdd__, &vm.seqClass->methods);
-  defineNativeFn(vm.memberString, 1, __seqIn__, &vm.seqClass->methods);
-
   vm.objClass = defineNativeClass(intern("__obj__"), &vm.globals);
   defineNativeFn(intern("get"), 1, __objGet__, &vm.objClass->methods);
   defineNativeFn(intern("set"), 2, __objSet__, &vm.objClass->methods);
   defineNativeFn(intern("has"), 1, __objHas__, &vm.objClass->methods);
 
-  // core definitions.
-  return interpretFile("src/core/__index__");
+  // native classes.
+
+  InterpretResult coreIntpt = interpretFile("src/core/__index__");
+  if (coreIntpt != INTERPRET_OK) return coreIntpt;
+
+  vm.seqClass = getClass("Sequence");
+  defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
+  defineNativeFn(intern("add"), 1, __seqAdd__, &vm.seqClass->methods);
+
+  return INTERPRET_OK;
 }

@@ -1,15 +1,29 @@
 
 
 class Object < __obj__ {
-  // wrap the native sequences in sequence instances.
+  __iter__() => Iterator(this.entries(), 0, len(this))
+
+  // The native `entries` function returns raw sequence
+  // objects. Here we wrap them in instances of the core
+  // Sequence class.
   entries() => {
-    let seq = [];
+    let seqRaw = entries(this);
+    let seqFancy = Sequence();
 
-    for (entry in entries(this))
-      seq.add([entry[0], entry[1]]);
+    // raw sequences don't implement the iteration protocol.
+    for (let i = 0; i < len(this); i = i + 1) {
+      let entryRaw = seqRaw[i];
+      let entryFancy = Sequence();
 
-    return seq;
+      entryFancy.add(entryRaw[0]);
+      entryFancy.add(entryRaw[1]);
+
+      seqFancy.add(entryFancy);
+    }
+
+    return seqFancy;
   }
-  keys() => [entry[0] | entry in entries(this)]
-  values() => [entry[1] | entry in entries(this)]
+
+  keys() => [entry[0] | entry in this.entries()]
+  values() => [entry[1] | entry in this.entries()]
 }

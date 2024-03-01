@@ -36,8 +36,8 @@ typedef struct {
   // methods with special semantics.
   ObjString* initString;
   ObjString* callString;
+  ObjString* iterString;
   ObjString* nextString;
-  ObjString* currString;
   ObjString* memberString;
   ObjString* subscriptGetString;
   ObjString* subscriptSetString;
@@ -47,6 +47,7 @@ typedef struct {
 
   ObjClass* seqClass;
   ObjClass* objClass;
+  ObjClass* stopIterClass;
 } VM;
 
 typedef enum {

@@ -1,5 +1,5 @@
 
-class Sequence < __seq__ {
+class Sequence < Object {
   __get__(idx) => this.values[idx]
   __set__(idx, val) => {
     this.values[idx] = val;
@@ -15,4 +15,8 @@ class Sequence < __seq__ {
 
     return true;
   }
+
+  __in__(value) => value in this.values or this.has(value)
+
+  __iter__() => Iterator(this, 0, len(this))
 }

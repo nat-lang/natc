@@ -13,3 +13,4 @@ assert(seq == [
 
 seq = [a | a in [a | a in [1,2,3]]];
 assert(seq == [1,2,3]);
+
