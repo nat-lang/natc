@@ -93,7 +93,6 @@ bool initVM() {
 
   vm.seqClass = NULL;
   vm.objClass = NULL;
-  vm.stopIterClass = NULL;
 
   return initializeCore(&vm) == INTERPRET_OK;
 }

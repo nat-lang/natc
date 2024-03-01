@@ -47,7 +47,6 @@ typedef struct {
 
   ObjClass* seqClass;
   ObjClass* objClass;
-  ObjClass* stopIterClass;
 } VM;
 
 typedef enum {

@@ -242,7 +242,7 @@ static void emitReturn() {
 
 static uint8_t makeConstant(Value value) {
   bool hashable = (value.type == VAL_BOOL || value.type == VAL_NIL ||
-                   value.type == VAL_NUMBER);
+                   value.type == VAL_NUMBER || IS_STRING(value));
   Value existing;
 
   if (hashable && mapGet(current->constants, value, &existing) &&
