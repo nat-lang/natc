@@ -19,6 +19,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
   object->type = type;
   object->isMarked = false;
   object->next = vm.objects;
+  object->hash = 0;
   vm.objects = object;
 
 #ifdef DEBUG_LOG_GC
@@ -113,8 +114,7 @@ uint32_t hashObject(Obj* object) {
     case OBJ_STRING:
       return ((ObjString*)object)->hash;
     default:
-      runtimeError("Only nil, bool, num, or string can be hashed.");
-      return 0;
+      return object->hash;
   }
 }
 
@@ -175,6 +175,7 @@ ObjMap* newMap() {
   initMap(map);
   return map;
 }
+
 static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
                              uint32_t hash) {
   uint32_t index = hash & (capacity - 1);
@@ -229,7 +230,7 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   map->capacity = capacity;
 }
 
-bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
+static bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -241,7 +242,7 @@ bool mapHas(ObjMap* map, Value key) {
   return mapHasHash(map, key, hashValue(key));
 }
 
-bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
+static bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -255,7 +256,7 @@ bool mapGet(ObjMap* map, Value key, Value* value) {
   return mapGetHash(map, key, value, hashValue(key));
 }
 
-bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
+static bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
   if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
     int capacity = GROW_CAPACITY(map->capacity);
     mapAdjustCapacity(map, capacity);
@@ -354,7 +355,7 @@ void printObject(Value value) {
       printFunction(AS_FUNCTION(value));
       break;
     case OBJ_INSTANCE:
-      printf("%s instance", AS_INSTANCE(value)->klass->name->chars);
+      printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars, AS_INSTANCE(value));
       break;
     case OBJ_MAP:
       printMap(AS_MAP(value));

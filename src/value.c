@@ -75,8 +75,12 @@ bool valuesEqual(Value a, Value b) {
       return true;
     case VAL_NUMBER:
       return AS_NUMBER(a) == AS_NUMBER(b);
-    case VAL_OBJ:
+    case VAL_OBJ: {
+      if (a.as.obj->hash != 0 && b.as.obj->hash != 0)
+        return a.as.obj->hash == b.as.obj->hash;
+  
       return AS_OBJ(a) == AS_OBJ(b);
+    }
     default:
       return false;  // Unreachable.
   }
