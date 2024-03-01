@@ -1,12 +1,16 @@
 
 let seqInstance = [1,2,3];
 
+seqInstance.add(4);
+
 // the underlying seq object itself.
 let seq = seqInstance.values;
 
 // subscript access.
 assert(seq[0] == 1);
+assert(seq[1] == 2);
 assert(seq[2] == 3);
+assert(seq[3] == 4);
 
 // subscript assignment.
 seq[0] = 2;
@@ -17,3 +21,8 @@ assert(seq[2] == 0);
 // index out of bounds.
 // seq[3];
 // seq[-1];
+
+let sum = [1,2,3].fold((a,b) => a + b, 0);
+
+assert(sum == 6);
+assert([1,2,3].fmap((a) => a + 1) == [2,3,4]);
