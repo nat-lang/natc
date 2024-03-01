@@ -4,29 +4,47 @@ let tree;
 
 tree = [1 [2 3 4] [5 6 7]];
 
-assert(tree.data == 1);
-
-assert(tree.children[0].data == 2);
-assert(tree.children[1].data == 5);
+assert(tree[0].data == 1);
+assert(tree[1][0].data == 2);
+assert(tree[1][1].data == 3);
+assert(tree[1][2].data == 4);
+assert(tree[2][0].data == 5);
+assert(tree[2][1].data == 6);
+assert(tree[2][2].data == 7);
 
 tree = [true false false];
 
-assert(tree.data);
-assert(!tree.children[0] and !tree.children[1]);
+assert(tree[0].data);
+assert(!tree[1].data);
+assert(!tree[2].data);
 
 // expression trees.
 
 tree = [(1 + 1) (1 + 2) (1 + 3)];
 
-assert(tree.data == 2);
-assert(tree.children[0] == 3);
-assert(tree.children[1] == 4);
+assert(tree[0].data == 2);
+assert(tree[1].data == 3);
+assert(tree[2].data == 4);
 
 let id = (a) => a;
 
 tree = [id(1) id(2) id(3)];
 
-assert(tree.data == 1);
-assert(tree.children[0] == 2);
-assert(tree.children[1] == 3);
+assert(tree[0].data == 1);
+assert(tree[1].data == 2);
+assert(tree[2].data == 3);
 
+// tree api.
+
+tree = [1 [2 3 4] [5 6 7]];
+
+let fill = (a) => {
+  if (!a) return 0;
+  return a;
+};
+
+tree = tree.fmap(fill);
+
+let sum = tree.fold((a, b) => a + b, 0);
+
+assert(sum == 28);

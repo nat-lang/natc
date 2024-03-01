@@ -1105,7 +1105,7 @@ static void brackets(bool canAssign) {
   } else {
     // it's a tree.
     currentChunk()->constants.values[klass] = identifier("Tree");
-    methodCall("setData", 1);
+    methodCall("addChild", 1);
 
     // and it may have branches.
     while (!check(TOKEN_RIGHT_BRACKET)) {

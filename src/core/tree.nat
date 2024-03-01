@@ -11,7 +11,41 @@ class Tree {
   }
 
   addChild(child) => {
+    if (type(child) != Tree)
+      child = Tree().setData(child);
+
     this.children.add(child);
     return this;
+  }
+
+  // Subscript access is to children.
+  __get__(idx) => this.children[idx]
+
+  isLeaf() => len(this.children) == 0
+
+  leaves() => {
+    if (this.isLeaf()) return [this.data];
+
+    return [leaf | child in this.children, leaf in child.leaves()];
+  }
+
+  fmap(fn) => {
+    let tree = Tree();
+
+    tree.setData(fn(this.data));
+  
+    for (child in this.children)
+      tree.addChild(child.fmap(fn));
+
+    return tree;
+  }
+
+  fold(fn, acc) => {
+    if (this.isLeaf())
+      return fn(acc, this.data);
+
+    let inner = (acc, child) => child.fold(fn, acc);
+
+    return this.children.fold(inner, acc);
   }
 }

@@ -19,4 +19,13 @@ class Sequence < Object {
   __in__(value) => value in this.values or this.has(value)
 
   __iter__() => Iterator(this, 0, len(this))
+
+  fmap(fn) => [fn(value) | value in this]
+
+  fold(fn, acc) => {
+    for (x in this)
+      acc = fn(acc, x);
+
+    return acc;
+  }
 }
