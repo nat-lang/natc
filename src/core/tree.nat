@@ -1,3 +1,4 @@
+class BadArgument < Error {}
 
 class Tree {
   init() => {
@@ -13,5 +14,25 @@ class Tree {
   addChild(child) => {
     this.children.add(child);
     return this;
+  }
+
+  interpret(binary, unary) => {
+    // base case.
+    if (len(this.children) == 1) {
+      let leaf = this.children[0].data;
+
+      return [Tree(fn(leaf)) | fn in unary, fn.accepts(leaf)];
+    }
+
+    // branching nodes.
+    if (len(this.children) == 2) {
+      let left = this.children[0].interpret(binary, unary);
+      let right = this.children[1].interpret(binary, unary);
+  
+      return [Tree(fn(l, r), [l, r]) | l in left, r in right,
+                                       fn in binary, fn.accepts(l, r)];
+    }
+
+    throw BadArgument("Can only interpret a binary tree.");
   }
 }
