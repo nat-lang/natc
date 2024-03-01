@@ -76,10 +76,10 @@ bool initVM() {
   vm.initString = intern("init");
   vm.callString = NULL;
   vm.callString = intern("call");
+  vm.iterString = NULL;
+  vm.iterString = intern("iter");
   vm.nextString = NULL;
   vm.nextString = intern("next");
-  vm.currString = NULL;
-  vm.currString = intern("curr");
   vm.memberString = NULL;
   vm.memberString = intern("__in__");
   vm.subscriptGetString = NULL;
@@ -90,8 +90,6 @@ bool initVM() {
   vm.lengthString = intern("__len__");
   vm.equalString = NULL;
   vm.equalString = intern("__eq__");
-  vm.hashString = NULL;
-  vm.hashString = intern("__hash__");
 
   vm.seqClass = NULL;
   vm.objClass = NULL;
@@ -104,14 +102,12 @@ void freeVM() {
   freeMap(&vm.strings);
   vm.initString = NULL;
   vm.callString = NULL;
-  vm.nextString = NULL;
-  vm.currString = NULL;
+  vm.iterString = NULL;
   vm.memberString = NULL;
   vm.subscriptGetString = NULL;
   vm.subscriptSetString = NULL;
   vm.lengthString = NULL;
   vm.equalString = NULL;
-  vm.hashString = NULL;
   freeObjects();
 }
 
@@ -321,7 +317,7 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   int intIdx = AS_NUMBER(idx);
 
   if (intIdx > seq->values.count - 1 || intIdx < 0) {
-    runtimeError("Index %i out of bounds.", intIdx);
+    runtimeError("Index %i out of bounds [0:%i]", intIdx, seq->values.count);
     return false;
   }
 
@@ -757,8 +753,7 @@ static InterpretResult loop() {
         }
 
         if (!IS_INSTANCE(obj)) {
-          runtimeError(
-              "Only objects or sequences may be tested for membership.");
+          runtimeError("Only objects or sequences may be tested for membership.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -794,12 +789,23 @@ static InterpretResult loop() {
       case OP_THROW: {
         Value value = vmPop();
 
-        if (!IS_CLASS(value)) {
-          runtimeError("Can only throw classes.");
+        if (!IS_INSTANCE(value)) {
+          runtimeError("Can only throw instance of 'Error'.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        runtimeError("Exception: %s", AS_CLASS(value)->name->chars);
+        Value msg;
+        if (!mapGet(&AS_INSTANCE(value)->fields, OBJ_VAL(intern("message")), &msg)) {
+          runtimeError("Error must define a 'message'.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        if (!IS_STRING(msg)) {
+          runtimeError("Error 'message' must be a string.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        runtimeError("%s: %s", AS_INSTANCE(value)->klass->name->chars, AS_STRING(msg)->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
     }

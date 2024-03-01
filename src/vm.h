@@ -36,8 +36,8 @@ typedef struct {
   // methods with special semantics.
   ObjString* initString;
   ObjString* callString;
+  ObjString* iterString;
   ObjString* nextString;
-  ObjString* currString;
   ObjString* memberString;
   ObjString* subscriptGetString;
   ObjString* subscriptSetString;

@@ -34,8 +34,7 @@ class Set < Object {
   elements() => this.keys()
 
   // Iteration is over elements.
-  __next__(idx) => next(this.elements(), idx)
-  __curr__(idx) => this.elements()[idx]
+  __iter__() => iter(this.elements())
 
   hashFor(element) => {
     if (type(element) == Set)

@@ -1,17 +1,25 @@
-let next = (seq, idx) => {
-  if ("__next__" in seq) return seq.__next__(idx);
+class IterationProtocolError < Error {}
 
-  // first iteration.
-  if (len(seq) == 0) return false;
-  if (idx == nil) return 0;
-  // final iteration.
-  if (idx == len(seq) - 1) return false;
+class Iterator {
+  init(seq, start, end) => {
+    this.seq = seq;
+    this.idx = start;
+    this.end = end;
+  }
 
-  return idx + 1;
-};
+  more() => this.idx != this.end
 
-let curr = (seq, idx) => {
-  if ("__curr__" in seq) return seq.__curr__(idx);
+  next() => {
+    let value = this.seq[this.idx];
+    this.idx = this.idx + 1;
+    return value;
+  }
 
-  return seq[idx];
+  __len__() => this.end - this.idx
+}
+
+let iter = (object) => {
+  if ("__iter__" in object) return object.__iter__();
+
+  throw IterationProtocolError("Must define an '__iter__' method to iterate.");
 };

@@ -69,9 +69,7 @@ typedef struct {
   // local slot of the bound variable.
   int var;
   // local slot of the object that implements the protocol.
-  int seq;
-  // local slot of current iteration index.
-  int idx;
+  int iter;
   // stack offset of the first instruction of the body.
   int loopStart;
 } Iterator;
@@ -141,9 +139,8 @@ static void errorAtCurrent(const char* message) {
 }
 
 static void initIterator(Iterator* iter) {
-  iter->idx = 0;
-  iter->seq = 0;
   iter->var = 0;
+  iter->iter = 0;
   iter->loopStart = 0;
 }
 
@@ -245,7 +242,7 @@ static void emitReturn() {
 
 static uint8_t makeConstant(Value value) {
   bool hashable = (value.type == VAL_BOOL || value.type == VAL_NIL ||
-                   value.type == VAL_NUMBER);
+                   value.type == VAL_NUMBER || IS_STRING(value));
   Value existing;
 
   if (hashable && mapGet(current->constants, value, &existing) &&
@@ -844,20 +841,24 @@ static Iterator iterator() {
   // consume the identifier.
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
 
+  // store the bound variable.
   emitConstant(NIL_VAL);
   iter.var = declareVariable();
   markInitialized();
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
 
-  // keep track of the sequence.
+  // initialize the iterator object, adjusting the local
+  // count to reflect the iter fn's presence on the stack
+  // during the iterator-yielding expression.
+  nativeVariable(vm.iterString->chars);
+  current->localCount++;
   expression();
-  iter.seq = addLocal(syntheticToken("#seq"));
-  markInitialized();
+  emitBytes(OP_CALL, 1);
+  current->localCount--;
 
-  // initialize the index to nil.
-  emitConstant(NIL_VAL);
-  iter.idx = addLocal(syntheticToken("#idx"));
+  // store it.
+  iter.iter = addLocal(syntheticToken("#iter"));
   markInitialized();
 
   iter.loopStart = currentChunk()->count;
@@ -866,29 +867,19 @@ static Iterator iterator() {
 }
 
 static int iterationNext(Iterator iter) {
-  // call "next" on the sequence, passing #idx.
-  nativeVariable(vm.nextString->chars);
-  emitBytes(OP_GET_LOCAL, iter.seq);
-  emitBytes(OP_GET_LOCAL, iter.idx);
-  emitBytes(OP_CALL, 2);
-
-  // revise #idx. bail if #idx == false.
-  emitBytes(OP_SET_LOCAL, iter.idx);
+  // call "more" on the iterator and bail if false.
+  emitBytes(OP_GET_LOCAL, iter.iter);
+  methodCall("more", 0);
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);
 
-  return exitJump;
-}
-
-static void iterationCurr(Iterator iter) {
-  // call "curr" on the sequence, passing #idx.
-  nativeVariable(vm.currString->chars);
-  emitBytes(OP_GET_LOCAL, iter.seq);
-  emitBytes(OP_GET_LOCAL, iter.idx);
-  emitBytes(OP_CALL, 2);
-
+  // otherwise continue iterating.
+  emitBytes(OP_GET_LOCAL, iter.iter);
+  methodCall("next", 0);
   emitBytes(OP_SET_LOCAL, iter.var);
   emitByte(OP_POP);
+
+  return exitJump;
 }
 
 static void iterationEnd(Iterator iter, int exitJump) {
@@ -897,7 +888,8 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitByte(OP_POP);  // jump condition.
 }
 
-// Parse a comprehension, given
+// Parse a comprehension, given the stack address [var] of the
+// sequence under construction and the type of [closingToken].
 Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   Iterator iter;
   initIterator(&iter);
@@ -915,7 +907,6 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     beginScope();
     iter = iterator();
     exitJump = iterationNext(iter);
-    iterationCurr(iter);
   } else {
     isPredicate = true;
     // the predicate to test against.
@@ -930,7 +921,7 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     // makes scope management simple. in particular,
     // variables will be in scope in every condition
     // to their right, and all we have to do is conclude
-    // the scope at the end of this function.
+    // each scope at the end of this function.
     checkpointB = comprehension(checkpointA, var, closingToken);
   } else if (check(closingToken)) {
     // now we parse the body, first saving the point
@@ -1241,7 +1232,6 @@ static void forInStatement() {
   Iterator iter = iterator();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
   int exitJump = iterationNext(iter);
-  iterationCurr(iter);
   statement();
   iterationEnd(iter, exitJump);
 }
