@@ -240,7 +240,7 @@ static void emitReturn() {
   emitByte(OP_RETURN);
 }
 
-static uint8_t makeConstant(Value value) {
+static uint16_t makeConstant(Value value) {
   bool hashable = (value.type == VAL_BOOL || value.type == VAL_NIL ||
                    value.type == VAL_NUMBER || IS_STRING(value));
   Value existing;
@@ -251,18 +251,25 @@ static uint8_t makeConstant(Value value) {
   }
 
   int constant = addConstant(currentChunk(), value);
-  if (constant > UINT8_MAX) {
+  if (constant > UINT16_MAX) {
     error("Too many constants in one chunk.");
     return 0;
   }
 
   if (hashable) mapSet(current->constants, value, NUMBER_VAL(constant));
 
-  return (uint8_t)constant;
+  return (uint16_t)constant;
 }
 
-static void emitConstant(Value value) {
-  emitBytes(OP_CONSTANT, makeConstant(value));
+static void emitConstant(int constant) {
+  emitByte(OP_CONSTANT);
+  emitBytes(constant >> 8, constant & 0xff);
+}
+
+static void loadConstant(Value value) {
+  int constant = makeConstant(value);
+
+  emitConstant(constant);
 }
 
 static void patchJump(int offset) {
@@ -362,10 +369,6 @@ static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
 
 static uint8_t identifierConstant(Token* name) {
   return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
-}
-
-static uint8_t loadConstant(char* name) {
-  return makeConstant(identifier(name));
 }
 
 static bool identifiersEqual(Token* a, Token* b) {
@@ -562,7 +565,7 @@ static void grouping(bool canAssign) {
 
 static void number(bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
-  emitConstant(NUMBER_VAL(value));
+  loadConstant(NUMBER_VAL(value));
 }
 
 static void and_(bool canAssign) {
@@ -586,12 +589,12 @@ static void or_(bool canAssign) {
 }
 
 static void string(bool canAssign) {
-  emitConstant(OBJ_VAL(
+  loadConstant(OBJ_VAL(
       copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 static void bareString() {
-  emitConstant(
+  loadConstant(
       OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
 
@@ -632,8 +635,9 @@ static int nativeCall(char* name, int argCount) {
 }
 
 static void methodCall(char* name, int argCount) {
-  uint8_t method = loadConstant(name);
-  emitBytes(OP_INVOKE, method);
+  Value method = identifier(name);
+  emitByte(OP_INVOKE);
+  loadConstant(method);
   emitByte(argCount);
 }
 
@@ -842,7 +846,7 @@ static Iterator iterator() {
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
 
   // store the bound variable.
-  emitConstant(NIL_VAL);
+  loadConstant(NIL_VAL);
   iter.var = declareVariable();
   markInitialized();
 
@@ -1031,7 +1035,7 @@ static void finishMapVal() {
 }
 
 static void finishSetVal() {
-  emitConstant(BOOL_VAL(true));
+  loadConstant(BOOL_VAL(true));
   emitByte(OP_SUBSCRIPT_SET);
 }
 
