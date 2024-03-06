@@ -340,7 +340,7 @@ static InterpretResult loop() {
 #define READ_SHORT() \
   (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 #define READ_CONSTANT() \
-  (frame->closure->function->chunk.constants.values[READ_BYTE()])
+  (frame->closure->function->chunk.constants.values[READ_SHORT()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(valueType, op)                          \
   do {                                                    \
@@ -384,12 +384,12 @@ static InterpretResult loop() {
         vmPop();
         break;
       case OP_GET_LOCAL: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         vmPush(frame->slots[slot]);
         break;
       }
       case OP_SET_LOCAL: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         frame->slots[slot] = vmPeek(0);
         break;
       }
@@ -592,12 +592,12 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_UPVALUE: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         vmPush(*frame->closure->upvalues[slot]->location);
         break;
       }
       case OP_SET_UPVALUE: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         *frame->closure->upvalues[slot]->location = vmPeek(0);
         break;
       }
@@ -753,7 +753,8 @@ static InterpretResult loop() {
         }
 
         if (!IS_INSTANCE(obj)) {
-          runtimeError("Only objects or sequences may be tested for membership.");
+          runtimeError(
+              "Only objects or sequences may be tested for membership.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -795,7 +796,8 @@ static InterpretResult loop() {
         }
 
         Value msg;
-        if (!mapGet(&AS_INSTANCE(value)->fields, OBJ_VAL(intern("message")), &msg)) {
+        if (!mapGet(&AS_INSTANCE(value)->fields, OBJ_VAL(intern("message")),
+                    &msg)) {
           runtimeError("Error must define a 'message'.");
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -805,7 +807,8 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        runtimeError("%s: %s", AS_INSTANCE(value)->klass->name->chars, AS_STRING(msg)->chars);
+        runtimeError("%s: %s", AS_INSTANCE(value)->klass->name->chars,
+                     AS_STRING(msg)->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
     }

@@ -11,10 +11,6 @@ import test/integration/membership
 import test/integration/recursion
 import test/integration/return
 import test/integration/sequence
-import test/integration/seq_comprehension1
-import test/integration/seq_comprehension2
-import test/integration/set1
-import test/integration/set2
-import test/integration/set_comprehension
+import test/integration/set
 import test/integration/string
 import test/integration/tree

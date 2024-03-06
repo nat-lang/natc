@@ -155,9 +155,8 @@ bool __objHas__(int argCount, Value* args) {
 
   if (!validateHashable(key)) return false;
 
-  bool hasKey =
-      mapHas(&AS_INSTANCE(obj)->fields, key) ||
-      mapHas(&AS_INSTANCE(obj)->klass->methods, key);
+  bool hasKey = mapHas(&AS_INSTANCE(obj)->fields, key) ||
+                mapHas(&AS_INSTANCE(obj)->klass->methods, key);
 
   vmPush(BOOL_VAL(hasKey));
   return true;
