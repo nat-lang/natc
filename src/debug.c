@@ -55,15 +55,6 @@ static int shortConstantInstruction(const char* name, Chunk* chunk,
   return offset + 3;
 }
 
-static int constantInstruction(const char* name, Chunk* chunk, int offset) {
-  uint8_t constant = chunk->code[offset + 1];
-
-  printf("%-16s %4d '", name, constant);
-  printValue(chunk->constants.values[constant]);
-  printf("'\n");
-  return offset + 2;
-}
-
 static int invokeInstruction(const char* name, Chunk* chunk, int offset) {
   uint8_t constant = readShort(chunk, offset);
   uint8_t argCount = chunk->code[offset + 3];
@@ -177,7 +168,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_INHERIT:
       return simpleInstruction("OP_INHERIT", offset);
     case OP_METHOD:
-      return constantInstruction("OP_METHOD", chunk, offset);
+      return shortConstantInstruction("OP_METHOD", chunk, offset);
     case OP_MEMBER:
       return simpleInstruction("OP_MEMBER", offset);
     case OP_IMPORT:

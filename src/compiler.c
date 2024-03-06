@@ -847,10 +847,12 @@ static void method() {
   }
 
   function(type);
-  emitBytes(OP_METHOD, constant);
+  emitByte(OP_METHOD);
+  emitShortConstant(constant);
 }
 
-// Parse an iterator.
+// Parse an iterator and store the details in an
+// [Iterator] struct.
 static Iterator iterator() {
   Iterator iter;
   initIterator(&iter);
@@ -879,7 +881,6 @@ static Iterator iterator() {
   markInitialized();
 
   iter.loopStart = currentChunk()->count;
-
   return iter;
 }
 
@@ -930,8 +931,8 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     iter = iterator();
     exitJump = iterationNext(iter);
   } else {
+    // a predicate to test against.
     isPredicate = true;
-    // the predicate to test against.
     expression();
 
     predJump = emitJump(OP_JUMP_IF_FALSE);
@@ -967,8 +968,8 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     iterationEnd(iter, exitJump);
     endScope();
   } else if (isPredicate) {
-    // we need to jump over this last condition pop
-    // if the condition was truthy.
+    // we need to jump over this last condition.
+    // pop if the condition was truthy.
     int elseJump = emitJump(OP_JUMP);
     patchJump(predJump);
     emitByte(OP_POP);
@@ -1196,7 +1197,7 @@ static void classDeclaration() {
   }
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 
-  // pop the classname
+  // pop the classname.
   emitByte(OP_POP);
 
   if (classCompiler.hasSuperclass) {

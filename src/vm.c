@@ -743,7 +743,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_METHOD:
-        defineMethod(READ_CONSTANT());
+        defineMethod(READ_SHORT_CONSTANT());
         break;
       case OP_MEMBER: {
         Value obj = vmPop();
