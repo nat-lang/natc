@@ -1,1 +1,8 @@
-clang-format -style=Google
+BasedOnStyle: Google
+IndentWidth: 2
+MaxEmptyLinesToKeep: 1
+ColumnLimit: 80
+PenaltyBreakAssignment: 2
+PenaltyReturnTypeOnItsOwnLine: 200
+PointerAlignment: Left
+SpaceBeforeParens: ControlStatements
