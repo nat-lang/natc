@@ -213,8 +213,13 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
   emitByte(byte2);
 }
 
-static void emitShortConstant(uint16_t constant) {
+static void emitConstant(uint16_t constant) {
   emitBytes(constant >> 8, constant & 0xff);
+}
+
+static void emitConstInstr(uint8_t instruction, uint16_t constant) {
+  emitByte(instruction);
+  emitConstant(constant);
 }
 
 static void emitLoop(int loopStart) {
@@ -236,8 +241,7 @@ static int emitJump(uint8_t instruction) {
 
 static void emitReturn() {
   if (current->type == TYPE_INITIALIZER) {
-    emitByte(OP_GET_LOCAL);
-    emitShortConstant(0);
+    emitConstInstr(OP_GET_LOCAL, 0);
   } else {
     emitByte(OP_NIL);
   }
@@ -268,8 +272,7 @@ static uint8_t makeConstant(Value value) {
 
 static void loadConstant(Value value) {
   int constant = makeConstant(value);
-  emitByte(OP_CONSTANT);
-  emitShortConstant(constant);
+  emitConstInstr(OP_CONSTANT, constant);
 }
 
 static void patchJump(int offset) {
@@ -532,16 +535,13 @@ static void dot(bool canAssign) {
 
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
-    emitByte(OP_SET_PROPERTY);
-    emitShortConstant(name);
+    emitConstInstr(OP_SET_PROPERTY, name);
   } else if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
-    emitByte(OP_INVOKE);
-    emitShortConstant(name);
+    emitConstInstr(OP_INVOKE, name);
     emitByte(argCount);
   } else {
-    emitByte(OP_GET_PROPERTY);
-    emitShortConstant(name);
+    emitConstInstr(OP_GET_PROPERTY, name);
   }
 }
 
@@ -608,11 +608,9 @@ static void namedVariable(Token name, bool canAssign) {
   if (arg != -1) {
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
-
   } else if ((arg = resolveUpvalue(current, &name)) != -1) {
     getOp = OP_GET_UPVALUE;
     setOp = OP_SET_UPVALUE;
-
   } else {
     arg = identifierConstant(&name);
     getOp = OP_GET_GLOBAL;
@@ -621,18 +619,15 @@ static void namedVariable(Token name, bool canAssign) {
 
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
-    emitByte(setOp);
-    emitShortConstant(arg);
+    emitConstInstr(setOp, arg);
   } else {
-    emitByte(getOp);
-    emitShortConstant(arg);
+    emitConstInstr(getOp, arg);
   }
 }
 
 static uint8_t nativeVariable(char* name) {
   uint8_t var = makeConstant(identifier(name));
-  emitByte(OP_GET_GLOBAL);
-  emitShortConstant(var);
+  emitConstInstr(OP_GET_GLOBAL, var);
   return var;
 }
 
@@ -645,8 +640,7 @@ static int nativeCall(char* name, int argCount) {
 static void methodCall(char* name, int argCount) {
   Value method = identifier(name);
   uint8_t constant = makeConstant(method);
-  emitByte(OP_INVOKE);
-  emitShortConstant(constant);
+  emitConstInstr(OP_INVOKE, constant);
   emitByte(argCount);
 }
 
@@ -677,13 +671,11 @@ static void super_(bool canAssign) {
   if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
     namedVariable(syntheticToken("super"), false);
-    emitByte(OP_SUPER_INVOKE);
-    emitShortConstant(name);
+    emitConstInstr(OP_SUPER_INVOKE, name);
     emitByte(argCount);
   } else {
     namedVariable(syntheticToken("super"), false);
-    emitByte(OP_GET_SUPER);
-    emitShortConstant(name);
+    emitConstInstr(OP_GET_SUPER, name);
   }
 }
 
@@ -735,8 +727,7 @@ static void defineVariable(uint8_t global) {
     return;
   }
 
-  emitByte(OP_DEFINE_GLOBAL);
-  emitShortConstant(global);
+  emitConstInstr(OP_DEFINE_GLOBAL, global);
 }
 
 static bool peekSignature() {
@@ -828,8 +819,7 @@ static void function(FunctionType type) {
   blockOrExpression();
 
   ObjFunction* function = endCompiler();
-  emitByte(OP_CLOSURE);
-  emitShortConstant(makeConstant(OBJ_VAL(function)));
+  emitConstInstr(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
 
   for (int i = 0; i < function->upvalueCount; i++) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
@@ -847,8 +837,7 @@ static void method() {
   }
 
   function(type);
-  emitByte(OP_METHOD);
-  emitShortConstant(constant);
+  emitConstInstr(OP_METHOD, constant);
 }
 
 // Parse an iterator and store the details in an
@@ -886,20 +875,16 @@ static Iterator iterator() {
 
 static int iterationNext(Iterator iter) {
   // call "more" on the iterator and bail if false.
-  emitByte(OP_GET_LOCAL);
-  emitShortConstant(iter.iter);
+  emitConstInstr(OP_GET_LOCAL, iter.iter);
 
   methodCall("more", 0);
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);
 
   // otherwise continue iterating.
-  emitByte(OP_GET_LOCAL);
-  emitShortConstant(iter.iter);
-
+  emitConstInstr(OP_GET_LOCAL, iter.iter);
   methodCall("next", 0);
-  emitByte(OP_SET_LOCAL);
-  emitShortConstant(iter.var);
+  emitConstInstr(OP_SET_LOCAL, iter.var);
   emitByte(OP_POP);
 
   return exitJump;
@@ -954,8 +939,7 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
 
     // load the comprehension instance, offsetting the local
     // count appropriately, and append the expression.
-    emitByte(OP_GET_LOCAL);
-    emitShortConstant(var);
+    emitConstInstr(OP_GET_LOCAL, var);
     current->localCount++;
     expression();
     methodCall("add", 1);
@@ -1157,13 +1141,11 @@ static void subscript(bool canAssign) {
 static void classDeclaration() {
   consume(TOKEN_IDENTIFIER, "Expect class name.");
   Token className = parser.previous;
-
-  uint8_t name = identifierConstant(&parser.previous);
+  uint8_t nameConstant = identifierConstant(&parser.previous);
   declareVariable();
 
-  emitByte(OP_CLASS);
-  emitShortConstant(name);
-  defineVariable(name);
+  emitConstInstr(OP_CLASS, nameConstant);
+  defineVariable(nameConstant);
 
   ClassCompiler classCompiler;
   classCompiler.hasSuperclass = false;

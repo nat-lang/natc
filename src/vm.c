@@ -340,10 +340,7 @@ static InterpretResult loop() {
 #define READ_SHORT() \
   (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 #define READ_CONSTANT() \
-  (frame->closure->function->chunk.constants.values[READ_BYTE()])
-#define READ_SHORT_CONSTANT() \
   (frame->closure->function->chunk.constants.values[READ_SHORT()])
-#define READ_SHORT_STRING() AS_STRING(READ_SHORT_CONSTANT())
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(valueType, op)                          \
   do {                                                    \
@@ -370,7 +367,7 @@ static InterpretResult loop() {
 
     switch (instruction = READ_BYTE()) {
       case OP_CONSTANT: {
-        Value constant = READ_SHORT_CONSTANT();
+        Value constant = READ_CONSTANT();
         vmPush(constant);
         break;
       }
@@ -397,7 +394,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_GLOBAL: {
-        ObjString* name = READ_SHORT_STRING();
+        ObjString* name = READ_STRING();
         Value value;
         if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
           runtimeError("Undefined variable '%s'.", name->chars);
@@ -407,13 +404,13 @@ static InterpretResult loop() {
         break;
       }
       case OP_DEFINE_GLOBAL: {
-        Value name = READ_SHORT_CONSTANT();
+        Value name = READ_CONSTANT();
         mapSet(&vm.globals, name, vmPeek(0));
         vmPop();
         break;
       }
       case OP_SET_GLOBAL: {
-        Value name = READ_SHORT_CONSTANT();
+        Value name = READ_CONSTANT();
         if (mapSet(&vm.globals, name, vmPeek(0))) {
           mapDelete(&vm.globals, name);
           runtimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
@@ -428,7 +425,7 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(vmPeek(0));
-        ObjString* name = READ_SHORT_STRING();
+        ObjString* name = READ_STRING();
 
         Value value;
         if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
@@ -449,7 +446,7 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(vmPeek(1));
-        mapSet(&instance->fields, READ_SHORT_CONSTANT(), vmPeek(0));
+        mapSet(&instance->fields, READ_CONSTANT(), vmPeek(0));
         Value value = vmPop();
         vmPop();
         vmPush(value);
@@ -586,7 +583,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_SUPER: {
-        ObjString* name = READ_SHORT_STRING();
+        ObjString* name = READ_STRING();
         ObjClass* superclass = AS_CLASS(vmPop());
 
         if (!bindMethod(superclass, name)) {
@@ -674,7 +671,7 @@ static InterpretResult loop() {
       // invocation is a composite instruction:
       // property access followed by a call.
       case OP_INVOKE: {
-        ObjString* method = READ_SHORT_STRING();
+        ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
 
         if (!invoke(method, argCount)) {
@@ -684,7 +681,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_SUPER_INVOKE: {
-        ObjString* method = READ_SHORT_STRING();
+        ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
         ObjClass* superclass = AS_CLASS(vmPop());
         if (!invokeFromClass(superclass, method, argCount)) {
@@ -694,7 +691,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_CLOSURE: {
-        ObjFunction* function = AS_FUNCTION(READ_SHORT_CONSTANT());
+        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
         vmPush(OBJ_VAL(closure));
         for (int i = 0; i < closure->upvalueCount; i++) {
@@ -727,7 +724,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_CLASS:
-        vmPush(OBJ_VAL(newClass(READ_SHORT_STRING())));
+        vmPush(OBJ_VAL(newClass(READ_STRING())));
         break;
       case OP_INHERIT: {
         Value superclass = vmPeek(1);
@@ -743,7 +740,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_METHOD:
-        defineMethod(READ_SHORT_CONSTANT());
+        defineMethod(READ_CONSTANT());
         break;
       case OP_MEMBER: {
         Value obj = vmPop();
@@ -820,9 +817,7 @@ static InterpretResult loop() {
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_CONSTANT
-#undef READ_SHORT_CONSTANT
 #undef READ_STRING
-#undef READ_SHORT_STRING
 #undef BINARY_OP
 }
 

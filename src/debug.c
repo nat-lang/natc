@@ -45,8 +45,7 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk,
   return offset + 3;
 }
 
-static int shortConstantInstruction(const char* name, Chunk* chunk,
-                                    int offset) {
+static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t constant = readShort(chunk, offset);
 
   printf("%-16s %d '", name, constant);
@@ -76,7 +75,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
   uint8_t instruction = chunk->code[offset];
   switch (instruction) {
     case OP_CONSTANT:
-      return shortConstantInstruction("OP_CONSTANT", chunk, offset);
+      return constantInstruction("OP_CONSTANT", chunk, offset);
     case OP_NIL:
       return simpleInstruction("OP_NIL", offset);
     case OP_TRUE:
@@ -90,25 +89,25 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_SET_LOCAL:
       return shortInstruction("OP_SET_LOCAL", chunk, offset);
     case OP_GET_GLOBAL:
-      return shortConstantInstruction("OP_GET_GLOBAL", chunk, offset);
+      return constantInstruction("OP_GET_GLOBAL", chunk, offset);
     case OP_DEFINE_GLOBAL:
-      return shortConstantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
+      return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL:
-      return shortConstantInstruction("OP_SET_GLOBAL", chunk, offset);
+      return constantInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_GET_UPVALUE:
       return shortInstruction("OP_GET_UPVALUE", chunk, offset);
     case OP_SET_UPVALUE:
       return shortInstruction("OP_SET_UPVALUE", chunk, offset);
     case OP_GET_PROPERTY:
-      return shortConstantInstruction("OP_GET_PROPERTY", chunk, offset);
+      return constantInstruction("OP_GET_PROPERTY", chunk, offset);
     case OP_SET_PROPERTY:
-      return shortConstantInstruction("OP_SET_PROPERTY", chunk, offset);
+      return constantInstruction("OP_SET_PROPERTY", chunk, offset);
     case OP_SUBSCRIPT_GET:
       return simpleInstruction("OP_SUBSCRIPT_GET", offset);
     case OP_SUBSCRIPT_SET:
       return simpleInstruction("OP_SUBSCRIPT_SET", offset);
     case OP_GET_SUPER:
-      return shortConstantInstruction("OP_GET_SUPER", chunk, offset);
+      return constantInstruction("OP_GET_SUPER", chunk, offset);
     case OP_EQUAL:
       return simpleInstruction("OP_EQUAL", offset);
     case OP_GREATER:
@@ -164,11 +163,11 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
     case OP_CLASS:
-      return shortConstantInstruction("OP_CLASS", chunk, offset);
+      return constantInstruction("OP_CLASS", chunk, offset);
     case OP_INHERIT:
       return simpleInstruction("OP_INHERIT", offset);
     case OP_METHOD:
-      return shortConstantInstruction("OP_METHOD", chunk, offset);
+      return constantInstruction("OP_METHOD", chunk, offset);
     case OP_MEMBER:
       return simpleInstruction("OP_MEMBER", offset);
     case OP_IMPORT:
