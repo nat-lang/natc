@@ -266,15 +266,10 @@ static uint8_t makeConstant(Value value) {
   return (uint8_t)constant;
 }
 
-void loadShortConstant(Value value) {
+static void loadConstant(Value value) {
   int constant = makeConstant(value);
   emitByte(OP_CONSTANT);
   emitShortConstant(constant);
-}
-
-static void loadConstant(Value value) {
-  int constant = makeConstant(value);
-  emitBytes(OP_CONSTANT, constant);
 }
 
 static void patchJump(int offset) {
@@ -687,7 +682,8 @@ static void super_(bool canAssign) {
     emitByte(argCount);
   } else {
     namedVariable(syntheticToken("super"), false);
-    emitBytes(OP_GET_SUPER, name);
+    emitByte(OP_GET_SUPER);
+    emitShortConstant(name);
   }
 }
 
@@ -1148,7 +1144,6 @@ static void subscript(bool canAssign) {
   expression();
   consume(TOKEN_RIGHT_BRACKET, "Expect ']' after arguments.");
 
-  // if it's assignment, revise the instruction.
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitByte(OP_SUBSCRIPT_SET);

@@ -85,7 +85,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
   uint8_t instruction = chunk->code[offset];
   switch (instruction) {
     case OP_CONSTANT:
-      return constantInstruction("OP_CONSTANT", chunk, offset);
+      return shortConstantInstruction("OP_CONSTANT", chunk, offset);
     case OP_NIL:
       return simpleInstruction("OP_NIL", offset);
     case OP_TRUE:
@@ -117,7 +117,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_SUBSCRIPT_SET:
       return simpleInstruction("OP_SUBSCRIPT_SET", offset);
     case OP_GET_SUPER:
-      return constantInstruction("OP_GET_SUPER", chunk, offset);
+      return shortConstantInstruction("OP_GET_SUPER", chunk, offset);
     case OP_EQUAL:
       return simpleInstruction("OP_EQUAL", offset);
     case OP_GREATER:

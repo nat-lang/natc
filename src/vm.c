@@ -370,7 +370,7 @@ static InterpretResult loop() {
 
     switch (instruction = READ_BYTE()) {
       case OP_CONSTANT: {
-        Value constant = READ_CONSTANT();
+        Value constant = READ_SHORT_CONSTANT();
         vmPush(constant);
         break;
       }
@@ -586,7 +586,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_SUPER: {
-        ObjString* name = READ_STRING();
+        ObjString* name = READ_SHORT_STRING();
         ObjClass* superclass = AS_CLASS(vmPop());
 
         if (!bindMethod(superclass, name)) {
@@ -820,7 +820,9 @@ static InterpretResult loop() {
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_CONSTANT
+#undef READ_SHORT_CONSTANT
 #undef READ_STRING
+#undef READ_SHORT_STRING
 #undef BINARY_OP
 }
 
