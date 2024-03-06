@@ -828,7 +828,8 @@ static void function(FunctionType type) {
   blockOrExpression();
 
   ObjFunction* function = endCompiler();
-  emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+  emitByte(OP_CLOSURE);
+  emitShortConstant(makeConstant(OBJ_VAL(function)));
 
   for (int i = 0; i < function->upvalueCount; i++) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);

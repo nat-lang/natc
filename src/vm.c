@@ -694,7 +694,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_CLOSURE: {
-        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+        ObjFunction* function = AS_FUNCTION(READ_SHORT_CONSTANT());
         ObjClosure* closure = newClosure(function);
         vmPush(OBJ_VAL(closure));
         for (int i = 0; i < closure->upvalueCount; i++) {
