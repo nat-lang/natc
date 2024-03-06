@@ -595,12 +595,12 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_UPVALUE: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         vmPush(*frame->closure->upvalues[slot]->location);
         break;
       }
       case OP_SET_UPVALUE: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         *frame->closure->upvalues[slot]->location = vmPeek(0);
         break;
       }
