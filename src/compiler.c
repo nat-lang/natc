@@ -610,26 +610,44 @@ static void namedVariable(Token name, bool canAssign) {
   if (arg != -1) {
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+      expression();
+      emitBytes(setOp, (uint8_t)arg);
+    } else {
+      emitBytes(getOp, (uint8_t)arg);
+    }
+
   } else if ((arg = resolveUpvalue(current, &name)) != -1) {
     getOp = OP_GET_UPVALUE;
     setOp = OP_SET_UPVALUE;
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+      expression();
+      emitBytes(setOp, (uint8_t)arg);
+    } else {
+      emitBytes(getOp, (uint8_t)arg);
+    }
   } else {
     arg = identifierConstant(&name);
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
-  }
 
-  if (canAssign && match(TOKEN_EQUAL)) {
-    expression();
-    emitBytes(setOp, (uint8_t)arg);
-  } else {
-    emitBytes(getOp, (uint8_t)arg);
+    if (canAssign && match(TOKEN_EQUAL)) {
+      expression();
+      emitByte(setOp);
+      emitShortConstant(arg);
+    } else {
+      emitByte(getOp);
+      emitShortConstant(arg);
+    }
   }
 }
 
 static uint8_t nativeVariable(char* name) {
   uint8_t var = makeConstant(identifier(name));
-  emitBytes(OP_GET_GLOBAL, var);
+  emitByte(OP_GET_GLOBAL);
+  emitShortConstant(var);
   return var;
 }
 
@@ -731,7 +749,8 @@ static void defineVariable(uint8_t global) {
     return;
   }
 
-  emitBytes(OP_DEFINE_GLOBAL, global);
+  emitByte(OP_DEFINE_GLOBAL);
+  emitShortConstant(global);
 }
 
 static bool peekSignature() {

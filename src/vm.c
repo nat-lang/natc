@@ -397,7 +397,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_GET_GLOBAL: {
-        ObjString* name = READ_STRING();
+        ObjString* name = READ_SHORT_STRING();
         Value value;
         if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
           runtimeError("Undefined variable '%s'.", name->chars);
@@ -407,13 +407,13 @@ static InterpretResult loop() {
         break;
       }
       case OP_DEFINE_GLOBAL: {
-        Value name = READ_CONSTANT();
+        Value name = READ_SHORT_CONSTANT();
         mapSet(&vm.globals, name, vmPeek(0));
         vmPop();
         break;
       }
       case OP_SET_GLOBAL: {
-        Value name = READ_CONSTANT();
+        Value name = READ_SHORT_CONSTANT();
         if (mapSet(&vm.globals, name, vmPeek(0))) {
           mapDelete(&vm.globals, name);
           runtimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
