@@ -261,8 +261,19 @@ static uint8_t makeConstant(Value value) {
   return (uint8_t)constant;
 }
 
-static void emitConstant(Value value) {
-  emitBytes(OP_CONSTANT, makeConstant(value));
+static void emitShortConstant(uint16_t constant) {
+  emitBytes(constant >> 8, constant & 0xff);
+}
+
+static void loadShortConstant(Value value) {
+  int constant = makeConstant(value);
+  emitByte(OP_CONSTANT);
+  emitShortConstant(constant);
+}
+
+static void loadConstant(Value value) {
+  int constant = makeConstant(value);
+  emitBytes(OP_CONSTANT, constant);
 }
 
 static void patchJump(int offset) {
@@ -362,10 +373,6 @@ static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
 
 static uint8_t identifierConstant(Token* name) {
   return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
-}
-
-static uint8_t loadConstant(char* name) {
-  return makeConstant(identifier(name));
 }
 
 static bool identifiersEqual(Token* a, Token* b) {
@@ -562,7 +569,7 @@ static void grouping(bool canAssign) {
 
 static void number(bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
-  emitConstant(NUMBER_VAL(value));
+  loadConstant(NUMBER_VAL(value));
 }
 
 static void and_(bool canAssign) {
@@ -586,12 +593,12 @@ static void or_(bool canAssign) {
 }
 
 static void string(bool canAssign) {
-  emitConstant(OBJ_VAL(
+  loadConstant(OBJ_VAL(
       copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 static void bareString() {
-  emitConstant(
+  loadConstant(
       OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
 
@@ -632,8 +639,10 @@ static int nativeCall(char* name, int argCount) {
 }
 
 static void methodCall(char* name, int argCount) {
-  uint8_t method = loadConstant(name);
-  emitBytes(OP_INVOKE, method);
+  Value method = identifier(name);
+  uint8_t constant = makeConstant(method);
+  emitByte(OP_INVOKE);
+  emitByte(constant);
   emitByte(argCount);
 }
 
@@ -842,7 +851,7 @@ static Iterator iterator() {
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
 
   // store the bound variable.
-  emitConstant(NIL_VAL);
+  loadConstant(NIL_VAL);
   iter.var = declareVariable();
   markInitialized();
 
@@ -1031,7 +1040,7 @@ static void finishMapVal() {
 }
 
 static void finishSetVal() {
-  emitConstant(BOOL_VAL(true));
+  loadConstant(BOOL_VAL(true));
   emitByte(OP_SUBSCRIPT_SET);
 }
 
@@ -1135,11 +1144,12 @@ static void classDeclaration() {
   consume(TOKEN_IDENTIFIER, "Expect class name.");
   Token className = parser.previous;
 
-  uint8_t nameConstant = identifierConstant(&parser.previous);
+  uint8_t name = identifierConstant(&parser.previous);
   declareVariable();
 
-  emitBytes(OP_CLASS, nameConstant);
-  defineVariable(nameConstant);
+  emitByte(OP_CLASS);
+  emitShortConstant(name);
+  defineVariable(name);
 
   ClassCompiler classCompiler;
   classCompiler.hasSuperclass = false;

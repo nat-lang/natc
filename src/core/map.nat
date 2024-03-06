@@ -1,6 +1,6 @@
 
 class Map < Object {
-  // Does each key in [this] map to the same key in [other]?
+  // Does each key in [this] map to the same value in [other]?
   subMap(other) => {
     for (key in this.keys()) {
       if (!key in other) return false;

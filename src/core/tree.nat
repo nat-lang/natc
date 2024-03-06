@@ -10,6 +10,8 @@ class Tree {
     return this;
   }
 
+  // Add a [child] to the tree, first converting it to a [Tree]
+  // object if it's not already. The compiler uses this method.
   addChild(child) => {
     if (type(child) != Tree)
       child = Tree().setData(child);
