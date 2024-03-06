@@ -265,7 +265,7 @@ static void emitShortConstant(uint16_t constant) {
   emitBytes(constant >> 8, constant & 0xff);
 }
 
-static void loadShortConstant(Value value) {
+void loadShortConstant(Value value) {
   int constant = makeConstant(value);
   emitByte(OP_CONSTANT);
   emitShortConstant(constant);
@@ -539,7 +539,8 @@ static void dot(bool canAssign) {
     emitBytes(OP_SET_PROPERTY, name);
   } else if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
-    emitBytes(OP_INVOKE, name);
+    emitByte(OP_INVOKE);
+    emitShortConstant(name);
     emitByte(argCount);
   } else {
     emitBytes(OP_GET_PROPERTY, name);
@@ -642,7 +643,7 @@ static void methodCall(char* name, int argCount) {
   Value method = identifier(name);
   uint8_t constant = makeConstant(method);
   emitByte(OP_INVOKE);
-  emitByte(constant);
+  emitShortConstant(constant);
   emitByte(argCount);
 }
 
@@ -673,7 +674,8 @@ static void super_(bool canAssign) {
   if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
     namedVariable(syntheticToken("super"), false);
-    emitBytes(OP_SUPER_INVOKE, name);
+    emitByte(OP_SUPER_INVOKE);
+    emitShortConstant(name);
     emitByte(argCount);
   } else {
     namedVariable(syntheticToken("super"), false);

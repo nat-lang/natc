@@ -674,7 +674,7 @@ static InterpretResult loop() {
       // invocation is a composite instruction:
       // property access followed by a call.
       case OP_INVOKE: {
-        ObjString* method = READ_STRING();
+        ObjString* method = READ_SHORT_STRING();
         int argCount = READ_BYTE();
 
         if (!invoke(method, argCount)) {
@@ -684,7 +684,7 @@ static InterpretResult loop() {
         break;
       }
       case OP_SUPER_INVOKE: {
-        ObjString* method = READ_STRING();
+        ObjString* method = READ_SHORT_STRING();
         int argCount = READ_BYTE();
         ObjClass* superclass = AS_CLASS(vmPop());
         if (!invokeFromClass(superclass, method, argCount)) {

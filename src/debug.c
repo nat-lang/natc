@@ -26,19 +26,24 @@ static int byteInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 2;
 }
 
+uint16_t readShort(Chunk* chunk, int offset) {
+  uint16_t code = (uint16_t)(chunk->code[offset + 1] << 8);
+  code |= chunk->code[offset + 2];
+  return code;
+}
+
 // static int shortInstruction(const char* name, Chunk* chunk, int offset) {}
 
 static int jumpInstruction(const char* name, int sign, Chunk* chunk,
                            int offset) {
-  uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
-  jump |= chunk->code[offset + 2];
+  uint16_t jump = readShort(chunk, offset);
   printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
   return offset + 3;
 }
 
-static int classInstruction(const char* name, Chunk* chunk, int offset) {
-  uint16_t constant = (uint16_t)(chunk->code[offset + 1] << 8);
-  constant |= chunk->code[offset + 2];
+static int shortConstantInstruction(const char* name, Chunk* chunk,
+                                    int offset) {
+  uint16_t constant = readShort(chunk, offset);
 
   printf("%-16s %4d '", name, constant);
   printValue(chunk->constants.values[constant]);
@@ -56,12 +61,12 @@ static int constantInstruction(const char* name, Chunk* chunk, int offset) {
 }
 
 static int invokeInstruction(const char* name, Chunk* chunk, int offset) {
-  uint8_t constant = chunk->code[offset + 1];
-  uint8_t argCount = chunk->code[offset + 2];
+  uint8_t constant = readShort(chunk, offset);
+  uint8_t argCount = chunk->code[offset + 3];
   printf("%-16s (%d args) %4d '", name, argCount, constant);
   printValue(chunk->constants.values[constant]);
   printf("'\n");
-  return offset + 3;
+  return offset + 4;
 }
 
 int disassembleInstruction(Chunk* chunk, int offset) {
@@ -163,7 +168,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
     case OP_CLASS:
-      return classInstruction("OP_CLASS", chunk, offset);
+      return shortConstantInstruction("OP_CLASS", chunk, offset);
     case OP_INHERIT:
       return simpleInstruction("OP_INHERIT", offset);
     case OP_METHOD:
