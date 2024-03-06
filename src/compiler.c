@@ -213,6 +213,10 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
   emitByte(byte2);
 }
 
+static void emitShortConstant(uint16_t constant) {
+  emitBytes(constant >> 8, constant & 0xff);
+}
+
 static void emitLoop(int loopStart) {
   emitByte(OP_LOOP);
 
@@ -232,7 +236,8 @@ static int emitJump(uint8_t instruction) {
 
 static void emitReturn() {
   if (current->type == TYPE_INITIALIZER) {
-    emitBytes(OP_GET_LOCAL, 0);
+    emitByte(OP_GET_LOCAL);
+    emitShortConstant(0);
   } else {
     emitByte(OP_NIL);
   }
@@ -259,10 +264,6 @@ static uint8_t makeConstant(Value value) {
   if (hashable) mapSet(current->constants, value, NUMBER_VAL(constant));
 
   return (uint8_t)constant;
-}
-
-static void emitShortConstant(uint16_t constant) {
-  emitBytes(constant >> 8, constant & 0xff);
 }
 
 void loadShortConstant(Value value) {
@@ -613,9 +614,11 @@ static void namedVariable(Token name, bool canAssign) {
 
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
-      emitBytes(setOp, (uint8_t)arg);
+      emitByte(setOp);
+      emitShortConstant(arg);
     } else {
-      emitBytes(getOp, (uint8_t)arg);
+      emitByte(getOp);
+      emitShortConstant(arg);
     }
 
   } else if ((arg = resolveUpvalue(current, &name)) != -1) {
@@ -898,15 +901,20 @@ static Iterator iterator() {
 
 static int iterationNext(Iterator iter) {
   // call "more" on the iterator and bail if false.
-  emitBytes(OP_GET_LOCAL, iter.iter);
+  emitByte(OP_GET_LOCAL);
+  emitShortConstant(iter.iter);
+
   methodCall("more", 0);
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);
 
   // otherwise continue iterating.
-  emitBytes(OP_GET_LOCAL, iter.iter);
+  emitByte(OP_GET_LOCAL);
+  emitShortConstant(iter.iter);
+
   methodCall("next", 0);
-  emitBytes(OP_SET_LOCAL, iter.var);
+  emitByte(OP_SET_LOCAL);
+  emitShortConstant(iter.var);
   emitByte(OP_POP);
 
   return exitJump;
@@ -961,7 +969,8 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
 
     // load the comprehension instance, offsetting the local
     // count appropriately, and append the expression.
-    emitBytes(OP_GET_LOCAL, var);
+    emitByte(OP_GET_LOCAL);
+    emitShortConstant(var);
     current->localCount++;
     expression();
     methodCall("add", 1);

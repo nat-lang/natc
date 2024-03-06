@@ -26,13 +26,17 @@ static int byteInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 2;
 }
 
-uint16_t readShort(Chunk* chunk, int offset) {
+static uint16_t readShort(Chunk* chunk, int offset) {
   uint16_t code = (uint16_t)(chunk->code[offset + 1] << 8);
   code |= chunk->code[offset + 2];
   return code;
 }
 
-// static int shortInstruction(const char* name, Chunk* chunk, int offset) {}
+static int shortInstruction(const char* name, Chunk* chunk, int offset) {
+  uint16_t slot = readShort(chunk, offset);
+  printf("%-16s %d\n", name, slot);
+  return offset + 3;
+}
 
 static int jumpInstruction(const char* name, int sign, Chunk* chunk,
                            int offset) {
@@ -45,7 +49,7 @@ static int shortConstantInstruction(const char* name, Chunk* chunk,
                                     int offset) {
   uint16_t constant = readShort(chunk, offset);
 
-  printf("%-16s %4d '", name, constant);
+  printf("%-16s %d '", name, constant);
   printValue(chunk->constants.values[constant]);
   printf("'\n");
   return offset + 3;
@@ -91,9 +95,9 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_POP:
       return simpleInstruction("OP_POP", offset);
     case OP_GET_LOCAL:
-      return byteInstruction("OP_GET_LOCAL", chunk, offset);
+      return shortInstruction("OP_GET_LOCAL", chunk, offset);
     case OP_SET_LOCAL:
-      return byteInstruction("OP_SET_LOCAL", chunk, offset);
+      return shortInstruction("OP_SET_LOCAL", chunk, offset);
     case OP_GET_GLOBAL:
       return shortConstantInstruction("OP_GET_GLOBAL", chunk, offset);
     case OP_DEFINE_GLOBAL:

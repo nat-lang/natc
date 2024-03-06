@@ -387,12 +387,12 @@ static InterpretResult loop() {
         vmPop();
         break;
       case OP_GET_LOCAL: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         vmPush(frame->slots[slot]);
         break;
       }
       case OP_SET_LOCAL: {
-        uint8_t slot = READ_BYTE();
+        uint8_t slot = READ_SHORT();
         frame->slots[slot] = vmPeek(0);
         break;
       }
