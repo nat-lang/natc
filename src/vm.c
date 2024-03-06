@@ -428,7 +428,7 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(vmPeek(0));
-        ObjString* name = READ_STRING();
+        ObjString* name = READ_SHORT_STRING();
 
         Value value;
         if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
@@ -449,7 +449,7 @@ static InterpretResult loop() {
         }
 
         ObjInstance* instance = AS_INSTANCE(vmPeek(1));
-        mapSet(&instance->fields, READ_CONSTANT(), vmPeek(0));
+        mapSet(&instance->fields, READ_SHORT_CONSTANT(), vmPeek(0));
         Value value = vmPop();
         vmPop();
         vmPush(value);

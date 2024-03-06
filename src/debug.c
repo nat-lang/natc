@@ -109,9 +109,9 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_SET_UPVALUE:
       return byteInstruction("OP_SET_UPVALUE", chunk, offset);
     case OP_GET_PROPERTY:
-      return constantInstruction("OP_GET_PROPERTY", chunk, offset);
+      return shortConstantInstruction("OP_GET_PROPERTY", chunk, offset);
     case OP_SET_PROPERTY:
-      return constantInstruction("OP_SET_PROPERTY", chunk, offset);
+      return shortConstantInstruction("OP_SET_PROPERTY", chunk, offset);
     case OP_SUBSCRIPT_GET:
       return simpleInstruction("OP_SUBSCRIPT_GET", offset);
     case OP_SUBSCRIPT_SET:
