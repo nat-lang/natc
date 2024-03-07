@@ -6,3 +6,4 @@ import src/core/map
 import src/core/set
 import src/core/tree
 import src/core/assertion
+import src/core/functional

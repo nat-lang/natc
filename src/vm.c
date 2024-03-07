@@ -452,110 +452,6 @@ static InterpretResult loop() {
         vmPush(value);
         break;
       }
-      case OP_SUBSCRIPT_GET: {
-        Value key = vmPop();
-        Value obj = vmPop();
-
-        // indexed access to sequences.
-        if (IS_SEQUENCE(obj)) {
-          ObjSequence* seq = AS_SEQUENCE(obj);
-
-          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
-
-          int idx = AS_NUMBER(key);
-
-          vmPush(seq->values.values[idx]);
-          break;
-        }
-
-        if (!IS_INSTANCE(obj)) {
-          runtimeError(
-              "Only objects, sequences, and instances with a '%s' method "
-              "support "
-              "access by subscript.",
-              vm.subscriptGetString->chars);
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
-        ObjInstance* instance = AS_INSTANCE(obj);
-
-        // classes may define their own subscript access operator.
-        Value getFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptGetString),
-                   &getFn)) {
-          // set up the context for the function call.
-          vmPush(obj);  // receiver.
-          vmPush(key);
-
-          if (!vmCallValue(getFn, 1)) return INTERPRET_RUNTIME_ERROR;
-          frame = &vm.frames[vm.frameCount - 1];
-          break;
-        }
-
-        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
-
-        // otherwise fall back to property access.
-        Value value;
-        if (mapGet(&instance->fields, key, &value)) {
-          vmPush(value);
-        } else {
-          // we don't throw an error if the property doesn't exist.
-          vmPush(NIL_VAL);
-        }
-        break;
-      }
-      case OP_SUBSCRIPT_SET: {
-        Value val = vmPop();
-        Value key = vmPop();
-        Value obj = vmPop();
-
-        // indexed assignment to sequences.
-        if (IS_SEQUENCE(obj)) {
-          ObjSequence* seq = AS_SEQUENCE(obj);
-
-          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
-
-          int idx = AS_NUMBER(key);
-
-          seq->values.values[idx] = val;
-
-          // leave the sequence on the stack.
-          vmPush(OBJ_VAL(seq));
-          break;
-        }
-
-        if (!IS_INSTANCE(obj)) {
-          runtimeError(
-              "Only objects, sequences, and instances with a '%s' method "
-              "support "
-              "assignment by subscript.",
-              vm.subscriptSetString->chars);
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
-        ObjInstance* instance = AS_INSTANCE(obj);
-
-        // classes may define their own subscript setting operator.
-        Value setFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptSetString),
-                   &setFn)) {
-          // set up the context for the function call.
-          vmPush(obj);  // receiver.
-          vmPush(key);
-          vmPush(val);
-
-          if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
-          frame = &vm.frames[vm.frameCount - 1];
-          break;
-        }
-
-        // otherwise fall back to property setting.
-        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
-        mapSet(&instance->fields, key, val);
-        // leave the object on the stack.
-        vmPush(obj);
-        break;
-      }
       case OP_EQUAL: {
         Value a = vmPop();
         Value b = vmPop();
@@ -662,6 +558,22 @@ static InterpretResult loop() {
       case OP_CALL: {
         int argCount = READ_BYTE();
         if (!vmCallValue(vmPeek(argCount), argCount)) {
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
+      case OP_CALL_INFIX: {
+        Value right = vmPop();
+        Value infix = vmPop();
+        Value left = vmPop();
+
+        vmPush(infix);
+        vmPush(left);
+        vmPush(right);
+
+        if (!vmCallValue(infix, 2)) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -810,6 +722,111 @@ static InterpretResult loop() {
         runtimeError("%s: %s", AS_INSTANCE(value)->klass->name->chars,
                      AS_STRING(msg)->chars);
         return INTERPRET_RUNTIME_ERROR;
+      }
+
+      case OP_SUBSCRIPT_GET: {
+        Value key = vmPop();
+        Value obj = vmPop();
+
+        // indexed access to sequences.
+        if (IS_SEQUENCE(obj)) {
+          ObjSequence* seq = AS_SEQUENCE(obj);
+
+          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
+
+          int idx = AS_NUMBER(key);
+
+          vmPush(seq->values.values[idx]);
+          break;
+        }
+
+        if (!IS_INSTANCE(obj)) {
+          runtimeError(
+              "Only objects, sequences, and instances with a '%s' method "
+              "support "
+              "access by subscript.",
+              vm.subscriptGetString->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(obj);
+
+        // classes may define their own subscript access operator.
+        Value getFn;
+        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptGetString),
+                   &getFn)) {
+          // set up the context for the function call.
+          vmPush(obj);  // receiver.
+          vmPush(key);
+
+          if (!vmCallValue(getFn, 1)) return INTERPRET_RUNTIME_ERROR;
+          frame = &vm.frames[vm.frameCount - 1];
+          break;
+        }
+
+        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
+
+        // otherwise fall back to property access.
+        Value value;
+        if (mapGet(&instance->fields, key, &value)) {
+          vmPush(value);
+        } else {
+          // we don't throw an error if the property doesn't exist.
+          vmPush(NIL_VAL);
+        }
+        break;
+      }
+      case OP_SUBSCRIPT_SET: {
+        Value val = vmPop();
+        Value key = vmPop();
+        Value obj = vmPop();
+
+        // indexed assignment to sequences.
+        if (IS_SEQUENCE(obj)) {
+          ObjSequence* seq = AS_SEQUENCE(obj);
+
+          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
+
+          int idx = AS_NUMBER(key);
+
+          seq->values.values[idx] = val;
+
+          // leave the sequence on the stack.
+          vmPush(OBJ_VAL(seq));
+          break;
+        }
+
+        if (!IS_INSTANCE(obj)) {
+          runtimeError(
+              "Only objects, sequences, and instances with a '%s' method "
+              "support "
+              "assignment by subscript.",
+              vm.subscriptSetString->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(obj);
+
+        // classes may define their own subscript setting operator.
+        Value setFn;
+        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptSetString),
+                   &setFn)) {
+          // set up the context for the function call.
+          vmPush(obj);  // receiver.
+          vmPush(key);
+          vmPush(val);
+
+          if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
+          frame = &vm.frames[vm.frameCount - 1];
+          break;
+        }
+
+        // otherwise fall back to property setting.
+        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
+        mapSet(&instance->fields, key, val);
+        // leave the object on the stack.
+        vmPush(obj);
+        break;
       }
     }
   }

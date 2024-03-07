@@ -198,11 +198,11 @@ static bool match(TokenType type) {
   return true;
 }
 
-static bool prevWhite() {
-  int offset = parser.previous.length + parser.current.length + 1;
+// Is there whitespace preceding the previous token?
+static bool penultWhite() { return isWhite(*(parser.previous.start - 1)); }
 
-  return isWhite(charAt(-offset));
-}
+// Is there whitespace preceding the current token?
+static bool prevWhite() { return isWhite(*(parser.current.start - 1)); }
 
 static void emitByte(uint8_t byte) {
   writeChunk(currentChunk(), byte, parser.previous.line);
@@ -465,6 +465,12 @@ static int declareVariable() {
   return addLocal(*name);
 }
 
+static uint8_t nativeVariable(char* name) {
+  uint8_t var = makeConstant(identifier(name));
+  emitConstInstr(OP_GET_GLOBAL, var);
+  return var;
+}
+
 static uint8_t argumentList() {
   uint8_t argCount = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
@@ -529,7 +535,7 @@ static void call(bool canAssign) {
   emitBytes(OP_CALL, argCount);
 }
 
-static void dot(bool canAssign) {
+static void property(bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
   uint8_t name = identifierConstant(&parser.previous);
 
@@ -542,6 +548,21 @@ static void dot(bool canAssign) {
     emitByte(argCount);
   } else {
     emitConstInstr(OP_GET_PROPERTY, name);
+  }
+}
+
+// A dot flush against an expression is property access;
+// a dot with whitespace preceding and following it is
+// function composition. We dont require the whitespace
+// following to disambiguate the two, but we may as well
+// enforce the symmetry.
+static void dot(bool canAssign) {
+  if (penultWhite() && prevWhite()) {
+    nativeVariable("compose");
+    expression();
+    emitByte(OP_CALL_INFIX);
+  } else {
+    property(canAssign);
   }
 }
 
@@ -623,12 +644,6 @@ static void namedVariable(Token name, bool canAssign) {
   } else {
     emitConstInstr(getOp, arg);
   }
-}
-
-static uint8_t nativeVariable(char* name) {
-  uint8_t var = makeConstant(identifier(name));
-  emitConstInstr(OP_GET_GLOBAL, var);
-  return var;
 }
 
 static int nativeCall(char* name, int argCount) {
@@ -752,7 +767,7 @@ static bool peekSignature() {
   return found;
 }
 
-static bool tryFn(FunctionType fnType) {
+static bool tryFunction(FunctionType fnType) {
   if (peekSignature()) {
     function(fnType);
     markInitialized();
@@ -762,19 +777,19 @@ static bool tryFn(FunctionType fnType) {
 }
 
 static void boundExpression() {
-  if (tryFn(TYPE_BOUND)) return;
+  if (tryFunction(TYPE_BOUND)) return;
 
   parsePrecedence(PREC_ASSIGNMENT, false);
 }
 
 static void whiteDelimitedExpression() {
-  if (tryFn(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS)) return;
 
   parsePrecedence(PREC_ASSIGNMENT, true);
 }
 
 static void expression() {
-  if (tryFn(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS)) return;
 
   parsePrecedence(PREC_ASSIGNMENT, false);
 }
