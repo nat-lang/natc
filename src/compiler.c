@@ -189,6 +189,7 @@ static void consumeQuiet(TokenType type) {
     parser.hadError = true;
 }
 
+static bool checkPrev(TokenType type) { return parser.previous.type == type; }
 static bool check(TokenType type) { return parser.current.type == type; }
 static bool peek(TokenType type) { return parser.next.type == type; }
 
@@ -663,6 +664,15 @@ static void variable(bool canAssign) {
   namedVariable(parser.previous, canAssign);
 }
 
+static void infix(bool canAssign) {
+  variable(canAssign);
+
+  if (penultWhite() && prevWhite()) {
+    expression();
+    emitByte(OP_CALL_INFIX);
+  }
+}
+
 static Token syntheticToken(const char* text) {
   Token token;
   token.start = text;
@@ -853,6 +863,10 @@ static void method() {
 
   function(type);
   emitConstInstr(OP_METHOD, constant);
+
+  if (!checkPrev(TOKEN_RIGHT_BRACE)) {
+    consume(TOKEN_SEMICOLON, "Expect ';' after method with expression body.");
+  }
 }
 
 // Parse an iterator and store the details in an
@@ -1447,7 +1461,7 @@ ParseRule rules[] = {
     [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
+    [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, and_, PREC_AND},
@@ -1484,9 +1498,13 @@ static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   prefixRule(canAssign);
 
-  if (whiteSensitive && prevWhite()) return;
-
-  while (precedence <= getRule(parser.current.type)->precedence) {
+  while (
+      // not white delimited and
+      !(whiteSensitive && prevWhite()) &&
+      // identifier used as an infix (revisit this)
+      ((parser.current.type == TOKEN_IDENTIFIER && precedence <= PREC_FACTOR) ||
+       // or grammatical infix.
+       precedence <= getRule(parser.current.type)->precedence)) {
     advance();
     ParseFn infixRule = getRule(parser.previous.type)->infix;
     infixRule(canAssign);

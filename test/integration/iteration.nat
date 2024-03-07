@@ -32,7 +32,7 @@ class Iterable {
     this[2] = "c";
   }
 
-  __iter__() => Iterator([this[0], this[1], this[2]], 0, 3)
+  __iter__() => Iterator([this[0], this[1], this[2]], 0, 3);
 }
 
 for (x in Iterable()) { 

@@ -1,0 +1,11 @@
+
+let f = (a,b) => a + b;
+let g = (a,b) => a * b;
+
+assert((1 f 2) == 3);
+assert((1 g 2) == 2);
+
+let k = (a) => a + 1;
+let x = (a, b) => a * b;
+
+assert(k(1 x 2) == 3);

@@ -7,13 +7,15 @@ class Iterator {
     this.end = end;
   }
 
-  more() => this.idx != this.end next() => {
+  more() => this.idx != this.end;
+
+  next() => {
     let value = this.seq[this.idx];
     this.idx = this.idx + 1;
     return value;
   }
 
-  __len__() => this.end - this.idx
+  __len__() => this.end - this.idx;
 }
 
 let iter = (object) => {

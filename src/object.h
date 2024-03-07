@@ -48,12 +48,19 @@ struct Obj {
   struct Obj *next;
 };
 
+typedef enum {
+  FIX_PRE,
+  FIX_AFF,
+  FIX_SUF,
+} FunctionFixity;
+
 typedef struct {
   Obj obj;
   int arity;
   int upvalueCount;
   Chunk chunk;
   ObjString *name;
+  FunctionFixity fixity;
 } ObjFunction;
 
 typedef bool (*NativeFn)(int argCount, Value *args);

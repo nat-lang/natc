@@ -137,8 +137,15 @@ static TokenType identifierType() {
             return checkpointKeyword(1, 1, "f", TOKEN_IF);
           case 'm':
             return checkpointKeyword(2, 4, "port", TOKEN_IMPORT);
-          case 'n':
+          case 'n': {
+            if (scanner.current - scanner.start > 2) {
+              switch (scanner.start[2]) {
+                case 'f':
+                  return checkpointKeyword(2, 3, "infix", TOKEN_INFIX);
+              }
+            }
             return checkpointKeyword(1, 1, "n", TOKEN_IN);
+          }
         }
       }
       break;

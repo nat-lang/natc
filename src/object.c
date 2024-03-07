@@ -61,6 +61,7 @@ ObjFunction* newFunction() {
   function->arity = 0;
   function->upvalueCount = 0;
   function->name = NULL;
+  function->fixity = FIX_PRE;
   initChunk(&function->chunk);
   return function;
 }
@@ -355,7 +356,8 @@ void printObject(Value value) {
       printFunction(AS_FUNCTION(value));
       break;
     case OBJ_INSTANCE:
-      printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars, AS_INSTANCE(value));
+      printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
+             AS_INSTANCE(value));
       break;
     case OBJ_MAP:
       printMap(AS_MAP(value));
