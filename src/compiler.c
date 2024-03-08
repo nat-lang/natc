@@ -377,7 +377,7 @@ static void statement();
 static void declaration();
 static void classDeclaration();
 static ParseRule* getRule(Token token);
-static void _parsePrecedence(Precedence precedence, DelimitFn fn);
+static void parseDelimitedPrecedence(Precedence precedence, DelimitFn fn);
 static void parsePrecedence(Precedence precedence);
 
 static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
@@ -814,7 +814,7 @@ static void boundExpression(bool isInfix) {
 static void whiteDelimitedExpression() {
   if (tryFunction(TYPE_ANONYMOUS)) return;
 
-  _parsePrecedence(PREC_ASSIGNMENT, prevWhite);
+  parseDelimitedPrecedence(PREC_ASSIGNMENT, prevWhite);
 }
 
 static void expression() {
@@ -1238,18 +1238,28 @@ static void classDeclaration() {
 }
 
 static void letDeclaration() {
-  bool isInfix = false;
+  int infixPrecedence = -1;
 
   if (check(TOKEN_INFIX)) {
     if (current->enclosing != NULL) error("Can only infix globals.");
     advance();
-    isInfix = true;
+
+    if (check(TOKEN_LEFT_PAREN)) {
+      advance();
+      consume(TOKEN_NUMBER, "Expect numeral precedence.");
+
+      infixPrecedence = strtod(parser.previous.start, NULL);
+
+      consume(TOKEN_RIGHT_PAREN, "Expect closing ')'.");
+    } else {
+      infixPrecedence = PREC_CALL;
+    }
   }
 
   uint8_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
-    boundExpression(isInfix);
+    boundExpression(infixPrecedence != -1);
   } else {
     emitByte(OP_NIL);
   }
@@ -1257,8 +1267,8 @@ static void letDeclaration() {
 
   defineVariable(var);
 
-  if (isInfix) {
-    parser.infixes[var] = PREC_CALL;
+  if (infixPrecedence != -1) {
+    parser.infixes[var] = infixPrecedence;
   }
 }
 
@@ -1535,7 +1545,7 @@ static ParseRule* getRule(Token token) {
   return &rules[token.type];
 }
 
-static void _parsePrecedence(Precedence precedence, DelimitFn delimit) {
+static void parseDelimitedPrecedence(Precedence precedence, DelimitFn delimit) {
   advance();
 
   ParseFn prefixRule = getRule(parser.previous)->prefix;
@@ -1567,7 +1577,7 @@ static void _parsePrecedence(Precedence precedence, DelimitFn delimit) {
 }
 
 static void parsePrecedence(Precedence precedence) {
-  _parsePrecedence(precedence, NULL);
+  parseDelimitedPrecedence(precedence, NULL);
 }
 
 ObjFunction* compile(const char* source, char* path) {

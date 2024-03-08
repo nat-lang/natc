@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "common.h"
-
 Scanner scanner;
 
 Scanner initScanner(const char *source) {
