@@ -122,7 +122,15 @@ static TokenType identifierType() {
     case 'c':
       return checkpointKeyword(1, 4, "lass", TOKEN_CLASS);
     case 'e':
-      return checkpointKeyword(1, 3, "lse", TOKEN_ELSE);
+      if (scanner.current - scanner.start > 1) {
+        switch (scanner.start[1]) {
+          case 'l':
+            return checkpointKeyword(2, 2, "se", TOKEN_ELSE);
+          case 'x':
+            return checkpointKeyword(2, 5, "tends", TOKEN_EXTENDS);
+        }
+      }
+      break;
     case 'f':
       if (scanner.current - scanner.start > 1) {
         switch (scanner.start[1]) {

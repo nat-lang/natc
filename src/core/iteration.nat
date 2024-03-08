@@ -1,4 +1,4 @@
-class IterationProtocolError < Error {}
+class IterationProtocolError extends Error {}
 
 class Iterator {
   init(seq, start, end) => {

@@ -1,4 +1,4 @@
-class AssertionFailure < Error {}
+class AssertionFailure extends Error {}
 
 let assert = (condition) => {
   if (!condition) throw AssertionFailure("");

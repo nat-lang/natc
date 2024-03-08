@@ -12,6 +12,10 @@ assert(&(2,2) == 4);
 // as arguments.
 assert(&(2 & 2, 2 & 2) == 8);
 
+// variable operands.
+let a = 2;
+assert(a & a == 4);
+
 // with objects as operands.
 & = (set1, set2) => set1.union(set2);
 

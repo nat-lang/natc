@@ -1,6 +1,6 @@
 
 
-class Object < __obj__ {
+class Object extends __obj__ {
   __iter__() => Iterator(this.entries(), 0, len(this));
 
   // The native `entries` function returns raw sequence

@@ -1,5 +1,5 @@
 
-class Sequence < Object {
+class Sequence extends Object {
   __get__(idx) => this.values[idx];
   __set__(idx, val) => {
     this.values[idx] = val;

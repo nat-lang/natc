@@ -1,5 +1,5 @@
 
-class Set < Object {
+class Set extends Object {
   // Calling a set is shorthand for the membership predicate,
   // so that the set behaves like its characteristic function.
   call(element) => element in this;
