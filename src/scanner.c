@@ -146,7 +146,7 @@ static TokenType identifierType() {
             if (scanner.current - scanner.start > 2) {
               switch (scanner.start[2]) {
                 case 'f':
-                  return checkpointKeyword(2, 3, "infix", TOKEN_INFIX);
+                  return checkpointKeyword(3, 2, "ix", TOKEN_INFIX);
               }
             }
             return checkpointKeyword(1, 1, "n", TOKEN_IN);

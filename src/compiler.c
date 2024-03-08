@@ -4,10 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
-#include "memory.h"
-#include "scanner.h"
-
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
@@ -22,6 +18,9 @@ typedef struct {
 
   bool hadError;
   bool panicMode;
+
+  // map from constants to precedences.
+  int infixes[UINT16_COUNT];
 } Parser;
 
 typedef enum {
@@ -152,6 +151,10 @@ static void initParser(Scanner scanner) {
   parser.panicMode = false;
   parser.current = scanToken();
   parser.next = scanToken();
+
+  for (int i = 0; i < UINT16_COUNT; i++) {
+    parser.infixes[i] = -1;
+  }
 }
 
 static void shiftParser() {
@@ -251,15 +254,20 @@ static void emitReturn() {
   emitByte(OP_RETURN);
 }
 
-static uint8_t makeConstant(Value value) {
-  bool hashable = (value.type == VAL_BOOL || value.type == VAL_NIL ||
-                   value.type == VAL_NUMBER || IS_STRING(value));
+static int getConstant(Value value) {
   Value existing;
 
-  if (hashable && mapGet(current->constants, value, &existing) &&
+  if (isHashable(value) && mapGet(current->constants, value, &existing) &&
       IS_NUMBER(existing)) {
-    return (uint8_t)AS_NUMBER(existing);
+    return (uint16_t)AS_NUMBER(existing);
   }
+
+  return -1;
+}
+
+static uint8_t makeConstant(Value value) {
+  int existing = getConstant(value);
+  if (existing != -1) return existing;
 
   int constant = addConstant(currentChunk(), value);
   if (constant > UINT16_MAX) {
@@ -267,7 +275,8 @@ static uint8_t makeConstant(Value value) {
     return 0;
   }
 
-  if (hashable) mapSet(current->constants, value, NUMBER_VAL(constant));
+  if (isHashable(value))
+    mapSet(current->constants, value, NUMBER_VAL(constant));
 
   return (uint16_t)constant;
 }
@@ -363,18 +372,22 @@ static void endScope() {
 
 static void function(FunctionType type);
 static void expression();
-static void boundExpression();
+static void boundExpression(bool isInfix);
 static void statement();
 static void declaration();
 static void classDeclaration();
-static ParseRule* getRule(TokenType type);
+static ParseRule* getRule(Token token);
 static void _parsePrecedence(Precedence precedence, DelimitFn fn);
 static void parsePrecedence(Precedence precedence);
 
 static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
 
-static uint8_t identifierConstant(Token* name) {
-  return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+static Value identifierToken(Token token) {
+  return OBJ_VAL(copyString(token.start, token.length));
+}
+
+static uint8_t identifierConstant(Token* token) {
+  return makeConstant(identifierToken(*token));
 }
 
 static bool identifiersEqual(Token* a, Token* b) {
@@ -491,7 +504,7 @@ static uint8_t argumentList() {
 
 static void binary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
-  ParseRule* rule = getRule(operatorType);
+  ParseRule* rule = getRule(parser.previous);
   parsePrecedence((Precedence)(rule->precedence + 1));
 
   switch (operatorType) {
@@ -667,10 +680,12 @@ static void variable(bool canAssign) {
 }
 
 static void infix(bool canAssign) {
+  ParseRule* rule = getRule(parser.previous);
+
   variable(canAssign);
 
   if (penultWhite() && prevWhite()) {
-    expression();
+    parsePrecedence((Precedence)(rule->precedence + 1));
     emitByte(OP_CALL_INFIX);
   }
 }
@@ -788,8 +803,10 @@ static bool tryFunction(FunctionType fnType) {
   return false;
 }
 
-static void boundExpression() {
+static void boundExpression(bool isInfix) {
   if (tryFunction(TYPE_BOUND)) return;
+
+  if (isInfix) error("Can only infix a function.");
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -1221,16 +1238,28 @@ static void classDeclaration() {
 }
 
 static void letDeclaration() {
+  bool isInfix = false;
+
+  if (check(TOKEN_INFIX)) {
+    if (current->enclosing != NULL) error("Can only infix globals.");
+    advance();
+    isInfix = true;
+  }
+
   uint8_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
-    boundExpression();
+    boundExpression(isInfix);
   } else {
     emitByte(OP_NIL);
   }
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
   defineVariable(var);
+
+  if (isInfix) {
+    parser.infixes[var] = PREC_CALL;
+  }
 }
 
 static void expressionStatement() {
@@ -1486,12 +1515,31 @@ ParseRule rules[] = {
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
 };
 
-static ParseRule* getRule(TokenType type) { return &rules[type]; }
+// Simply look up the rule for the [token]'s type, unless the
+// [token] is an identifier, in which case check the parser's
+// infix table for a user-defined infixation precedence.
+static ParseRule* getRule(Token token) {
+  if (token.type == TOKEN_IDENTIFIER) {
+    int constant = getConstant(identifierToken(token));
+    int prec = parser.infixes[constant];
+
+    if (prec == -1) {
+      rules[TOKEN_IDENTIFIER].infix = NULL;
+      rules[TOKEN_IDENTIFIER].precedence = PREC_NONE;
+    } else {
+      rules[TOKEN_IDENTIFIER].infix = infix;
+      rules[TOKEN_IDENTIFIER].precedence = prec;
+    }
+  }
+
+  return &rules[token.type];
+}
 
 static void _parsePrecedence(Precedence precedence, DelimitFn delimit) {
   advance();
 
-  ParseFn prefixRule = getRule(parser.previous.type)->prefix;
+  ParseFn prefixRule = getRule(parser.previous)->prefix;
+
   if (prefixRule == NULL) {
     error("Expect expression.");
     return;
@@ -1500,15 +1548,16 @@ static void _parsePrecedence(Precedence precedence, DelimitFn delimit) {
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   prefixRule(canAssign);
 
-  while (
-      // not delimited and
-      !(delimit != NULL && delimit()) &&
-      // identifier used as an infix
-      ((parser.current.type == TOKEN_IDENTIFIER && precedence <= PREC_FACTOR) ||
-       // or grammatical infix.
-       precedence <= getRule(parser.current.type)->precedence)) {
+  while (!(delimit != NULL && delimit()) &&
+         precedence <= getRule(parser.current)->precedence) {
     advance();
-    ParseFn infixRule = getRule(parser.previous.type)->infix;
+    ParseFn infixRule = getRule(parser.previous)->infix;
+
+    if (infixRule == NULL) {
+      error("Expect expression.");
+      return;
+    }
+
     infixRule(canAssign);
   }
 
@@ -1533,6 +1582,7 @@ ObjFunction* compile(const char* source, char* path) {
   }
 
   ObjFunction* function = endCompiler();
+
   return parser.hadError ? NULL : function;
 }
 
