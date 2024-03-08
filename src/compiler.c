@@ -18,9 +18,6 @@ typedef struct {
 
   bool hadError;
   bool panicMode;
-
-  // map from constants to precedences.
-  int infixes[UINT16_COUNT];
 } Parser;
 
 typedef enum {
@@ -96,6 +93,12 @@ Parser parser;
 Compiler* current = NULL;
 ClassCompiler* currentClass = NULL;
 
+// map from constants to precedences.
+ObjMap* infixes = NULL;
+
+void initInfixes() { infixes = newMap(); }
+void freeInfixes() { freeMap(infixes); }
+
 static Chunk* currentChunk() { return &current->function->chunk; }
 
 static Parser saveParser() {
@@ -151,10 +154,6 @@ static void initParser(Scanner scanner) {
   parser.panicMode = false;
   parser.current = scanToken();
   parser.next = scanToken();
-
-  for (int i = 0; i < UINT16_COUNT; i++) {
-    parser.infixes[i] = -1;
-  }
 }
 
 static void shiftParser() {
@@ -1255,7 +1254,6 @@ static void letDeclaration() {
       infixPrecedence = PREC_CALL;
     }
   }
-
   uint8_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
@@ -1268,7 +1266,8 @@ static void letDeclaration() {
   defineVariable(var);
 
   if (infixPrecedence != -1) {
-    parser.infixes[var] = infixPrecedence;
+    Value name = currentChunk()->constants.values[var];
+    mapSet(infixes, name, NUMBER_VAL(infixPrecedence));
   }
 }
 
@@ -1530,15 +1529,15 @@ ParseRule rules[] = {
 // infix table for a user-defined infixation precedence.
 static ParseRule* getRule(Token token) {
   if (token.type == TOKEN_IDENTIFIER) {
-    int constant = getConstant(identifierToken(token));
-    int prec = parser.infixes[constant];
+    Value name = identifierToken(token);
+    Value prec;
 
-    if (prec == -1) {
+    if (mapGet(infixes, name, &prec)) {
+      rules[TOKEN_IDENTIFIER].infix = infix;
+      rules[TOKEN_IDENTIFIER].precedence = AS_NUMBER(prec);
+    } else {
       rules[TOKEN_IDENTIFIER].infix = NULL;
       rules[TOKEN_IDENTIFIER].precedence = PREC_NONE;
-    } else {
-      rules[TOKEN_IDENTIFIER].infix = infix;
-      rules[TOKEN_IDENTIFIER].precedence = prec;
     }
   }
 

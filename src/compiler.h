@@ -10,5 +10,7 @@
 
 ObjFunction* compile(const char* source, char* path);
 void markCompilerRoots();
+void initInfixes();
+void freeInfixes();
 
 #endif

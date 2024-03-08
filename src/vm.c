@@ -94,7 +94,9 @@ bool initVM() {
   vm.seqClass = NULL;
   vm.objClass = NULL;
 
-  return initializeCore(&vm) == INTERPRET_OK;
+  initInfixes();
+
+  return initializeCore() == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -109,6 +111,7 @@ void freeVM() {
   vm.lengthString = NULL;
   vm.equalString = NULL;
   freeObjects();
+  freeInfixes();
 }
 
 void vmPush(Value value) {
