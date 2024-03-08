@@ -39,6 +39,7 @@ typedef enum {
 } Precedence;
 
 typedef void (*ParseFn)(bool canAssign);
+typedef bool (*DelimitFn)();
 
 typedef struct {
   ParseFn prefix;
@@ -189,7 +190,7 @@ static void consumeQuiet(TokenType type) {
     parser.hadError = true;
 }
 
-static bool checkPrev(TokenType type) { return parser.previous.type == type; }
+static bool prev(TokenType type) { return parser.previous.type == type; }
 static bool check(TokenType type) { return parser.current.type == type; }
 static bool peek(TokenType type) { return parser.next.type == type; }
 
@@ -367,7 +368,8 @@ static void statement();
 static void declaration();
 static void classDeclaration();
 static ParseRule* getRule(TokenType type);
-static void parsePrecedence(Precedence precedence, bool whiteSensitive);
+static void _parsePrecedence(Precedence precedence, DelimitFn fn);
+static void parsePrecedence(Precedence precedence);
 
 static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
 
@@ -490,7 +492,7 @@ static uint8_t argumentList() {
 static void binary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
   ParseRule* rule = getRule(operatorType);
-  parsePrecedence((Precedence)(rule->precedence + 1), false);
+  parsePrecedence((Precedence)(rule->precedence + 1));
 
   switch (operatorType) {
     case TOKEN_BANG_EQUAL:
@@ -597,7 +599,7 @@ static void and_(bool canAssign) {
   int endJump = emitJump(OP_JUMP_IF_FALSE);
 
   emitByte(OP_POP);
-  parsePrecedence(PREC_AND, false);
+  parsePrecedence(PREC_AND);
 
   patchJump(endJump);
 }
@@ -609,7 +611,7 @@ static void or_(bool canAssign) {
   patchJump(elseJump);
   emitByte(OP_POP);
 
-  parsePrecedence(PREC_OR, false);
+  parsePrecedence(PREC_OR);
   patchJump(endJump);
 }
 
@@ -716,7 +718,7 @@ static void unary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
   // Compile the operand.
-  parsePrecedence(PREC_UNARY, false);
+  parsePrecedence(PREC_UNARY);
 
   // Emit the operator instruction.
   switch (operatorType) {
@@ -789,19 +791,19 @@ static bool tryFunction(FunctionType fnType) {
 static void boundExpression() {
   if (tryFunction(TYPE_BOUND)) return;
 
-  parsePrecedence(PREC_ASSIGNMENT, false);
+  parsePrecedence(PREC_ASSIGNMENT);
 }
 
 static void whiteDelimitedExpression() {
   if (tryFunction(TYPE_ANONYMOUS)) return;
 
-  parsePrecedence(PREC_ASSIGNMENT, true);
+  _parsePrecedence(PREC_ASSIGNMENT, prevWhite);
 }
 
 static void expression() {
   if (tryFunction(TYPE_ANONYMOUS)) return;
 
-  parsePrecedence(PREC_ASSIGNMENT, false);
+  parsePrecedence(PREC_ASSIGNMENT);
 }
 
 static void block() {
@@ -864,7 +866,7 @@ static void method() {
   function(type);
   emitConstInstr(OP_METHOD, constant);
 
-  if (!checkPrev(TOKEN_RIGHT_BRACE)) {
+  if (!prev(TOKEN_RIGHT_BRACE)) {
     consume(TOKEN_SEMICOLON, "Expect ';' after method with expression body.");
   }
 }
@@ -1027,7 +1029,7 @@ static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
   Parser checkpointA = saveParser();
 
   if (advanceToPipe(initialBraceDepth, initialBracketDepth)) {
-    consume(TOKEN_PIPE, "Expect '|' between body and conditions.");
+    advance();  // eat the pipe.
 
     // the comprehension instance is on top of the stack now;
     // we'll need to refer to it when we hit the bottom
@@ -1486,7 +1488,7 @@ ParseRule rules[] = {
 
 static ParseRule* getRule(TokenType type) { return &rules[type]; }
 
-static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
+static void _parsePrecedence(Precedence precedence, DelimitFn delimit) {
   advance();
 
   ParseFn prefixRule = getRule(parser.previous.type)->prefix;
@@ -1499,9 +1501,9 @@ static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
   prefixRule(canAssign);
 
   while (
-      // not white delimited and
-      !(whiteSensitive && prevWhite()) &&
-      // identifier used as an infix (revisit this)
+      // not delimited and
+      !(delimit != NULL && delimit()) &&
+      // identifier used as an infix
       ((parser.current.type == TOKEN_IDENTIFIER && precedence <= PREC_FACTOR) ||
        // or grammatical infix.
        precedence <= getRule(parser.current.type)->precedence)) {
@@ -1513,6 +1515,10 @@ static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
   if (canAssign && match(TOKEN_EQUAL)) {
     error("Invalid assignment target.");
   }
+}
+
+static void parsePrecedence(Precedence precedence) {
+  _parsePrecedence(precedence, NULL);
 }
 
 ObjFunction* compile(const char* source, char* path) {

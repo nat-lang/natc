@@ -9,3 +9,7 @@ let k = (a) => a + 1;
 let x = (a, b) => a * b;
 
 assert(k(1 x 2) == 3);
+
+let & = (set1, set2) => set1.union(set2);
+
+assert({1,2,3} & {4,5,6} == {1,2,3,4,5,6});

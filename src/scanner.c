@@ -32,6 +32,11 @@ static bool isAlpha(char c) {
 
 static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
+bool isSymbol(char c) {
+  return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
+          c == '?' || c == '$' || c == '\'');
+}
+
 static bool isAtEnd() { return *scanner.current == '\0'; }
 
 static char advance() {
@@ -188,7 +193,7 @@ static TokenType identifierType() {
 }
 
 static Token identifier() {
-  while (isAlpha(peek()) || isDigit(peek())) advance();
+  while (isAlpha(peek()) || isDigit(peek()) || isSymbol(peek())) advance();
   return makeToken(identifierType());
 }
 
@@ -233,7 +238,7 @@ Token scanToken() {
 
   char c = advance();
 
-  if (isAlpha(c)) return identifier();
+  if (isAlpha(c) || isSymbol(c)) return identifier();
   if (isDigit(c)) return number();
 
   switch (c) {
