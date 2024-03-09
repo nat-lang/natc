@@ -1,4 +1,5 @@
 import src/core/error
+import src/core/math
 import src/core/iteration
 import src/core/object
 import src/core/sequence
@@ -6,3 +7,4 @@ import src/core/map
 import src/core/set
 import src/core/tree
 import src/core/assertion
+import src/core/functional

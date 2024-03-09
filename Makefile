@@ -14,12 +14,16 @@ clean:
 nat:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 
+# Compile the interpreter in debug mode.
+nat-debug:
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
+
 # Compile and symlink to local bin.
 dev:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(BIN)/nat
 
-# Compile the interpreter with verbosity=debug.
+# Compile the interpreter in debug mode and symlink to local bin.
 debug:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(BIN)/nat
@@ -29,14 +33,18 @@ debug-gc:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-gc SOURCE_DIR=src
 	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(BIN)/nat
 
-# Compile the interpreter and run the tests.
-ci:
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
+# Run all the tests.
+integration:
 	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
 
 # Run all the tests.
+trip:
+	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/trip/__index__ && echo "ok"
+
+# Run all the tests.
 tests:
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
+	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "integration ok"
+	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/trip/__index__ && echo "trip        ok"
 
 test-leaks:
 	@ leaks --atExit -- $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"

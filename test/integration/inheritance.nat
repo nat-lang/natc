@@ -15,7 +15,7 @@ class A {
   }
 }
 
-class B < A {
+class B extends A {
   conclude() => {
     return 1;
   }
@@ -31,7 +31,7 @@ class A {
   }
 }
 
-class B < A {
+class B extends A {
   method() => {
     return "B";
   }
@@ -41,7 +41,7 @@ class B < A {
   }
 }
 
-class C < B {}
+class C extends B {}
 
 assert(C().method() == "B");
 assert(C().test() == "A");
@@ -54,7 +54,7 @@ class A {
   }
 }
 
-class B < A {
+class B extends A {
   method() => {
     let closure = super.method;
     

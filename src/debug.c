@@ -102,10 +102,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_GET_PROPERTY", chunk, offset);
     case OP_SET_PROPERTY:
       return constantInstruction("OP_SET_PROPERTY", chunk, offset);
-    case OP_SUBSCRIPT_GET:
-      return simpleInstruction("OP_SUBSCRIPT_GET", offset);
-    case OP_SUBSCRIPT_SET:
-      return simpleInstruction("OP_SUBSCRIPT_SET", offset);
     case OP_GET_SUPER:
       return constantInstruction("OP_GET_SUPER", chunk, offset);
     case OP_EQUAL:
@@ -136,6 +132,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return jumpInstruction("OP_LOOP", -1, chunk, offset);
     case OP_CALL:
       return byteInstruction("OP_CALL", chunk, offset);
+    case OP_CALL_INFIX:
+      return simpleInstruction("OP_CALL_INFIX", offset);
     case OP_INVOKE:
       return invokeInstruction("OP_INVOKE", chunk, offset);
     case OP_SUPER_INVOKE:
@@ -174,6 +172,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_IMPORT", offset);
     case OP_THROW:
       return simpleInstruction("OP_THROW", offset);
+    case OP_SUBSCRIPT_GET:
+      return simpleInstruction("OP_SUBSCRIPT_GET", offset);
+    case OP_SUBSCRIPT_SET:
+      return simpleInstruction("OP_SUBSCRIPT_SET", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

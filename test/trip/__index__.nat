@@ -1,0 +1,5 @@
+// Trip tests, inspired by https://mirror.las.iastate.edu/tex-archive/info/knuth-pdf/tex/tripman.pdf.
+// These tests target syntax and behavior that no one would ever
+// want or need to concoct, but that are nevertheless valid nat.
+
+import test/trip/tree

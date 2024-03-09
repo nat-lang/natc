@@ -1,8 +1,8 @@
 
-class Set < Object {
+class Set extends Object {
   // Calling a set is shorthand for the membership predicate,
   // so that the set behaves like its characteristic function.
-  call(element) => element in this
+  call(element) => element in this;
 
   setKeyHash(key) => {
     if (type(key) == Set) 
@@ -29,12 +29,12 @@ class Set < Object {
   }
 
   // The compiler calls this method when building a set comprehension.
-  add(element) => this.__set__(element, true)
+  add(element) => this.__set__(element, true);
 
-  elements() => this.keys()
+  elements() => this.keys();
 
   // Iteration is over elements.
-  __iter__() => iter(this.elements())
+  __iter__() => iter(this.elements());
 
   hashFor(element) => {
     if (type(element) == Set)
@@ -75,13 +75,13 @@ class Set < Object {
   }
 
   // Is [this] a proper superset of [other]?
-  supset(other) => other.subset(this)
+  supset(other) => other.subset(this);
 
   // Is [this] a superset of or equal to [other]?
-  supsetEq(other) => other.subsetEq(this) 
+  supsetEq(other) => other.subsetEq(this);
 
   // Is [this] equal to [other]?
-  __eq__(other) => this.subsetEq(other) and other.subsetEq(this)
+  __eq__(other) => this.subsetEq(other) and other.subsetEq(this);
 
   union(other) => {
     let set = {};
@@ -116,7 +116,7 @@ class Set < Object {
     return set;
   }
 
-  cp() => ({x | x in this})
+  cp() => ({x | x in this});
 
   powerset() => {
     let powerset = {};

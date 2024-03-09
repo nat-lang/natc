@@ -129,6 +129,26 @@ ObjString* copyString(const char* chars, int length) {
   return allocateString(heapChars, length, hash);
 }
 
+ObjString* takeString(char* chars, int length) {
+  uint32_t hash = hashString(chars, length);
+  ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
+  if (interned != NULL) {
+    FREE_ARRAY(char, chars, length + 1);
+    return interned;
+  }
+  return allocateString(chars, length, hash);
+}
+
+ObjString* concatenateStrings(ObjString* a, ObjString* b) {
+  int length = a->length + b->length;
+  char* chars = ALLOCATE(char, length + 1);
+  memcpy(chars, a->chars, a->length);
+  memcpy(chars + a->length, b->chars, b->length);
+  chars[length] = '\0';
+
+  return takeString(chars, length);
+}
+
 ObjString* intern(const char* chars) {
   return copyString(chars, strlen(chars));
 }
@@ -139,16 +159,6 @@ ObjUpvalue* newUpvalue(Value* slot) {
   upvalue->closed = NIL_VAL;
   upvalue->next = NULL;
   return upvalue;
-}
-
-ObjString* takeString(char* chars, int length) {
-  uint32_t hash = hashString(chars, length);
-  ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
-  if (interned != NULL) {
-    FREE_ARRAY(char, chars, length + 1);
-    return interned;
-  }
-  return allocateString(chars, length, hash);
 }
 
 static void printFunction(ObjFunction* function) {
@@ -355,7 +365,8 @@ void printObject(Value value) {
       printFunction(AS_FUNCTION(value));
       break;
     case OBJ_INSTANCE:
-      printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars, AS_INSTANCE(value));
+      printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
+             AS_INSTANCE(value));
       break;
     case OBJ_MAP:
       printMap(AS_MAP(value));

@@ -1,0 +1,11 @@
+
+// composition.
+
+let f = (a) => a + 1;
+let g = f . f;
+
+assert(g(1) == 3);
+
+let g = ((a) => a) . f;
+
+assert(g(1) == 2);

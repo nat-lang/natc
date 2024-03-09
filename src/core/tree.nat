@@ -21,9 +21,9 @@ class Tree {
   }
 
   // Subscript access is to children.
-  __get__(idx) => this.children[idx]
+  __get__(idx) => this.children[idx];
 
-  isLeaf() => len(this.children) == 0
+  isLeaf() => len(this.children) == 0;
 
   leaves() => {
     if (this.isLeaf()) return [this.data];

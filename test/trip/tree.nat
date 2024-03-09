@@ -1,0 +1,27 @@
+
+let tree =
+[    151334                             // tree[0]
+"a" "b"                                 // tree[1] tree[2]
+
+"c" [   134152 "d"                      // tree[3] tree[4][0] tree[4][1]
+
+
+[1   2 3     ] 312451 41556341          // tree[4][2][0] tree[4][2][1] tree[4][2][2] tree[4][3] tree[4][4]
+] "a" [5124125 613412     7124124]      // tree[5] tree[6][0] tree[6][1] tree[6][2]
+];
+
+assert(tree[0].data == 151334);
+assert(tree[1].data == "a");
+assert(tree[2].data == "b");
+assert(tree[3].data == "c");
+assert(tree[4][0].data == 134152);
+assert(tree[4][1].data == "d");
+assert(tree[4][2][0].data == 1);
+assert(tree[4][2][1].data == 2);
+assert(tree[4][2][2].data == 3);
+assert(tree[4][3].data == 312451);
+assert(tree[4][4].data == 41556341);
+assert(tree[5].data == "a");
+assert(tree[6][0].data == 5124125);
+assert(tree[6][1].data == 613412);
+assert(tree[6][2].data == 7124124);

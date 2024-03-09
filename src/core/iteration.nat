@@ -1,4 +1,4 @@
-class IterationProtocolError < Error {}
+class IterationProtocolError extends Error {}
 
 class Iterator {
   init(seq, start, end) => {
@@ -7,7 +7,7 @@ class Iterator {
     this.end = end;
   }
 
-  more() => this.idx != this.end
+  more() => this.idx != this.end;
 
   next() => {
     let value = this.seq[this.idx];
@@ -15,7 +15,7 @@ class Iterator {
     return value;
   }
 
-  __len__() => this.end - this.idx
+  __len__() => this.end - this.idx;
 }
 
 let iter = (object) => {

@@ -1,11 +1,11 @@
 
-class Sequence < Object {
-  __get__(idx) => this.values[idx]
+class Sequence extends Object {
+  __get__(idx) => this.values[idx];
   __set__(idx, val) => {
     this.values[idx] = val;
     return this;
   }
-  __len__() => len(this.values)
+  __len__() => len(this.values);
   __eq__(seq) => {
     if (len(this) != len(seq)) return false;
 
@@ -16,11 +16,11 @@ class Sequence < Object {
     return true;
   }
 
-  __in__(value) => value in this.values or this.has(value)
+  __in__(value) => value in this.values or this.has(value);
 
-  __iter__() => Iterator(this, 0, len(this))
+  __iter__() => Iterator(this, 0, len(this));
 
-  fmap(fn) => [fn(value) | value in this]
+  fmap(fn) => [fn(value) | value in this];
 
   fold(fn, acc) => {
     for (x in this)

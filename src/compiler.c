@@ -4,10 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
-#include "memory.h"
-#include "scanner.h"
-
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
@@ -39,6 +35,7 @@ typedef enum {
 } Precedence;
 
 typedef void (*ParseFn)(bool canAssign);
+typedef bool (*DelimitFn)();
 
 typedef struct {
   ParseFn prefix;
@@ -95,6 +92,12 @@ typedef struct ClassCompiler {
 Parser parser;
 Compiler* current = NULL;
 ClassCompiler* currentClass = NULL;
+
+// map from constants to precedences.
+ObjMap* infixes = NULL;
+
+void initInfixes() { infixes = newMap(); }
+void freeInfixes() { freeMap(infixes); }
 
 static Chunk* currentChunk() { return &current->function->chunk; }
 
@@ -175,8 +178,26 @@ static void advanceDottedIdentifier() {
   checkError();
 }
 
+static bool prev(TokenType type) { return parser.previous.type == type; }
+static bool check(TokenType type) { return parser.current.type == type; }
+static bool peek(TokenType type) { return parser.next.type == type; }
+
+// Keyword symbols that are also valid identifiers
+// aren't tokenized, so we need to check for the
+// bare string.
+static bool checkStr(char* str) {
+  return strncmp(parser.current.start, str, strlen(str)) == 0;
+}
+
 static void consume(TokenType type, const char* message) {
   if (parser.current.type == type)
+    advance();
+  else
+    errorAtCurrent(message);
+}
+
+static void consumeStr(char* str, const char* message) {
+  if (checkStr(str))
     advance();
   else
     errorAtCurrent(message);
@@ -189,8 +210,12 @@ static void consumeQuiet(TokenType type) {
     parser.hadError = true;
 }
 
-static bool check(TokenType type) { return parser.current.type == type; }
-static bool peek(TokenType type) { return parser.next.type == type; }
+static void consumeStrQuiet(char* str) {
+  if (checkStr(str))
+    advance();
+  else
+    parser.hadError = true;
+}
 
 static bool match(TokenType type) {
   if (!check(type)) return false;
@@ -198,11 +223,11 @@ static bool match(TokenType type) {
   return true;
 }
 
-static bool prevWhite() {
-  int offset = parser.previous.length + parser.current.length + 1;
+// Is there whitespace preceding the previous token?
+static bool penultWhite() { return isWhite(*(parser.previous.start - 1)); }
 
-  return isWhite(charAt(-offset));
-}
+// Is there whitespace preceding the current token?
+static bool prevWhite() { return isWhite(*(parser.current.start - 1)); }
 
 static void emitByte(uint8_t byte) {
   writeChunk(currentChunk(), byte, parser.previous.line);
@@ -249,15 +274,20 @@ static void emitReturn() {
   emitByte(OP_RETURN);
 }
 
-static uint8_t makeConstant(Value value) {
-  bool hashable = (value.type == VAL_BOOL || value.type == VAL_NIL ||
-                   value.type == VAL_NUMBER || IS_STRING(value));
+static int getConstant(Value value) {
   Value existing;
 
-  if (hashable && mapGet(current->constants, value, &existing) &&
+  if (isHashable(value) && mapGet(current->constants, value, &existing) &&
       IS_NUMBER(existing)) {
-    return (uint8_t)AS_NUMBER(existing);
+    return (uint16_t)AS_NUMBER(existing);
   }
+
+  return -1;
+}
+
+static uint8_t makeConstant(Value value) {
+  int existing = getConstant(value);
+  if (existing != -1) return existing;
 
   int constant = addConstant(currentChunk(), value);
   if (constant > UINT16_MAX) {
@@ -265,7 +295,8 @@ static uint8_t makeConstant(Value value) {
     return 0;
   }
 
-  if (hashable) mapSet(current->constants, value, NUMBER_VAL(constant));
+  if (isHashable(value))
+    mapSet(current->constants, value, NUMBER_VAL(constant));
 
   return (uint16_t)constant;
 }
@@ -361,17 +392,22 @@ static void endScope() {
 
 static void function(FunctionType type);
 static void expression();
-static void boundExpression();
+static void boundExpression(bool isInfix);
 static void statement();
 static void declaration();
 static void classDeclaration();
-static ParseRule* getRule(TokenType type);
-static void parsePrecedence(Precedence precedence, bool whiteSensitive);
+static ParseRule* getRule(Token token);
+static void parseDelimitedPrecedence(Precedence precedence, DelimitFn fn);
+static void parsePrecedence(Precedence precedence);
 
 static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
 
-static uint8_t identifierConstant(Token* name) {
-  return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+static Value identifierToken(Token token) {
+  return OBJ_VAL(copyString(token.start, token.length));
+}
+
+static uint8_t identifierConstant(Token* token) {
+  return makeConstant(identifierToken(*token));
 }
 
 static bool identifiersEqual(Token* a, Token* b) {
@@ -465,6 +501,12 @@ static int declareVariable() {
   return addLocal(*name);
 }
 
+static uint8_t nativeVariable(char* name) {
+  uint8_t var = makeConstant(identifier(name));
+  emitConstInstr(OP_GET_GLOBAL, var);
+  return var;
+}
+
 static uint8_t argumentList() {
   uint8_t argCount = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
@@ -482,8 +524,8 @@ static uint8_t argumentList() {
 
 static void binary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
-  ParseRule* rule = getRule(operatorType);
-  parsePrecedence((Precedence)(rule->precedence + 1), false);
+  ParseRule* rule = getRule(parser.previous);
+  parsePrecedence((Precedence)(rule->precedence + 1));
 
   switch (operatorType) {
     case TOKEN_BANG_EQUAL:
@@ -491,30 +533,6 @@ static void binary(bool canAssign) {
       break;
     case TOKEN_EQUAL_EQUAL:
       emitByte(OP_EQUAL);
-      break;
-    case TOKEN_GREATER:
-      emitByte(OP_GREATER);
-      break;
-    case TOKEN_GREATER_EQUAL:
-      emitBytes(OP_LESS, OP_NOT);
-      break;
-    case TOKEN_LESS:
-      emitByte(OP_LESS);
-      break;
-    case TOKEN_LESS_EQUAL:
-      emitBytes(OP_GREATER, OP_NOT);
-      break;
-    case TOKEN_PLUS:
-      emitByte(OP_ADD);
-      break;
-    case TOKEN_MINUS:
-      emitByte(OP_SUBTRACT);
-      break;
-    case TOKEN_STAR:
-      emitByte(OP_MULTIPLY);
-      break;
-    case TOKEN_SLASH:
-      emitByte(OP_DIVIDE);
       break;
     case TOKEN_IN:
       emitByte(OP_MEMBER);
@@ -529,7 +547,7 @@ static void call(bool canAssign) {
   emitBytes(OP_CALL, argCount);
 }
 
-static void dot(bool canAssign) {
+static void property(bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
   uint8_t name = identifierConstant(&parser.previous);
 
@@ -542,6 +560,21 @@ static void dot(bool canAssign) {
     emitByte(argCount);
   } else {
     emitConstInstr(OP_GET_PROPERTY, name);
+  }
+}
+
+// A dot flush against an expression is property access;
+// a dot with whitespace preceding and following it is
+// function composition. We dont require the whitespace
+// following to disambiguate the two, but we may as well
+// enforce the symmetry.
+static void dot(bool canAssign) {
+  if (penultWhite() && prevWhite()) {
+    nativeVariable("compose");
+    expression();
+    emitByte(OP_CALL_INFIX);
+  } else {
+    property(canAssign);
   }
 }
 
@@ -575,7 +608,7 @@ static void and_(bool canAssign) {
   int endJump = emitJump(OP_JUMP_IF_FALSE);
 
   emitByte(OP_POP);
-  parsePrecedence(PREC_AND, false);
+  parsePrecedence(PREC_AND);
 
   patchJump(endJump);
 }
@@ -587,7 +620,7 @@ static void or_(bool canAssign) {
   patchJump(elseJump);
   emitByte(OP_POP);
 
-  parsePrecedence(PREC_OR, false);
+  parsePrecedence(PREC_OR);
   patchJump(endJump);
 }
 
@@ -625,12 +658,6 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
-static uint8_t nativeVariable(char* name) {
-  uint8_t var = makeConstant(identifier(name));
-  emitConstInstr(OP_GET_GLOBAL, var);
-  return var;
-}
-
 static int nativeCall(char* name, int argCount) {
   int address = nativeVariable(name);
   emitBytes(OP_CALL, argCount);
@@ -646,6 +673,17 @@ static void methodCall(char* name, int argCount) {
 
 static void variable(bool canAssign) {
   namedVariable(parser.previous, canAssign);
+}
+
+static void infix(bool canAssign) {
+  ParseRule* rule = getRule(parser.previous);
+
+  variable(canAssign);
+
+  if (penultWhite() && prevWhite()) {
+    parsePrecedence((Precedence)(rule->precedence + 1));
+    emitByte(OP_CALL_INFIX);
+  }
 }
 
 static Token syntheticToken(const char* text) {
@@ -691,15 +729,12 @@ static void unary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
   // Compile the operand.
-  parsePrecedence(PREC_UNARY, false);
+  parsePrecedence(PREC_UNARY);
 
   // Emit the operator instruction.
   switch (operatorType) {
     case TOKEN_BANG:
       emitByte(OP_NOT);
-      break;
-    case TOKEN_MINUS:
-      emitByte(OP_NEGATE);
       break;
     default:
       return;  // Unreachable.
@@ -743,7 +778,7 @@ static bool peekSignature() {
     } while (match(TOKEN_COMMA));
   }
   consumeQuiet(TOKEN_RIGHT_PAREN);
-  consumeQuiet(TOKEN_ARROW);
+  consumeStrQuiet("=>");
 
   found = !parser.hadError;
 
@@ -752,7 +787,7 @@ static bool peekSignature() {
   return found;
 }
 
-static bool tryFn(FunctionType fnType) {
+static bool tryFunction(FunctionType fnType) {
   if (peekSignature()) {
     function(fnType);
     markInitialized();
@@ -761,22 +796,22 @@ static bool tryFn(FunctionType fnType) {
   return false;
 }
 
-static void boundExpression() {
-  if (tryFn(TYPE_BOUND)) return;
+static void boundExpression(bool isInfix) {
+  if (tryFunction(TYPE_BOUND)) return;
 
-  parsePrecedence(PREC_ASSIGNMENT, false);
+  parsePrecedence(PREC_ASSIGNMENT);
 }
 
 static void whiteDelimitedExpression() {
-  if (tryFn(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS)) return;
 
-  parsePrecedence(PREC_ASSIGNMENT, true);
+  parseDelimitedPrecedence(PREC_ASSIGNMENT, prevWhite);
 }
 
 static void expression() {
-  if (tryFn(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS)) return;
 
-  parsePrecedence(PREC_ASSIGNMENT, false);
+  parsePrecedence(PREC_ASSIGNMENT);
 }
 
 static void block() {
@@ -814,7 +849,7 @@ static void function(FunctionType type) {
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-  consume(TOKEN_ARROW, "Expect '=>' after signature.");
+  consumeStr("=>", "Expect '=>' after signature.");
 
   blockOrExpression();
 
@@ -838,6 +873,10 @@ static void method() {
 
   function(type);
   emitConstInstr(OP_METHOD, constant);
+
+  if (!prev(TOKEN_RIGHT_BRACE)) {
+    consume(TOKEN_SEMICOLON, "Expect ';' after method with expression body.");
+  }
 }
 
 // Parse an iterator and store the details in an
@@ -998,7 +1037,7 @@ static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
   Parser checkpointA = saveParser();
 
   if (advanceToPipe(initialBraceDepth, initialBracketDepth)) {
-    consume(TOKEN_PIPE, "Expect '|' between body and conditions.");
+    advance();  // eat the pipe.
 
     // the comprehension instance is on top of the stack now;
     // we'll need to refer to it when we hit the bottom
@@ -1152,7 +1191,7 @@ static void classDeclaration() {
   classCompiler.enclosing = currentClass;
   currentClass = &classCompiler;
 
-  if (match(TOKEN_LESS)) {
+  if (match(TOKEN_EXTENDS)) {
     consume(TOKEN_IDENTIFIER, "Expect superclass name.");
     variable(false);
 
@@ -1190,16 +1229,38 @@ static void classDeclaration() {
 }
 
 static void letDeclaration() {
+  int infixPrecedence = -1;
+
+  if (check(TOKEN_INFIX)) {
+    if (current->enclosing != NULL) error("Can only infix globals.");
+    advance();
+
+    if (check(TOKEN_LEFT_PAREN)) {
+      advance();
+      consume(TOKEN_NUMBER, "Expect numeral precedence.");
+
+      infixPrecedence = strtod(parser.previous.start, NULL);
+
+      consume(TOKEN_RIGHT_PAREN, "Expect closing ')'.");
+    } else {
+      infixPrecedence = PREC_CALL;
+    }
+  }
   uint8_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
-    boundExpression();
+    boundExpression(infixPrecedence != -1);
   } else {
     emitByte(OP_NIL);
   }
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
   defineVariable(var);
+
+  if (infixPrecedence != -1) {
+    Value name = currentChunk()->constants.values[var];
+    mapSet(infixes, name, NUMBER_VAL(infixPrecedence));
+  }
 }
 
 static void expressionStatement() {
@@ -1419,20 +1480,12 @@ ParseRule rules[] = {
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, dot, PREC_CALL},
-    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
-    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
     [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
     [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
     [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
+    [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, and_, PREC_AND},
@@ -1455,12 +1508,31 @@ ParseRule rules[] = {
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
 };
 
-static ParseRule* getRule(TokenType type) { return &rules[type]; }
+// Simply look up the rule for the [token]'s type, unless the
+// [token] is an identifier, in which case check the parser's
+// infix table for a user-defined infixation precedence.
+static ParseRule* getRule(Token token) {
+  if (token.type == TOKEN_IDENTIFIER) {
+    Value name = identifierToken(token);
+    Value prec;
 
-static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
+    if (mapGet(infixes, name, &prec)) {
+      rules[TOKEN_IDENTIFIER].infix = infix;
+      rules[TOKEN_IDENTIFIER].precedence = AS_NUMBER(prec);
+    } else {
+      rules[TOKEN_IDENTIFIER].infix = NULL;
+      rules[TOKEN_IDENTIFIER].precedence = PREC_NONE;
+    }
+  }
+
+  return &rules[token.type];
+}
+
+static void parseDelimitedPrecedence(Precedence precedence, DelimitFn delimit) {
   advance();
 
-  ParseFn prefixRule = getRule(parser.previous.type)->prefix;
+  ParseFn prefixRule = getRule(parser.previous)->prefix;
+
   if (prefixRule == NULL) {
     error("Expect expression.");
     return;
@@ -1469,17 +1541,26 @@ static void parsePrecedence(Precedence precedence, bool whiteSensitive) {
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   prefixRule(canAssign);
 
-  if (whiteSensitive && prevWhite()) return;
-
-  while (precedence <= getRule(parser.current.type)->precedence) {
+  while (!(delimit != NULL && delimit()) &&
+         precedence <= getRule(parser.current)->precedence) {
     advance();
-    ParseFn infixRule = getRule(parser.previous.type)->infix;
+    ParseFn infixRule = getRule(parser.previous)->infix;
+
+    if (infixRule == NULL) {
+      error("Expect expression.");
+      return;
+    }
+
     infixRule(canAssign);
   }
 
   if (canAssign && match(TOKEN_EQUAL)) {
     error("Invalid assignment target.");
   }
+}
+
+static void parsePrecedence(Precedence precedence) {
+  parseDelimitedPrecedence(precedence, NULL);
 }
 
 ObjFunction* compile(const char* source, char* path) {
@@ -1494,6 +1575,7 @@ ObjFunction* compile(const char* source, char* path) {
   }
 
   ObjFunction* function = endCompiler();
+
   return parser.hadError ? NULL : function;
 }
 

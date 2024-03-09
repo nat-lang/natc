@@ -131,6 +131,7 @@ ObjNative *newNative(int arity, ObjString *name, NativeFn function);
 ObjSequence *newSequence();
 ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
+ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjString *intern(const char *chars);
 ObjUpvalue *newUpvalue(Value *slot);
 void printObject(Value value);

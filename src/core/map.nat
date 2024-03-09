@@ -1,5 +1,5 @@
 
-class Map < Object {
+class Map extends Object {
   // Does each key in [this] map to the same value in [other]?
   subMap(other) => {
     for (key in this.keys()) {
