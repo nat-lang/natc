@@ -1,7 +1,7 @@
 
 let infix &;
 
-& = (a, b) => a+b;
+& = (a, b) => a + b;
 
 // simplest case.
 assert(2 & 2 == 4);
@@ -16,12 +16,12 @@ assert(&(2 & 2, 2 & 2) == 8);
 let a = 2;
 assert(a & a == 4);
 
-// with objects as operands.
+// object operands.
 & = (set1, set2) => set1.union(set2);
 
 assert({1,2,3} & {4,5,6} == {1,2,3,4,5,6});
 
-// with functions as operands.
+// function operands.
 let infix ~ = (f, g) => (x) => f(g(x));
 
 assert((((a) => a + 1) ~ ((a) => a + 1))(0) == 2);
@@ -34,3 +34,11 @@ let infix(7) times = (a,b) => a * b;
 assert(5 plus 5 == 10);
 assert(5 times 5 == 25);
 assert(5 plus 5 times 2 == 15);
+
+// dependency.
+
+let infix(5) f = __add__;
+assert(1 f 1 == 2);
+
+let infix g = >;
+assert(1 g 1 == false);

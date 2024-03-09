@@ -294,23 +294,6 @@ static bool isFalsey(Value value) {
   return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
-static void concatenate() {
-  ObjString* b = AS_STRING(vmPeek(0));
-  ObjString* a = AS_STRING(vmPeek(1));
-
-  int length = a->length + b->length;
-  char* chars = ALLOCATE(char, length + 1);
-  memcpy(chars, a->chars, a->length);
-  memcpy(chars + a->length, b->chars, b->length);
-  chars[length] = '\0';
-
-  ObjString* result = takeString(chars, length);
-  vmPop();
-  vmPop();
-
-  vmPush(OBJ_VAL(result));
-}
-
 static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   if (!IS_INTEGER(idx)) {
     runtimeError("Sequences must be indexed by integer.");
@@ -345,16 +328,6 @@ static InterpretResult loop() {
 #define READ_CONSTANT() \
   (frame->closure->function->chunk.constants.values[READ_SHORT()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
-#define BINARY_OP(valueType, op)                          \
-  do {                                                    \
-    if (!IS_NUMBER(vmPeek(0)) || !IS_NUMBER(vmPeek(1))) { \
-      runtimeError("Operands must be numbers.");          \
-      return INTERPRET_RUNTIME_ERROR;                     \
-    }                                                     \
-    double b = AS_NUMBER(vmPop());                        \
-    double a = AS_NUMBER(vmPop());                        \
-    vmPush(valueType(a op b));                            \
-  } while (false)
 
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -500,37 +473,10 @@ static InterpretResult loop() {
         *frame->closure->upvalues[slot]->location = vmPeek(0);
         break;
       }
-      case OP_GREATER:
-        BINARY_OP(BOOL_VAL, >);
-        break;
-      case OP_LESS:
-        BINARY_OP(BOOL_VAL, <);
-        break;
-      case OP_ADD: {
-        if (IS_STRING(vmPeek(0)) && IS_STRING(vmPeek(1))) {
-          concatenate();
-        } else if (IS_NUMBER(vmPeek(0)) && IS_NUMBER(vmPeek(1))) {
-          double b = AS_NUMBER(vmPop());
-          double a = AS_NUMBER(vmPop());
-          vmPush(NUMBER_VAL(a + b));
-        } else {
-          runtimeError("Operands must be two numbers or two strings.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
-        break;
-      }
-      case OP_SUBTRACT:
-        BINARY_OP(NUMBER_VAL, -);
-        break;
-      case OP_MULTIPLY:
-        BINARY_OP(NUMBER_VAL, *);
-        break;
-      case OP_DIVIDE:
-        BINARY_OP(NUMBER_VAL, /);
-        break;
       case OP_NOT:
         vmPush(BOOL_VAL(isFalsey(vmPop())));
         break;
+      // unreachable.
       case OP_NEGATE:
         if (!IS_NUMBER(vmPeek(0))) {
           runtimeError("Operand must be a number.");
@@ -838,7 +784,6 @@ static InterpretResult loop() {
 #undef READ_SHORT
 #undef READ_CONSTANT
 #undef READ_STRING
-#undef BINARY_OP
 }
 
 InterpretResult interpret(char* path, const char* source) {

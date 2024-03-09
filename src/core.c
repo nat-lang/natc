@@ -1,14 +1,8 @@
+#include "core.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
-#include "compiler.h"
-#include "debug.h"
-#include "io.h"
-#include "object.h"
-#include "value.h"
-#include "vm.h"
 
 static void defineNative(ObjString* name, Value native, ObjMap* dest) {
   vmPush(OBJ_VAL(name));
@@ -234,6 +228,39 @@ bool __type__(int argCount, Value* args) {
   return true;
 }
 
+BINARY_NATIVE(gt__, BOOL_VAL, >);
+BINARY_NATIVE(lt__, BOOL_VAL, <);
+BINARY_NATIVE(gte__, BOOL_VAL, >=);
+BINARY_NATIVE(lte__, BOOL_VAL, <=);
+
+BINARY_NATIVE(sub__, NUMBER_VAL, -);
+BINARY_NATIVE(div__, NUMBER_VAL, /);
+BINARY_NATIVE(mul__, NUMBER_VAL, *);
+
+bool __add__(int argCount, Value* args) {
+  if (IS_STRING(vmPeek(0)) && IS_STRING(vmPeek(1))) {
+    // can't pop them until after the concatenation,
+    // which allocates memory for the new string.
+    ObjString* b = AS_STRING(vmPeek(0));
+    ObjString* a = AS_STRING(vmPeek(1));
+
+    ObjString* result = concatenateStrings(a, b);
+    vmPop();
+    vmPop();
+    vmPop();  // fn
+    vmPush(OBJ_VAL(result));
+  } else if (IS_NUMBER(vmPeek(0)) && IS_NUMBER(vmPeek(1))) {
+    double b = AS_NUMBER(vmPop());
+    double a = AS_NUMBER(vmPop());
+    vmPop();  // fn
+    vmPush(NUMBER_VAL(a + b));
+  } else {
+    runtimeError("Operands must be two numbers or two strings.");
+    return false;
+  }
+  return true;
+}
+
 InterpretResult initializeCore() {
   // native functions.
 
@@ -242,6 +269,15 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("setHash"), 2, __setHash__, &vm.globals);
   defineNativeFn(intern("type"), 1, __type__, &vm.globals);
   defineNativeFn(intern("entries"), 1, __objEntries__, &vm.globals);
+
+  defineNativeFn(intern("__gt__"), 2, __gt__, &vm.globals);
+  defineNativeFn(intern("__lt__"), 2, __lt__, &vm.globals);
+  defineNativeFn(intern("__gte__"), 2, __gte__, &vm.globals);
+  defineNativeFn(intern("__lte__"), 2, __lte__, &vm.globals);
+  defineNativeFn(intern("__add__"), 2, __add__, &vm.globals);
+  defineNativeFn(intern("__sub__"), 2, __sub__, &vm.globals);
+  defineNativeFn(intern("__div__"), 2, __div__, &vm.globals);
+  defineNativeFn(intern("__mul__"), 2, __mul__, &vm.globals);
 
   vm.objClass = defineNativeClass(intern("__obj__"), &vm.globals);
   defineNativeFn(intern("get"), 1, __objGet__, &vm.objClass->methods);

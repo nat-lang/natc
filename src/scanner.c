@@ -30,10 +30,13 @@ static bool isAlpha(char c) {
 
 static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
-bool isSymbol(char c) {
+bool isIdentifierSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
-          c == '?' || c == '$' || c == '\'');
+          c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
+          c == '+' || c == '-' || c == '/' || c == '*');
 }
+
+bool isSymbol(char c) { return isIdentifierSymbol(c) || (c == '='); }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }
 
@@ -244,7 +247,7 @@ Token scanToken() {
 
   char c = advance();
 
-  if (isAlpha(c) || isSymbol(c)) return identifier();
+  if (isAlpha(c) || isIdentifierSymbol(c)) return identifier();
   if (isDigit(c)) return number();
 
   switch (c) {
@@ -268,28 +271,17 @@ Token scanToken() {
       return makeToken(TOKEN_COMMA);
     case '.':
       return makeToken(TOKEN_DOT);
-    case '-':
-      return makeToken(TOKEN_MINUS);
-    case '+':
-      return makeToken(TOKEN_PLUS);
-    case '/':
-      return makeToken(TOKEN_SLASH);
-    case '*':
-      return makeToken(TOKEN_STAR);
     case '|':
       return makeToken(TOKEN_PIPE);
     case '!':
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-    case '=':
+    case '=': {
       if (match('>')) {
         return makeToken(TOKEN_ARROW);
       } else {
         return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
       }
-    case '<':
-      return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-    case '>':
-      return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+    }
     case '"':
       return string();
   }

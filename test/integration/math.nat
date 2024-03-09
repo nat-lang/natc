@@ -1,0 +1,18 @@
+
+
+assert(2 > 1);
+assert(1 < 2);
+assert(2 >= 2);
+assert(2 <= 2);
+
+// fix me! variadic functions? overloading?
+// assert(2 == -(0 - 2));
+
+// precedence.
+
+assert(5 + 5 * 2 == 2 * 5 + 5 );
+assert(10 - 4 / 2 == 7 / 1 + 1);
+
+assert(5 + 5 >= 10 and 1 <= 5 + 5);
+assert(5 + 5 > 9 and 9 < 5 + 5);
+assert(5 + 5 < 11  and 11 > 5 + 5);

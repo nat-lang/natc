@@ -178,8 +178,26 @@ static void advanceDottedIdentifier() {
   checkError();
 }
 
+static bool prev(TokenType type) { return parser.previous.type == type; }
+static bool check(TokenType type) { return parser.current.type == type; }
+static bool peek(TokenType type) { return parser.next.type == type; }
+
+// Keyword symbols that are also valid identifiers
+// aren't tokenized, so we need to check for the
+// bare string.
+static bool checkStr(char* str) {
+  return strncmp(parser.current.start, str, strlen(str)) == 0;
+}
+
 static void consume(TokenType type, const char* message) {
   if (parser.current.type == type)
+    advance();
+  else
+    errorAtCurrent(message);
+}
+
+static void consumeStr(char* str, const char* message) {
+  if (checkStr(str))
     advance();
   else
     errorAtCurrent(message);
@@ -192,9 +210,12 @@ static void consumeQuiet(TokenType type) {
     parser.hadError = true;
 }
 
-static bool prev(TokenType type) { return parser.previous.type == type; }
-static bool check(TokenType type) { return parser.current.type == type; }
-static bool peek(TokenType type) { return parser.next.type == type; }
+static void consumeStrQuiet(char* str) {
+  if (checkStr(str))
+    advance();
+  else
+    parser.hadError = true;
+}
 
 static bool match(TokenType type) {
   if (!check(type)) return false;
@@ -513,30 +534,6 @@ static void binary(bool canAssign) {
     case TOKEN_EQUAL_EQUAL:
       emitByte(OP_EQUAL);
       break;
-    case TOKEN_GREATER:
-      emitByte(OP_GREATER);
-      break;
-    case TOKEN_GREATER_EQUAL:
-      emitBytes(OP_LESS, OP_NOT);
-      break;
-    case TOKEN_LESS:
-      emitByte(OP_LESS);
-      break;
-    case TOKEN_LESS_EQUAL:
-      emitBytes(OP_GREATER, OP_NOT);
-      break;
-    case TOKEN_PLUS:
-      emitByte(OP_ADD);
-      break;
-    case TOKEN_MINUS:
-      emitByte(OP_SUBTRACT);
-      break;
-    case TOKEN_STAR:
-      emitByte(OP_MULTIPLY);
-      break;
-    case TOKEN_SLASH:
-      emitByte(OP_DIVIDE);
-      break;
     case TOKEN_IN:
       emitByte(OP_MEMBER);
       break;
@@ -739,9 +736,6 @@ static void unary(bool canAssign) {
     case TOKEN_BANG:
       emitByte(OP_NOT);
       break;
-    case TOKEN_MINUS:
-      emitByte(OP_NEGATE);
-      break;
     default:
       return;  // Unreachable.
   }
@@ -784,7 +778,7 @@ static bool peekSignature() {
     } while (match(TOKEN_COMMA));
   }
   consumeQuiet(TOKEN_RIGHT_PAREN);
-  consumeQuiet(TOKEN_ARROW);
+  consumeStrQuiet("=>");
 
   found = !parser.hadError;
 
@@ -804,8 +798,6 @@ static bool tryFunction(FunctionType fnType) {
 
 static void boundExpression(bool isInfix) {
   if (tryFunction(TYPE_BOUND)) return;
-
-  if (isInfix) error("Can only infix a function.");
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -857,7 +849,7 @@ static void function(FunctionType type) {
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-  consume(TOKEN_ARROW, "Expect '=>' after signature.");
+  consumeStr("=>", "Expect '=>' after signature.");
 
   blockOrExpression();
 
@@ -1488,19 +1480,11 @@ ParseRule rules[] = {
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, dot, PREC_CALL},
-    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
-    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
     [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
     [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
     [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
