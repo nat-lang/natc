@@ -80,6 +80,8 @@ bool initVM() {
   vm.iterString = intern("iter");
   vm.nextString = NULL;
   vm.nextString = intern("next");
+  vm.addString = NULL;
+  vm.addString = intern("add");
   vm.memberString = NULL;
   vm.memberString = intern("__in__");
   vm.subscriptGetString = NULL;
@@ -133,7 +135,56 @@ static bool checkArity(int paramCount, int argCount) {
   return false;
 }
 
+// Collapse [argCount] - [arity] + 1 arguments into a final
+// sequence argument.
+static bool variadify(ObjClosure* closure, int* argCount) {
+  // put a sequence on the stack.
+  vmPush(OBJ_VAL(newInstance(vm.seqClass)));
+  initClass(vm.seqClass, 0);
+
+  // either the function was called (a) with arity - 1 arguments
+  // or (b) with arity - n arguments for n > 1. (a) is valid;
+  // *args is just an empty sequence. (b) is invalid and will be
+  // picked up by the arity check downstream.
+  if (*argCount < closure->function->arity) {
+    *argCount = *argCount + 1;
+    return true;
+  }
+
+  // walk the variadic arguments in the order they were
+  // applied, peeking at and adding each to the sequence.
+  int i = *argCount - closure->function->arity;
+  while (i >= 0) {
+    Value seq = vmPop();
+    Value arg = vmPeek(i);
+
+    vmPush(seq);
+    vmPush(arg);
+
+    if (!invoke(vm.addString, 1)) return false;
+    i--;
+  }
+
+  // now pop the sequence, all the variadic arguments,
+  // and leave the sequence on the stack in their place.
+  Value seq = vmPop();
+  i = *argCount - closure->function->arity;
+  while (i >= 0) {
+    vmPop();
+    i--;
+  }
+  vmPush(seq);
+
+  // what we've done is made these two equal.
+  *argCount = closure->function->arity;
+
+  return true;
+}
+
 static bool call(ObjClosure* closure, int argCount) {
+  if (closure->function->variadic)
+    if (!variadify(closure, &argCount)) return false;
+
   if (!checkArity(closure->function->arity, argCount)) return false;
 
   if (vm.frameCount == FRAMES_MAX) {

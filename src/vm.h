@@ -38,6 +38,7 @@ typedef struct {
   ObjString* callString;
   ObjString* iterString;
   ObjString* nextString;
+  ObjString* addString;
   ObjString* memberString;
   ObjString* subscriptGetString;
   ObjString* subscriptSetString;
