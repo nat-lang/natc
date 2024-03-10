@@ -35,7 +35,7 @@ assert(5 plus 5 == 10);
 assert(5 times 5 == 25);
 assert(5 plus 5 times 2 == 15);
 
-// dependency.
+// simple assignment.
 
 let infix(5) f = __add__;
 assert(1 f 1 == 2);

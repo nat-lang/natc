@@ -204,6 +204,7 @@ static void markRoots() {
   markObject((Obj*)vm.initString);
   markObject((Obj*)vm.callString);
   markObject((Obj*)vm.iterString);
+  markObject((Obj*)vm.addString);
   markObject((Obj*)vm.lengthString);
   markObject((Obj*)vm.memberString);
   markObject((Obj*)vm.subscriptGetString);

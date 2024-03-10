@@ -840,10 +840,21 @@ static void function(FunctionType type) {
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
+      if (current->function->variadic)
+        error("Can only apply * to the final parameter.");
+
       current->function->arity++;
       if (current->function->arity > 255) {
         errorAtCurrent("Can't have more than 255 parameters.");
       }
+
+      if (checkStr("*")) {
+        current->function->variadic = true;
+        // shift the star off the parameter's token.
+        parser.current.start++;
+        parser.current.length--;
+      }
+
       uint8_t constant = parseVariable("Expect parameter name.");
       defineVariable(constant);
     } while (match(TOKEN_COMMA));

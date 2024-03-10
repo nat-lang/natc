@@ -20,6 +20,27 @@ assert(seq[2] == 0);
 
 let seq;
 
+// api.
+
+seq = [1,2,3];
+
+let sum = seq.fold((a,b) => a + b, 0);
+
+assert(sum == 6);
+assert(seq.fmap((a) => a + 1) == [2,3,4]);
+
+seq.add(4);
+
+let sum = seq.fold((a,b) => a + b, 0);
+
+assert(sum == 10);
+assert(seq.fmap((a) => a + 1) == [2,3,4,5]);
+
+// sequence comprehension.
+// --------------------------------------
+
+let seq;
+
 // literal body.
 
 seq = [true | a in [1,2,3]];
@@ -95,18 +116,3 @@ assert(seq == [
 seq = [a | a in [a | a in [1,2,3]]];
 assert(seq == [1,2,3]);
 
-// api.
-
-seq = [1,2,3];
-
-let sum = seq.fold((a,b) => a + b, 0);
-
-assert(sum == 6);
-assert(seq.fmap((a) => a + 1) == [2,3,4]);
-
-seq.add(4);
-
-let sum = seq.fold((a,b) => a + b, 0);
-
-assert(sum == 10);
-assert(seq.fmap((a) => a + 1) == [2,3,4,5]);
