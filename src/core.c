@@ -228,6 +228,48 @@ bool __type__(int argCount, Value* args) {
   return true;
 }
 
+bool __clock__(int argCount, Value* args) {
+  vmPop();  // native fn.
+  vmPush(NUMBER_VAL((double)clock() / CLOCKS_PER_SEC));
+  return true;
+}
+
+bool __str__(int argCount, Value* args) {
+  Value value = vmPeek(0);
+  ObjString* string;
+
+  switch (value.type) {
+    case VAL_NUMBER: {
+      double num = AS_NUMBER(value);
+
+      char buffer[24];
+      int length = sprintf(buffer, "%.14g", num);
+
+      string = copyString(buffer, length);
+      break;
+    }
+    case VAL_NIL: {
+      string = copyString("nil", 4);
+
+      break;
+    }
+    case VAL_BOOL: {
+      string =
+          (AS_BOOL(value) ? copyString("true", 4) : copyString("false", 5));
+
+      break;
+    }
+    default:
+      return false;
+  }
+
+  vmPop();
+  vmPop();  // native fn.
+  vmPush(OBJ_VAL(string));
+
+  return true;
+}
+
 BINARY_NATIVE(gt__, BOOL_VAL, >);
 BINARY_NATIVE(lt__, BOOL_VAL, <);
 BINARY_NATIVE(gte__, BOOL_VAL, >=);
@@ -265,10 +307,12 @@ InterpretResult initializeCore() {
   // native functions.
 
   defineNativeFn(intern("len"), 1, __length__, &vm.globals);
+  defineNativeFn(intern("str"), 1, __str__, &vm.globals);
   defineNativeFn(intern("getHash"), 1, __getHash__, &vm.globals);
   defineNativeFn(intern("setHash"), 2, __setHash__, &vm.globals);
   defineNativeFn(intern("type"), 1, __type__, &vm.globals);
   defineNativeFn(intern("entries"), 1, __objEntries__, &vm.globals);
+  defineNativeFn(intern("clock"), 0, __clock__, &vm.globals);
 
   defineNativeFn(intern("__gt__"), 2, __gt__, &vm.globals);
   defineNativeFn(intern("__lt__"), 2, __lt__, &vm.globals);

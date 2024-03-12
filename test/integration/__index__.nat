@@ -1,3 +1,7 @@
+import test/utils
+
+let conclude = begin();
+
 import test/integration/affix
 import test/integration/block
 import test/integration/class
@@ -16,3 +20,5 @@ import test/integration/sequence
 import test/integration/set
 import test/integration/string
 import test/integration/tree
+
+conclude("integration");

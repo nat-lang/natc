@@ -43,8 +43,8 @@ trip:
 
 # Run all the tests.
 tests:
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "integration ok"
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/trip/__index__ && echo "trip        ok"
+	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__
+	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/trip/__index__
 
 test-leaks:
 	@ leaks --atExit -- $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
