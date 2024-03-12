@@ -1,0 +1,7 @@
+let begin = () => {
+  let start = clock();
+  return (name) => {
+    let end = clock() - start;
+    print name + " ok " + "(" + str(end) + "s)";
+  };
+};
