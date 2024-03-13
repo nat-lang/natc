@@ -120,8 +120,7 @@ static void errorAt(Token* token, const char* message) {
   else
     parser.panicMode = true;
 
-  fprintf(stderr, "[line %d] in %s, Error", token->line,
-          current->function->name->chars);
+  fprintf(stderr, "[line %d] in %s, Error", token->line, current->function->name->chars);
 
   if (token->type == TOKEN_EOF) {
     fprintf(stderr, " at end");
@@ -137,9 +136,7 @@ static void errorAt(Token* token, const char* message) {
 
 static void error(const char* message) { errorAt(&parser.previous, message); }
 
-static void errorAtCurrent(const char* message) {
-  errorAt(&parser.current, message);
-}
+static void errorAtCurrent(const char* message) { errorAt(&parser.current, message); }
 
 static void initIterator(Iterator* iter) {
   iter->var = 0;
@@ -238,9 +235,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
   emitByte(byte2);
 }
 
-static void emitConstant(uint16_t constant) {
-  emitBytes(constant >> 8, constant & 0xff);
-}
+static void emitConstant(uint16_t constant) { emitBytes(constant >> 8, constant & 0xff); }
 
 static void emitConstInstr(uint8_t instruction, uint16_t constant) {
   emitByte(instruction);
@@ -295,8 +290,7 @@ static uint8_t makeConstant(Value value) {
     return 0;
   }
 
-  if (isHashable(value))
-    mapSet(current->constants, value, NUMBER_VAL(constant));
+  if (isHashable(value)) mapSet(current->constants, value, NUMBER_VAL(constant));
 
   return (uint16_t)constant;
 }
@@ -363,9 +357,8 @@ static ObjFunction* endCompiler() {
 
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-    disassembleChunk(currentChunk(), function->name != NULL
-                                         ? function->name->chars
-                                         : "<script>");
+    disassembleChunk(currentChunk(),
+                     function->name != NULL ? function->name->chars : "<script>");
   }
 #endif
 
@@ -392,7 +385,7 @@ static void endScope() {
 
 static void function(FunctionType type);
 static void expression();
-static void boundExpression(bool isInfix);
+static void boundExpression();
 static void statement();
 static void declaration();
 static void classDeclaration();
@@ -625,13 +618,12 @@ static void or_(bool canAssign) {
 }
 
 static void string(bool canAssign) {
-  loadConstant(OBJ_VAL(
-      copyString(parser.previous.start + 1, parser.previous.length - 2)));
+  loadConstant(
+      OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 static void bareString() {
-  loadConstant(
-      OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
+  loadConstant(OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
 
 static void namedVariable(Token name, bool canAssign) {
@@ -671,9 +663,7 @@ static void methodCall(char* name, int argCount) {
   emitByte(argCount);
 }
 
-static void variable(bool canAssign) {
-  namedVariable(parser.previous, canAssign);
-}
+static void variable(bool canAssign) { namedVariable(parser.previous, canAssign); }
 
 static void infix(bool canAssign) {
   ParseRule* rule = getRule(parser.previous);
@@ -796,7 +786,7 @@ static bool tryFunction(FunctionType fnType) {
   return false;
 }
 
-static void boundExpression(bool isInfix) {
+static void boundExpression() {
   if (tryFunction(TYPE_BOUND)) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
@@ -840,8 +830,7 @@ static void function(FunctionType type) {
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      if (current->function->variadic)
-        error("Can only apply * to the final parameter.");
+      if (current->function->variadic) error("Can only apply * to the final parameter.");
 
       current->function->arity++;
       if (current->function->arity > 255) {
@@ -877,8 +866,7 @@ static void method() {
   consume(TOKEN_IDENTIFIER, "Expect method name.");
   uint8_t constant = identifierConstant(&parser.previous);
   FunctionType type = TYPE_METHOD;
-  if (parser.previous.length == 4 &&
-      memcmp(parser.previous.start, "init", 4) == 0) {
+  if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
     type = TYPE_INITIALIZER;
   }
 
@@ -909,7 +897,7 @@ static Iterator iterator() {
   // initialize the iterator object, adjusting the local
   // count to reflect the iter fn's presence on the stack
   // during the iterator-yielding expression.
-  nativeVariable(vm.iterString->chars);
+  nativeVariable(vm.strings.iter->chars);
   current->localCount++;
   expression();
   emitBytes(OP_CALL, 1);
@@ -1029,13 +1017,11 @@ bool advanceToPipe(int initialBraceDepth, int initialBracketDepth) {
     if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
     if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
 
-    nested = (braceDepth > initialBraceDepth) ||
-             (bracketDepth > initialBracketDepth);
+    nested = (braceDepth > initialBraceDepth) || (bracketDepth > initialBracketDepth);
 
     if (check(TOKEN_PIPE) && !nested) return true;
 
-    if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1)
-      return false;
+    if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1) return false;
     if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == initialBracketDepth - 1)
       return false;
 
@@ -1073,13 +1059,9 @@ static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
   return false;
 }
 
-static bool trySetComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACE, 1, 0);
-}
+static bool trySetComprehension() { return tryComprehension(TOKEN_RIGHT_BRACE, 1, 0); }
 
-static bool trySeqComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACKET, 0, 1);
-}
+static bool trySeqComprehension() { return tryComprehension(TOKEN_RIGHT_BRACKET, 0, 1); }
 
 static void finishMapVal() {
   consume(TOKEN_COLON, "Expect ':' after map key.");
@@ -1257,10 +1239,16 @@ static void letDeclaration() {
       infixPrecedence = PREC_CALL;
     }
   }
+
   uint8_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
-    boundExpression(infixPrecedence != -1);
+    boundExpression();
+  } else if (checkStr("<-")) {
+    if (infixPrecedence != -1) error("Can't infix when destructuring.");
+    advance();
+    expression();
+    emitByte(OP_DESTRUCTURE);
   } else {
     emitByte(OP_NIL);
   }

@@ -1,0 +1,5 @@
+class ASTNode extends Tree {}
+
+class ASTApp extends ASTNode {}
+class ASTStmt extends ASTNode {}
+class ASTBlock extends ASTNode {}

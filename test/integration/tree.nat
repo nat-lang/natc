@@ -54,6 +54,6 @@ tree = tree.fmap((a) => {
   return a;
 });
 
-let sum = tree.fold((a, b) => a + b, 0);
+let sum = tree.fold(+, 0);
 
 assert(sum == 28);

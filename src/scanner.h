@@ -17,7 +17,8 @@ typedef enum {
   TOKEN_SEMICOLON,
   TOKEN_PIPE,
   // One or two character tokens.
-  TOKEN_ARROW,
+  TOKEN_FAT_ARROW,
+  TOKEN_LEFT_ARROW,
   TOKEN_BANG,
   TOKEN_BANG_EQUAL,
   TOKEN_EQUAL,

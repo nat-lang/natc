@@ -94,7 +94,7 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   string->hash = hash;
 
   vmPush(OBJ_VAL(string));
-  mapSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
+  mapSet(&vm.interned, OBJ_VAL(string), NIL_VAL);
   vmPop();
 
   return string;
@@ -121,7 +121,7 @@ uint32_t hashObject(Obj* object) {
 
 ObjString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
+  ObjString* interned = mapFindString(&vm.interned, chars, length, hash);
   if (interned != NULL) return interned;
 
   char* heapChars = ALLOCATE(char, length + 1);
@@ -132,7 +132,7 @@ ObjString* copyString(const char* chars, int length) {
 
 ObjString* takeString(char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
+  ObjString* interned = mapFindString(&vm.interned, chars, length, hash);
   if (interned != NULL) {
     FREE_ARRAY(char, chars, length + 1);
     return interned;

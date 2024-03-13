@@ -12,8 +12,7 @@ static void defineNative(ObjString* name, Value native, ObjMap* dest) {
   vmPop();
 }
 
-static void defineNativeFn(ObjString* name, int arity, NativeFn function,
-                           ObjMap* dest) {
+static void defineNativeFn(ObjString* name, int arity, NativeFn function, ObjMap* dest) {
   Value fn = OBJ_VAL(newNative(arity, name, function));
   defineNative(name, fn, dest);
 }
@@ -73,7 +72,7 @@ static ObjClass* getClass(char* name) {
 bool seqInstance() {
   ObjInstance* seq = newInstance(getClass("Sequence"));
   vmPush(OBJ_VAL(seq));
-  return initClass(vm.seqClass, 0);
+  return initClass(vm.classes.sequence, 0);
 }
 
 bool __objEntries__(int argCount, Value* args) {
@@ -168,14 +167,14 @@ bool __length__(int argCount, Value* args) {
 
   if (!IS_INSTANCE(value)) {
     runtimeError("Only sequences and objects with a '%s' method have length.",
-                 vm.lengthString->chars);
+                 vm.strings.length->chars);
     return false;
   }
 
   ObjInstance* instance = AS_INSTANCE(value);
 
   Value method;
-  if (mapGet(&instance->klass->methods, OBJ_VAL(vm.lengthString), &method)) {
+  if (mapGet(&instance->klass->methods, OBJ_VAL(vm.strings.length), &method)) {
     // set up the context for the function call.
     vmPush(value);  // receiver.
     return vmCallValue(method, 0);
@@ -238,7 +237,7 @@ bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
 
-  switch (value.type) {
+  switch (value.cType) {
     case VAL_NUMBER: {
       double num = AS_NUMBER(value);
 
@@ -254,8 +253,7 @@ bool __str__(int argCount, Value* args) {
       break;
     }
     case VAL_BOOL: {
-      string =
-          (AS_BOOL(value) ? copyString("true", 4) : copyString("false", 5));
+      string = (AS_BOOL(value) ? copyString("true", 4) : copyString("false", 5));
 
       break;
     }
@@ -323,19 +321,21 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("__div__"), 2, __div__, &vm.globals);
   defineNativeFn(intern("__mul__"), 2, __mul__, &vm.globals);
 
-  vm.objClass = defineNativeClass(intern("__obj__"), &vm.globals);
-  defineNativeFn(intern("get"), 1, __objGet__, &vm.objClass->methods);
-  defineNativeFn(intern("set"), 2, __objSet__, &vm.objClass->methods);
-  defineNativeFn(intern("has"), 1, __objHas__, &vm.objClass->methods);
+  vm.classes.object = defineNativeClass(intern("__obj__"), &vm.globals);
+  defineNativeFn(intern("get"), 1, __objGet__, &vm.classes.object->methods);
+  defineNativeFn(intern("set"), 2, __objSet__, &vm.classes.object->methods);
+  defineNativeFn(intern("has"), 1, __objHas__, &vm.classes.object->methods);
 
   // native classes.
 
   InterpretResult coreIntpt = interpretFile("src/core/__index__");
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
-  vm.seqClass = getClass("Sequence");
-  defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
-  defineNativeFn(intern("add"), 1, __seqAdd__, &vm.seqClass->methods);
+  vm.classes.sequence = getClass("Sequence");
+  defineNativeFn(vm.strings.init, 0, __seqInit__, &vm.classes.sequence->methods);
+  defineNativeFn(intern("add"), 1, __seqAdd__, &vm.classes.sequence->methods);
+
+  vm.classes.astNode = getClass("ASTNode");
 
   return INTERPRET_OK;
 }

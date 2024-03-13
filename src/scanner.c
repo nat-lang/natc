@@ -277,7 +277,7 @@ Token scanToken() {
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=': {
       if (match('>')) {
-        return makeToken(TOKEN_ARROW);
+        return makeToken(TOKEN_FAT_ARROW);
       } else {
         return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
       }

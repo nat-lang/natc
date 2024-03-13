@@ -1,12 +1,18 @@
-#ifndef clox_vm_h
-#define clox_vm_h
+#ifndef nat_vm_h
+#define nat_vm_h
 
+#include "ast.h"
 #include "chunk.h"
 #include "object.h"
 #include "value.h"
 
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
+
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_SHORT()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 
 typedef struct {
   ObjClosure* closure;
@@ -15,12 +21,32 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjString* init;
+  ObjString* call;
+  ObjString* iter;
+  ObjString* next;
+  ObjString* add;
+  ObjString* member;
+  ObjString* subscriptGet;
+  ObjString* subscriptSet;
+  ObjString* length;
+  ObjString* equal;
+  ObjString* hash;
+} Strings;
+
+typedef struct {
+  ObjClass* sequence;
+  ObjClass* object;
+  ObjClass* astNode;
+} Classes;
+
+typedef struct {
   Value stack[STACK_MAX];
   Value* stackTop;
 
   CallFrame frames[FRAMES_MAX];
   int frameCount;
-  ObjMap strings;
+  ObjMap interned;
   ObjMap globals;
   Obj* objects;
   ObjUpvalue* openUpvalues;
@@ -33,21 +59,8 @@ typedef struct {
   size_t bytesAllocated;
   size_t nextGC;
 
-  // methods with special semantics.
-  ObjString* initString;
-  ObjString* callString;
-  ObjString* iterString;
-  ObjString* nextString;
-  ObjString* addString;
-  ObjString* memberString;
-  ObjString* subscriptGetString;
-  ObjString* subscriptSetString;
-  ObjString* lengthString;
-  ObjString* equalString;
-  ObjString* hashString;
-
-  ObjClass* seqClass;
-  ObjClass* objClass;
+  Strings strings;
+  Classes classes;
 } VM;
 
 typedef enum {

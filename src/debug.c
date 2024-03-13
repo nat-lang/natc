@@ -7,7 +7,7 @@
 #include "vm.h"
 
 void disassembleChunk(Chunk* chunk, const char* name) {
-  printf("== %s ==\n", name);
+  printf("== %s (%i) ==\n", name, chunk->count);
 
   for (int offset = 0; offset < chunk->count;) {
     offset = disassembleInstruction(chunk, offset);
@@ -38,8 +38,7 @@ static int shortInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 3;
 }
 
-static int jumpInstruction(const char* name, int sign, Chunk* chunk,
-                           int offset) {
+static int jumpInstruction(const char* name, int sign, Chunk* chunk, int offset) {
   uint16_t jump = readShort(chunk, offset);
   printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
   return offset + 3;
@@ -176,6 +175,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_SUBSCRIPT_GET", offset);
     case OP_SUBSCRIPT_SET:
       return simpleInstruction("OP_SUBSCRIPT_SET", offset);
+    case OP_DESTRUCTURE:
+      return simpleInstruction("OP_DESTRUCTURE", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
