@@ -33,8 +33,17 @@ class AST extends ASTNode {
 
   opReturn() => {
 
-    let value = this.pop();
+    let value = this.stack.pop();
+
+    let node = ASTReturnStmt();
+
+   //  node.setData(value);
+    print "--------";
+    print node.setData;
+    node.setData(value);
+    print "-------";
     print value;
+    print "--------";
     
     // (this.children.add . ASTReturnStmt().addData)(this.pop());
   }

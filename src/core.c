@@ -64,8 +64,6 @@ bool __seqPop__(int argCount, Value* args) {
   if (!seqValueField(obj, &seq)) return false;
   Value value = popValueArray(&AS_SEQUENCE(seq)->values);
 
-  printValue(value);
-
   vmPop();
   vmPush(value);
   return true;

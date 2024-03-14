@@ -37,8 +37,6 @@ assert(seq.inc() == [2,3,4,5]);
 
 let top = seq.pop();
 
-print top;
-
 assert(top == 4);
 assert(len(seq) == 3);
 assert(seq == [1,2,3]);
