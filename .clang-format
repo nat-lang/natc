@@ -1,8 +1,8 @@
 BasedOnStyle: Google
 IndentWidth: 2
 MaxEmptyLinesToKeep: 1
-ColumnLimit: 80
-PenaltyBreakAssignment: 2
+ColumnLimit: 90
+PenaltyBreakAssignment: 200
 PenaltyReturnTypeOnItsOwnLine: 200
 PointerAlignment: Left
 SpaceBeforeParens: ControlStatements
