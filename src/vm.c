@@ -373,7 +373,10 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
-static InterpretResult loop() {
+// Loop until we're back to [baseFrames] frames. Typically this
+// is just 0, but if we want to execute a function in the middle
+// of interpretation without going off the rails..
+InterpretResult execute(int baseFrames) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
   for (;;) {
@@ -385,9 +388,13 @@ static InterpretResult loop() {
                            (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
 
-    uint8_t instruction;
+    uint8_t instruction = READ_BYTE();
 
-    switch (instruction = READ_BYTE()) {
+    if (instruction == OP_END) {
+      printf("FOUND A NULL\n");
+    }
+
+    switch (instruction) {
       case OP_CONSTANT: {
         Value constant = READ_CONSTANT();
         vmPush(constant);
@@ -619,7 +626,9 @@ static InterpretResult loop() {
         Value result = vmPop();
         closeUpvalues(frame->slots);
         vm.frameCount--;
-        if (vm.frameCount == 0) {
+
+        if (vm.frameCount == baseFrames) {
+          printf("\nRETURNING AT FRAMECOUNT %i\n", vm.frameCount);
           vmPop();
           return INTERPRET_OK;
         }
@@ -840,6 +849,9 @@ static InterpretResult loop() {
             return INTERPRET_RUNTIME_ERROR;
         }
       }
+        // default:
+        //   runtimeError("Unexpected op code");
+        //   return INTERPRET_RUNTIME_ERROR;
     }
   }
 }
@@ -854,5 +866,5 @@ InterpretResult interpret(char* path, const char* source) {
   vmPush(OBJ_VAL(closure));
   call(closure, 0);
 
-  return loop();
+  return execute(0);
 }

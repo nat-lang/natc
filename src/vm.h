@@ -84,5 +84,6 @@ bool invoke(ObjString* name, int argCount);
 bool validateHashable(Value value);
 bool vmCallValue(Value value, int argCount);
 bool vmInstanceHas(ObjInstance* instance, Value value);
+InterpretResult execute(int frameCount);
 
 #endif

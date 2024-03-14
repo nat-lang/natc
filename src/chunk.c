@@ -20,16 +20,19 @@ void freeChunk(Chunk* chunk) {
   initChunk(chunk);
 }
 
+// Write a new opcode [byte] to the chunk, keep the books,
+// and append a null char to the end of the chunk to delimit.
 void writeChunk(Chunk* chunk, uint8_t byte, int line) {
-  if (chunk->capacity < chunk->count + 1) {
+  // +1 for the null delimiter.
+  if (chunk->capacity < chunk->count + 2) {
     int oldCapacity = chunk->capacity;
     chunk->capacity = GROW_CAPACITY(oldCapacity);
-    chunk->code =
-        GROW_ARRAY(uint8_t, chunk->code, oldCapacity, chunk->capacity);
+    chunk->code = GROW_ARRAY(uint8_t, chunk->code, oldCapacity, chunk->capacity);
     chunk->lines = GROW_ARRAY(int, chunk->lines, oldCapacity, chunk->capacity);
   }
 
   chunk->code[chunk->count] = byte;
+  chunk->code[chunk->count + 1] = OP_END;
   chunk->lines[chunk->count] = line;
   chunk->count++;
 }

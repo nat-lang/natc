@@ -69,12 +69,6 @@ static ObjClass* getClass(char* name) {
   return AS_CLASS(obj);
 }
 
-bool seqInstance() {
-  ObjInstance* seq = newInstance(getClass("Sequence"));
-  vmPush(OBJ_VAL(seq));
-  return initClass(vm.classes.sequence, 0);
-}
-
 bool __objEntries__(int argCount, Value* args) {
   if (!IS_INSTANCE(vmPeek(0))) {
     runtimeError("Only objects have entries.");
