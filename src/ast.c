@@ -4,16 +4,17 @@
 
 // Read the syntax tree of a function off the tape.
 bool readAST(ObjClosure* closure) {
+#ifdef DEBUG_TRACE_EXECUTION
+  disassembleChunk(&closure->function->chunk, closure->function->name->chars);
+  printf("\n");
+#endif
+
   // the root of the tree.
   ObjInstance* node = newInstance(vm.classes.astNode);
   vmPush(OBJ_VAL(node));
   initClass(vm.classes.astNode, 0);
-
-  printf("\nD 1\n");
-  printf("\nSTART loop at framecount %i\n", vm.frameCount - 1);
   if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
   vmPush(OBJ_VAL(node));
-  printf("\nFINISH loop at framecount %i\n", vm.frameCount);
 
   CallFrame* frame = &vm.frames[vm.frameCount + 1];
   frame->closure = closure;
@@ -37,17 +38,21 @@ bool readAST(ObjClosure* closure) {
 
     switch (instruction) {
       case OP_CONSTANT: {
-        printf("\nD 2\n");
-        Value constant = READ_CONSTANT();
+        vmPush(READ_CONSTANT());
 
-        vmPush(constant);
-
-        if (!invoke(intern("addChild"), 1)) return false;
+        if (!invoke(intern("opConstant"), 1)) return false;
         if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
 
         break;
       }
+      case OP_RETURN: {
+        if (!invoke(intern("opReturn"), 0)) return false;
+        if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
+        break;
+      }
       case OP_CALL: {
+      }
+      case OP_NIL: {
       }
     }
   }

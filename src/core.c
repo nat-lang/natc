@@ -33,23 +33,41 @@ bool __seqInit__(int argCount, Value* args) {
   return true;
 }
 
+bool seqValueField(ObjInstance* obj, Value* seq) {
+  if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), seq)) {
+    runtimeError("Sequence instance missing its values!");
+    return false;
+  }
+  if (!IS_SEQUENCE(*seq)) {
+    runtimeError("Expecting sequence.");
+    return false;
+  }
+  return true;
+}
+
 bool __seqAdd__(int argCount, Value* args) {
   Value val = vmPeek(0);
   ObjInstance* obj = AS_INSTANCE(vmPeek(1));
 
   Value seq;
-  if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), &seq)) {
-    runtimeError("Sequence instance missing its values!");
-    return false;
-  }
-  if (!IS_SEQUENCE(seq)) {
-    runtimeError("Expecting sequence.");
-    return false;
-  }
+  if (!seqValueField(obj, &seq)) return false;
 
   writeValueArray(&AS_SEQUENCE(seq)->values, val);
   vmPop();
 
+  return true;
+}
+
+bool __seqPop__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+  Value seq;
+  if (!seqValueField(obj, &seq)) return false;
+  Value value = popValueArray(&AS_SEQUENCE(seq)->values);
+
+  printValue(value);
+
+  vmPop();
+  vmPush(value);
   return true;
 }
 
@@ -328,8 +346,9 @@ InterpretResult initializeCore() {
   vm.classes.sequence = getClass("Sequence");
   defineNativeFn(vm.strings.init, 0, __seqInit__, &vm.classes.sequence->methods);
   defineNativeFn(intern("add"), 1, __seqAdd__, &vm.classes.sequence->methods);
+  defineNativeFn(intern("pop"), 0, __seqPop__, &vm.classes.sequence->methods);
 
-  vm.classes.astNode = getClass("ASTNode");
+  vm.classes.astNode = getClass("AST");
 
   return INTERPRET_OK;
 }

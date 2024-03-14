@@ -1,5 +1,44 @@
 class ASTNode extends Tree {}
 
-class ASTApp extends ASTNode {}
 class ASTStmt extends ASTNode {}
-class ASTBlock extends ASTNode {}
+
+class ASTReturnStmt extends ASTStmt {}
+
+class ASTExpr extends ASTNode {}
+
+class ASTClosure extends ASTExpr {
+  init() => {
+    this.signature = nil;
+
+    super.init();
+  }
+}
+
+class ASTApp extends ASTExpr {}
+class ASTBlock extends ASTExpr {}
+
+class AST extends ASTNode {
+  init() => {
+    this.stack = [];
+    super.init();
+  }
+  addStmt(stmt) => {
+    let child = ASTStmt();
+    child.addData(stmt);
+
+    this.children.add(child);
+  }
+
+  opConstant(value) => this.push(value);
+
+  opReturn() => {
+
+    let value = this.pop();
+    print value;
+    
+    // (this.children.add . ASTReturnStmt().addData)(this.pop());
+  }
+  
+  push(value) => this.stack.add(value);
+  pop() => this.stack.pop();
+}

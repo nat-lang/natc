@@ -373,10 +373,11 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
-// Loop until we're back to [baseFrames] frames. Typically this
-// is just 0, but if we want to execute a function in the middle
-// of interpretation without going off the rails..
-InterpretResult execute(int baseFrames) {
+// Loop until we're back to [baseFrame] frames. Typically this
+// is just 0, but if we want to execute a single function in the
+// middle of interpretation, we can set it to the current frame
+// before executing.
+InterpretResult execute(int baseFrame) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
   for (;;) {
@@ -627,8 +628,7 @@ InterpretResult execute(int baseFrames) {
         closeUpvalues(frame->slots);
         vm.frameCount--;
 
-        if (vm.frameCount == baseFrames) {
-          printf("\nRETURNING AT FRAMECOUNT %i\n", vm.frameCount);
+        if (vm.frameCount == baseFrame) {
           vmPop();
           return INTERPRET_OK;
         }
@@ -833,9 +833,7 @@ InterpretResult execute(int baseFrames) {
           case VAL_OBJ: {
             switch (OBJ_TYPE(value)) {
               case OBJ_CLOSURE: {
-                printf("\nD 0\n");
-                readAST(AS_CLOSURE(value));
-                printf("\nD 1000\n");
+                if (!readAST(AS_CLOSURE(value))) return INTERPRET_RUNTIME_ERROR;
                 break;
               }
               default:
