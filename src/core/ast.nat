@@ -6,6 +6,9 @@ class ASTReturnStmt extends ASTStmt {}
 
 class ASTExpr extends ASTNode {}
 
+class ASTApp extends ASTExpr {}
+class ASTBlock extends ASTExpr {}
+
 class ASTClosure extends ASTExpr {
   init() => {
     this.signature = nil;
@@ -14,8 +17,6 @@ class ASTClosure extends ASTExpr {
   }
 }
 
-class ASTApp extends ASTExpr {}
-class ASTBlock extends ASTExpr {}
 
 class AST extends ASTNode {
   init() => {
@@ -29,6 +30,10 @@ class AST extends ASTNode {
     this.children.add(child);
   }
 
+  opClosure() => {
+
+  }
+
   opConstant(value) => this.push(value);
 
   opReturn() => {
@@ -37,14 +42,13 @@ class AST extends ASTNode {
 
     let node = ASTReturnStmt();
 
-   //  node.setData(value);
     print "--------";
-    print node.setData;
+    print "a";
     node.setData(value);
-    print "-------";
-    print value;
-    print "--------";
-    
+    print "b";
+
+    this.children.add(node);
+  
     // (this.children.add . ASTReturnStmt().addData)(this.pop());
   }
   

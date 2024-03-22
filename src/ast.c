@@ -46,9 +46,13 @@ bool readAST(ObjClosure* closure) {
         break;
       }
       case OP_RETURN: {
+        printf("here 0?\n");
         if (!invoke(intern("opReturn"), 0)) return false;
+        printf("here 1?\n");
         if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
-        break;
+        printf("here 2?\n");
+        // skip the implicit final return statement.
+        goto exit_loop;
       }
       case OP_CALL: {
       }
@@ -59,10 +63,12 @@ bool readAST(ObjClosure* closure) {
 
   printf("\nD 2\n");
 
+exit_loop:
   vmPop();  // the node.
   vmPop();  // the destructured expression.
 
   vmPush(OBJ_VAL(node));
+  ;
 
   return true;
 }
