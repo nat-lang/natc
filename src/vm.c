@@ -624,17 +624,20 @@ InterpretResult execute(int baseFrame) {
         vmPop();
         break;
       case OP_RETURN: {
-        Value result = vmPop();
+        Value value = vmPop();
         closeUpvalues(frame->slots);
         vm.frameCount--;
 
-        if (vm.frameCount == baseFrame) {
+        if (vm.frameCount == 0) {
           vmPop();
           return INTERPRET_OK;
         }
 
         vm.stackTop = frame->slots;
-        vmPush(result);
+        vmPush(value);
+
+        if (vm.frameCount == baseFrame) return INTERPRET_OK;
+
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -833,8 +836,9 @@ InterpretResult execute(int baseFrame) {
           case VAL_OBJ: {
             switch (OBJ_TYPE(value)) {
               case OBJ_CLOSURE: {
-                if (!readAST(AS_CLOSURE(value))) return INTERPRET_RUNTIME_ERROR;
                 printf("how far'd we get\n");
+                if (!readAST(AS_CLOSURE(value))) return INTERPRET_RUNTIME_ERROR;
+                printf("this far?\n");
                 break;
               }
               default:

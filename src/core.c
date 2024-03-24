@@ -69,7 +69,7 @@ bool __seqPop__(int argCount, Value* args) {
   return true;
 }
 
-static ObjClass* getClass(char* name) {
+ObjClass* getClass(char* name) {
   Value obj;
 
   if (!mapGet(&vm.globals, OBJ_VAL(intern(name)), &obj)) {
@@ -346,7 +346,7 @@ InterpretResult initializeCore() {
   defineNativeFn(intern("add"), 1, __seqAdd__, &vm.classes.sequence->methods);
   defineNativeFn(intern("pop"), 0, __seqPop__, &vm.classes.sequence->methods);
 
-  vm.classes.astNode = getClass("AST");
+  vm.classes.astNode = getClass("ASTNode");
 
   return INTERPRET_OK;
 }

@@ -24,5 +24,6 @@
   }
 
 InterpretResult initializeCore();
+ObjClass* getClass(char* name);
 
 #endif

@@ -5,7 +5,6 @@
 #include "debug.h"
 #include "object.h"
 #include "value.h"
-#include "vm.h"
 
 bool readAST(ObjClosure* closure);
 

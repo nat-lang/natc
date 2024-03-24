@@ -76,6 +76,7 @@ void freeVM();
 void runtimeError(const char* format, ...);
 
 InterpretResult interpret(char* path, const char* source);
+InterpretResult execute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
@@ -84,6 +85,5 @@ bool invoke(ObjString* name, int argCount);
 bool validateHashable(Value value);
 bool vmCallValue(Value value, int argCount);
 bool vmInstanceHas(ObjInstance* instance, Value value);
-InterpretResult execute(int baseFrame);
 
 #endif

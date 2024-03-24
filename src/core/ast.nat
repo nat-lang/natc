@@ -1,10 +1,32 @@
-class ASTNode extends Tree {}
+class ASTNode extends Tree {
+  addStmt(stmt) => {
+    let child = ASTStmt();
+    child.addData(stmt);
+
+    this.children.add(child);
+  }
+
+  opClosure() => ASTClosure();
+
+  opConstant(value) => ASTLiteral(value);
+  opReturn(expr) => ASTReturnStmt(expr);
+}
 
 class ASTStmt extends ASTNode {}
-
-class ASTReturnStmt extends ASTStmt {}
+class ASTReturnStmt extends ASTStmt {
+  init(value) => {
+    super.init();
+    this.data = value;
+  }
+}
 
 class ASTExpr extends ASTNode {}
+class ASTLiteral extends ASTExpr {
+  init(value) => {
+    super.init();
+    this.data = value;
+  }
+}
 
 class ASTApp extends ASTExpr {}
 class ASTBlock extends ASTExpr {}
@@ -15,43 +37,4 @@ class ASTClosure extends ASTExpr {
 
     super.init();
   }
-}
-
-
-class AST extends ASTNode {
-  init() => {
-    this.stack = [];
-    super.init();
-  }
-  addStmt(stmt) => {
-    let child = ASTStmt();
-    child.addData(stmt);
-
-    this.children.add(child);
-  }
-
-  opClosure() => {
-
-  }
-
-  opConstant(value) => this.push(value);
-
-  opReturn() => {
-
-    let value = this.stack.pop();
-
-    let node = ASTReturnStmt();
-
-    print "--------";
-    print "a";
-    node.setData(value);
-    print "b";
-
-    this.children.add(node);
-  
-    // (this.children.add . ASTReturnStmt().addData)(this.pop());
-  }
-  
-  push(value) => this.stack.add(value);
-  pop() => this.stack.pop();
 }

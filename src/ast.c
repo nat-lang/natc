@@ -2,21 +2,36 @@
 
 #include <stdio.h>
 
+#include "core.h"
+
+bool newNode(char* className, int argCount) {
+  ObjClass* klass = getClass(className);
+  ObjInstance* node = newInstance(klass);
+  // initialize the instance.
+  vmPush(OBJ_VAL(node));
+  printf("1.1\n");
+  if (!initClass(klass, argCount)) return false;
+  printf("1.2\n");
+  if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
+  printf("1.3\n");
+  return true;
+}
+
 // Read the syntax tree of a function off the tape.
 bool readAST(ObjClosure* closure) {
 #ifdef DEBUG_TRACE_EXECUTION
   disassembleChunk(&closure->function->chunk, closure->function->name->chars);
   printf("\n");
 #endif
+  printf("0\n");
 
   // the root of the tree.
-  ObjInstance* node = newInstance(vm.classes.astNode);
-  vmPush(OBJ_VAL(node));
-  initClass(vm.classes.astNode, 0);
-  if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
-  vmPush(OBJ_VAL(node));
+  if (!newNode("ASTNode", 0)) return false;
 
-  CallFrame* frame = &vm.frames[vm.frameCount + 1];
+  Value root = vmPeek(0);
+  Value node = root;
+
+  CallFrame* frame = &vm.frames[vm.frameCount++];
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
   frame->slots = NULL;
@@ -31,13 +46,19 @@ bool readAST(ObjClosure* closure) {
     disassembleInstruction(&frame->closure->function->chunk,
                            (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
-
+    printf("\t");
+    disassembleInstruction(&frame->closure->function->chunk,
+                           (int)(frame->ip - frame->closure->function->chunk.code));
     uint8_t instruction = READ_BYTE();
 
-    if (instruction == OP_END) break;
+    if (instruction == OP_END) {
+      printf("OP ENDING\n");
+      break;
+    }
 
     switch (instruction) {
       case OP_CONSTANT: {
+        vmPush(node);
         vmPush(READ_CONSTANT());
 
         if (!invoke(intern("opConstant"), 1)) return false;
@@ -46,29 +67,26 @@ bool readAST(ObjClosure* closure) {
         break;
       }
       case OP_RETURN: {
-        printf("here 0?\n");
-        if (!invoke(intern("opReturn"), 0)) return false;
-        printf("here 1?\n");
+        disassembleStack();
+        printf("3\n");
+        if (!invoke(intern("opReturn"), 1)) return false;
         if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
-        printf("here 2?\n");
-        // skip the implicit final return statement.
-        goto exit_loop;
+
+        break;
       }
-      case OP_CALL: {
-      }
-      case OP_NIL: {
+      default: {
+        runtimeError("Unhandled destructured opcode.");
+        return false;
       }
     }
   }
 
   printf("\nD 2\n");
 
-exit_loop:
-  vmPop();  // the node.
+  vmPop();  // the root.
   vmPop();  // the destructured expression.
 
-  vmPush(OBJ_VAL(node));
-  ;
+  vmPush(root);
 
   return true;
 }
