@@ -7,9 +7,7 @@ class ASTNode extends Tree {
   }
 
   opClosure() => ASTClosure();
-
   opConstant(value) => ASTLiteral(value);
-  opReturn(expr) => ASTReturnStmt(expr);
 }
 
 class ASTStmt extends ASTNode {}
@@ -32,9 +30,8 @@ class ASTApp extends ASTExpr {}
 class ASTBlock extends ASTExpr {}
 
 class ASTClosure extends ASTExpr {
-  init() => {
-    this.signature = nil;
-
-    super.init();
+  opReturn(expr) => {
+    this.children.add(ASTReturnStmt(expr));
+    return this;
   }
 }

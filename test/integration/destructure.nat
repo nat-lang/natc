@@ -2,6 +2,10 @@
 let b <- (a) => 1;
 
 print b;
+print b.children.values;
+print b[0].data.data;
+
+b <- (a) => a;
 
 // print b[0].data;
 // let b <- (a) => +(a,1);

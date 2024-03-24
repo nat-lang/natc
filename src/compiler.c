@@ -642,9 +642,14 @@ static void namedVariable(Token name, bool canAssign) {
     setOp = OP_SET_GLOBAL;
   }
 
-  if (canAssign && match(TOKEN_EQUAL)) {
+  if (canAssign && checkStr("<-")) {
+    advance();
+    expression();
+    emitByte(OP_DESTRUCTURE);
+  } else if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitConstInstr(setOp, arg);
+
   } else {
     emitConstInstr(getOp, arg);
   }

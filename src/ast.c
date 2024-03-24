@@ -26,7 +26,7 @@ bool readAST(ObjClosure* closure) {
   printf("0\n");
 
   // the root of the tree.
-  if (!newNode("ASTNode", 0)) return false;
+  if (!newNode("ASTClosure", 0)) return false;
 
   Value root = vmPeek(0);
   Value node = root;
@@ -46,15 +46,7 @@ bool readAST(ObjClosure* closure) {
     disassembleInstruction(&frame->closure->function->chunk,
                            (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
-    printf("\t");
-    disassembleInstruction(&frame->closure->function->chunk,
-                           (int)(frame->ip - frame->closure->function->chunk.code));
     uint8_t instruction = READ_BYTE();
-
-    if (instruction == OP_END) {
-      printf("OP ENDING\n");
-      break;
-    }
 
     switch (instruction) {
       case OP_CONSTANT: {
@@ -74,6 +66,23 @@ bool readAST(ObjClosure* closure) {
 
         break;
       }
+      case OP_NIL: {
+        vmPush(node);
+        vmPush(NIL_VAL);
+
+        if (!invoke(intern("opConstant"), 1)) return false;
+        if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
+        break;
+      }
+      case OP_END: {
+        vmPop();  // the root.
+        vmPop();  // the destructured expression.
+
+        vmPush(root);
+
+        vm.frameCount--;
+        return true;
+      }
       default: {
         runtimeError("Unhandled destructured opcode.");
         return false;
@@ -81,12 +90,6 @@ bool readAST(ObjClosure* closure) {
     }
   }
 
-  printf("\nD 2\n");
-
-  vmPop();  // the root.
-  vmPop();  // the destructured expression.
-
-  vmPush(root);
-
-  return true;
+  runtimeError("This should be unreachable.");
+  return false;
 }
