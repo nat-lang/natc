@@ -646,10 +646,10 @@ static void namedVariable(Token name, bool canAssign) {
     advance();
     expression();
     emitByte(OP_DESTRUCTURE);
+    emitConstInstr(setOp, arg);
   } else if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitConstInstr(setOp, arg);
-
   } else {
     emitConstInstr(getOp, arg);
   }

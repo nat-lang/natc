@@ -1,12 +1,65 @@
 
-let b <- (a) => 1;
+let f;
 
-print b;
-print b.children.values;
-print b[0].data.data;
+// constant function to literal.
 
-b <- (a) => a;
+f <- (a) => 1;
 
-// print b[0].data;
-// let b <- (a) => +(a,1);
+// explicit and implicit returns.
+assert(len(f.block.statements) == 2);
+
+// explicit.
+assert(type(f.block.statements[0]) == ASTReturnStmt);
+assert(type(f.block.statements[0].data) == ASTLiteral);
+assert(f.block.statements[0].data.data == 1);
+
+// implicit.
+assert(type(f.block.statements[1]) == ASTReturnStmt);
+assert(type(f.block.statements[1].data) == ASTLiteral);
+assert(f.block.statements[1].data.data == nil);
+
+// constant function to global.
+f <- (a) => c;
+
+// explicit and implicit returns.
+assert(len(f.block.statements) == 2);
+
+// explicit.
+assert(type(f.block.statements[0]) == ASTReturnStmt);
+assert(type(f.block.statements[0].data) == ASTGlobal);
+assert(f.block.statements[0].data.data == "c");
+
+// implicit.
+assert(type(f.block.statements[1]) == ASTReturnStmt);
+assert(type(f.block.statements[1].data) == ASTLiteral);
+assert(f.block.statements[1].data.data == nil);
+
+// constant function to local.
+
+f <- (a) => a;
+
+// explicit and implicit returns.
+assert(len(f.block.statements) == 2);
+
+// explicit.
+assert(type(f.block.statements[0]) == ASTReturnStmt);
+assert(type(f.block.statements[0].data) == ASTLocal);
+assert(f.block.statements[0].data.data == 1);
+
+// implicit.
+assert(type(f.block.statements[1]) == ASTReturnStmt);
+assert(type(f.block.statements[1].data) == ASTLiteral);
+assert(f.block.statements[1].data.data == nil);
+
+// function to binary application.
+
+f <- (a) => a + 1;
+
+let r0 = f.block.statements[0];
+
+assert(type(r0) == ASTReturnStmt);
+
+assert(type(r0.data) == ASTApp);
+print r0.data.arguments.values;
+assert(r0.data.fn == "+");
 

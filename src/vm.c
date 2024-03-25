@@ -836,9 +836,7 @@ InterpretResult execute(int baseFrame) {
           case VAL_OBJ: {
             switch (OBJ_TYPE(value)) {
               case OBJ_CLOSURE: {
-                printf("how far'd we get\n");
                 if (!readAST(AS_CLOSURE(value))) return INTERPRET_RUNTIME_ERROR;
-                printf("this far?\n");
                 break;
               }
               default:

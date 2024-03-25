@@ -9,12 +9,15 @@ bool newNode(char* className, int argCount) {
   ObjInstance* node = newInstance(klass);
   // initialize the instance.
   vmPush(OBJ_VAL(node));
-  printf("1.1\n");
   if (!initClass(klass, argCount)) return false;
-  printf("1.2\n");
   if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
-  printf("1.3\n");
+
   return true;
+}
+
+bool executeMethod(char* method, int argCount) {
+  return (invoke(intern(method), argCount)) &&
+         (execute(vm.frameCount - 1) == INTERPRET_OK);
 }
 
 // Read the syntax tree of a function off the tape.
@@ -23,13 +26,11 @@ bool readAST(ObjClosure* closure) {
   disassembleChunk(&closure->function->chunk, closure->function->name->chars);
   printf("\n");
 #endif
-  printf("0\n");
 
   // the root of the tree.
   if (!newNode("ASTClosure", 0)) return false;
 
   Value root = vmPeek(0);
-  Value node = root;
 
   CallFrame* frame = &vm.frames[vm.frameCount++];
   frame->closure = closure;
@@ -50,28 +51,40 @@ bool readAST(ObjClosure* closure) {
 
     switch (instruction) {
       case OP_CONSTANT: {
-        vmPush(node);
+        vmPush(root);
         vmPush(READ_CONSTANT());
 
-        if (!invoke(intern("opConstant"), 1)) return false;
-        if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
-
+        if (!executeMethod("opConstant", 1)) return false;
         break;
       }
       case OP_RETURN: {
-        disassembleStack();
-        printf("3\n");
-        if (!invoke(intern("opReturn"), 1)) return false;
-        if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
+        if (!executeMethod("opReturn", 1)) return false;
 
         break;
       }
       case OP_NIL: {
-        vmPush(node);
-        vmPush(NIL_VAL);
+        vmPush(root);
+        if (!executeMethod("opNil", 0)) return false;
+        break;
+      }
+      case OP_GET_GLOBAL: {
+        vmPush(root);
+        ObjString* name = READ_STRING();
+        vmPush(OBJ_VAL(name));
 
-        if (!invoke(intern("opConstant"), 1)) return false;
-        if (execute(vm.frameCount - 1) != INTERPRET_OK) return false;
+        if (!executeMethod("opGetGlobal", 1)) return false;
+        break;
+      }
+      case OP_GET_LOCAL: {
+        vmPush(root);
+        uint8_t slot = READ_SHORT();
+        vmPush(NUMBER_VAL(slot));
+
+        if (!executeMethod("opGetLocal", 1)) return false;
+        break;
+      }
+      case OP_CALL_INFIX: {
+        if (!executeMethod("opCallInfix", 3)) return false;
         break;
       }
       case OP_END: {

@@ -8,6 +8,15 @@ class ASTNode extends Tree {
 
   opClosure() => ASTClosure();
   opConstant(value) => ASTLiteral(value);
+  opNil() => ASTLiteral(nil);
+  opGetLocal(slot) => ASTLocal(slot);
+  opGetGlobal(name) => ASTGlobal(name);
+  opCallInfix(left, fn, right) => {
+    print left.data;
+    print fn.data;
+    print right.data;
+    return ASTApp(fn, [left, right]);
+  }
 }
 
 class ASTStmt extends ASTNode {}
@@ -26,12 +35,43 @@ class ASTLiteral extends ASTExpr {
   }
 }
 
-class ASTApp extends ASTExpr {}
-class ASTBlock extends ASTExpr {}
+class ASTLocal extends ASTExpr {
+  init(slot) => {
+    super.init();
+    this.data = slot;
+  }
+}
+
+class ASTGlobal extends ASTExpr {
+  init(name) => {
+    super.init();
+    this.data = name;
+  }
+}
+
+class ASTApp extends ASTExpr {
+  init(fn, arguments) => {
+    super.init();
+
+    this.fn = fn;
+    this.arguments = arguments;
+  }
+}
+class ASTBlock extends ASTExpr {
+  init() => {
+    super.init();
+    this.statements = [];
+  }
+}
 
 class ASTClosure extends ASTExpr {
+  init() => {
+    super.init();
+    this.block = ASTBlock();
+  }
+
   opReturn(expr) => {
-    this.children.add(ASTReturnStmt(expr));
+    this.block.statements.add(ASTReturnStmt(expr));
     return this;
   }
 }
