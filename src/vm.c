@@ -849,10 +849,11 @@ InterpretResult execute(int baseFrame) {
             runtimeError("Undestructurable value.");
             return INTERPRET_RUNTIME_ERROR;
         }
+        break;
       }
-        // default:
-        //   runtimeError("Unexpected op code");
-        //   return INTERPRET_RUNTIME_ERROR;
+      default:
+        runtimeError("Unexpected op code");
+        return INTERPRET_RUNTIME_ERROR;
     }
   }
 }

@@ -1,4 +1,5 @@
 import src/core/error
+import src/core/logic
 import src/core/math
 import src/core/iteration
 import src/core/object

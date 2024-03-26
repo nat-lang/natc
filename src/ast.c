@@ -20,7 +20,7 @@ bool executeMethod(char* method, int argCount) {
          (execute(vm.frameCount - 1) == INTERPRET_OK);
 }
 
-// Read the syntax tree of a function off the tape.
+// Read the syntax tree of [closure] off the tape.
 bool readAST(ObjClosure* closure) {
 #ifdef DEBUG_TRACE_EXECUTION
   disassembleChunk(&closure->function->chunk, closure->function->name->chars);
@@ -54,17 +54,35 @@ bool readAST(ObjClosure* closure) {
         vmPush(root);
         vmPush(READ_CONSTANT());
 
-        if (!executeMethod("opConstant", 1)) return false;
-        break;
-      }
-      case OP_RETURN: {
-        if (!executeMethod("opReturn", 1)) return false;
-
+        if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_NIL: {
         vmPush(root);
-        if (!executeMethod("opNil", 0)) return false;
+        vmPush(NIL_VAL);
+        if (!executeMethod("opLiteral", 1)) return false;
+        break;
+      }
+      case OP_TRUE: {
+        vmPush(root);
+        vmPush(BOOL_VAL(true));
+        if (!executeMethod("opLiteral", 1)) return false;
+        break;
+      }
+      case OP_FALSE: {
+        vmPush(root);
+        vmPush(BOOL_VAL(false));
+        if (!executeMethod("opLiteral", 1)) return false;
+        break;
+      }
+      case OP_RETURN: {
+        Value value = vmPop();
+        vmPush(root);
+        vmPush(value);
+
+        if (!executeMethod("opReturn", 1)) return false;
+
+        vmPop();  // nil.
         break;
       }
       case OP_GET_GLOBAL: {
@@ -83,8 +101,30 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opGetLocal", 1)) return false;
         break;
       }
+      case OP_CALL: {
+        int argCount = READ_BYTE();
+        Value args[argCount];
+
+        for (int i = 0; i < argCount; i++) args[i] = vmPop();
+        Value fn = vmPop();
+        vmPush(root);
+        vmPush(fn);
+        for (int i = argCount - 1; i >= 0; i--) vmPush(args[i]);
+
+        if (!executeMethod("opCall", argCount + 1)) return false;
+        break;
+      }
       case OP_CALL_INFIX: {
-        if (!executeMethod("opCallInfix", 3)) return false;
+        Value right = vmPop();
+        Value infix = vmPop();
+        Value left = vmPop();
+
+        vmPush(root);
+        vmPush(infix);
+        vmPush(left);
+        vmPush(right);
+
+        if (!executeMethod("opCall", 3)) return false;
         break;
       }
       case OP_END: {

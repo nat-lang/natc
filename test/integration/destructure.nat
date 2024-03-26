@@ -58,8 +58,33 @@ f <- (a) => a + 1;
 let r0 = f.block.statements[0];
 
 assert(type(r0) == ASTReturnStmt);
-
 assert(type(r0.data) == ASTApp);
-print r0.data.arguments.values;
-assert(r0.data.fn == "+");
+assert(r0.data.fn.data == "+");
 
+f <- (a) => +(a, 1);
+
+let r0 = f.block.statements[0];
+assert(type(r0) == ASTReturnStmt);
+assert(type(r0.data) == ASTApp);
+assert(r0.data.fn.data == "+");
+
+f <- (a) => a and true;
+
+let r0 = f.block.statements[0];
+assert(type(r0) == ASTReturnStmt);
+assert(type(r0.data) == ASTApp);
+assert(r0.data.fn.data == "and");
+
+f <- (a) => a or true;
+
+let r0 = f.block.statements[0];
+assert(type(r0) == ASTReturnStmt);
+assert(type(r0.data) == ASTApp);
+assert(r0.data.fn.data == "or");
+
+f <- (a) => a implies b;
+
+let r0 = f.block.statements[0];
+assert(type(r0) == ASTReturnStmt);
+assert(type(r0.data) == ASTApp);
+assert(r0.data.fn.data == "implies");
