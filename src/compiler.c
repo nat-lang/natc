@@ -630,6 +630,7 @@ static void namedVariable(Token name, bool canAssign) {
   } else if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitConstInstr(setOp, arg);
+
   } else {
     emitConstInstr(getOp, arg);
   }

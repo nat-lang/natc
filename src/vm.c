@@ -391,10 +391,6 @@ InterpretResult execute(int baseFrame) {
 
     uint8_t instruction = READ_BYTE();
 
-    if (instruction == OP_END) {
-      printf("FOUND A NULL\n");
-    }
-
     switch (instruction) {
       case OP_CONSTANT: {
         Value constant = READ_CONSTANT();

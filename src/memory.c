@@ -194,8 +194,7 @@ static void markRoots() {
   for (int i = 0; i < vm.frameCount; i++) {
     markObject((Obj*)vm.frames[i].closure);
   }
-  for (ObjUpvalue* upvalue = vm.openUpvalues; upvalue != NULL;
-       upvalue = upvalue->next) {
+  for (ObjUpvalue* upvalue = vm.openUpvalues; upvalue != NULL; upvalue = upvalue->next) {
     markObject((Obj*)upvalue);
   }
   markMap(&vm.globals);

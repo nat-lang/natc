@@ -33,7 +33,7 @@ static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 bool isIdentifierSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' || c == '?' ||
           c == '$' || c == '\'' || c == '>' || c == '<' || c == '+' || c == '-' ||
-          c == '/' || c == '*');
+          c == '/' || c == '\\' || c == '*');
 }
 
 bool isSymbol(char c) { return isIdentifierSymbol(c) || (c == '='); }
