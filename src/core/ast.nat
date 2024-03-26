@@ -1,15 +1,9 @@
 class ASTNode extends Tree {
-  addStmt(stmt) => {
-    let child = ASTStmt();
-    child.addData(stmt);
-
-    this.children.add(child);
-  }
-
   opClosure() => ASTClosure();
   opLiteral(value) => ASTLiteral(value);
   opGetLocal(slot) => ASTLocal(slot);
   opGetGlobal(name) => ASTGlobal(name);
+  opGetUpvalue(slot) => ASTUpvalue(slot);
   opCall(fn, *args) => ASTApp(fn, args);
 }
 
@@ -29,19 +23,16 @@ class ASTLiteral extends ASTExpr {
   }
 }
 
-class ASTLocal extends ASTExpr {
-  init(slot) => {
+class ASTVar extends ASTExpr {
+  init(id) => {
     super.init();
-    this.data = slot;
+    this.data = id;
   }
 }
 
-class ASTGlobal extends ASTExpr {
-  init(name) => {
-    super.init();
-    this.data = name;
-  }
-}
+class ASTLocal extends ASTVar {}
+class ASTGlobal extends ASTVar {}
+class ASTUpvalue extends ASTVar {}
 
 class ASTApp extends ASTExpr {
   init(fn, arguments) => {

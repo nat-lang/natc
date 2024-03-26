@@ -10,8 +10,7 @@
 
 #define MAP_MAX_LOAD 0.75
 
-#define ALLOCATE_OBJ(type, objectType) \
-  (type*)allocateObject(sizeof(type), objectType)
+#define ALLOCATE_OBJ(type, objectType) (type*)allocateObject(sizeof(type), objectType)
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
@@ -150,9 +149,7 @@ ObjString* concatenateStrings(ObjString* a, ObjString* b) {
   return takeString(chars, length);
 }
 
-ObjString* intern(const char* chars) {
-  return copyString(chars, strlen(chars));
-}
+ObjString* intern(const char* chars) { return copyString(chars, strlen(chars)); }
 
 ObjUpvalue* newUpvalue(Value* slot) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
@@ -166,7 +163,7 @@ static void printFunction(ObjFunction* function) {
   if (function->name == NULL) {
     printf("<script>");
   } else {
-    printf("<fn %s>", function->name->chars);
+    printf("<fn %s at %p>", function->name->chars, function);
   }
 }
 
@@ -187,8 +184,7 @@ ObjMap* newMap() {
   return map;
 }
 
-static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
-                             uint32_t hash) {
+static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key, uint32_t hash) {
   uint32_t index = hash & (capacity - 1);
   MapEntry* tombstone = NULL;
 
@@ -249,9 +245,7 @@ static bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
   return !IS_UNDEF(entry->key);
 }
 
-bool mapHas(ObjMap* map, Value key) {
-  return mapHasHash(map, key, hashValue(key));
-}
+bool mapHas(ObjMap* map, Value key) { return mapHasHash(map, key, hashValue(key)); }
 
 static bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
   if (map->count == 0) return false;
@@ -309,8 +303,7 @@ void mapAddAll(ObjMap* from, ObjMap* to) {
   }
 }
 
-ObjString* mapFindString(ObjMap* map, const char* chars, int length,
-                         uint32_t hash) {
+ObjString* mapFindString(ObjMap* map, const char* chars, int length, uint32_t hash) {
   if (map->count == 0) return NULL;
 
   uint32_t index = hash & (map->capacity - 1);
@@ -319,8 +312,7 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
     if (IS_UNDEF(entry->key)) {
       // Stop if we find an empty non-tombstone entry.
       if (IS_NIL(entry->value)) return NULL;
-    } else if (IS_STRING(entry->key) &&
-               AS_STRING(entry->key)->length == length &&
+    } else if (IS_STRING(entry->key) && AS_STRING(entry->key)->length == length &&
                AS_STRING(entry->key)->hash == hash &&
                memcmp(AS_STRING(entry->key)->chars, chars, length) == 0) {
       // We found it.
@@ -334,8 +326,7 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
 void mapRemoveWhite(ObjMap* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
-    if (!IS_UNDEF(entry->key) && IS_OBJ(entry->key) &&
-        !AS_OBJ(entry->key)->isMarked) {
+    if (!IS_UNDEF(entry->key) && IS_OBJ(entry->key) && !AS_OBJ(entry->key)->isMarked) {
       mapDelete(map, entry->key);
     }
   }

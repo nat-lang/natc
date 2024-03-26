@@ -53,7 +53,6 @@ bool readAST(ObjClosure* closure) {
       case OP_CONSTANT: {
         vmPush(root);
         vmPush(READ_CONSTANT());
-
         if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
@@ -101,6 +100,24 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opGetLocal", 1)) return false;
         break;
       }
+      case OP_GET_UPVALUE: {
+        vmPush(root);
+        uint8_t slot = READ_SHORT();
+        vmPush(NUMBER_VAL(slot));
+
+        if (!executeMethod("opGetUpvalue", 1)) return false;
+        break;
+      }
+      case OP_CLOSURE: {
+        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+        ObjClosure* closure = newClosure(function);
+        vmPush(OBJ_VAL(closure));
+        captureUpvalues(closure, frame);
+
+        if (!readAST(closure)) return false;
+
+        break;
+      }
       case OP_CALL: {
         int argCount = READ_BYTE();
         Value args[argCount];
@@ -130,9 +147,7 @@ bool readAST(ObjClosure* closure) {
       case OP_END: {
         vmPop();  // the root.
         vmPop();  // the destructured expression.
-
         vmPush(root);
-
         vm.frameCount--;
         return true;
       }

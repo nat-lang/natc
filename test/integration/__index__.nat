@@ -6,7 +6,7 @@ import test/integration/affix
 import test/integration/block
 import test/integration/class
 import test/integration/closure
-import test/integration/destructure
+
 import test/integration/equality
 import test/integration/functional
 import test/integration/iteration
@@ -20,7 +20,10 @@ import test/integration/recursion
 import test/integration/return
 import test/integration/sequence
 import test/integration/set
+
 import test/integration/string
+
 import test/integration/tree
+import test/integration/destructure
 
 conclude("integration");

@@ -55,36 +55,59 @@ assert(f.block.statements[1].data.data == nil);
 
 f <- (a) => a + 1;
 
-let r0 = f.block.statements[0];
+let r = f.block.statements[0];
 
-assert(type(r0) == ASTReturnStmt);
-assert(type(r0.data) == ASTApp);
-assert(r0.data.fn.data == "+");
+assert(type(r) == ASTReturnStmt);
+assert(type(r.data) == ASTApp);
+assert(r.data.fn.data == "+");
 
 f <- (a) => +(a, 1);
 
-let r0 = f.block.statements[0];
-assert(type(r0) == ASTReturnStmt);
-assert(type(r0.data) == ASTApp);
-assert(r0.data.fn.data == "+");
+let r = f.block.statements[0];
+assert(type(r) == ASTReturnStmt);
+assert(type(r.data) == ASTApp);
+assert(r.data.fn.data == "+");
 
 f <- (a) => a and true;
 
-let r0 = f.block.statements[0];
-assert(type(r0) == ASTReturnStmt);
-assert(type(r0.data) == ASTApp);
-assert(r0.data.fn.data == "and");
+let r = f.block.statements[0];
+assert(type(r) == ASTReturnStmt);
+assert(type(r.data) == ASTApp);
+assert(r.data.fn.data == "and");
 
 f <- (a) => a or true;
 
-let r0 = f.block.statements[0];
-assert(type(r0) == ASTReturnStmt);
-assert(type(r0.data) == ASTApp);
-assert(r0.data.fn.data == "or");
+let r = f.block.statements[0];
+assert(type(r) == ASTReturnStmt);
+assert(type(r.data) == ASTApp);
+assert(r.data.fn.data == "or");
 
 f <- (a) => a implies b;
 
-let r0 = f.block.statements[0];
-assert(type(r0) == ASTReturnStmt);
-assert(type(r0.data) == ASTApp);
-assert(r0.data.fn.data == "implies");
+let r = f.block.statements[0];
+assert(type(r) == ASTReturnStmt);
+assert(type(r.data) == ASTApp);
+assert(r.data.fn.data == "implies");
+
+// function to function.
+
+f <- (g) => (x) => 1;
+
+let r = f.block.statements[0];
+
+assert(type(r.data) == ASTClosure);
+assert(type(r.data.block.statements[0].data) == ASTLiteral);
+
+f <- (g) => (x) => g(x);
+
+let r = f.block.statements[0];
+
+assert(type(f.block.statements[0].data) == ASTClosure);
+assert(type(r.data.block.statements[0].data) == ASTApp);
+
+f <- (f, g) => (x) => f(g(x));
+
+let r = f.block.statements[0];
+
+assert(type(f.block.statements[0].data) == ASTClosure);
+assert(type(r.data.block.statements[0].data) == ASTApp);

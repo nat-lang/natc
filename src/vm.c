@@ -328,6 +328,18 @@ static ObjUpvalue* captureUpvalue(Value* local) {
   return createdUpvalue;
 }
 
+void captureUpvalues(ObjClosure* closure, CallFrame* frame) {
+  for (int i = 0; i < closure->upvalueCount; i++) {
+    uint8_t isLocal = READ_BYTE();
+    uint8_t index = READ_BYTE();
+    if (isLocal) {
+      closure->upvalues[i] = captureUpvalue(frame->slots + index);
+    } else {
+      closure->upvalues[i] = frame->closure->upvalues[index];
+    }
+  }
+}
+
 static void closeUpvalues(Value* last) {
   while (vm.openUpvalues != NULL && vm.openUpvalues->location >= last) {
     ObjUpvalue* upvalue = vm.openUpvalues;
@@ -603,16 +615,7 @@ InterpretResult execute(int baseFrame) {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
         vmPush(OBJ_VAL(closure));
-
-        for (int i = 0; i < closure->upvalueCount; i++) {
-          uint8_t isLocal = READ_BYTE();
-          uint8_t index = READ_BYTE();
-          if (isLocal) {
-            closure->upvalues[i] = captureUpvalue(frame->slots + index);
-          } else {
-            closure->upvalues[i] = frame->closure->upvalues[index];
-          }
-        }
+        captureUpvalues(closure, frame);
         break;
       }
       case OP_CLOSE_UPVALUE:
