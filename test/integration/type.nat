@@ -1,0 +1,8 @@
+
+let o = Object();
+
+let a = o;
+
+
+print a;
+print o;

@@ -194,25 +194,25 @@ static void markRoots() {
   for (int i = 0; i < vm.frameCount; i++) {
     markObject((Obj*)vm.frames[i].closure);
   }
-  for (ObjUpvalue* upvalue = vm.openUpvalues; upvalue != NULL;
-       upvalue = upvalue->next) {
+  for (ObjUpvalue* upvalue = vm.openUpvalues; upvalue != NULL; upvalue = upvalue->next) {
     markObject((Obj*)upvalue);
   }
   markMap(&vm.globals);
   markCompilerRoots();
 
-  markObject((Obj*)vm.initString);
-  markObject((Obj*)vm.callString);
-  markObject((Obj*)vm.iterString);
-  markObject((Obj*)vm.addString);
-  markObject((Obj*)vm.lengthString);
-  markObject((Obj*)vm.memberString);
-  markObject((Obj*)vm.subscriptGetString);
-  markObject((Obj*)vm.subscriptSetString);
-  markObject((Obj*)vm.equalString);
+  markObject((Obj*)vm.strings.init);
+  markObject((Obj*)vm.strings.call);
+  markObject((Obj*)vm.strings.iter);
+  markObject((Obj*)vm.strings.add);
+  markObject((Obj*)vm.strings.length);
+  markObject((Obj*)vm.strings.member);
+  markObject((Obj*)vm.strings.subscriptGet);
+  markObject((Obj*)vm.strings.subscriptSet);
+  markObject((Obj*)vm.strings.equal);
 
-  markObject((Obj*)vm.seqClass);
-  markObject((Obj*)vm.objClass);
+  markObject((Obj*)vm.classes.object);
+  markObject((Obj*)vm.classes.sequence);
+  markObject((Obj*)vm.classes.astNode);
 }
 
 static void traceReferences() {
@@ -252,7 +252,7 @@ void collectGarbage() {
 
   markRoots();
   traceReferences();
-  mapRemoveWhite(&vm.strings);
+  mapRemoveWhite(&vm.interned);
   sweep();
 
   vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;

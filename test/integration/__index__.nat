@@ -11,6 +11,7 @@ import test/integration/functional
 import test/integration/iteration
 import test/integration/lambda
 import test/integration/length
+import test/integration/logic
 import test/integration/math
 import test/integration/map
 import test/integration/membership
@@ -18,6 +19,7 @@ import test/integration/recursion
 import test/integration/return
 import test/integration/sequence
 import test/integration/set
+import test/integration/destructure
 import test/integration/string
 import test/integration/tree
 

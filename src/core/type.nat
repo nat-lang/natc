@@ -1,0 +1,9 @@
+class Type {}
+
+class TVar extends Type {}
+class TBool extends Type {}
+class TNumber extends Type {}
+class TString extends Type {}
+class TFunction extends Type {}
+class TMap extends Type {}
+class TSet extends Type {}

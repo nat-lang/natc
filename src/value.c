@@ -16,13 +16,14 @@ void writeValueArray(ValueArray* array, Value value) {
   if (array->capacity < array->count + 1) {
     int oldCapacity = array->capacity;
     array->capacity = GROW_CAPACITY(oldCapacity);
-    array->values =
-        GROW_ARRAY(Value, array->values, oldCapacity, array->capacity);
+    array->values = GROW_ARRAY(Value, array->values, oldCapacity, array->capacity);
   }
 
   array->values[array->count] = value;
   array->count++;
 }
+
+Value popValueArray(ValueArray* array) { return array->values[--array->count]; }
 
 void freeValueArray(ValueArray* array) {
   FREE_ARRAY(Value, array->values, array->capacity);
@@ -37,7 +38,7 @@ bool findInValueArray(ValueArray* array, Value value) {
 }
 
 void printValue(Value value) {
-  switch (value.type) {
+  switch (value.cType) {
     case VAL_BOOL: {
       printf(AS_BOOL(value) ? "true" : "false");
       break;
@@ -67,8 +68,8 @@ void printValueArray(ValueArray* array) {
 }
 
 bool valuesEqual(Value a, Value b) {
-  if (a.type != b.type) return false;
-  switch (a.type) {
+  if (a.cType != b.cType) return false;
+  switch (a.cType) {
     case VAL_BOOL:
       return AS_BOOL(a) == AS_BOOL(b);
     case VAL_NIL:
@@ -78,7 +79,7 @@ bool valuesEqual(Value a, Value b) {
     case VAL_OBJ: {
       if (a.as.obj->hash != 0 && b.as.obj->hash != 0)
         return a.as.obj->hash == b.as.obj->hash;
-  
+
       return AS_OBJ(a) == AS_OBJ(b);
     }
     default:
@@ -119,14 +120,14 @@ static inline uint32_t hashNumber(double num) {
 }
 
 bool isHashable(Value value) {
-  return (value.type == VAL_BOOL || value.type == VAL_NIL ||
-          value.type == VAL_NUMBER || IS_STRING(value));
+  return (value.cType == VAL_BOOL || value.cType == VAL_NIL ||
+          value.cType == VAL_NUMBER || IS_STRING(value));
 }
 
 // Generates a hash code for [value], which must be one of
 // nil, bool, num, or string.
 uint32_t hashValue(Value value) {
-  switch (value.type) {
+  switch (value.cType) {
     case VAL_BOOL:
       return AS_BOOL(value);
     case VAL_NIL:
@@ -142,7 +143,7 @@ uint32_t hashValue(Value value) {
   return 0;
 }
 Value typeValue(Value value) {
-  switch (value.type) {
+  switch (value.cType) {
     case VAL_OBJ:
       switch (AS_OBJ(value)->type) {
         case OBJ_INSTANCE:
