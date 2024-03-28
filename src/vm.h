@@ -48,6 +48,8 @@ typedef struct {
 
   ObjClass* seqClass;
   ObjClass* objClass;
+
+  ObjMap* infixes;
 } VM;
 
 typedef enum {
