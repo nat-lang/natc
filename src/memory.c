@@ -213,6 +213,8 @@ static void markRoots() {
 
   markObject((Obj*)vm.seqClass);
   markObject((Obj*)vm.objClass);
+
+  markObject((Obj*)vm.infixes);
 }
 
 static void traceReferences() {

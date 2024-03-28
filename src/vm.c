@@ -96,7 +96,8 @@ bool initVM() {
   vm.seqClass = NULL;
   vm.objClass = NULL;
 
-  initInfixes();
+  vm.infixes = NULL;
+  vm.infixes = newMap();
 
   return initializeCore() == INTERPRET_OK;
 }
@@ -104,6 +105,7 @@ bool initVM() {
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
+
   vm.initString = NULL;
   vm.callString = NULL;
   vm.iterString = NULL;
@@ -112,8 +114,9 @@ void freeVM() {
   vm.subscriptSetString = NULL;
   vm.lengthString = NULL;
   vm.equalString = NULL;
+  vm.infixes = NULL;
+
   freeObjects();
-  freeInfixes();
 }
 
 void vmPush(Value value) {

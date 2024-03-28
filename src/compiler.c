@@ -93,12 +93,6 @@ Parser parser;
 Compiler* current = NULL;
 ClassCompiler* currentClass = NULL;
 
-// map from constants to precedences.
-ObjMap* infixes = NULL;
-
-void initInfixes() { infixes = newMap(); }
-void freeInfixes() { freeMap(infixes); }
-
 static Chunk* currentChunk() { return &current->function->chunk; }
 
 static Parser saveParser() {
@@ -1270,7 +1264,7 @@ static void letDeclaration() {
 
   if (infixPrecedence != -1) {
     Value name = currentChunk()->constants.values[var];
-    mapSet(infixes, name, NUMBER_VAL(infixPrecedence));
+    mapSet(vm.infixes, name, NUMBER_VAL(infixPrecedence));
   }
 }
 
@@ -1527,7 +1521,7 @@ static ParseRule* getRule(Token token) {
     Value name = identifierToken(token);
     Value prec;
 
-    if (mapGet(infixes, name, &prec)) {
+    if (mapGet(vm.infixes, name, &prec)) {
       rules[TOKEN_IDENTIFIER].infix = infix;
       rules[TOKEN_IDENTIFIER].precedence = AS_NUMBER(prec);
     } else {
