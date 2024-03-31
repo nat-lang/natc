@@ -199,6 +199,7 @@ static void markRoots() {
     markObject((Obj*)upvalue);
   }
   markMap(&vm.globals);
+  markMap(&vm.infixes);
   markCompilerRoots();
 
   markObject((Obj*)vm.initString);
@@ -213,8 +214,6 @@ static void markRoots() {
 
   markObject((Obj*)vm.seqClass);
   markObject((Obj*)vm.objClass);
-
-  markObject((Obj*)vm.infixes);
 }
 
 static void traceReferences() {

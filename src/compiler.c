@@ -279,11 +279,12 @@ static int getConstant(Value value) {
   return -1;
 }
 
-static uint8_t makeConstant(Value value) {
+static uint16_t makeConstant(Value value) {
   int existing = getConstant(value);
   if (existing != -1) return existing;
 
   int constant = addConstant(currentChunk(), value);
+
   if (constant > UINT16_MAX) {
     error("Too many constants in one chunk.");
     return 0;
@@ -296,7 +297,7 @@ static uint8_t makeConstant(Value value) {
 }
 
 static void loadConstant(Value value) {
-  int constant = makeConstant(value);
+  uint16_t constant = makeConstant(value);
   emitConstInstr(OP_CONSTANT, constant);
 }
 
@@ -357,9 +358,9 @@ static ObjFunction* endCompiler() {
 
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-    disassembleChunk(currentChunk(), function->name != NULL
-                                         ? function->name->chars
-                                         : "<script>");
+    disassembleChunk(&function->chunk, function->name != NULL
+                                           ? function->name->chars
+                                           : "<script>");
   }
 #endif
 
@@ -400,7 +401,7 @@ static Value identifierToken(Token token) {
   return OBJ_VAL(copyString(token.start, token.length));
 }
 
-static uint8_t identifierConstant(Token* token) {
+static uint16_t identifierConstant(Token* token) {
   return makeConstant(identifierToken(*token));
 }
 
@@ -495,8 +496,8 @@ static int declareVariable() {
   return addLocal(*name);
 }
 
-static uint8_t nativeVariable(char* name) {
-  uint8_t var = makeConstant(identifier(name));
+static uint16_t nativeVariable(char* name) {
+  uint16_t var = makeConstant(identifier(name));
   emitConstInstr(OP_GET_GLOBAL, var);
   return var;
 }
@@ -543,7 +544,7 @@ static void call(bool canAssign) {
 
 static void property(bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
-  uint8_t name = identifierConstant(&parser.previous);
+  uint16_t name = identifierConstant(&parser.previous);
 
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
@@ -660,7 +661,7 @@ static int nativeCall(char* name, int argCount) {
 
 static void methodCall(char* name, int argCount) {
   Value method = identifier(name);
-  uint8_t constant = makeConstant(method);
+  uint16_t constant = makeConstant(method);
   emitConstInstr(OP_INVOKE, constant);
   emitByte(argCount);
 }
@@ -696,7 +697,7 @@ static void super_(bool canAssign) {
 
   consume(TOKEN_DOT, "Expect '.' after 'super'.");
   consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
-  uint8_t name = identifierConstant(&parser.previous);
+  uint16_t name = identifierConstant(&parser.previous);
 
   namedVariable(syntheticToken("this"), false);
 
@@ -735,7 +736,7 @@ static void unary(bool canAssign) {
   }
 }
 
-static uint8_t parseVariable(const char* errorMessage) {
+static uint16_t parseVariable(const char* errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
   declareVariable();
 
@@ -750,7 +751,7 @@ static void markInitialized() {
   current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
-static void defineVariable(uint8_t global) {
+static void defineVariable(uint16_t global) {
   if (current->scopeDepth > 0) {
     markInitialized();
     return;
@@ -849,7 +850,7 @@ static void function(FunctionType type) {
         parser.current.length--;
       }
 
-      uint8_t constant = parseVariable("Expect parameter name.");
+      uint16_t constant = parseVariable("Expect parameter name.");
       defineVariable(constant);
     } while (match(TOKEN_COMMA));
   }
@@ -869,7 +870,7 @@ static void function(FunctionType type) {
 
 static void method() {
   consume(TOKEN_IDENTIFIER, "Expect method name.");
-  uint8_t constant = identifierConstant(&parser.previous);
+  uint16_t constant = identifierConstant(&parser.previous);
   FunctionType type = TYPE_METHOD;
   if (parser.previous.length == 4 &&
       memcmp(parser.previous.start, "init", 4) == 0) {
@@ -1185,7 +1186,7 @@ static void subscript(bool canAssign) {
 static void classDeclaration() {
   consume(TOKEN_IDENTIFIER, "Expect class name.");
   Token className = parser.previous;
-  uint8_t nameConstant = identifierConstant(&parser.previous);
+  uint16_t nameConstant = identifierConstant(&parser.previous);
   declareVariable();
 
   emitConstInstr(OP_CLASS, nameConstant);
@@ -1251,7 +1252,7 @@ static void letDeclaration() {
       infixPrecedence = PREC_CALL;
     }
   }
-  uint8_t var = parseVariable("Expect variable name.");
+  uint16_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
     boundExpression(infixPrecedence != -1);
@@ -1264,7 +1265,7 @@ static void letDeclaration() {
 
   if (infixPrecedence != -1) {
     Value name = currentChunk()->constants.values[var];
-    mapSet(vm.infixes, name, NUMBER_VAL(infixPrecedence));
+    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
   }
 }
 
@@ -1521,7 +1522,7 @@ static ParseRule* getRule(Token token) {
     Value name = identifierToken(token);
     Value prec;
 
-    if (mapGet(vm.infixes, name, &prec)) {
+    if (mapGet(&vm.infixes, name, &prec)) {
       rules[TOKEN_IDENTIFIER].infix = infix;
       rules[TOKEN_IDENTIFIER].precedence = AS_NUMBER(prec);
     } else {
@@ -1588,6 +1589,7 @@ void markCompilerRoots() {
   Compiler* compiler = current;
   while (compiler != NULL) {
     markObject((Obj*)compiler->function);
+    markObject((Obj*)compiler->constants);
     compiler = compiler->enclosing;
   }
 }

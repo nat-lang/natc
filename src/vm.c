@@ -71,6 +71,7 @@ bool initVM() {
 
   initMap(&vm.globals);
   initMap(&vm.strings);
+  initMap(&vm.infixes);
 
   vm.initString = NULL;
   vm.initString = intern("init");
@@ -96,15 +97,13 @@ bool initVM() {
   vm.seqClass = NULL;
   vm.objClass = NULL;
 
-  vm.infixes = NULL;
-  vm.infixes = newMap();
-
   return initializeCore() == INTERPRET_OK;
 }
 
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
+  freeMap(&vm.infixes);
 
   vm.initString = NULL;
   vm.callString = NULL;
@@ -114,7 +113,6 @@ void freeVM() {
   vm.subscriptSetString = NULL;
   vm.lengthString = NULL;
   vm.equalString = NULL;
-  vm.infixes = NULL;
 
   freeObjects();
 }
@@ -425,11 +423,13 @@ static InterpretResult loop() {
       }
       case OP_GET_GLOBAL: {
         ObjString* name = READ_STRING();
+
         Value value;
         if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
+
         vmPush(value);
         break;
       }
