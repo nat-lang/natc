@@ -338,7 +338,7 @@ static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
   current = compiler;
   current->function->name = functionName(type, name);
 
-  for (int i = 0; i <= UINT8_COUNT; i++) {
+  for (int i = 0; i < UINT8_COUNT; i++) {
     compiler->locals[i].depth = 0;
     compiler->locals[i].isCaptured = false;
 

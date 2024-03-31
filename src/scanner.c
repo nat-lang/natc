@@ -14,7 +14,7 @@ Scanner initScanner(const char *source) {
 }
 
 void initToken(Token *token) {
-  token->type = 0;
+  token->type = -1;
   token->start = NULL;
   token->length = -1;
   token->line = -1;
