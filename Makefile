@@ -57,7 +57,7 @@ test-leaks:
 # Run valgrind against the integration tests.
 test-valgrind:
 	@ $(MAKE) debug
-	@ valgrind --leak-check=full --track-origins=yes -s build/nat test/integration/__index__
+	@ valgrind --leak-check=full --track-origins=yes --error-exitcode=1 -s build/nat test/integration/__index__
 
 # Run valgrind against the integration tests in a container.
 valgrind:
