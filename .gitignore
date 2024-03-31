@@ -1,6 +1,7 @@
 build/**/*
 
 !build/Dockerfile
+!build/Dockerfile.valgrind
 !build/c.make
 
 **/*/.DS_Store

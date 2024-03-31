@@ -47,9 +47,19 @@ tests:
 	@ $(BUILD_DIR)/nat test/trip/__index__
 
 # Compile with debugging enabled, sign the binary, and create a symbol map
-# before calling leaks.
+# before running leaks against the integration tests.
 test-leaks:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 	@ codesign -s - --entitlements $(BUILD_DIR)/nat.entitlements -f build/nat
 	@ dsymutil build/nat
 	@ MallocStackLogging=1 leaks --atExit -- $(BUILD_DIR)/nat test/integration/__index__
+
+# Run valgrind against the integration tests.
+test-valgrind:
+	@ $(MAKE) debug
+	@ valgrind --leak-check=full --track-origins=yes -s build/nat test/integration/__index__
+
+# Run valgrind against the integration tests in a container.
+valgrind:
+	@ docker build -t "valgrind" -f build/Dockerfile.valgrind .
+	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp valgrind sh -c "make test-valgrind"
