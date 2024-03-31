@@ -16,3 +16,5 @@ jobs:
         run:  make integration
       - name: Run trip tests
         run: make trip
+      - name: Run valgrind
+        run: make valgrind
