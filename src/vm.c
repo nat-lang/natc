@@ -371,7 +371,11 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
-static InterpretResult loop() {
+// Loop until we're back to [baseFrame] frames. Typically this
+// is just 0, but if we want to execute a single function in the
+// middle of interpretation without overflowing its scope, we can
+// let [baseFrame] = the current frame.
+InterpretResult execute(int baseFrame) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
 #define READ_BYTE() (*frame->ip++)
@@ -625,16 +629,20 @@ static InterpretResult loop() {
         vmPop();
         break;
       case OP_RETURN: {
-        Value result = vmPop();
+        Value value = vmPop();
         closeUpvalues(frame->slots);
         vm.frameCount--;
+
         if (vm.frameCount == 0) {
           vmPop();
           return INTERPRET_OK;
         }
 
         vm.stackTop = frame->slots;
-        vmPush(result);
+        vmPush(value);
+
+        if (vm.frameCount == baseFrame) return INTERPRET_OK;
+
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -699,8 +707,9 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
         InterpretResult result = interpretFile(AS_STRING(path)->chars);
-        vmPop();
-        return result;
+        if (result != INTERPRET_OK) return result;
+        vmPop();  // the return value of the module's function.
+        break;
       }
       case OP_THROW: {
         Value value = vmPop();
@@ -840,7 +849,7 @@ static InterpretResult loop() {
 #undef READ_STRING
 }
 
-InterpretResult interpret(char* path, const char* source) {
+InterpretResult interpretUntil(char* path, const char* source, int frame) {
   ObjFunction* function = compile(source, path);
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
@@ -850,5 +859,9 @@ InterpretResult interpret(char* path, const char* source) {
   vmPush(OBJ_VAL(closure));
   call(closure, 0);
 
-  return loop();
+  return execute(frame);
+}
+
+InterpretResult interpret(char* path, const char* source) {
+  return interpretUntil(path, source, vm.frameCount);
 }
