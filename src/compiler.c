@@ -80,8 +80,6 @@ typedef struct Compiler {
   int localCount;
   Upvalue upvalues[UINT8_COUNT];
   int scopeDepth;
-
-  ObjMap* constants;
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -332,16 +330,25 @@ static ObjString* functionName(FunctionType type, char* name) {
 static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
   compiler->enclosing = current;
   compiler->function = NULL;
+  compiler->function = newFunction();
   compiler->type = type;
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
-  compiler->function = newFunction();
 
   current = compiler;
   current->function->name = functionName(type, name);
 
+  for (int i = 0; i <= UINT8_COUNT; i++) {
+    compiler->locals[i].depth = 0;
+    compiler->locals[i].isCaptured = false;
+
+    initToken(&compiler->locals[i].name);
+  }
+
   Local* local = &current->locals[current->localCount++];
   local->depth = 0;
+  local->isCaptured = false;
+  local->name.type = TOKEN_IDENTIFIER;
   if (type == TYPE_METHOD || type == TYPE_INITIALIZER) {
     local->name.start = "this";
     local->name.length = 4;
@@ -829,6 +836,7 @@ static void blockOrExpression() {
 static void function(FunctionType type) {
   Compiler compiler;
   initCompiler(&compiler, type, NULL);
+
   beginScope();
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
