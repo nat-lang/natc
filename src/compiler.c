@@ -271,7 +271,8 @@ static void emitReturn() {
 static int getConstant(Value value) {
   Value existing;
 
-  if (isHashable(value) && mapGet(current->constants, value, &existing) &&
+  if (isHashable(value) &&
+      mapGet(&current->function->constants, value, &existing) &&
       IS_NUMBER(existing)) {
     return (uint16_t)AS_NUMBER(existing);
   }
@@ -291,7 +292,7 @@ static uint16_t makeConstant(Value value) {
   }
 
   if (isHashable(value))
-    mapSet(current->constants, value, NUMBER_VAL(constant));
+    mapSet(&current->function->constants, value, NUMBER_VAL(constant));
 
   return (uint16_t)constant;
 }
@@ -334,9 +335,7 @@ static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
   compiler->type = type;
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
-  compiler->constants = NULL;
   compiler->function = newFunction();
-  compiler->constants = newMap();
 
   current = compiler;
   current->function->name = functionName(type, name);
@@ -1589,7 +1588,6 @@ void markCompilerRoots() {
   Compiler* compiler = current;
   while (compiler != NULL) {
     markObject((Obj*)compiler->function);
-    markObject((Obj*)compiler->constants);
     compiler = compiler->enclosing;
   }
 }

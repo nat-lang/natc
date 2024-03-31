@@ -708,7 +708,10 @@ InterpretResult execute(int baseFrame) {
         }
         InterpretResult result = interpretFile(AS_STRING(path)->chars);
         if (result != INTERPRET_OK) return result;
-        vmPop();  // the return value of the module's function.
+        // pop the return value of the module's function.
+        // if/when import statements become selective,
+        // it'll probably stick around.
+        vmPop();
         break;
       }
       case OP_THROW: {
@@ -849,7 +852,7 @@ InterpretResult execute(int baseFrame) {
 #undef READ_STRING
 }
 
-InterpretResult interpretUntil(char* path, const char* source, int frame) {
+InterpretResult interpret(char* path, const char* source) {
   ObjFunction* function = compile(source, path);
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
@@ -859,9 +862,5 @@ InterpretResult interpretUntil(char* path, const char* source, int frame) {
   vmPush(OBJ_VAL(closure));
   call(closure, 0);
 
-  return execute(frame);
-}
-
-InterpretResult interpret(char* path, const char* source) {
-  return interpretUntil(path, source, vm.frameCount);
+  return execute(vm.frameCount - 1);
 }

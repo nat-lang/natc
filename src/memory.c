@@ -153,6 +153,7 @@ static void freeObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
+      freeMap(&function->constants);
       FREE(ObjFunction, object);
       break;
     }
