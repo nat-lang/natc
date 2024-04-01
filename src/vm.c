@@ -746,11 +746,8 @@ InterpretResult execute(int baseFrame) {
         // indexed access to sequences.
         if (IS_SEQUENCE(obj)) {
           ObjSequence* seq = AS_SEQUENCE(obj);
-
           if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
-
           int idx = AS_NUMBER(key);
-
           vmPush(seq->values.values[idx]);
           break;
         }
@@ -764,9 +761,8 @@ InterpretResult execute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(obj);
-
         // classes may define their own subscript access operator.
+        ObjInstance* instance = AS_INSTANCE(obj);
         Value getFn;
         if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptGetString),
                    &getFn)) {
@@ -792,26 +788,21 @@ InterpretResult execute(int baseFrame) {
         break;
       }
       case OP_SUBSCRIPT_SET: {
-        Value val = vmPop();
-        Value key = vmPop();
-        Value obj = vmPop();
-
         // indexed assignment to sequences.
-        if (IS_SEQUENCE(obj)) {
-          ObjSequence* seq = AS_SEQUENCE(obj);
+        if (IS_SEQUENCE(vmPeek(2))) {
+          ObjSequence* seq = AS_SEQUENCE(vmPeek(2));
 
-          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
-
-          int idx = AS_NUMBER(key);
-
-          seq->values.values[idx] = val;
+          if (!validateSeqIdx(seq, vmPeek(1))) return INTERPRET_RUNTIME_ERROR;
+          int idx = AS_NUMBER(vmPeek(1));
+          seq->values.values[idx] = vmPeek(0);
 
           // leave the sequence on the stack.
-          vmPush(OBJ_VAL(seq));
+          vmPop();  // val.
+          vmPop();  // key.
           break;
         }
 
-        if (!IS_INSTANCE(obj)) {
+        if (!IS_INSTANCE(vmPeek(2))) {
           runtimeError(
               "Only objects, sequences, and instances with a '%s' method "
               "support "
@@ -820,27 +811,22 @@ InterpretResult execute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(obj);
-
         // classes may define their own subscript setting operator.
+        ObjInstance* instance = AS_INSTANCE(vmPeek(2));
         Value setFn;
         if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptSetString),
                    &setFn)) {
-          // set up the context for the function call.
-          vmPush(obj);  // receiver.
-          vmPush(key);
-          vmPush(val);
-
+          // the stack is already ready for the function call.
           if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
           frame = &vm.frames[vm.frameCount - 1];
           break;
         }
-
         // otherwise fall back to property setting.
-        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
-        mapSet(&instance->fields, key, val);
+        if (!validateHashable(vmPeek(1))) return INTERPRET_RUNTIME_ERROR;
+        mapSet(&instance->fields, vmPeek(1), vmPeek(0));
         // leave the object on the stack.
-        vmPush(obj);
+        vmPop();  // val.
+        vmPop();  // key.
         break;
       }
     }

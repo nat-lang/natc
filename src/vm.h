@@ -50,7 +50,6 @@ typedef struct {
 
   ObjClass* seqClass;
   ObjClass* objClass;
-
 } VM;
 
 typedef enum {
