@@ -18,10 +18,16 @@ CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
 
 # Mode configuration.
 ifeq ($(MODE),debug)
+	CFLAGS += -O0 -DDEBUG -g
+	BUILD_DIR := build/debug
+else ifeq ($(MODE),debug-trace)
 	CFLAGS += -O0 -DDEBUG -g -D DEBUG_PRINT_CODE -D DEBUG_TRACE_EXECUTION
 	BUILD_DIR := build/debug
-else ifeq ($(MODE),debug-gc)
-	CFLAGS += -O0 -DDEBUG -g -D DEBUG_STRESS_GC -D DEBUG_LOG_GC
+else ifeq ($(MODE),debug-log-gc)
+	CFLAGS += -O0 -DDEBUG -g -D DEBUG_LOG_GC
+	BUILD_DIR := build/debug
+else ifeq ($(MODE),debug-stress-gc)
+	CFLAGS += -O0 -DDEBUG -g -D DEBUG_STRESS_GC
 	BUILD_DIR := build/debug
 else
 	CFLAGS += -O3 -flto

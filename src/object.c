@@ -63,6 +63,7 @@ ObjFunction* newFunction() {
   function->name = NULL;
   function->variadic = false;
   initChunk(&function->chunk);
+  initMap(&function->constants);
   return function;
 }
 
@@ -179,12 +180,6 @@ void initMap(ObjMap* map) {
 void freeMap(ObjMap* map) {
   FREE_ARRAY(MapEntry, map->entries, map->capacity);
   initMap(map);
-}
-
-ObjMap* newMap() {
-  ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
-  initMap(map);
-  return map;
 }
 
 static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
@@ -344,7 +339,7 @@ void mapRemoveWhite(ObjMap* map) {
 void markMap(ObjMap* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
-    if (IS_OBJ(entry->key)) markObject(AS_OBJ(entry->key));
+    markValue(entry->key);
     markValue(entry->value);
   }
 }

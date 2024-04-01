@@ -22,6 +22,8 @@ typedef struct {
   int frameCount;
   ObjMap strings;
   ObjMap globals;
+  ObjMap infixes;
+
   Obj* objects;
   ObjUpvalue* openUpvalues;
 
@@ -48,8 +50,6 @@ typedef struct {
 
   ObjClass* seqClass;
   ObjClass* objClass;
-
-  ObjMap* infixes;
 } VM;
 
 typedef enum {

@@ -71,6 +71,7 @@ bool initVM() {
 
   initMap(&vm.globals);
   initMap(&vm.strings);
+  initMap(&vm.infixes);
 
   vm.initString = NULL;
   vm.initString = intern("init");
@@ -96,15 +97,13 @@ bool initVM() {
   vm.seqClass = NULL;
   vm.objClass = NULL;
 
-  vm.infixes = NULL;
-  vm.infixes = newMap();
-
   return initializeCore() == INTERPRET_OK;
 }
 
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
+  freeMap(&vm.infixes);
 
   vm.initString = NULL;
   vm.callString = NULL;
@@ -114,7 +113,6 @@ void freeVM() {
   vm.subscriptSetString = NULL;
   vm.lengthString = NULL;
   vm.equalString = NULL;
-  vm.infixes = NULL;
 
   freeObjects();
 }
@@ -373,7 +371,11 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
-static InterpretResult loop() {
+// Loop until we're back to [baseFrame] frames. Typically this
+// is just 0, but if we want to execute a single function in the
+// middle of interpretation without overflowing its scope, we can
+// let [baseFrame] = the current frame.
+InterpretResult execute(int baseFrame) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
 #define READ_BYTE() (*frame->ip++)
@@ -425,11 +427,13 @@ static InterpretResult loop() {
       }
       case OP_GET_GLOBAL: {
         ObjString* name = READ_STRING();
+
         Value value;
         if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
+
         vmPush(value);
         break;
       }
@@ -625,16 +629,20 @@ static InterpretResult loop() {
         vmPop();
         break;
       case OP_RETURN: {
-        Value result = vmPop();
+        Value value = vmPop();
         closeUpvalues(frame->slots);
         vm.frameCount--;
+
         if (vm.frameCount == 0) {
           vmPop();
           return INTERPRET_OK;
         }
 
         vm.stackTop = frame->slots;
-        vmPush(result);
+        vmPush(value);
+
+        if (vm.frameCount == baseFrame) return INTERPRET_OK;
+
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -699,8 +707,12 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
         InterpretResult result = interpretFile(AS_STRING(path)->chars);
+        if (result != INTERPRET_OK) return result;
+        // pop the return value of the module's function.
+        // if/when import statements become selective,
+        // it'll probably stick around.
         vmPop();
-        return result;
+        break;
       }
       case OP_THROW: {
         Value value = vmPop();
@@ -734,11 +746,8 @@ static InterpretResult loop() {
         // indexed access to sequences.
         if (IS_SEQUENCE(obj)) {
           ObjSequence* seq = AS_SEQUENCE(obj);
-
           if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
-
           int idx = AS_NUMBER(key);
-
           vmPush(seq->values.values[idx]);
           break;
         }
@@ -752,9 +761,8 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(obj);
-
         // classes may define their own subscript access operator.
+        ObjInstance* instance = AS_INSTANCE(obj);
         Value getFn;
         if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptGetString),
                    &getFn)) {
@@ -780,26 +788,21 @@ static InterpretResult loop() {
         break;
       }
       case OP_SUBSCRIPT_SET: {
-        Value val = vmPop();
-        Value key = vmPop();
-        Value obj = vmPop();
-
         // indexed assignment to sequences.
-        if (IS_SEQUENCE(obj)) {
-          ObjSequence* seq = AS_SEQUENCE(obj);
+        if (IS_SEQUENCE(vmPeek(2))) {
+          ObjSequence* seq = AS_SEQUENCE(vmPeek(2));
 
-          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
-
-          int idx = AS_NUMBER(key);
-
-          seq->values.values[idx] = val;
+          if (!validateSeqIdx(seq, vmPeek(1))) return INTERPRET_RUNTIME_ERROR;
+          int idx = AS_NUMBER(vmPeek(1));
+          seq->values.values[idx] = vmPeek(0);
 
           // leave the sequence on the stack.
-          vmPush(OBJ_VAL(seq));
+          vmPop();  // val.
+          vmPop();  // key.
           break;
         }
 
-        if (!IS_INSTANCE(obj)) {
+        if (!IS_INSTANCE(vmPeek(2))) {
           runtimeError(
               "Only objects, sequences, and instances with a '%s' method "
               "support "
@@ -808,27 +811,22 @@ static InterpretResult loop() {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(obj);
-
         // classes may define their own subscript setting operator.
+        ObjInstance* instance = AS_INSTANCE(vmPeek(2));
         Value setFn;
         if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptSetString),
                    &setFn)) {
-          // set up the context for the function call.
-          vmPush(obj);  // receiver.
-          vmPush(key);
-          vmPush(val);
-
+          // the stack is already ready for the function call.
           if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
           frame = &vm.frames[vm.frameCount - 1];
           break;
         }
-
         // otherwise fall back to property setting.
-        if (!validateHashable(key)) return INTERPRET_RUNTIME_ERROR;
-        mapSet(&instance->fields, key, val);
+        if (!validateHashable(vmPeek(1))) return INTERPRET_RUNTIME_ERROR;
+        mapSet(&instance->fields, vmPeek(1), vmPeek(0));
         // leave the object on the stack.
-        vmPush(obj);
+        vmPop();  // val.
+        vmPop();  // key.
         break;
       }
     }
@@ -850,5 +848,5 @@ InterpretResult interpret(char* path, const char* source) {
   vmPush(OBJ_VAL(closure));
   call(closure, 0);
 
-  return loop();
+  return execute(vm.frameCount - 1);
 }

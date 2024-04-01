@@ -31,6 +31,7 @@ class Set extends Object {
   // The compiler calls this method when building a set comprehension.
   add(element) => this.__set__(element, true);
 
+  // The elements of the set are the keys of the underlying map.
   elements() => this.keys();
 
   // Iteration is over elements.

@@ -13,6 +13,13 @@ Scanner initScanner(const char *source) {
   return scanner;
 }
 
+void initToken(Token *token) {
+  token->type = -1;
+  token->start = NULL;
+  token->length = -1;
+  token->line = -1;
+}
+
 void printScanner(Scanner sc) {
   fprintf(stderr, "(scanner current): %s\n", scanner.current);
 }

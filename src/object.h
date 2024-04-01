@@ -49,12 +49,27 @@ struct Obj {
 };
 
 typedef struct {
+  Value key;
+  Value value;
+} MapEntry;
+
+typedef struct {
+  Obj obj;
+  int count;
+  int capacity;
+  MapEntry *entries;
+} ObjMap;
+
+typedef struct {
   Obj obj;
   int arity;
   int upvalueCount;
   bool variadic;
   Chunk chunk;
   ObjString *name;
+  // cache from values to constant indices
+  // in the function's chunk.constants.
+  ObjMap constants;
 } ObjFunction;
 
 typedef bool (*NativeFn)(int argCount, Value *args);
@@ -86,18 +101,6 @@ typedef struct {
   ObjUpvalue **upvalues;
   int upvalueCount;
 } ObjClosure;
-
-typedef struct {
-  Value key;
-  Value value;
-} MapEntry;
-
-typedef struct {
-  Obj obj;
-  int count;
-  int capacity;
-  MapEntry *entries;
-} ObjMap;
 
 typedef struct {
   Obj obj;

@@ -1,6 +1,7 @@
 BUILD_DIR := build
 CURRENT_DIR := $(shell pwd)
 BIN := $(HOME)/bin
+HAS_LEAKS := false
 
 default: clean dev
 
@@ -8,43 +9,57 @@ default: clean dev
 clean:
 	@ rm -rf $(BUILD_DIR)/release
 	@ rm -rf $(BUILD_DIR)/debug
-	@ rm $(BUILD_DIR)/nat $(BIN)/nat
+	@ rm -f $(BUILD_DIR)/nat $(BIN)/nat
 
 # Compile the interpreter.
 nat:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 
-# Compile the interpreter in debug mode.
-nat-debug:
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
-
 # Compile and symlink to local bin.
 dev:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
-	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(BIN)/nat
+	@ ln -s $(BUILD_DIR)/nat $(BIN)/nat
 
-# Compile the interpreter in debug mode and symlink to local bin.
+# Compile the interpreter in debug mode.
 debug:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
-	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(BIN)/nat
+
+# Compile the interpreter with instruction and stack tracing enabled.
+debug-trace:
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-trace SOURCE_DIR=src
 
 # Compile the interpreter with a manic garbage collector.
-debug-gc:
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-gc SOURCE_DIR=src
-	@ ln -s $(CURRENT_DIR)/$(BUILD_DIR)/nat $(BIN)/nat
+debug-stress-gc:
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stress-gc SOURCE_DIR=src
 
-# Run all the tests.
+# Compile the interpreter
+debug-log-gc:
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
+
 integration:
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
+	@ $(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
 
-# Run all the tests.
 trip:
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/trip/__index__ && echo "ok"
+	@ $(BUILD_DIR)/nat test/trip/__index__ && echo "ok"
 
-# Run all the tests.
 tests:
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__
-	@ $(CURRENT_DIR)/$(BUILD_DIR)/nat test/trip/__index__
+	@ $(BUILD_DIR)/nat test/integration/__index__
+	@ $(BUILD_DIR)/nat test/trip/__index__
 
+# Compile with debugging enabled, sign the binary, and create a symbol map
+# before running leaks against the integration tests.
 test-leaks:
-	@ leaks --atExit -- $(CURRENT_DIR)/$(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
+	@ codesign -s - --entitlements $(BUILD_DIR)/nat.entitlements -f build/nat
+	@ dsymutil build/nat
+	@ MallocStackLogging=1 leaks --atExit -- $(BUILD_DIR)/nat test/integration/__index__
+
+# Run valgrind against the integration tests.
+test-valgrind:
+	@ $(MAKE) debug
+	@ valgrind --leak-check=full --track-origins=yes --error-exitcode=1 -s build/nat test/integration/__index__
+
+# Run valgrind against the integration tests in a container.
+valgrind:
+	@ docker build -t "valgrind" -f build/Dockerfile.valgrind .
+	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp valgrind sh -c "make test-valgrind"

@@ -4,32 +4,48 @@
 #include <string.h>
 #include <time.h>
 
-static void defineNative(ObjString* name, Value native, ObjMap* dest) {
-  vmPush(OBJ_VAL(name));
-  vmPush(native);
-  mapSet(dest, vm.stack[0], vm.stack[1]);
-  vmPop();
-  vmPop();
-}
-
-static void defineNativeFn(ObjString* name, int arity, NativeFn function,
+static void defineNativeFn(char* name, int arity, NativeFn function,
                            ObjMap* dest) {
-  Value fn = OBJ_VAL(newNative(arity, name, function));
-  defineNative(name, fn, dest);
+  // first put the values on the stack so they're
+  // not gc'd if/when the map is recapacitated.
+  ObjString* objName = intern(name);
+  vmPush(OBJ_VAL(objName));
+  ObjNative* native = newNative(arity, objName, function);
+  Value fn = OBJ_VAL(native);
+  vmPush(fn);
+  mapSet(dest, vmPeek(1), vmPeek(0));
+  vmPop();
+  vmPop();
 }
 
-ObjClass* defineNativeClass(ObjString* name, ObjMap* dest) {
-  ObjClass* klass = newClass(name);
+static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
+  defineNativeFn(name, arity, function, &vm.globals);
+}
 
-  defineNative(name, OBJ_VAL(klass), dest);
+static void defineNativeFnMethod(char* name, int arity, NativeFn function,
+                                 ObjClass* klass) {
+  defineNativeFn(name, arity, function, &klass->methods);
+}
 
+ObjClass* defineNativeClass(char* name) {
+  ObjString* objName = intern(name);
+  vmPush(OBJ_VAL(objName));
+  ObjClass* klass = newClass(objName);
+  vmPush(OBJ_VAL(klass));
+  mapSet(&vm.globals, vmPeek(1), vmPeek(0));
+  vmPop();
+  vmPop();
   return klass;
 }
 
 bool __seqInit__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
 
-  mapSet(&obj->fields, OBJ_VAL(intern("values")), OBJ_VAL(newSequence()));
+  vmPush(OBJ_VAL(intern("values")));
+  vmPush(OBJ_VAL(newSequence()));
+  mapSet(&obj->fields, vmPeek(1), vmPeek(0));
+  vmPop();
+  vmPop();
 
   return true;
 }
@@ -86,20 +102,25 @@ bool __objEntries__(int argCount, Value* args) {
 
   // the entry sequence.
   ObjSequence* entries = newSequence();
+  vmPush(OBJ_VAL(entries));
 
   for (int i = 0; i < map->fields.capacity; i++) {
     MapEntry* entry = &map->fields.entries[i];
     if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
 
     ObjSequence* entrySeq = newSequence();
+    vmPush(OBJ_VAL(entrySeq));
 
     writeValueArray(&entrySeq->values, entry->key);
     writeValueArray(&entrySeq->values, entry->value);
     writeValueArray(&entries->values, OBJ_VAL(entrySeq));
+
+    vmPop();
   }
 
-  // pop the map (and native fn) now that we're done
+  // pop the entries, map, and native fn, now that we're done
   // with them and leave the entries on the stack.
+  vmPop();
   vmPop();
   vmPop();
   vmPush(OBJ_VAL(entries));
@@ -116,72 +137,71 @@ static bool validateHash(Value value) {
 }
 
 bool __objGet__(int argCount, Value* args) {
-  Value key = vmPop();
-  Value obj = vmPop();
+  if (!validateHashable(vmPeek(0))) return false;
 
-  if (!validateHashable(key)) return false;
+  Value value = NIL_VAL;
 
-  Value value;
-  if (mapGet(&AS_INSTANCE(obj)->fields, key, &value) ||
-      mapGet(&AS_INSTANCE(obj)->klass->methods, key, &value)) {
-    vmPush(value);
-  } else {
-    vmPush(NIL_VAL);
-  }
+  if (!mapGet(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), &value))
+    mapGet(&AS_INSTANCE(vmPeek(1))->klass->methods, vmPeek(0), &value);
 
+  vmPop();
+  vmPop();
+  vmPush(value);
   return true;
 }
 
 bool __objSet__(int argCount, Value* args) {
-  Value val = vmPop();
-  Value key = vmPop();
-  Value obj = vmPop();
+  if (!validateHashable(vmPeek(1))) return false;
+  mapSet(&AS_INSTANCE(vmPeek(2))->fields, vmPeek(1), vmPeek(0));
 
-  if (!validateHashable(key)) return false;
-
-  mapSet(&AS_INSTANCE(obj)->fields, key, val);
+  vmPop();
+  vmPop();
+  vmPop();
   return true;
 }
 
 bool __objHas__(int argCount, Value* args) {
-  Value key = vmPop();
-  Value obj = vmPop();
+  if (!validateHashable(vmPeek(0))) return false;
 
-  if (!validateHashable(key)) return false;
-
-  bool hasKey = mapHas(&AS_INSTANCE(obj)->fields, key) ||
-                mapHas(&AS_INSTANCE(obj)->klass->methods, key);
-
+  bool hasKey = mapHas(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0)) ||
+                mapHas(&AS_INSTANCE(vmPeek(1))->klass->methods, vmPeek(0));
+  vmPop();
+  vmPop();
   vmPush(BOOL_VAL(hasKey));
   return true;
 }
 
 bool __length__(int argCount, Value* args) {
-  Value value = vmPop();
-  vmPop();  // native fn.
-
-  if (IS_SEQUENCE(value)) {
-    ObjSequence* seq = AS_SEQUENCE(value);
+  if (IS_SEQUENCE(vmPeek(0))) {
+    ObjSequence* seq = AS_SEQUENCE(vmPeek(0));
+    vmPop();
+    vmPop();  // native fn.
     vmPush(NUMBER_VAL(seq->values.count));
     return true;
   }
 
-  if (!IS_INSTANCE(value)) {
+  // use the object's length method if defined.
+  if (!IS_INSTANCE(vmPeek(0))) {
     runtimeError("Only sequences and objects with a '%s' method have length.",
                  vm.lengthString->chars);
+    vmPop();
+    vmPop();  // native fn.
     return false;
   }
 
-  ObjInstance* instance = AS_INSTANCE(value);
-
+  ObjInstance* instance = AS_INSTANCE(vmPeek(0));
   Value method;
   if (mapGet(&instance->klass->methods, OBJ_VAL(vm.lengthString), &method)) {
     // set up the context for the function call.
-    vmPush(value);  // receiver.
+    vmPop();
+    vmPop();                    // native fn.
+    vmPush(OBJ_VAL(instance));  // receiver.
     return vmCallValue(method, 0);
   }
 
-  // default to the instance's field count.
+  // otherwise default to the instance's field count.
+  vmPop();
+  vmPop();  // native fn.
   vmPush(NUMBER_VAL(instance->fields.count));
   return true;
 }
@@ -306,27 +326,27 @@ bool __add__(int argCount, Value* args) {
 InterpretResult initializeCore() {
   // native functions.
 
-  defineNativeFn(intern("len"), 1, __length__, &vm.globals);
-  defineNativeFn(intern("str"), 1, __str__, &vm.globals);
-  defineNativeFn(intern("getHash"), 1, __getHash__, &vm.globals);
-  defineNativeFn(intern("setHash"), 2, __setHash__, &vm.globals);
-  defineNativeFn(intern("type"), 1, __type__, &vm.globals);
-  defineNativeFn(intern("entries"), 1, __objEntries__, &vm.globals);
-  defineNativeFn(intern("clock"), 0, __clock__, &vm.globals);
+  defineNativeFnGlobal("len", 1, __length__);
+  defineNativeFnGlobal("str", 1, __str__);
+  defineNativeFnGlobal("getHash", 1, __getHash__);
+  defineNativeFnGlobal("setHash", 2, __setHash__);
+  defineNativeFnGlobal("type", 1, __type__);
+  defineNativeFnGlobal("entries", 1, __objEntries__);
+  defineNativeFnGlobal("clock", 0, __clock__);
 
-  defineNativeFn(intern("__gt__"), 2, __gt__, &vm.globals);
-  defineNativeFn(intern("__lt__"), 2, __lt__, &vm.globals);
-  defineNativeFn(intern("__gte__"), 2, __gte__, &vm.globals);
-  defineNativeFn(intern("__lte__"), 2, __lte__, &vm.globals);
-  defineNativeFn(intern("__add__"), 2, __add__, &vm.globals);
-  defineNativeFn(intern("__sub__"), 2, __sub__, &vm.globals);
-  defineNativeFn(intern("__div__"), 2, __div__, &vm.globals);
-  defineNativeFn(intern("__mul__"), 2, __mul__, &vm.globals);
+  defineNativeFnGlobal("__gt__", 2, __gt__);
+  defineNativeFnGlobal("__lt__", 2, __lt__);
+  defineNativeFnGlobal("__gte__", 2, __gte__);
+  defineNativeFnGlobal("__lte__", 2, __lte__);
+  defineNativeFnGlobal("__add__", 2, __add__);
+  defineNativeFnGlobal("__sub__", 2, __sub__);
+  defineNativeFnGlobal("__div__", 2, __div__);
+  defineNativeFnGlobal("__mul__", 2, __mul__);
 
-  vm.objClass = defineNativeClass(intern("__obj__"), &vm.globals);
-  defineNativeFn(intern("get"), 1, __objGet__, &vm.objClass->methods);
-  defineNativeFn(intern("set"), 2, __objSet__, &vm.objClass->methods);
-  defineNativeFn(intern("has"), 1, __objHas__, &vm.objClass->methods);
+  vm.objClass = defineNativeClass("__obj__");
+  defineNativeFnMethod("get", 1, __objGet__, vm.objClass);
+  defineNativeFnMethod("set", 2, __objSet__, vm.objClass);
+  defineNativeFnMethod("has", 1, __objHas__, vm.objClass);
 
   // native classes.
 
@@ -334,8 +354,8 @@ InterpretResult initializeCore() {
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
   vm.seqClass = getClass("Sequence");
-  defineNativeFn(vm.initString, 0, __seqInit__, &vm.seqClass->methods);
-  defineNativeFn(intern("add"), 1, __seqAdd__, &vm.seqClass->methods);
+  defineNativeFnMethod("init", 0, __seqInit__, vm.seqClass);
+  defineNativeFnMethod("add", 1, __seqAdd__, vm.seqClass);
 
   return INTERPRET_OK;
 }

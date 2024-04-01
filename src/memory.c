@@ -1,5 +1,6 @@
 #include "memory.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "compiler.h"
@@ -153,6 +154,7 @@ static void freeObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
+      freeMap(&function->constants);
       FREE(ObjFunction, object);
       break;
     }
@@ -199,6 +201,7 @@ static void markRoots() {
     markObject((Obj*)upvalue);
   }
   markMap(&vm.globals);
+  markMap(&vm.infixes);
   markCompilerRoots();
 
   markObject((Obj*)vm.initString);
@@ -213,8 +216,6 @@ static void markRoots() {
 
   markObject((Obj*)vm.seqClass);
   markObject((Obj*)vm.objClass);
-
-  markObject((Obj*)vm.infixes);
 }
 
 static void traceReferences() {
