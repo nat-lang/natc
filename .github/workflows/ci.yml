@@ -18,3 +18,8 @@ jobs:
         run: make trip
       - name: Run valgrind
         run: make valgrind
+      - name: Run garbage collection stress
+        run: |
+          sudo make clean
+          make debug-stress-gc
+          make tests
