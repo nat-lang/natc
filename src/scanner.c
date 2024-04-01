@@ -127,8 +127,6 @@ static TokenType checkpointKeyword(int start, int length, const char *rest,
 
 static TokenType identifierType() {
   switch (scanner.start[0]) {
-    case 'a':
-      return checkpointKeyword(1, 2, "nd", TOKEN_AND);
     case 'c':
       return checkpointKeyword(1, 4, "lass", TOKEN_CLASS);
     case 'e':
@@ -174,8 +172,6 @@ static TokenType identifierType() {
       return checkpointKeyword(1, 2, "et", TOKEN_LET);
     case 'n':
       return checkpointKeyword(1, 2, "il", TOKEN_NIL);
-    case 'o':
-      return checkpointKeyword(1, 1, "r", TOKEN_OR);
     case 'p':
       return checkpointKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
