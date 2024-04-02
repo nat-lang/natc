@@ -21,6 +21,8 @@
 
 #define S_OBJ "__obj__"
 #define S_SEQUENCE "Sequence"
+#define S_AST_NODE "ASTNode"
+#define S_AST_CLOSURE "ASTClosure"
 
 ObjFunction* compile(const char* source, char* path);
 void markCompilerRoots();

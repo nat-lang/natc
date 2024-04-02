@@ -11,9 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run:  make nat
+        run: make nat
       - name: Run integration tests
-        run:  make integration
+        run: make integration
       - name: Run trip tests
         run: make trip
       - name: Run valgrind

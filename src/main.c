@@ -17,7 +17,7 @@ static void repl() {
       break;
     }
 
-    interpret(line, "repl");
+    vmInterpret(line, "repl");
   }
 }
 

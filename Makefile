@@ -48,7 +48,7 @@ tests:
 
 # Compile with debugging enabled, sign the binary, and create a symbol map
 # before running leaks against the integration tests.
-test-leaks:
+leaks:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 	@ codesign -s - --entitlements $(BUILD_DIR)/nat.entitlements -f build/nat
 	@ dsymutil build/nat

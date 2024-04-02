@@ -1,5 +1,5 @@
-#ifndef clox_vm_h
-#define clox_vm_h
+#ifndef nat_vm_h
+#define nat_vm_h
 
 #include "chunk.h"
 #include "object.h"
@@ -7,6 +7,13 @@
 
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
+
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() \
+  (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() \
+  (frame->closure->function->chunk.constants.values[READ_SHORT()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 
 typedef struct {
   ObjClosure* closure;
@@ -17,6 +24,8 @@ typedef struct {
 typedef struct {
   ObjClass* sequence;
   ObjClass* object;
+  ObjClass* astNode;
+  ObjClass* astClosure;
 } Classes;
 
 typedef struct {
@@ -54,16 +63,19 @@ extern VM vm;
 
 bool initVM();
 void freeVM();
-void runtimeError(const char* format, ...);
 
-InterpretResult interpret(char* path, const char* source);
+void vmRuntimeError(const char* format, ...);
+
+InterpretResult vmInterpret(char* path, const char* source);
+InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
-bool initClass(ObjClass* klass, int argCount);
-bool invoke(ObjString* name, int argCount);
-bool validateHashable(Value value);
+bool vmInitClass(ObjClass* klass, int argCount);
+bool vmInvoke(ObjString* name, int argCount);
+bool vmValidateHashable(Value value);
 bool vmCallValue(Value value, int argCount);
 bool vmInstanceHas(ObjInstance* instance, Value value);
+void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
 
 #endif

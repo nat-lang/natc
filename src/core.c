@@ -56,11 +56,11 @@ bool __seqAdd__(int argCount, Value* args) {
 
   Value seq;
   if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), &seq)) {
-    runtimeError("Sequence instance missing its values!");
+    vmRuntimeError("Sequence instance missing its values!");
     return false;
   }
   if (!IS_SEQUENCE(seq)) {
-    runtimeError("Expecting sequence.");
+    vmRuntimeError("Expecting sequence.");
     return false;
   }
 
@@ -74,12 +74,12 @@ static ObjClass* getClass(char* name) {
   Value obj;
 
   if (!mapGet(&vm.globals, OBJ_VAL(intern(name)), &obj)) {
-    runtimeError("Couldn't find class %s", name);
+    vmRuntimeError("Couldn't find class %s", name);
     return NULL;
   }
 
   if (!IS_CLASS(obj)) {
-    runtimeError("Not a class: %s", name);
+    vmRuntimeError("Not a class: %s", name);
     return NULL;
   }
 
@@ -88,7 +88,7 @@ static ObjClass* getClass(char* name) {
 
 bool __objEntries__(int argCount, Value* args) {
   if (!IS_INSTANCE(vmPeek(0))) {
-    runtimeError("Only objects have entries.");
+    vmRuntimeError("Only objects have entries.");
     return false;
   }
 
@@ -124,14 +124,14 @@ bool __objEntries__(int argCount, Value* args) {
 
 static bool validateHash(Value value) {
   if (!IS_NUMBER(value)) {
-    runtimeError("Hash must be a number.");
+    vmRuntimeError("Hash must be a number.");
     return false;
   }
   return true;
 }
 
 bool __objGet__(int argCount, Value* args) {
-  if (!validateHashable(vmPeek(0))) return false;
+  if (!vmValidateHashable(vmPeek(0))) return false;
 
   Value value = NIL_VAL;
 
@@ -145,7 +145,7 @@ bool __objGet__(int argCount, Value* args) {
 }
 
 bool __objSet__(int argCount, Value* args) {
-  if (!validateHashable(vmPeek(1))) return false;
+  if (!vmValidateHashable(vmPeek(1))) return false;
   mapSet(&AS_INSTANCE(vmPeek(2))->fields, vmPeek(1), vmPeek(0));
 
   vmPop();
@@ -155,7 +155,7 @@ bool __objSet__(int argCount, Value* args) {
 }
 
 bool __objHas__(int argCount, Value* args) {
-  if (!validateHashable(vmPeek(0))) return false;
+  if (!vmValidateHashable(vmPeek(0))) return false;
 
   bool hasKey = mapHas(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0)) ||
                 mapHas(&AS_INSTANCE(vmPeek(1))->klass->methods, vmPeek(0));
@@ -176,8 +176,8 @@ bool __length__(int argCount, Value* args) {
 
   // use the object's length method if defined.
   if (!IS_INSTANCE(vmPeek(0))) {
-    runtimeError("Only sequences and objects with a '%s' method have length.",
-                 S_LEN);
+    vmRuntimeError("Only sequences and objects with a '%s' method have length.",
+                   S_LEN);
     vmPop();
     vmPop();  // native fn.
     return false;
@@ -216,11 +216,11 @@ bool __setHash__(int argCount, Value* args) {
   vmPop();  // native fn.
 
   if (IS_STRING(obj)) {
-    runtimeError("Can't set hash of a string.");
+    vmRuntimeError("Can't set hash of a string.");
     return false;
   }
   if (!IS_OBJ(obj)) {
-    runtimeError("Can only set hash of an object.");
+    vmRuntimeError("Can only set hash of an object.");
     return false;
   }
 
@@ -311,7 +311,7 @@ bool __add__(int argCount, Value* args) {
     vmPop();  // fn
     vmPush(NUMBER_VAL(a + b));
   } else {
-    runtimeError("Operands must be two numbers or two strings.");
+    vmRuntimeError("Operands must be two numbers or two strings.");
     return false;
   }
   return true;
@@ -350,6 +350,9 @@ InterpretResult initializeCore() {
   vm.classes.sequence = getClass(S_SEQUENCE);
   defineNativeFnMethod(S_INIT, 0, __seqInit__, vm.classes.sequence);
   defineNativeFnMethod(S_ADD, 1, __seqAdd__, vm.classes.sequence);
+
+  vm.classes.astNode = getClass(S_AST_NODE);
+  vm.classes.astClosure = getClass(S_AST_CLOSURE);
 
   return INTERPRET_OK;
 }

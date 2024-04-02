@@ -393,7 +393,7 @@ static void endScope() {
 
 static void function(FunctionType type);
 static void expression();
-static void boundExpression(bool isInfix);
+static void boundExpression();
 static void statement();
 static void declaration();
 static void classDeclaration();
@@ -631,7 +631,12 @@ static void namedVariable(Token name, bool canAssign) {
     setOp = OP_SET_GLOBAL;
   }
 
-  if (canAssign && match(TOKEN_EQUAL)) {
+  if (canAssign && checkStr("<-")) {
+    advance();
+    expression();
+    emitByte(OP_DESTRUCTURE);
+    emitConstInstr(setOp, arg);
+  } else if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitConstInstr(setOp, arg);
   } else {
@@ -777,7 +782,7 @@ static bool tryFunction(FunctionType fnType) {
   return false;
 }
 
-static void boundExpression(bool isInfix) {
+static void boundExpression() {
   if (tryFunction(TYPE_BOUND)) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
@@ -1242,7 +1247,7 @@ static void letDeclaration() {
   uint16_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
-    boundExpression(infixPrecedence != -1);
+    boundExpression();
   } else {
     emitByte(OP_NIL);
   }
