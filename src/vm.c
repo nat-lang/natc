@@ -801,6 +801,9 @@ InterpretResult execute(int baseFrame) {
         vmPop();  // key.
         break;
       }
+      default:
+        runtimeError("Unexpected op code: %i", instruction);
+        return INTERPRET_RUNTIME_ERROR;
     }
   }
 

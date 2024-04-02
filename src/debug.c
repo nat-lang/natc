@@ -176,6 +176,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_SUBSCRIPT_GET", offset);
     case OP_SUBSCRIPT_SET:
       return simpleInstruction("OP_SUBSCRIPT_SET", offset);
+    case OP_END:
+      return simpleInstruction("OP_END", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
