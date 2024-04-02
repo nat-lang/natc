@@ -73,29 +73,8 @@ bool initVM() {
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
-  vm.initString = NULL;
-  vm.initString = intern("init");
-  vm.callString = NULL;
-  vm.callString = intern("call");
-  vm.iterString = NULL;
-  vm.iterString = intern("iter");
-  vm.nextString = NULL;
-  vm.nextString = intern("next");
-  vm.addString = NULL;
-  vm.addString = intern("add");
-  vm.memberString = NULL;
-  vm.memberString = intern("__in__");
-  vm.subscriptGetString = NULL;
-  vm.subscriptGetString = intern("__get__");
-  vm.subscriptSetString = NULL;
-  vm.subscriptSetString = intern("__set__");
-  vm.lengthString = NULL;
-  vm.lengthString = intern("__len__");
-  vm.equalString = NULL;
-  vm.equalString = intern("__eq__");
-
-  vm.seqClass = NULL;
-  vm.objClass = NULL;
+  vm.classes.object = NULL;
+  vm.classes.sequence = NULL;
 
   return initializeCore() == INTERPRET_OK;
 }
@@ -105,14 +84,8 @@ void freeVM() {
   freeMap(&vm.strings);
   freeMap(&vm.infixes);
 
-  vm.initString = NULL;
-  vm.callString = NULL;
-  vm.iterString = NULL;
-  vm.memberString = NULL;
-  vm.subscriptGetString = NULL;
-  vm.subscriptSetString = NULL;
-  vm.lengthString = NULL;
-  vm.equalString = NULL;
+  vm.classes.object = NULL;
+  vm.classes.sequence = NULL;
 
   freeObjects();
 }
@@ -140,8 +113,8 @@ static bool checkArity(int paramCount, int argCount) {
 // sequence argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
-  vmPush(OBJ_VAL(newInstance(vm.seqClass)));
-  initClass(vm.seqClass, 0);
+  vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
+  initClass(vm.classes.sequence, 0);
 
   // either the function was called (a) with arity - 1 arguments
   // or (b) with arity - n arguments for n > 1. (a) is valid;
@@ -162,7 +135,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
     vmPush(seq);
     vmPush(arg);
 
-    if (!invoke(vm.addString, 1)) return false;
+    if (!invoke(intern(S_ADD), 1)) return false;
     i--;
   }
 
@@ -227,12 +200,12 @@ bool vmCallValue(Value callee, int argCount) {
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);
         Value callFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.callString),
+        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_CALL)),
                    &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
         } else {
           printValue(callee);
-          runtimeError("Objects require a 'call' method to be called.");
+          runtimeError("Objects require a '%s' method to be called.", S_CALL);
           return false;
         }
         return true;
@@ -250,7 +223,7 @@ bool vmCallValue(Value callee, int argCount) {
 bool initClass(ObjClass* klass, int argCount) {
   Value initializer;
 
-  if (mapGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
+  if (mapGet(&klass->methods, OBJ_VAL(intern(S_INIT)), &initializer)) {
     return vmCallValue(initializer, argCount);
   } else if (argCount != 0) {
     runtimeError("Expected 0 arguments but got %d.", argCount);
@@ -498,7 +471,7 @@ InterpretResult execute(int baseFrame) {
           Value equalFn;
           if (valuesEqual(OBJ_VAL(instanceA->klass),
                           OBJ_VAL(instanceB->klass)) &&
-              mapGet(&instanceA->klass->methods, OBJ_VAL(vm.equalString),
+              mapGet(&instanceA->klass->methods, OBJ_VAL(intern(S_EQ)),
                      &equalFn)) {
             vmPush(a);
             vmPush(b);
@@ -685,8 +658,7 @@ InterpretResult execute(int baseFrame) {
 
         // classes can override the membership predicate.
         Value memFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.memberString),
-                   &memFn)) {
+        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_IN)), &memFn)) {
           vmPush(obj);
           vmPush(val);
 
@@ -757,14 +729,14 @@ InterpretResult execute(int baseFrame) {
               "Only objects, sequences, and instances with a '%s' method "
               "support "
               "access by subscript.",
-              vm.subscriptGetString->chars);
+              S_SUBSCRIPT_GET);
           return INTERPRET_RUNTIME_ERROR;
         }
 
         // classes may define their own subscript access operator.
         ObjInstance* instance = AS_INSTANCE(obj);
         Value getFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptGetString),
+        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_SUBSCRIPT_GET)),
                    &getFn)) {
           // set up the context for the function call.
           vmPush(obj);  // receiver.
@@ -807,14 +779,14 @@ InterpretResult execute(int baseFrame) {
               "Only objects, sequences, and instances with a '%s' method "
               "support "
               "assignment by subscript.",
-              vm.subscriptSetString->chars);
+              S_SUBSCRIPT_SET);
           return INTERPRET_RUNTIME_ERROR;
         }
 
         // classes may define their own subscript setting operator.
         ObjInstance* instance = AS_INSTANCE(vmPeek(2));
         Value setFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(vm.subscriptSetString),
+        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_SUBSCRIPT_SET)),
                    &setFn)) {
           // the stack is already ready for the function call.
           if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;

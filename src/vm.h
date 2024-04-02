@@ -15,6 +15,11 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjClass* sequence;
+  ObjClass* object;
+} Classes;
+
+typedef struct {
   Value stack[STACK_MAX];
   Value* stackTop;
 
@@ -27,6 +32,9 @@ typedef struct {
   Obj* objects;
   ObjUpvalue* openUpvalues;
 
+  // core defs.
+  Classes classes;
+
   // memory.
   int grayCount;
   int grayCapacity;
@@ -34,22 +42,6 @@ typedef struct {
 
   size_t bytesAllocated;
   size_t nextGC;
-
-  // methods with special semantics.
-  ObjString* initString;
-  ObjString* callString;
-  ObjString* iterString;
-  ObjString* nextString;
-  ObjString* addString;
-  ObjString* memberString;
-  ObjString* subscriptGetString;
-  ObjString* subscriptSetString;
-  ObjString* lengthString;
-  ObjString* equalString;
-  ObjString* hashString;
-
-  ObjClass* seqClass;
-  ObjClass* objClass;
 } VM;
 
 typedef enum {

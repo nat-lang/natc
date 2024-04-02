@@ -860,7 +860,7 @@ static void method() {
   uint16_t constant = identifierConstant(&parser.previous);
   FunctionType type = TYPE_METHOD;
   if (parser.previous.length == 4 &&
-      memcmp(parser.previous.start, "init", 4) == 0) {
+      memcmp(parser.previous.start, S_INIT, 4) == 0) {
     type = TYPE_INITIALIZER;
   }
 
@@ -891,7 +891,7 @@ static Iterator iterator() {
   // initialize the iterator object, adjusting the local
   // count to reflect the iter fn's presence on the stack
   // during the iterator-yielding expression.
-  nativeVariable(vm.iterString->chars);
+  nativeVariable(S_ITER);
   current->localCount++;
   expression();
   emitBytes(OP_CALL, 1);
@@ -974,7 +974,7 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     emitConstInstr(OP_GET_LOCAL, var);
     current->localCount++;
     expression();
-    methodCall("add", 1);
+    methodCall(S_ADD, 1);
     // pop the comprehension instance.
     current->localCount--;
     emitByte(OP_POP);
@@ -1122,7 +1122,7 @@ static void braces(bool canAssign) {
 
 // A tree literal, sequence literal, or sequence comprehension.
 static void brackets(bool canAssign) {
-  int klass = nativeCall("Sequence", 0);
+  int klass = nativeCall(S_SEQUENCE, 0);
 
   // empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
@@ -1136,11 +1136,11 @@ static void brackets(bool canAssign) {
 
   // it's a sequence.
   if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    methodCall("add", 1);
+    methodCall(S_ADD, 1);
 
     while (match(TOKEN_COMMA)) {
       expression();
-      methodCall("add", 1);
+      methodCall(S_ADD, 1);
     }
   } else {
     // it's a tree.

@@ -203,19 +203,6 @@ static void markRoots() {
   markMap(&vm.globals);
   markMap(&vm.infixes);
   markCompilerRoots();
-
-  markObject((Obj*)vm.initString);
-  markObject((Obj*)vm.callString);
-  markObject((Obj*)vm.iterString);
-  markObject((Obj*)vm.addString);
-  markObject((Obj*)vm.lengthString);
-  markObject((Obj*)vm.memberString);
-  markObject((Obj*)vm.subscriptGetString);
-  markObject((Obj*)vm.subscriptSetString);
-  markObject((Obj*)vm.equalString);
-
-  markObject((Obj*)vm.seqClass);
-  markObject((Obj*)vm.objClass);
 }
 
 static void traceReferences() {
