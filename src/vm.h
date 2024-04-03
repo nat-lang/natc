@@ -26,6 +26,7 @@ typedef struct {
   ObjClass* object;
   ObjClass* astNode;
   ObjClass* astClosure;
+  ObjClass* astSignature;
 } Classes;
 
 typedef struct {

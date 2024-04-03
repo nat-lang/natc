@@ -1,16 +1,33 @@
 #include "ast.h"
 
+#include <stdio.h>
+
 #include "common.h"
 #include "debug.h"
 #include "object.h"
 #include "value.h"
 #include "vm.h"
 
-bool newNode(ObjClass* klass, int argCount) {
+bool instance(ObjClass* klass) {
   ObjInstance* node = newInstance(klass);
   // initialize the instance.
   vmPush(OBJ_VAL(node));
-  if (!vmInitClass(klass, argCount)) return false;
+
+  if (!mapHas(&klass->methods, OBJ_VAL(intern(S_INIT)))) return true;
+  if (!vmInitClass(klass, 0)) return false;
+  if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
+
+  return true;
+}
+
+bool closureInstance(ObjMap signature) {
+  ObjInstance* node = newInstance(vm.classes.astClosure);
+  vmPush(OBJ_VAL(node));
+
+  if (!instance(vm.classes.astSignature)) return false;
+  mapAddAll(&signature, &AS_INSTANCE(vmPeek(0))->fields);
+
+  if (!vmInitClass(vm.classes.astClosure, 1)) return false;
   if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
 
   return true;
@@ -29,7 +46,7 @@ bool readAST(ObjClosure* closure) {
 #endif
 
   // the root of the tree.
-  if (!newNode(vm.classes.astClosure, 0)) return false;
+  if (!closureInstance(closure->function->signature)) return false;
 
   Value root = vmPeek(0);
 

@@ -64,6 +64,7 @@ ObjFunction* newFunction() {
   function->variadic = false;
   initChunk(&function->chunk);
   initMap(&function->constants);
+  initMap(&function->signature);
   return function;
 }
 

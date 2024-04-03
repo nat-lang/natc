@@ -250,9 +250,6 @@ Token scanToken() {
 
   char c = advance();
 
-  if (isAlpha(c) || isIdentifierSymbol(c)) return identifier();
-  if (isDigit(c)) return number();
-
   switch (c) {
     case '(':
       return makeToken(TOKEN_LEFT_PAREN);
@@ -280,14 +277,21 @@ Token scanToken() {
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=': {
       if (match('>')) {
-        return makeToken(TOKEN_ARROW);
+        return makeToken(TOKEN_FAT_ARROW);
       } else {
         return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
       }
     }
+    case '<': {
+      if (match('-')) return makeToken(TOKEN_ARROW_LEFT);
+      break;
+    }
     case '"':
       return string();
   }
+
+  if (isAlpha(c) || isIdentifierSymbol(c)) return identifier();
+  if (isDigit(c)) return number();
 
   return errorToken("Unexpected character.");
 }

@@ -42,6 +42,9 @@ class ASTApp extends ASTExpr {
     this.arguments = arguments;
   }
 }
+
+class ASTSignature extends Object {}
+
 class ASTBlock extends ASTExpr {
   init() => {
     super.init();
@@ -50,8 +53,9 @@ class ASTBlock extends ASTExpr {
 }
 
 class ASTClosure extends ASTExpr {
-  init() => {
+  init(signature) => {
     super.init();
+    this.signature = signature;
     this.block = ASTBlock();
   }
 

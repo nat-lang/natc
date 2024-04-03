@@ -64,6 +64,7 @@ void initClasses(Classes* classes) {
   classes->sequence = NULL;
   classes->astNode = NULL;
   classes->astClosure = NULL;
+  classes->astSignature = NULL;
 }
 
 bool initVM() {
@@ -597,6 +598,7 @@ InterpretResult vmExecute(int baseFrame) {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
         vmPush(OBJ_VAL(closure));
+
         for (int i = 0; i < closure->upvalueCount; i++) {
           uint8_t isLocal = READ_BYTE();
           uint8_t index = READ_BYTE();
@@ -738,8 +740,7 @@ InterpretResult vmExecute(int baseFrame) {
         if (!IS_INSTANCE(obj)) {
           vmRuntimeError(
               "Only objects, sequences, and instances with a '%s' method "
-              "support "
-              "access by subscript.",
+              "support access by subscript.",
               S_SUBSCRIPT_GET);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -788,8 +789,7 @@ InterpretResult vmExecute(int baseFrame) {
         if (!IS_INSTANCE(vmPeek(2))) {
           vmRuntimeError(
               "Only objects, sequences, and instances with a '%s' method "
-              "support "
-              "assignment by subscript.",
+              "support assignment by subscript.",
               S_SUBSCRIPT_SET);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -819,7 +819,9 @@ InterpretResult vmExecute(int baseFrame) {
           case VAL_OBJ: {
             switch (OBJ_TYPE(value)) {
               case OBJ_CLOSURE: {
-                if (!readAST(AS_CLOSURE(value))) return INTERPRET_RUNTIME_ERROR;
+                ObjClosure* closure = AS_CLOSURE(value);
+
+                if (!readAST(closure)) return INTERPRET_RUNTIME_ERROR;
                 break;
               }
               default:

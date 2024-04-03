@@ -28,11 +28,6 @@ class Sequence extends Object {
     return acc;
   }
 
-  all(predicate) => this.fmap(predicate).fold(
-    (a,b) => a and b, true
-  );
-
-  some(predicate) => this.fmap(predicate).fold(
-    (a,b) => a or b, false
-  );
+  all(predicate) => this.fmap(predicate).fold(and, true);
+  some(predicate) => this.fmap(predicate).fold(or, false);
 }

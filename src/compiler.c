@@ -188,13 +188,6 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static void consumeStr(char* str, const char* message) {
-  if (checkStr(str))
-    advance();
-  else
-    errorAtCurrent(message);
-}
-
 static void consumeQuiet(TokenType type) {
   if (parser.current.type == type)
     advance();
@@ -468,7 +461,7 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
   return -1;
 }
 
-static int addLocal(Token name) {
+static uint8_t addLocal(Token name) {
   if (current->localCount == UINT8_COUNT) {
     error("Too many local variables in function.");
     return 0;
@@ -483,7 +476,7 @@ static int addLocal(Token name) {
   return current->localCount - 1;
 }
 
-static int declareVariable() {
+static uint8_t declareVariable() {
   if (current->scopeDepth == 0) return 0;
 
   Token* name = &parser.previous;
@@ -631,8 +624,7 @@ static void namedVariable(Token name, bool canAssign) {
     setOp = OP_SET_GLOBAL;
   }
 
-  if (canAssign && checkStr("<-")) {
-    advance();
+  if (canAssign && match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
     emitConstInstr(setOp, arg);
@@ -729,9 +721,9 @@ static void unary(bool canAssign) {
 
 static uint16_t parseVariable(const char* errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
-  declareVariable();
+  uint8_t local = declareVariable();
 
-  if (current->scopeDepth > 0) return 0;
+  if (current->scopeDepth > 0) return local;
 
   return identifierConstant(&parser.previous);
 }
@@ -742,13 +734,16 @@ static void markInitialized() {
   current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
-static void defineVariable(uint16_t global) {
+static void defineVariable(uint16_t variable) {
   if (current->scopeDepth > 0) {
     markInitialized();
+
+    mapSet(&current->function->signature, NUMBER_VAL(variable),
+           identifierToken(current->locals[variable].name));
     return;
   }
 
-  emitConstInstr(OP_DEFINE_GLOBAL, global);
+  emitConstInstr(OP_DEFINE_GLOBAL, variable);
 }
 
 static bool peekSignature() {
@@ -847,7 +842,7 @@ static void function(FunctionType type) {
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-  consumeStr("=>", "Expect '=>' after signature.");
+  consume(TOKEN_FAT_ARROW, "Expect '=>' after signature.");
 
   blockOrExpression();
 
