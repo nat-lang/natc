@@ -4,6 +4,9 @@ let f;
 
 f <- (a) => 1;
 
+assert(type(f.signature) == ASTSignature);
+assert(f.signature.entries()[0][1] == "a");
+
 // explicit and implicit returns.
 assert(len(f.block.statements) == 2);
 

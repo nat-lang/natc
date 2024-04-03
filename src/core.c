@@ -70,7 +70,7 @@ bool __seqAdd__(int argCount, Value* args) {
   return true;
 }
 
-static ObjClass* getClass(char* name) {
+ObjClass* getClass(char* name) {
   Value obj;
 
   if (!mapGet(&vm.globals, OBJ_VAL(intern(name)), &obj)) {
@@ -353,6 +353,7 @@ InterpretResult initializeCore() {
 
   vm.classes.astNode = getClass(S_AST_NODE);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
+  vm.classes.astSignature = getClass(S_AST_SIGNATURE);
 
   return INTERPRET_OK;
 }
