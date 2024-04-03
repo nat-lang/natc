@@ -12,7 +12,7 @@
   static bool __##name(int argCount, Value* args) {         \
     do {                                                    \
       if (!IS_NUMBER(vmPeek(0)) || !IS_NUMBER(vmPeek(1))) { \
-        runtimeError("Operands must be numbers.");          \
+        vmRuntimeError("Operands must be numbers.");        \
         return false;                                       \
       }                                                     \
       double b = AS_NUMBER(vmPop());                        \

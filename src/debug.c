@@ -147,6 +147,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       printf("\n");
 
       ObjFunction* function = AS_FUNCTION(chunk->constants.values[constant]);
+
       for (int j = 0; j < function->upvalueCount; j++) {
         int isLocal = chunk->code[offset++];
         int index = chunk->code[offset++];
@@ -176,6 +177,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_SUBSCRIPT_GET", offset);
     case OP_SUBSCRIPT_SET:
       return simpleInstruction("OP_SUBSCRIPT_SET", offset);
+    case OP_END:
+      return simpleInstruction("OP_END", offset);
+    case OP_DESTRUCTURE:
+      return simpleInstruction("OP_DESTRUCTURE", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

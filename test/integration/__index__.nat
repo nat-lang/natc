@@ -6,11 +6,13 @@ import test/integration/affix
 import test/integration/block
 import test/integration/class
 import test/integration/closure
+import test/integration/destructure
 import test/integration/equality
 import test/integration/functional
 import test/integration/iteration
 import test/integration/lambda
 import test/integration/length
+import test/integration/logic
 import test/integration/math
 import test/integration/map
 import test/integration/membership

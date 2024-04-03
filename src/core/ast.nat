@@ -1,0 +1,65 @@
+class ASTNode extends Tree {
+  opClosure() => ASTClosure();
+  opLiteral(value) => ASTLiteral(value);
+  opGetLocal(slot) => ASTLocal(slot);
+  opGetGlobal(name) => ASTGlobal(name);
+  opGetUpvalue(slot) => ASTUpvalue(slot);
+  opCall(fn, *args) => ASTApp(fn, args);
+}
+
+class ASTStmt extends ASTNode {}
+class ASTReturnStmt extends ASTStmt {
+  init(value) => {
+    super.init();
+    this.data = value;
+  }
+}
+
+class ASTExpr extends ASTNode {}
+class ASTLiteral extends ASTExpr {
+  init(value) => {
+    super.init();
+    this.data = value;
+  }
+}
+
+class ASTVar extends ASTExpr {
+  init(id) => {
+    super.init();
+    this.data = id;
+  }
+}
+
+class ASTLocal extends ASTVar {}
+class ASTGlobal extends ASTVar {}
+class ASTUpvalue extends ASTVar {}
+
+class ASTApp extends ASTExpr {
+  init(fn, arguments) => {
+    super.init();
+
+    this.fn = fn;
+    this.arguments = arguments;
+  }
+}
+
+class ASTSignature extends Object {}
+
+class ASTBlock extends ASTExpr {
+  init() => {
+    super.init();
+    this.statements = [];
+  }
+}
+
+class ASTClosure extends ASTExpr {
+  init(signature) => {
+    super.init();
+    this.signature = signature;
+    this.block = ASTBlock();
+  }
+
+  opReturn(expr) => {
+    this.block.statements.add(ASTReturnStmt(expr));
+  }
+}

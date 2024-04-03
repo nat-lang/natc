@@ -188,13 +188,6 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static void consumeStr(char* str, const char* message) {
-  if (checkStr(str))
-    advance();
-  else
-    errorAtCurrent(message);
-}
-
 static void consumeQuiet(TokenType type) {
   if (parser.current.type == type)
     advance();
@@ -393,7 +386,7 @@ static void endScope() {
 
 static void function(FunctionType type);
 static void expression();
-static void boundExpression(bool isInfix);
+static void boundExpression();
 static void statement();
 static void declaration();
 static void classDeclaration();
@@ -468,7 +461,7 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
   return -1;
 }
 
-static int addLocal(Token name) {
+static uint8_t addLocal(Token name) {
   if (current->localCount == UINT8_COUNT) {
     error("Too many local variables in function.");
     return 0;
@@ -483,7 +476,7 @@ static int addLocal(Token name) {
   return current->localCount - 1;
 }
 
-static int declareVariable() {
+static uint8_t declareVariable() {
   if (current->scopeDepth == 0) return 0;
 
   Token* name = &parser.previous;
@@ -605,26 +598,6 @@ static void number(bool canAssign) {
   loadConstant(NUMBER_VAL(value));
 }
 
-static void and_(bool canAssign) {
-  int endJump = emitJump(OP_JUMP_IF_FALSE);
-
-  emitByte(OP_POP);
-  parsePrecedence(PREC_AND);
-
-  patchJump(endJump);
-}
-
-static void or_(bool canAssign) {
-  int elseJump = emitJump(OP_JUMP_IF_FALSE);
-  int endJump = emitJump(OP_JUMP);
-
-  patchJump(elseJump);
-  emitByte(OP_POP);
-
-  parsePrecedence(PREC_OR);
-  patchJump(endJump);
-}
-
 static void string(bool canAssign) {
   loadConstant(OBJ_VAL(
       copyString(parser.previous.start + 1, parser.previous.length - 2)));
@@ -651,7 +624,11 @@ static void namedVariable(Token name, bool canAssign) {
     setOp = OP_SET_GLOBAL;
   }
 
-  if (canAssign && match(TOKEN_EQUAL)) {
+  if (canAssign && match(TOKEN_ARROW_LEFT)) {
+    expression();
+    emitByte(OP_DESTRUCTURE);
+    emitConstInstr(setOp, arg);
+  } else if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitConstInstr(setOp, arg);
   } else {
@@ -744,9 +721,9 @@ static void unary(bool canAssign) {
 
 static uint16_t parseVariable(const char* errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
-  declareVariable();
+  uint8_t local = declareVariable();
 
-  if (current->scopeDepth > 0) return 0;
+  if (current->scopeDepth > 0) return local;
 
   return identifierConstant(&parser.previous);
 }
@@ -757,13 +734,16 @@ static void markInitialized() {
   current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
-static void defineVariable(uint16_t global) {
+static void defineVariable(uint16_t variable) {
   if (current->scopeDepth > 0) {
     markInitialized();
+
+    mapSet(&current->function->signature, NUMBER_VAL(variable),
+           identifierToken(current->locals[variable].name));
     return;
   }
 
-  emitConstInstr(OP_DEFINE_GLOBAL, global);
+  emitConstInstr(OP_DEFINE_GLOBAL, variable);
 }
 
 static bool peekSignature() {
@@ -797,7 +777,7 @@ static bool tryFunction(FunctionType fnType) {
   return false;
 }
 
-static void boundExpression(bool isInfix) {
+static void boundExpression() {
   if (tryFunction(TYPE_BOUND)) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
@@ -862,7 +842,7 @@ static void function(FunctionType type) {
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-  consumeStr("=>", "Expect '=>' after signature.");
+  consume(TOKEN_FAT_ARROW, "Expect '=>' after signature.");
 
   blockOrExpression();
 
@@ -880,7 +860,7 @@ static void method() {
   uint16_t constant = identifierConstant(&parser.previous);
   FunctionType type = TYPE_METHOD;
   if (parser.previous.length == 4 &&
-      memcmp(parser.previous.start, "init", 4) == 0) {
+      memcmp(parser.previous.start, S_INIT, 4) == 0) {
     type = TYPE_INITIALIZER;
   }
 
@@ -911,7 +891,7 @@ static Iterator iterator() {
   // initialize the iterator object, adjusting the local
   // count to reflect the iter fn's presence on the stack
   // during the iterator-yielding expression.
-  nativeVariable(vm.iterString->chars);
+  nativeVariable(S_ITER);
   current->localCount++;
   expression();
   emitBytes(OP_CALL, 1);
@@ -994,7 +974,7 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     emitConstInstr(OP_GET_LOCAL, var);
     current->localCount++;
     expression();
-    methodCall("add", 1);
+    methodCall(S_ADD, 1);
     // pop the comprehension instance.
     current->localCount--;
     emitByte(OP_POP);
@@ -1142,7 +1122,7 @@ static void braces(bool canAssign) {
 
 // A tree literal, sequence literal, or sequence comprehension.
 static void brackets(bool canAssign) {
-  int klass = nativeCall("Sequence", 0);
+  int klass = nativeCall(S_SEQUENCE, 0);
 
   // empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) return advance();
@@ -1156,11 +1136,11 @@ static void brackets(bool canAssign) {
 
   // it's a sequence.
   if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    methodCall("add", 1);
+    methodCall(S_ADD, 1);
 
     while (match(TOKEN_COMMA)) {
       expression();
-      methodCall("add", 1);
+      methodCall(S_ADD, 1);
     }
   } else {
     // it's a tree.
@@ -1262,7 +1242,7 @@ static void letDeclaration() {
   uint16_t var = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
-    boundExpression(infixPrecedence != -1);
+    boundExpression();
   } else {
     emitByte(OP_NIL);
   }
@@ -1501,7 +1481,6 @@ ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
-    [TOKEN_AND] = {NULL, and_, PREC_AND},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
@@ -1509,7 +1488,6 @@ ParseRule rules[] = {
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_IN] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE},
-    [TOKEN_OR] = {NULL, or_, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {super_, NULL, PREC_NONE},

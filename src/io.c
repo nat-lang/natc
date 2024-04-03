@@ -56,7 +56,7 @@ InterpretResult interpretFile(const char* path) {
   char* qualifiedPath = qualifyPath(path);
   char* source = readFile(qualifiedPath);
 
-  InterpretResult result = interpret((char*)path, source);
+  InterpretResult result = vmInterpret((char*)path, source);
   free(source);
 
   return result;

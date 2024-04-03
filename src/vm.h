@@ -1,5 +1,5 @@
-#ifndef clox_vm_h
-#define clox_vm_h
+#ifndef nat_vm_h
+#define nat_vm_h
 
 #include "chunk.h"
 #include "object.h"
@@ -8,11 +8,26 @@
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() \
+  (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() \
+  (frame->closure->function->chunk.constants.values[READ_SHORT()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
+
 typedef struct {
   ObjClosure* closure;
   uint8_t* ip;
   Value* slots;
 } CallFrame;
+
+typedef struct {
+  ObjClass* sequence;
+  ObjClass* object;
+  ObjClass* astNode;
+  ObjClass* astClosure;
+  ObjClass* astSignature;
+} Classes;
 
 typedef struct {
   Value stack[STACK_MAX];
@@ -27,6 +42,9 @@ typedef struct {
   Obj* objects;
   ObjUpvalue* openUpvalues;
 
+  // core defs.
+  Classes classes;
+
   // memory.
   int grayCount;
   int grayCapacity;
@@ -34,22 +52,6 @@ typedef struct {
 
   size_t bytesAllocated;
   size_t nextGC;
-
-  // methods with special semantics.
-  ObjString* initString;
-  ObjString* callString;
-  ObjString* iterString;
-  ObjString* nextString;
-  ObjString* addString;
-  ObjString* memberString;
-  ObjString* subscriptGetString;
-  ObjString* subscriptSetString;
-  ObjString* lengthString;
-  ObjString* equalString;
-  ObjString* hashString;
-
-  ObjClass* seqClass;
-  ObjClass* objClass;
 } VM;
 
 typedef enum {
@@ -62,16 +64,19 @@ extern VM vm;
 
 bool initVM();
 void freeVM();
-void runtimeError(const char* format, ...);
 
-InterpretResult interpret(char* path, const char* source);
+void vmRuntimeError(const char* format, ...);
+
+InterpretResult vmInterpret(char* path, const char* source);
+InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
-bool initClass(ObjClass* klass, int argCount);
-bool invoke(ObjString* name, int argCount);
-bool validateHashable(Value value);
+bool vmInitClass(ObjClass* klass, int argCount);
+bool vmInvoke(ObjString* name, int argCount);
+bool vmValidateHashable(Value value);
 bool vmCallValue(Value value, int argCount);
 bool vmInstanceHas(ObjInstance* instance, Value value);
+void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
 
 #endif

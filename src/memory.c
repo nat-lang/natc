@@ -112,6 +112,7 @@ static void blackenObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
       markArray(&function->chunk.constants);
+      markMap(&function->signature);
       break;
     }
     case OBJ_MAP: {
@@ -147,7 +148,6 @@ static void freeObject(Obj* object) {
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
-
       FREE(ObjClosure, object);
       break;
     }
@@ -155,6 +155,7 @@ static void freeObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
       freeMap(&function->constants);
+      freeMap(&function->signature);
       FREE(ObjFunction, object);
       break;
     }
@@ -203,19 +204,6 @@ static void markRoots() {
   markMap(&vm.globals);
   markMap(&vm.infixes);
   markCompilerRoots();
-
-  markObject((Obj*)vm.initString);
-  markObject((Obj*)vm.callString);
-  markObject((Obj*)vm.iterString);
-  markObject((Obj*)vm.addString);
-  markObject((Obj*)vm.lengthString);
-  markObject((Obj*)vm.memberString);
-  markObject((Obj*)vm.subscriptGetString);
-  markObject((Obj*)vm.subscriptSetString);
-  markObject((Obj*)vm.equalString);
-
-  markObject((Obj*)vm.seqClass);
-  markObject((Obj*)vm.objClass);
 }
 
 static void traceReferences() {

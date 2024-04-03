@@ -1,5 +1,5 @@
 
-class Tree {
+class Tree extends Object {
   init() => {
     this.data = nil;
     this.children = [];
