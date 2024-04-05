@@ -28,6 +28,12 @@ class Sequence extends Object {
     return acc;
   }
 
+  concat(other) => {
+    let seq = [x | x in this];
+    for (x in other) seq.add(x);
+    return seq;
+  }
+
   all(predicate) => this.fmap(predicate).fold(and, true);
   some(predicate) => this.fmap(predicate).fold(or, false);
 }
