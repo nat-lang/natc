@@ -117,14 +117,14 @@ class Set extends Object {
     return set;
   }
 
-  cp() => ({x | x in this});
+  copy() => ({x | x in this});
 
   powerset() => {
     let powerset = {};
 
     for (element in this) {
       for (set in powerset) {
-        let x = set.cp().add(element);
+        let x = set.copy().add(element);
         powerset.add(x);
       }
       powerset.add({element});

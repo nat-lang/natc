@@ -560,8 +560,8 @@ static void property(bool canAssign) {
 // A dot flush against an expression is property access;
 // a dot with whitespace preceding and following it is
 // function composition. We dont require the whitespace
-// following to disambiguate the two, but we may as well
-// enforce the symmetry.
+// following composition to disambiguate the two, but we
+// may as well enforce the symmetry.
 static void dot(bool canAssign) {
   if (penultWhite() && prevWhite()) {
     nativeVariable("compose");
@@ -737,9 +737,6 @@ static void markInitialized() {
 static void defineVariable(uint16_t variable) {
   if (current->scopeDepth > 0) {
     markInitialized();
-
-    mapSet(&current->function->signature, NUMBER_VAL(variable),
-           identifierToken(current->locals[variable].name));
     return;
   }
 
@@ -839,6 +836,8 @@ static void function(FunctionType type) {
 
       uint16_t constant = parseVariable("Expect parameter name.");
       defineVariable(constant);
+      mapSet(&current->function->signature, NUMBER_VAL(constant),
+             identifierToken(current->locals[constant].name));
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
@@ -950,8 +949,8 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   } else {
     // a predicate to test against.
     isPredicate = true;
-    expression();
 
+    expression();
     predJump = emitJump(OP_JUMP_IF_FALSE);
     emitByte(OP_POP);
   }
@@ -1225,7 +1224,7 @@ static void letDeclaration() {
   int infixPrecedence = -1;
 
   if (check(TOKEN_INFIX)) {
-    if (current->enclosing != NULL) error("Can only infix globals.");
+    if (current->scopeDepth > 0) error("Can only infix globals.");
     advance();
 
     if (check(TOKEN_LEFT_PAREN)) {
@@ -1240,15 +1239,20 @@ static void letDeclaration() {
     }
   }
   uint16_t var = parseVariable("Expect variable name.");
+  emitByte(OP_NIL);
+  defineVariable(var);
 
   if (match(TOKEN_EQUAL)) {
     boundExpression();
-  } else {
-    emitByte(OP_NIL);
+
+    if (current->scopeDepth > 0)
+      emitConstInstr(OP_SET_LOCAL, var);
+    else
+      emitConstInstr(OP_SET_GLOBAL, var);
+
+    emitByte(OP_POP);
   }
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
-
-  defineVariable(var);
 
   if (infixPrecedence != -1) {
     Value name = currentChunk()->constants.values[var];
