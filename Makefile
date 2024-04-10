@@ -37,14 +37,18 @@ debug-log-gc:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
 
 integration:
-	@ $(BUILD_DIR)/nat test/integration/__index__ && echo "ok"
+	@ $(BUILD_DIR)/nat test/integration/__index__
+
+regression:
+	@ $(BUILD_DIR)/nat test/regression/__index__
 
 trip:
-	@ $(BUILD_DIR)/nat test/trip/__index__ && echo "ok"
+	@ $(BUILD_DIR)/nat test/trip/__index__
 
 tests:
-	@ $(BUILD_DIR)/nat test/integration/__index__
-	@ $(BUILD_DIR)/nat test/trip/__index__
+	@ $(MAKE) integration
+	@ $(MAKE) regression
+	@ $(MAKE) trip
 
 # Compile with debugging enabled, sign the binary, and create a symbol map
 # before running leaks against the integration tests.

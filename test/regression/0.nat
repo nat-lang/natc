@@ -1,0 +1,15 @@
+// the inaugural regression test:
+// as of [0ec462a] the anonymous function declaration
+// marks the top of the local stack as initialized after
+// parsing, causing local 'a' to be reclaimed when the
+// inner scope ends. 'a' is then incorrectly free in the
+// final line of the function.
+
+let f = (a) => {
+  {
+    (x) => x;
+  }
+  a;
+};
+
+f(1);

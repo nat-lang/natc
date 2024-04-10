@@ -610,6 +610,7 @@ static void bareString() {
 
 static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
+
   int arg = resolveLocal(current, &name);
 
   if (arg != -1) {
@@ -768,7 +769,6 @@ static bool peekSignature() {
 static bool tryFunction(FunctionType fnType) {
   if (peekSignature()) {
     function(fnType);
-    markInitialized();
     return true;
   }
   return false;

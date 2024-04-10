@@ -1,0 +1,7 @@
+import test/utils
+
+let conclude = begin();
+
+import test/regression/0
+
+conclude("regression ");
