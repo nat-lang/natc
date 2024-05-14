@@ -207,8 +207,7 @@ bool vmCallValue(Value callee, int argCount) {
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);
         Value callFn;
-        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_CALL)),
-                   &callFn)) {
+        if (mapGet(&instance->klass->fields, INTERN(S_CALL), &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
         } else {
           printValue(callee);
@@ -230,7 +229,7 @@ bool vmCallValue(Value callee, int argCount) {
 bool vmInitClass(ObjClass* klass, int argCount) {
   Value initializer;
 
-  if (mapGet(&klass->fields, OBJ_VAL(intern(S_INIT)), &initializer)) {
+  if (mapGet(&klass->fields, INTERN(S_INIT), &initializer)) {
     return vmCallValue(initializer, argCount);
   } else if (argCount != 0) {
     vmRuntimeError("Expected 0 arguments but got %d.", argCount);
@@ -471,11 +470,11 @@ InterpretResult vmExecute(int baseFrame) {
           vmRuntimeError("Only objects and classes have properties.");
         }
 
-        ObjMap* fields;
-        if (IS_INSTANCE(vmPeek(1))) fields = &AS_INSTANCE(vmPeek(1))->fields;
-        if (IS_CLASS(vmPeek(1))) fields = &AS_CLASS(vmPeek(1))->fields;
+        if (IS_INSTANCE(vmPeek(1)))
+          mapSet(&AS_INSTANCE(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
+        if (IS_CLASS(vmPeek(1)))
+          mapSet(&AS_CLASS(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
 
-        mapSet(fields, READ_CONSTANT(), vmPeek(0));
         Value value = vmPop();
         vmPop();
         vmPush(value);
@@ -493,7 +492,7 @@ InterpretResult vmExecute(int baseFrame) {
           Value equalFn;
           ObjClass lca;
           if (leastCommonAncestor(instanceA->klass, instanceB->klass, &lca) &&
-              mapGet(&lca.fields, OBJ_VAL(intern(S_EQ)), &equalFn)) {
+              mapGet(&lca.fields, INTERN(S_EQ), &equalFn)) {
             vmPush(b);
             vmPush(a);
             if (!vmCallValue(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
@@ -672,6 +671,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         ObjClass* subclass = AS_CLASS(vmPeek(0));
         mapAddAll(&AS_CLASS(superclass)->fields, &subclass->fields);
+        mapSet(&subclass->fields, INTERN(S_SUPERCLASS), superclass);
         subclass->super = AS_CLASS(superclass);
         vmPop();  // Subclass.
         break;
@@ -699,7 +699,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         // classes can override the membership predicate.
         Value memFn;
-        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_IN)), &memFn)) {
+        if (mapGet(&instance->klass->fields, INTERN(S_IN), &memFn)) {
           vmPush(obj);
           vmPush(val);
 
@@ -736,8 +736,7 @@ InterpretResult vmExecute(int baseFrame) {
         }
 
         Value msg;
-        if (!mapGet(&AS_INSTANCE(value)->fields, OBJ_VAL(intern("message")),
-                    &msg)) {
+        if (!mapGet(&AS_INSTANCE(value)->fields, INTERN("message"), &msg)) {
           vmRuntimeError("Error must define a 'message'.");
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -776,8 +775,7 @@ InterpretResult vmExecute(int baseFrame) {
         // classes may define their own subscript access operator.
         ObjInstance* instance = AS_INSTANCE(obj);
         Value getFn;
-        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_SUBSCRIPT_GET)),
-                   &getFn)) {
+        if (mapGet(&instance->klass->fields, INTERN(S_SUBSCRIPT_GET), &getFn)) {
           // set up the context for the function call.
           vmPush(obj);  // receiver.
           vmPush(key);
@@ -825,8 +823,7 @@ InterpretResult vmExecute(int baseFrame) {
         // classes may define their own subscript setting operator.
         ObjInstance* instance = AS_INSTANCE(vmPeek(2));
         Value setFn;
-        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_SUBSCRIPT_SET)),
-                   &setFn)) {
+        if (mapGet(&instance->klass->fields, INTERN(S_SUBSCRIPT_SET), &setFn)) {
           // the stack is already ready for the function call.
           if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
           frame = &vm.frames[vm.frameCount - 1];

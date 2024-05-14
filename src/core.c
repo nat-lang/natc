@@ -39,7 +39,7 @@ ObjClass* defineNativeClass(char* name) {
 }
 
 ObjSequence* __sequentialInit__(ObjInstance* obj) {
-  vmPush(OBJ_VAL(intern("values")));
+  vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
   mapSet(&obj->fields, vmPeek(1), vmPeek(0));
@@ -57,7 +57,7 @@ bool __sequenceInit__(int argCount, Value* args) {
 }
 
 bool sequenceValueField(ObjInstance* obj, Value* seq) {
-  if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), seq)) {
+  if (!mapGet(&obj->fields, INTERN("values"), seq)) {
     vmRuntimeError("Sequence instance missing its values!");
     return false;
   }
@@ -104,7 +104,7 @@ bool __tupleInit__(int argCount, Value* args) {
 ObjClass* getClass(char* name) {
   Value obj;
 
-  if (!mapGet(&vm.globals, OBJ_VAL(intern(name)), &obj)) {
+  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
     vmRuntimeError("Couldn't find class %s", name);
     return NULL;
   }
@@ -216,7 +216,7 @@ bool __length__(int argCount, Value* args) {
 
   ObjInstance* instance = AS_INSTANCE(vmPeek(0));
   Value method;
-  if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_LEN)), &method)) {
+  if (mapGet(&instance->klass->fields, INTERN(S_LEN), &method)) {
     // set up the context for the function call.
     vmPop();
     vmPop();                    // native fn.
@@ -261,26 +261,6 @@ bool __setHash__(int argCount, Value* args) {
 
   // return nothing.
   vmPush(NIL_VAL);
-
-  return true;
-}
-
-bool __superclass__(int argCount, Value* args) {
-  Value klass = vmPop();
-  vmPop();  // native fn.
-
-  if (!IS_CLASS(klass)) {
-    vmRuntimeError("Only classes have superclasses.");
-    return false;
-  }
-
-  ObjClass* super = AS_CLASS(klass)->super;
-
-  if (super == NULL) {
-    vmPush(NIL_VAL);
-  } else {
-    vmPush(OBJ_VAL(super));
-  }
 
   return true;
 }

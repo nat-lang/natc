@@ -28,6 +28,8 @@
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
 
+#define INTERN(value) ((OBJ_VAL(intern(value))))
+
 typedef enum {
   OBJ_BOUND_METHOD,
   OBJ_CLASS,

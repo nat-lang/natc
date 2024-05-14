@@ -128,6 +128,7 @@ class B extends A {
   }
 }
 
+assert(B.__superclass__ == A);
 assert(B().compose() == 2);
 
 // resolve super call in a parent.
