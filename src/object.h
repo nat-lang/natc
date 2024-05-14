@@ -104,10 +104,11 @@ typedef struct {
   int upvalueCount;
 } ObjClosure;
 
-typedef struct {
+typedef struct ObjClass {
   Obj obj;
   ObjString *name;
   ObjMap fields;
+  struct ObjClass *super;
 } ObjClass;
 
 typedef struct {
@@ -158,7 +159,7 @@ ObjString *mapFindString(ObjMap *map, const char *chars, int length,
                          uint32_t hash);
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
-
+bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
 uint32_t hashObject(Obj *object);
 
 #endif

@@ -443,13 +443,8 @@ InterpretResult vmExecute(int baseFrame) {
         if (IS_INSTANCE(vmPeek(0))) {
           ObjInstance* instance = AS_INSTANCE(vmPeek(0));
 
-          if (getObjectProperty(instance->fields, name, &value)) {
-            vmPop();  // instance.
-            vmPush(value);
-            break;
-          }
-
-          if (getObjectProperty(instance->klass->fields, name, &value)) {
+          if (getObjectProperty(instance->fields, name, &value) ||
+              getObjectProperty(instance->klass->fields, name, &value)) {
             vmPop();  // instance.
             vmPush(value);
             break;
@@ -496,12 +491,11 @@ InterpretResult vmExecute(int baseFrame) {
           ObjInstance* instanceB = AS_INSTANCE(b);
 
           Value equalFn;
-          if (valuesEqual(OBJ_VAL(instanceA->klass),
-                          OBJ_VAL(instanceB->klass)) &&
-              mapGet(&instanceA->klass->fields, OBJ_VAL(intern(S_EQ)),
-                     &equalFn)) {
-            vmPush(a);
+          ObjClass lca;
+          if (leastCommonAncestor(instanceA->klass, instanceB->klass, &lca) &&
+              mapGet(&lca.fields, OBJ_VAL(intern(S_EQ)), &equalFn)) {
             vmPush(b);
+            vmPush(a);
             if (!vmCallValue(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
 
             frame = &vm.frames[vm.frameCount - 1];
@@ -678,6 +672,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         ObjClass* subclass = AS_CLASS(vmPeek(0));
         mapAddAll(&AS_CLASS(superclass)->fields, &subclass->fields);
+        subclass->super = AS_CLASS(superclass);
         vmPop();  // Subclass.
         break;
       }

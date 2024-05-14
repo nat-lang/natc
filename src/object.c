@@ -39,6 +39,7 @@ ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
 ObjClass* newClass(ObjString* name) {
   ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
   klass->name = name;
+  klass->super = NULL;
   initMap(&klass->fields);
   return klass;
 }
@@ -348,6 +349,31 @@ void markMap(ObjMap* map) {
 }
 
 static void printMap(ObjMap* map) { printf("<map>"); }
+
+// Is [a] a subclass of [b]?
+bool isSubclass(ObjClass* a, ObjClass* b) {
+  ObjClass* k = a;
+  while (k != NULL) {
+    if (k == b) return true;
+    k = k->super;
+  }
+  return false;
+}
+
+bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
+  ObjClass* k = a;
+
+  while (k != NULL) {
+    if (isSubclass(b, k)) {
+      *ancestor = *k;
+      return true;
+    }
+
+    k = k->super;
+  }
+
+  return false;
+}
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {

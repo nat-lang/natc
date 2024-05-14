@@ -265,6 +265,26 @@ bool __setHash__(int argCount, Value* args) {
   return true;
 }
 
+bool __superclass__(int argCount, Value* args) {
+  Value klass = vmPop();
+  vmPop();  // native fn.
+
+  if (!IS_CLASS(klass)) {
+    vmRuntimeError("Only classes have superclasses.");
+    return false;
+  }
+
+  ObjClass* super = AS_CLASS(klass)->super;
+
+  if (super == NULL) {
+    vmPush(NIL_VAL);
+  } else {
+    vmPush(OBJ_VAL(super));
+  }
+
+  return true;
+}
+
 bool __type__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
