@@ -394,7 +394,7 @@ static ParseRule* getRule(Token token);
 static void parseDelimitedPrecedence(Precedence precedence, DelimitFn fn);
 static void parsePrecedence(Precedence precedence);
 
-static Value identifier(char* name) { return OBJ_VAL(intern(name)); }
+static Value identifier(char* name) { return INTERN(name); }
 
 static Value identifierToken(Token token) {
   return OBJ_VAL(copyString(token.start, token.length));

@@ -15,6 +15,9 @@
 #define S_SUBSCRIPT_GET "__get__"
 #define S_SUBSCRIPT_SET "__set__"
 
+#define S_SUPERCLASS "__superclass__"
+#define S_CLASS "__class__"
+
 #define S_ADD "add"
 #define S_CALL "call"
 #define S_INIT "init"

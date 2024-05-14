@@ -37,3 +37,19 @@ let c = Comparable(2);
 
 assert(a == b);
 assert(a != c);
+
+// defined for least common ancestor.
+
+class C' extends Comparable {
+  __eq__(other) => this.datum < other.datum;
+}
+
+let c1 = C'(1);
+let c2 = C'(2);
+
+assert(c1 == a);
+assert(c2 != a);
+assert(c2 == c);
+
+assert(c1 == c2);
+assert(c2 != c1);

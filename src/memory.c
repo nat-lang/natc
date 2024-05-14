@@ -88,7 +88,8 @@ static void blackenObject(Obj* object) {
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
       markObject((Obj*)klass->name);
-      markMap(&klass->methods);
+      markObject((Obj*)klass->super);
+      markMap(&klass->fields);
       break;
     }
     case OBJ_CLOSURE: {
@@ -141,7 +142,8 @@ static void freeObject(Obj* object) {
       break;
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
-      freeMap(&klass->methods);
+      klass->super = NULL;
+      freeMap(&klass->fields);
       FREE(ObjClass, object);
       break;
     }
