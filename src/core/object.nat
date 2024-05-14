@@ -1,6 +1,13 @@
 
 
 class Object extends __obj__ {
+  init() => {
+    this.__private__ = [
+      "__class__",
+      "__private__"
+    ];
+  }
+
   __iter__() => Iterator(this.entries(), 0, len(this));
 
   // The native [entries] function returns raw [ObjSequence]
@@ -15,7 +22,8 @@ class Object extends __obj__ {
       let key = cSeq[i][0];
       let val = cSeq[i][1];
 
-      entries.push((key,val));
+      if (!(key in this.__private__))
+        entries.push((key,val));
     }
 
     return entries;
