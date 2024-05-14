@@ -1277,7 +1277,7 @@ static void letDeclaration() {
 static void expressionStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
-  emitByte(OP_POP);
+  emitByte(OP_EXPR_STATEMENT);
 }
 
 static int loopCondition() {

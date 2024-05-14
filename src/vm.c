@@ -395,6 +395,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_FALSE:
         vmPush(BOOL_VAL(false));
         break;
+      case OP_EXPR_STATEMENT:
       case OP_POP:
         vmPop();
         break;
