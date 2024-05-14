@@ -1,5 +1,4 @@
 
-
 assert(2 > 1);
 assert(1 < 2);
 assert(2 >= 2);
@@ -16,3 +15,11 @@ assert(10 - 4 / 2 == 7 / 1 + 1);
 assert(5 + 5 >= 10 and 1 <= 5 + 5);
 assert(5 + 5 > 9 and 9 < 5 + 5);
 assert(5 + 5 < 11  and 11 > 5 + 5);
+
+
+for (let x = 0; x < 100; x = x + 1) {
+  let n = random(10);
+
+  assert(type(n) == num);
+  assert(n >= 0 and n < 10);
+}

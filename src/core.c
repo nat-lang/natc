@@ -1,16 +1,17 @@
 #include "core.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-static void defineNativeFn(char* name, int arity, NativeFn function,
-                           ObjMap* dest) {
+static void defineNativeFn(char* name, int arity, bool variadic,
+                           NativeFn function, ObjMap* dest) {
   // first put the values on the stack so they're
   // not gc'd if/when the map is recapacitated.
   ObjString* objName = intern(name);
   vmPush(OBJ_VAL(objName));
-  ObjNative* native = newNative(arity, objName, function);
+  ObjNative* native = newNative(arity, variadic, objName, function);
   Value fn = OBJ_VAL(native);
   vmPush(fn);
   mapSet(dest, vmPeek(1), vmPeek(0));
@@ -19,12 +20,12 @@ static void defineNativeFn(char* name, int arity, NativeFn function,
 }
 
 static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
-  defineNativeFn(name, arity, function, &vm.globals);
+  defineNativeFn(name, arity, false, function, &vm.globals);
 }
 
-static void defineNativeFnMethod(char* name, int arity, NativeFn function,
-                                 ObjClass* klass) {
-  defineNativeFn(name, arity, function, &klass->methods);
+static void defineNativeFnMethod(char* name, int arity, bool variadic,
+                                 NativeFn function, ObjClass* klass) {
+  defineNativeFn(name, arity, variadic, function, &klass->fields);
 }
 
 ObjClass* defineNativeClass(char* name) {
@@ -38,34 +39,65 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
-bool __seqInit__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
-
+ObjSequence* __sequentialInit__(ObjInstance* obj) {
   vmPush(OBJ_VAL(intern("values")));
-  vmPush(OBJ_VAL(newSequence()));
+  ObjSequence* seq = newSequence();
+  vmPush(OBJ_VAL(seq));
   mapSet(&obj->fields, vmPeek(1), vmPeek(0));
   vmPop();
   vmPop();
+  return seq;
+}
+
+bool __sequenceInit__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+
+  __sequentialInit__(obj);
 
   return true;
 }
 
-bool __seqAdd__(int argCount, Value* args) {
-  Value val = vmPeek(0);
-  ObjInstance* obj = AS_INSTANCE(vmPeek(1));
-
-  Value seq;
-  if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), &seq)) {
+bool sequenceValueField(ObjInstance* obj, Value* seq) {
+  if (!mapGet(&obj->fields, OBJ_VAL(intern("values")), seq)) {
     vmRuntimeError("Sequence instance missing its values!");
     return false;
   }
-  if (!IS_SEQUENCE(seq)) {
+  if (!IS_SEQUENCE(*seq)) {
     vmRuntimeError("Expecting sequence.");
     return false;
   }
+  return true;
+}
 
+bool __sequencePush__(int argCount, Value* args) {
+  Value val = vmPeek(0);
+  ObjInstance* obj = AS_INSTANCE(vmPeek(1));
+  Value seq;
+
+  if (!sequenceValueField(obj, &seq)) return false;
   writeValueArray(&AS_SEQUENCE(seq)->values, val);
   vmPop();
+  return true;
+}
+
+bool __sequencePop__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+  Value seq;
+  if (!sequenceValueField(obj, &seq)) return false;
+  Value value = popValueArray(&AS_SEQUENCE(seq)->values);
+
+  vmPop();
+  vmPush(value);
+  return true;
+}
+
+bool __tupleInit__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
+  ObjSequence* seq = __sequentialInit__(obj);
+
+  int i = argCount;
+  while (i-- > 0) writeValueArray(&seq->values, vmPeek(i));
+  while (++i < argCount) vmPop();
 
   return true;
 }
@@ -122,6 +154,20 @@ bool __objEntries__(int argCount, Value* args) {
   return true;
 }
 
+bool __randomNumber__(int argCount, Value* args) {
+  Value upperBound = vmPop();
+  vmPop();  // native fn.
+
+  if (!IS_NUMBER(upperBound)) {
+    vmRuntimeError("Upper bound must be a number.");
+    return false;
+  }
+
+  int x = arc4random_uniform(AS_NUMBER(upperBound));
+  vmPush(NUMBER_VAL(x));
+  return true;
+}
+
 static bool validateHash(Value value) {
   if (!IS_NUMBER(value)) {
     vmRuntimeError("Hash must be a number.");
@@ -136,7 +182,7 @@ bool __objGet__(int argCount, Value* args) {
   Value value = NIL_VAL;
 
   if (!mapGet(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), &value))
-    mapGet(&AS_INSTANCE(vmPeek(1))->klass->methods, vmPeek(0), &value);
+    mapGet(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0), &value);
 
   vmPop();
   vmPop();
@@ -158,7 +204,7 @@ bool __objHas__(int argCount, Value* args) {
   if (!vmValidateHashable(vmPeek(0))) return false;
 
   bool hasKey = mapHas(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0)) ||
-                mapHas(&AS_INSTANCE(vmPeek(1))->klass->methods, vmPeek(0));
+                mapHas(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0));
   vmPop();
   vmPop();
   vmPush(BOOL_VAL(hasKey));
@@ -185,7 +231,7 @@ bool __length__(int argCount, Value* args) {
 
   ObjInstance* instance = AS_INSTANCE(vmPeek(0));
   Value method;
-  if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_LEN)), &method)) {
+  if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_LEN)), &method)) {
     // set up the context for the function call.
     vmPop();
     vmPop();                    // native fn.
@@ -234,11 +280,84 @@ bool __setHash__(int argCount, Value* args) {
   return true;
 }
 
-bool __type__(int argCount, Value* args) {
+bool __superclass__(int argCount, Value* args) {
+  Value klass = vmPop();
+  vmPop();  // native fn.
+
+  if (!IS_CLASS(klass)) {
+    vmRuntimeError("Only classes have superclasses.");
+    return false;
+  }
+
+  ObjClass* super = AS_CLASS(klass)->super;
+
+  if (super == NULL) {
+    vmPush(NIL_VAL);
+  } else {
+    vmPush(OBJ_VAL(super));
+  }
+
+  return true;
+}
+
+bool __cType__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
 
-  vmPush(typeValue(value));
+  switch (value.cType) {
+    case VAL_BOOL:
+      vmPush(OBJ_VAL(vm.classes.cTypeBool));
+      break;
+    case VAL_NUMBER:
+      vmPush(OBJ_VAL(vm.classes.cTypeNumber));
+      break;
+    case VAL_NIL:
+      vmPush(OBJ_VAL(vm.classes.cTypeNil));
+      break;
+    case VAL_OBJ:
+      switch (AS_OBJ(value)->oType) {
+        case OBJ_CLASS:
+          vmPush(OBJ_VAL(vm.classes.oTypeClass));
+          break;
+        case OBJ_INSTANCE:
+          vmPush(OBJ_VAL(vm.classes.oTypeInstance));
+          break;
+        case OBJ_STRING:
+          vmPush(OBJ_VAL(vm.classes.oTypeString));
+          break;
+        case OBJ_CLOSURE:
+          vmPush(OBJ_VAL(vm.classes.oTypeClosure));
+          break;
+        default: {
+          printValue(value);
+          vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
+          return false;
+        }
+      }
+      break;
+    case VAL_UNDEF:
+      vmPush(OBJ_VAL(vm.classes.cTypeUndef));
+      break;
+    default:
+      vmRuntimeError("Unexpected value.");
+      return false;
+  }
+  return true;
+}
+
+bool __localTypeEnv__(int argCount, Value* args) {
+  vmPop();  // native fn.
+  vmPush(OBJ_VAL(newInstance(vm.classes.typeEnv)));
+  vmInitInstance(vm.classes.typeEnv, 0);
+  mapAddAll(&vm.frame->closure->typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
+  return true;
+}
+
+bool __globalTypeEnv__(int argCount, Value* args) {
+  vmPop();  // native fn.
+  vmPush(OBJ_VAL(newInstance(vm.classes.typeEnv)));
+  vmInitInstance(vm.classes.typeEnv, 0);
+  mapAddAll(&vm.typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
   return true;
 }
 
@@ -252,7 +371,7 @@ bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
 
-  switch (value.type) {
+  switch (value.cType) {
     case VAL_NUMBER: {
       double num = AS_NUMBER(value);
 
@@ -264,17 +383,17 @@ bool __str__(int argCount, Value* args) {
     }
     case VAL_NIL: {
       string = copyString("nil", 4);
-
       break;
     }
     case VAL_BOOL: {
       string =
           (AS_BOOL(value) ? copyString("true", 4) : copyString("false", 5));
-
       break;
     }
-    default:
+    default: {
+      vmRuntimeError("Can't turn x into a string.");
       return false;
+    }
   }
 
   vmPop();
@@ -324,9 +443,13 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("getHash", 1, __getHash__);
   defineNativeFnGlobal("setHash", 2, __setHash__);
-  defineNativeFnGlobal("type", 1, __type__);
+  defineNativeFnGlobal("cType", 1, __cType__);
+  defineNativeFnGlobal("localTypeEnv", 0, __localTypeEnv__);
+  defineNativeFnGlobal("globalTypeEnv", 0, __globalTypeEnv__);
   defineNativeFnGlobal("entries", 1, __objEntries__);
   defineNativeFnGlobal("clock", 0, __clock__);
+  defineNativeFnGlobal("superclass", 1, __superclass__);
+  defineNativeFnGlobal("random", 1, __randomNumber__);
 
   defineNativeFnGlobal("__gt__", 2, __gt__);
   defineNativeFnGlobal("__lt__", 2, __lt__);
@@ -338,22 +461,36 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("__mul__", 2, __mul__);
 
   vm.classes.object = defineNativeClass(S_OBJ);
-  defineNativeFnMethod("get", 1, __objGet__, vm.classes.object);
-  defineNativeFnMethod("set", 2, __objSet__, vm.classes.object);
-  defineNativeFnMethod("has", 1, __objHas__, vm.classes.object);
+  defineNativeFnMethod("get", 1, false, __objGet__, vm.classes.object);
+  defineNativeFnMethod("set", 2, false, __objSet__, vm.classes.object);
+  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.object);
 
   // native classes.
 
   InterpretResult coreIntpt = interpretFile("src/core/__index__");
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
-  vm.classes.sequence = getClass(S_SEQUENCE);
-  defineNativeFnMethod(S_INIT, 0, __seqInit__, vm.classes.sequence);
-  defineNativeFnMethod(S_ADD, 1, __seqAdd__, vm.classes.sequence);
+  vm.classes.tuple = getClass(S_TUPLE);
+  defineNativeFnMethod(S_INIT, 0, true, __tupleInit__, vm.classes.tuple);
 
+  vm.classes.sequence = getClass(S_SEQUENCE);
+  defineNativeFnMethod(S_INIT, 0, false, __sequenceInit__, vm.classes.sequence);
+  defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.classes.sequence);
+  defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.classes.sequence);
+
+  vm.classes.typeEnv = getClass(S_TYPE_ENV);
   vm.classes.astNode = getClass(S_AST_NODE);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
   vm.classes.astSignature = getClass(S_AST_SIGNATURE);
 
+  vm.classes.cTypeBool = getClass(S_CTYPE_BOOL);
+  vm.classes.cTypeNil = getClass(S_CTYPE_NIL);
+  vm.classes.cTypeNumber = getClass(S_CTYPE_NUMBER);
+  vm.classes.cTypeUndef = getClass(S_CTYPE_UNDEF);
+  vm.classes.oTypeClass = getClass(S_OTYPE_CLASS);
+  vm.classes.oTypeInstance = getClass(S_OTYPE_INSTANCE);
+  vm.classes.oTypeString = getClass(S_OTYPE_STRING);
+  vm.classes.oTypeClosure = getClass(S_OTYPE_CLOSURE);
+  vm.classes.oTypeSequence = getClass(S_OTYPE_SEQUENCE);
   return INTERPRET_OK;
 }

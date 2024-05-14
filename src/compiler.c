@@ -188,15 +188,8 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static void consumeQuiet(TokenType type) {
+static void consumeQuietly(TokenType type) {
   if (parser.current.type == type)
-    advance();
-  else
-    parser.hadError = true;
-}
-
-static void consumeStrQuiet(char* str) {
-  if (checkStr(str))
     advance();
   else
     parser.hadError = true;
@@ -495,6 +488,11 @@ static uint8_t declareVariable() {
   return addLocal(*name);
 }
 
+static void defineType(int var) {
+  emitConstInstr(
+      current->scopeDepth > 0 ? OP_SET_TYPE_LOCAL : OP_SET_TYPE_GLOBAL, var);
+}
+
 static uint16_t nativeVariable(char* name) {
   uint16_t var = makeConstant(identifier(name));
   emitConstInstr(OP_GET_GLOBAL, var);
@@ -588,8 +586,20 @@ static void literal(bool canAssign) {
   }
 }
 
-static void grouping(bool canAssign) {
+static void parentheses(bool canAssign) {
   expression();
+
+  if (check(TOKEN_COMMA)) {
+    int argCount = 1;
+    do {
+      advance();
+      expression();
+      argCount++;
+    } while (check(TOKEN_COMMA));
+
+    nativeVariable("Tuple");
+    emitBytes(OP_CALL_POSTFIX, argCount);
+  }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
@@ -625,12 +635,15 @@ static void namedVariable(Token name, bool canAssign) {
     setOp = OP_SET_GLOBAL;
   }
 
-  if (canAssign && match(TOKEN_ARROW_LEFT)) {
+  if (canAssign && match(TOKEN_EQUAL)) {
+    expression();
+    emitConstInstr(setOp, arg);
+  } else if (canAssign && match(TOKEN_COLON)) {
+    expression();
+    defineType(arg);
+  } else if (canAssign && match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
-    emitConstInstr(setOp, arg);
-  } else if (canAssign && match(TOKEN_EQUAL)) {
-    expression();
     emitConstInstr(setOp, arg);
   } else {
     emitConstInstr(getOp, arg);
@@ -749,15 +762,15 @@ static bool peekSignature() {
 
   Parser checkpoint = saveParser();
 
-  consumeQuiet(TOKEN_LEFT_PAREN);
+  consumeQuietly(TOKEN_LEFT_PAREN);
 
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      consumeQuiet(TOKEN_IDENTIFIER);
+      consumeQuietly(TOKEN_IDENTIFIER);
     } while (match(TOKEN_COMMA));
   }
-  consumeQuiet(TOKEN_RIGHT_PAREN);
-  consumeStrQuiet("=>");
+  consumeQuietly(TOKEN_RIGHT_PAREN);
+  consumeQuietly(TOKEN_FAT_ARROW);
 
   found = !parser.hadError;
 
@@ -973,7 +986,7 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     emitConstInstr(OP_GET_LOCAL, var);
     current->localCount++;
     expression();
-    methodCall(S_ADD, 1);
+    methodCall(S_PUSH, 1);
     // pop the comprehension instance.
     current->localCount--;
     emitByte(OP_POP);
@@ -1135,11 +1148,11 @@ static void brackets(bool canAssign) {
 
   // it's a sequence.
   if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    methodCall(S_ADD, 1);
+    methodCall(S_PUSH, 1);
 
     while (match(TOKEN_COMMA)) {
       expression();
-      methodCall(S_ADD, 1);
+      methodCall(S_PUSH, 1);
     }
   } else {
     // it's a tree.
@@ -1242,16 +1255,29 @@ static void letDeclaration() {
   emitByte(OP_NIL);
   defineVariable(var);
 
+  if (match(TOKEN_COLON)) {
+    expression();
+    defineType(var);
+    consume(TOKEN_SEMICOLON, "Expect ';' after type declaration.");
+    return;
+  }
+
   if (match(TOKEN_EQUAL)) {
     boundExpression();
-
-    if (current->scopeDepth > 0)
-      emitConstInstr(OP_SET_LOCAL, var);
-    else
-      emitConstInstr(OP_SET_GLOBAL, var);
-
-    emitByte(OP_POP);
+  } else if (match(TOKEN_ARROW_LEFT)) {
+    expression();
+    emitByte(OP_DESTRUCTURE);
+  } else {
+    emitByte(OP_NIL);
   }
+
+  if (current->scopeDepth > 0)
+    emitConstInstr(OP_SET_LOCAL, var);
+  else
+    emitConstInstr(OP_SET_GLOBAL, var);
+
+  emitByte(OP_POP);
+
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
   if (infixPrecedence != -1) {
@@ -1263,7 +1289,7 @@ static void letDeclaration() {
 static void expressionStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
-  emitByte(OP_POP);
+  emitByte(OP_EXPR_STATEMENT);
 }
 
 static int loopCondition() {
@@ -1469,7 +1495,7 @@ static void statement() {
 }
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
+    [TOKEN_LEFT_PAREN] = {parentheses, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {braces, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},

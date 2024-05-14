@@ -1,29 +1,47 @@
 
 
 class Object extends __obj__ {
-  __iter__() => Iterator(this.entries(), 0, len(this));
+  init() => {
+    this.__private__ = [
+      "__class__",
+      "__private__"
+    ];
+  }
 
-  // The native `entries` function returns raw sequence
+  __iter__() => {
+    let seq = this.entries();
+
+    return Iterator(seq, 0, len(seq));
+  }
+
+  // The native [entries] function returns raw [ObjSequence]
   // objects. Here we wrap them in instances of the core
-  // Sequence class.
+  // [Sequence] class.
   entries() => {
-    let seqRaw = entries(this);
-    let seqFancy = Sequence();
+    let cSeq = entries(this);
+    let entries = Sequence();
 
     // raw sequences don't implement the iteration protocol.
     for (let i = 0; i < len(this); i = i + 1) {
-      let entryRaw = seqRaw[i];
-      let entryFancy = Sequence();
+      let key = cSeq[i][0];
 
-      entryFancy.add(entryRaw[0]);
-      entryFancy.add(entryRaw[1]);
-
-      seqFancy.add(entryFancy);
+      if (!(key in this.__private__)) {
+        let val = cSeq[i][1];
+        let entry = Sequence();
+        entry.push(key);
+        entry.push(val);
+        entries.push(entry);
+      }
     }
 
-    return seqFancy;
+    return entries;
   }
 
   keys() => [entry[0] | entry in this.entries()];
   values() => [entry[1] | entry in this.entries()];
+
+  extend(other) => {
+    for (entry in other)
+      this[entry[0]] = entry[1];
+  }
 }

@@ -16,7 +16,7 @@
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
 
-  object->type = type;
+  object->oType = type;
   object->isMarked = false;
   object->next = vm.objects;
   object->hash = 0;
@@ -39,7 +39,8 @@ ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
 ObjClass* newClass(ObjString* name) {
   ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
   klass->name = name;
-  initMap(&klass->methods);
+  klass->super = NULL;
+  initMap(&klass->fields);
   return klass;
 }
 
@@ -53,6 +54,7 @@ ObjClosure* newClosure(ObjFunction* function) {
   closure->function = function;
   closure->upvalues = upvalues;
   closure->upvalueCount = function->upvalueCount;
+  initMap(&closure->typeEnv);
   return closure;
 }
 
@@ -75,9 +77,11 @@ ObjInstance* newInstance(ObjClass* klass) {
   return instance;
 }
 
-ObjNative* newNative(int arity, ObjString* name, NativeFn function) {
+ObjNative* newNative(int arity, bool variadic, ObjString* name,
+                     NativeFn function) {
   ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   native->arity = arity;
+  native->variadic = variadic;
   native->name = name;
   native->function = function;
   return native;
@@ -113,7 +117,7 @@ static uint32_t hashString(const char* key, int length) {
 
 // Generate a hash code for [object].
 uint32_t hashObject(Obj* object) {
-  switch (object->type) {
+  switch (object->oType) {
     case OBJ_STRING:
       return ((ObjString*)object)->hash;
     default:
@@ -347,13 +351,48 @@ void markMap(ObjMap* map) {
 
 static void printMap(ObjMap* map) { printf("<map>"); }
 
+// Is [a] a subclass of [b]?
+bool isSubclass(ObjClass* a, ObjClass* b) {
+  ObjClass* k = a;
+  while (k != NULL) {
+    if (k == b) return true;
+    k = k->super;
+  }
+  return false;
+}
+
+bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
+  ObjClass* k = a;
+
+  while (k != NULL) {
+    if (isSubclass(b, k)) {
+      *ancestor = *k;
+      return true;
+    }
+
+    k = k->super;
+  }
+
+  return false;
+}
+
+bool classesEqual(ObjClass* a, ObjClass* b) {
+  return isSubclass(a, b) || isSubclass(b, a);
+}
+
+bool objectsEqual(Obj* a, Obj* b) {
+  if (a->hash != 0 && b->hash != 0) return a->hash == b->hash;
+
+  return a == b;
+}
+
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_BOUND_METHOD:
       printFunction(AS_BOUND_METHOD(value)->method->function);
       break;
     case OBJ_CLASS:
-      printf("%s", AS_CLASS(value)->name->chars);
+      printf("<%s class>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
       printFunction(AS_CLOSURE(value)->function);

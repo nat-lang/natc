@@ -1,47 +1,58 @@
 
 class Set extends Object {
+  init() => {
+    this.map = Map();
+  }
+
+  // The elements of the set are the keys of the underlying map.
+  elements() => this.map.keys();
+
   // Calling a set is shorthand for the membership predicate,
   // so that the set behaves like its characteristic function.
   call(element) => element in this;
 
   setKeyHash(key) => {
-    if (type(key) == Set) 
-      setHash(key, key.hash());
+    if (is(key, Object)) {
+      if (key.hash)
+        setHash(key, key.hash());
+    }
   }
 
   __set__(key, value) => {
     this.setKeyHash(key);
-
-    this.set(key, value);
+    this.map.set(key, value);
     return this;
   }
 
   __get__(key) => {
     this.setKeyHash(key);
 
-    return this.get(key);
+    return this.map.get(key);
   }
 
   __in__(key) => {
     this.setKeyHash(key);
 
-    return this.has(key);
+    return this.map.has(key);
   }
 
-  // The compiler calls this method when building a set comprehension.
   add(element) => this.__set__(element, true);
 
-  // The elements of the set are the keys of the underlying map.
-  elements() => this.keys();
+  // The compiler calls this method when building a set comprehension.
+  push(element) => this.add(element);
+
+  __len__() => len(this.elements());
 
   // Iteration is over elements.
   __iter__() => iter(this.elements());
 
   hashFor(element) => {
-    if (type(element) == Set)
-      return element.hash();
-    else
-      return getHash(element);
+    if (is(element, Object)) {
+      if (element.hash)
+        return element.hash();
+    }
+
+    return getHash(element);
   }
 
   // Hash the elements and sum them.

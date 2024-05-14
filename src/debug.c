@@ -82,6 +82,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_TRUE", offset);
     case OP_FALSE:
       return simpleInstruction("OP_FALSE", offset);
+    case OP_EXPR_STATEMENT:
+      return simpleInstruction("OP_EXPR_STATEMENT", offset);
     case OP_POP:
       return simpleInstruction("OP_POP", offset);
     case OP_GET_LOCAL:
@@ -106,22 +108,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_GET_SUPER", chunk, offset);
     case OP_EQUAL:
       return simpleInstruction("OP_EQUAL", offset);
-    case OP_GREATER:
-      return simpleInstruction("OP_GREATER", offset);
-    case OP_LESS:
-      return simpleInstruction("OP_LESS", offset);
-    case OP_ADD:
-      return simpleInstruction("OP_ADD", offset);
-    case OP_SUBTRACT:
-      return simpleInstruction("OP_SUBTRACT", offset);
-    case OP_MULTIPLY:
-      return simpleInstruction("OP_MULTIPLY", offset);
-    case OP_DIVIDE:
-      return simpleInstruction("OP_DIVIDE", offset);
     case OP_NOT:
       return simpleInstruction("OP_NOT", offset);
-    case OP_NEGATE:
-      return simpleInstruction("OP_NEGATE", offset);
     case OP_PRINT:
       return simpleInstruction("OP_PRINT", offset);
     case OP_JUMP:
@@ -134,6 +122,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return byteInstruction("OP_CALL", chunk, offset);
     case OP_CALL_INFIX:
       return simpleInstruction("OP_CALL_INFIX", offset);
+    case OP_CALL_POSTFIX:
+      return simpleInstruction("OP_CALL_POSTFIX", offset);
     case OP_INVOKE:
       return invokeInstruction("OP_INVOKE", chunk, offset);
     case OP_SUPER_INVOKE:
@@ -181,6 +171,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_END", offset);
     case OP_DESTRUCTURE:
       return simpleInstruction("OP_DESTRUCTURE", offset);
+    case OP_SET_TYPE_LOCAL:
+      return shortInstruction("OP_SET_TYPE_LOCAL", chunk, offset);
+    case OP_SET_TYPE_GLOBAL:
+      return constantInstruction("OP_SET_TYPE_GLOBAL", chunk, offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

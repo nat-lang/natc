@@ -7,11 +7,21 @@ class ASTNode extends Tree {
   opCall(fn, *args) => ASTApp(fn, args);
 }
 
-class ASTStmt extends ASTNode {}
-class ASTReturnStmt extends ASTStmt {
-  init(value) => {
-    super.init();
-    this.data = value;
+class ASTStatement extends ASTNode {}
+class ASTAssignment extends ASTStatement {
+  init(var, value) => {
+    this.children = [var, value];
+  }
+}
+class ASTReturn extends ASTStatement {
+  init(expr) => {
+    this.children = [expr];
+  }
+}
+
+class ASTExprStatement extends ASTStatement {
+  init(expr) => {
+    this.children = [expr];
   }
 }
 
@@ -33,22 +43,23 @@ class ASTVar extends ASTExpr {
 class ASTLocal extends ASTVar {}
 class ASTGlobal extends ASTVar {}
 class ASTUpvalue extends ASTVar {}
+class ASTArgumentSequence extends ASTExpr {
+  init(arguments) => {
+    super.init();
+    this.children = arguments;
+  }
+}
 
 class ASTApp extends ASTExpr {
   init(fn, arguments) => {
     super.init();
-
-    this.fn = fn;
-    this.arguments = arguments;
+    this.children = [fn, ASTArgumentSequence(arguments)];
   }
 }
 
-class ASTSignature extends Object {}
-
-class ASTBlock extends ASTExpr {
-  init() => {
-    super.init();
-    this.statements = [];
+class ASTSignature extends Object {
+  init(parameters) => {
+    this.parameters = parameters;
   }
 }
 
@@ -56,10 +67,20 @@ class ASTClosure extends ASTExpr {
   init(signature) => {
     super.init();
     this.signature = signature;
-    this.block = ASTBlock();
+    this.children = [];
+  }
+
+  opExprStatement(expr) => {
+    let node = ASTExprStatement(expr);
+    this.children.push(node);
   }
 
   opReturn(expr) => {
-    this.block.statements.add(ASTReturnStmt(expr));
+    let node = ASTReturn(expr);
+    this.children.push(node);
+  }
+  opSetLocal(slot, value) => {
+    let node = ASTAssignment(ASTLocal(slot), value);
+    this.children.push(node);
   }
 }

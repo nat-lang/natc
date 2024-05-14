@@ -1,115 +1,117 @@
-let f;
 
 // constant function to literal.
 
-f <- (a) => 1;
+let f <- (a) => 1;
 
 assert(type(f.signature) == ASTSignature);
-assert(f.signature.entries()[0][1] == "a");
+assert(f.signature.parameters[1] == "a");
 
 // explicit and implicit returns.
-assert(len(f.block.statements) == 2);
+assert(len(f.children) == 2);
 
 // explicit.
-assert(type(f.block.statements[0]) == ASTReturnStmt);
-assert(type(f.block.statements[0].data) == ASTLiteral);
-assert(f.block.statements[0].data.data == 1);
+assert(type(f[0]) == ASTReturn);
+assert(type(f[0][0]) == ASTLiteral);
+assert(f[0][0].data == 1);
 
 // implicit.
-assert(type(f.block.statements[1]) == ASTReturnStmt);
-assert(type(f.block.statements[1].data) == ASTLiteral);
-assert(f.block.statements[1].data.data == nil);
+assert(type(f[1]) == ASTReturn);
+assert(type(f[1][0]) == ASTLiteral);
+assert(f[1][0].data == nil);
 
 // constant function to global.
 f <- (a) => c;
 
 // explicit and implicit returns.
-assert(len(f.block.statements) == 2);
+assert(len(f.children) == 2);
 
 // explicit.
-assert(type(f.block.statements[0]) == ASTReturnStmt);
-assert(type(f.block.statements[0].data) == ASTGlobal);
-assert(f.block.statements[0].data.data == "c");
+assert(type(f[0]) == ASTReturn);
+assert(type(f[0][0]) == ASTGlobal);
+assert(f[0][0].data == "c");
 
 // implicit.
-assert(type(f.block.statements[1]) == ASTReturnStmt);
-assert(type(f.block.statements[1].data) == ASTLiteral);
-assert(f.block.statements[1].data.data == nil);
+assert(type(f[1]) == ASTReturn);
+assert(type(f[1][0]) == ASTLiteral);
+assert(f[1][0].data == nil);
 
 // constant function to local.
 
 f <- (a) => a;
 
 // explicit and implicit returns.
-assert(len(f.block.statements) == 2);
+assert(len(f.children) == 2);
 
 // explicit.
-assert(type(f.block.statements[0]) == ASTReturnStmt);
-assert(type(f.block.statements[0].data) == ASTLocal);
-assert(f.block.statements[0].data.data == 1);
+assert(type(f[0]) == ASTReturn);
+assert(type(f[0][0]) == ASTLocal);
+assert(f[0][0].data == 1);
 
 // implicit.
-assert(type(f.block.statements[1]) == ASTReturnStmt);
-assert(type(f.block.statements[1].data) == ASTLiteral);
-assert(f.block.statements[1].data.data == nil);
+assert(type(f[1]) == ASTReturn);
+assert(type(f[1][0]) == ASTLiteral);
+assert(f[1][0].data == nil);
 
 // function to binary application.
 
 f <- (a) => a + 1;
 
-let r = f.block.statements[0];
+let r = f[0];
 
-assert(type(r) == ASTReturnStmt);
-assert(type(r.data) == ASTApp);
-assert(r.data.fn.data == "+");
+assert(type(r) == ASTReturn);
+assert(type(r[0]) == ASTApp);
+assert(r[0][0].data == "+");
 
 f <- (a) => +(a, 1);
 
-let r = f.block.statements[0];
-assert(type(r) == ASTReturnStmt);
-assert(type(r.data) == ASTApp);
-assert(r.data.fn.data == "+");
+let r = f[0];
+assert(type(r) == ASTReturn);
+assert(type(r[0]) == ASTApp);
+assert(r[0][0].data == "+");
 
 f <- (a) => a and true;
 
-let r = f.block.statements[0];
-assert(type(r) == ASTReturnStmt);
-assert(type(r.data) == ASTApp);
-assert(r.data.fn.data == "and");
+let r = f[0];
+assert(type(r) == ASTReturn);
+assert(type(r[0]) == ASTApp);
+assert(r[0][0].data == "and");
 
 f <- (a) => a or true;
 
-let r = f.block.statements[0];
-assert(type(r) == ASTReturnStmt);
-assert(type(r.data) == ASTApp);
-assert(r.data.fn.data == "or");
+let r = f[0];
+assert(type(r) == ASTReturn);
+assert(type(r[0]) == ASTApp);
+assert(r[0][0].data == "or");
 
 f <- (a) => a implies b;
 
-let r = f.block.statements[0];
-assert(type(r) == ASTReturnStmt);
-assert(type(r.data) == ASTApp);
-assert(r.data.fn.data == "implies");
+let r = f[0];
+assert(type(r) == ASTReturn);
+assert(type(r[0]) == ASTApp);
+assert(r[0][0].data == "implies");
 
 // function to function.
 
 f <- (g) => (x) => 1;
 
-let r = f.block.statements[0];
-
-assert(type(r.data) == ASTClosure);
-assert(type(r.data.block.statements[0].data) == ASTLiteral);
+assert(type(f[0][0]) == ASTClosure);
+assert(type(f[0][0][0][0]) == ASTLiteral);
 
 f <- (g) => (x) => g(x);
 
-let r = f.block.statements[0];
-
-assert(type(f.block.statements[0].data) == ASTClosure);
-assert(type(r.data.block.statements[0].data) == ASTApp);
+assert(type(f[0][0]) == ASTClosure);
+assert(type(f[0][0][0][0]) == ASTApp);
 
 f <- (f, g) => (x) => f(g(x));
 
-let r = f.block.statements[0];
+assert(type(f[0][0]) == ASTClosure);
+assert(type(f[0][0][0][0]) == ASTApp);
 
-assert(type(f.block.statements[0].data) == ASTClosure);
-assert(type(r.data.block.statements[0].data) == ASTApp);
+// local assignment.
+
+f <- (g) => {
+  let a = 1;
+  return a;
+};
+
+assert(len(f.children) == 3);

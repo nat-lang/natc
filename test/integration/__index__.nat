@@ -18,9 +18,10 @@ import test/integration/map
 import test/integration/membership
 import test/integration/recursion
 import test/integration/return
-import test/integration/sequence
+import test/integration/sequential
 import test/integration/set
 import test/integration/string
 import test/integration/tree
+import test/integration/type
 
 conclude("integration");

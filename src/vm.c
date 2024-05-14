@@ -29,9 +29,9 @@ void vmRuntimeError(const char* format, ...) {
   fputs("\n", stderr);
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
-    CallFrame* frame = &vm.frames[i];
-    ObjFunction* function = frame->closure->function;
-    size_t instruction = frame->ip - function->chunk.code - 1;
+    vm.frame = &vm.frames[i];
+    ObjFunction* function = vm.frame->closure->function;
+    size_t instruction = vm.frame->ip - function->chunk.code - 1;
     fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
     if (function->name == NULL) {
       fprintf(stderr, "script\n");
@@ -61,10 +61,21 @@ bool vmValidateHashable(Value value) {
 
 void initClasses(Classes* classes) {
   classes->object = NULL;
+  classes->tuple = NULL;
   classes->sequence = NULL;
+  classes->typeEnv = NULL;
   classes->astNode = NULL;
   classes->astClosure = NULL;
   classes->astSignature = NULL;
+  classes->cTypeBool = NULL;
+  classes->cTypeNil = NULL;
+  classes->cTypeNumber = NULL;
+  classes->cTypeUndef = NULL;
+  classes->oTypeClass = NULL;
+  classes->oTypeInstance = NULL;
+  classes->oTypeString = NULL;
+  classes->oTypeClosure = NULL;
+  classes->oTypeSequence = NULL;
 }
 
 bool initVM() {
@@ -79,6 +90,7 @@ bool initVM() {
   vm.grayStack = NULL;
 
   initMap(&vm.globals);
+  initMap(&vm.typeEnv);
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
@@ -109,6 +121,14 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
+bool vmInitInstance(ObjClass* klass, int argCount) {
+  if (!vmInstantiateClass(klass, argCount)) return false;
+  if (vmClassInitializable(klass))
+    if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
+
+  return true;
+}
+
 static bool checkArity(int paramCount, int argCount) {
   if (argCount == paramCount) return true;
 
@@ -117,11 +137,11 @@ static bool checkArity(int paramCount, int argCount) {
 }
 
 // Collapse [argCount] - [arity] + 1 arguments into a final
-// sequence argument.
+// [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
   vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
-  vmInitClass(vm.classes.sequence, 0);
+  vmInstantiateClass(vm.classes.sequence, 0);
 
   // either the function was called (a) with arity - 1 arguments
   // or (b) with arity - n arguments for n > 1. (a) is valid;
@@ -142,7 +162,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
     vmPush(seq);
     vmPush(arg);
 
-    if (!vmInvoke(intern(S_ADD), 1)) return false;
+    if (!vmInvoke(intern(S_PUSH), 1)) return false;
     i--;
   }
 
@@ -173,16 +193,16 @@ static bool call(ObjClosure* closure, int argCount) {
     return false;
   }
 
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = vm.stackTop - argCount - 1;
+  vm.frame = &vm.frames[vm.frameCount++];
+  vm.frame->closure = closure;
+  vm.frame->ip = closure->function->chunk.code;
+  vm.frame->slots = vm.stackTop - argCount - 1;
 
   return true;
 }
 
 static bool callNative(ObjNative* native, int argCount) {
-  if (!checkArity(native->arity, argCount)) return false;
+  if (!native->variadic && !checkArity(native->arity, argCount)) return false;
 
   return (native->function)(argCount, vm.stackTop - argCount);
 }
@@ -198,7 +218,7 @@ bool vmCallValue(Value callee, int argCount) {
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
-        return vmInitClass(klass, argCount);
+        return vmInstantiateClass(klass, argCount);
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
@@ -207,7 +227,7 @@ bool vmCallValue(Value callee, int argCount) {
       case OBJ_INSTANCE: {
         ObjInstance* instance = AS_INSTANCE(callee);
         Value callFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_CALL)),
+        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_CALL)),
                    &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
         } else {
@@ -227,10 +247,17 @@ bool vmCallValue(Value callee, int argCount) {
   return false;
 }
 
-bool vmInitClass(ObjClass* klass, int argCount) {
+bool vmClassInitializable(ObjClass* klass) {
+  return mapHas(&klass->fields, OBJ_VAL(intern(S_INIT)));
+}
+
+bool vmInstantiateClass(ObjClass* klass, int argCount) {
   Value initializer;
 
-  if (mapGet(&klass->methods, OBJ_VAL(intern(S_INIT)), &initializer)) {
+  mapSet(&AS_INSTANCE(vmPeek(argCount))->fields, OBJ_VAL(intern(S_CLASS)),
+         OBJ_VAL(klass));
+
+  if (mapGet(&klass->fields, OBJ_VAL(intern(S_INIT)), &initializer)) {
     return vmCallValue(initializer, argCount);
   } else if (argCount != 0) {
     vmRuntimeError("Expected 0 arguments but got %d.", argCount);
@@ -241,7 +268,7 @@ bool vmInitClass(ObjClass* klass, int argCount) {
 
 static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
   Value method;
-  if (!mapGet(&klass->methods, OBJ_VAL(name), &method)) {
+  if (!mapGet(&klass->fields, OBJ_VAL(name), &method)) {
     vmRuntimeError("Undefined property '%s' for class '%s'.", name->chars,
                    klass->name->chars);
     return false;
@@ -269,16 +296,35 @@ bool vmInvoke(ObjString* name, int argCount) {
   return invokeFromClass(instance->klass, name, argCount);
 }
 
-static bool bindMethod(ObjClass* klass, ObjString* name) {
-  Value method;
-  if (!mapGet(&klass->methods, OBJ_VAL(name), &method)) {
-    vmRuntimeError("Undefined property '%s'.", name->chars);
-    return false;
+static bool getClassProperty(ObjClass* klass, Value name) {
+  Value property;
+  if (mapGet(&klass->fields, name, &property)) {
+    if (IS_CLOSURE(property)) {
+      ObjBoundMethod* bound = newBoundMethod(vmPeek(0), AS_CLOSURE(property));
+      vmPop();
+      vmPush(OBJ_VAL(bound));
+    } else {
+      vmPop();
+      vmPush(property);
+    }
+  } else {
+    vmPop();
+    vmPush(NIL_VAL);
   }
 
-  ObjBoundMethod* bound = newBoundMethod(vmPeek(0), AS_CLOSURE(method));
-  vmPop();
-  vmPush(OBJ_VAL(bound));
+  return true;
+}
+
+static bool getInstanceProperty(ObjInstance* instance, Value name) {
+  Value value;
+  if (mapGet(&instance->fields, name, &value)) {
+    vmPop();  // Instance.
+    vmPush(value);
+  } else if (!getClassProperty(instance->klass, name)) {
+    vmPop();
+    vmPush(NIL_VAL);
+  }
+
   return true;
 }
 
@@ -330,7 +376,7 @@ static void closeUpvalues(Value* last) {
 static void defineMethod(Value name) {
   Value method = vmPeek(0);
   ObjClass* klass = AS_CLASS(vmPeek(1));
-  mapSet(&klass->methods, name, method);
+  mapSet(&klass->fields, name, method);
   vmPop();
 }
 
@@ -347,7 +393,8 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   int intIdx = AS_NUMBER(idx);
 
   if (intIdx > seq->values.count - 1 || intIdx < 0) {
-    vmRuntimeError("Index %i out of bounds [0:%i]", intIdx, seq->values.count);
+    vmRuntimeError("Index %i out of bounds for sequence (length %i).", intIdx,
+                   seq->values.count);
     return false;
   }
 
@@ -358,7 +405,7 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
   if (!vmValidateHashable(value)) return false;
 
   bool hasKey = mapHas(&instance->fields, value) ||
-                mapHas(&instance->klass->methods, value);
+                mapHas(&instance->klass->fields, value);
   vmPush(BOOL_VAL(hasKey));
   return true;
 }
@@ -368,7 +415,9 @@ bool vmInstanceHas(ObjInstance* instance, Value value) {
 // middle of interpretation without overflowing its scope, we can
 // let [baseFrame] = the current frame.
 InterpretResult vmExecute(int baseFrame) {
-  CallFrame* frame = &vm.frames[vm.frameCount - 1];
+  vm.frame = &vm.frames[vm.frameCount - 1];
+
+  CallFrame* frame = vm.frame;
 
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -397,6 +446,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_FALSE:
         vmPush(BOOL_VAL(false));
         break;
+      case OP_EXPR_STATEMENT:
       case OP_POP:
         vmPop();
         break;
@@ -425,6 +475,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
         mapSet(&vm.globals, name, vmPeek(0));
+        mapSet(&vm.typeEnv, name, NIL_VAL);
         vmPop();
         break;
       }
@@ -438,29 +489,23 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_GET_PROPERTY: {
-        if (!IS_INSTANCE(vmPeek(0))) {
-          vmRuntimeError("Only objects have properties.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        Value name = READ_CONSTANT();
 
-        ObjInstance* instance = AS_INSTANCE(vmPeek(0));
-        ObjString* name = READ_STRING();
-
-        Value value;
-        if (mapGet(&instance->fields, OBJ_VAL(name), &value)) {
-          vmPop();  // Instance.
-          vmPush(value);
+        if (IS_INSTANCE(vmPeek(0)) &&
+            getInstanceProperty(AS_INSTANCE(vmPeek(0)), name))
           break;
-        }
 
-        if (!bindMethod(instance->klass, name)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        if (IS_CLASS(vmPeek(0)) && getClassProperty(AS_CLASS(vmPeek(0)), name))
+          break;
+
+        vmRuntimeError("Only objects and classes have properties.");
+        return INTERPRET_RUNTIME_ERROR;
+
         break;
       }
       case OP_SET_PROPERTY: {
         if (!IS_INSTANCE(vmPeek(1))) {
-          vmRuntimeError("Only objects have properties.");
+          vmRuntimeError("Only objects and classes have properties.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -481,10 +526,9 @@ InterpretResult vmExecute(int baseFrame) {
           ObjInstance* instanceB = AS_INSTANCE(b);
 
           Value equalFn;
-          if (valuesEqual(OBJ_VAL(instanceA->klass),
-                          OBJ_VAL(instanceB->klass)) &&
-              mapGet(&instanceA->klass->methods, OBJ_VAL(intern(S_EQ)),
-                     &equalFn)) {
+          ObjClass lca;
+          if (leastCommonAncestor(instanceA->klass, instanceB->klass, &lca) &&
+              mapGet(&lca.fields, OBJ_VAL(intern(S_EQ)), &equalFn)) {
             vmPush(a);
             vmPush(b);
             if (!vmCallValue(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
@@ -498,12 +542,9 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_GET_SUPER: {
-        ObjString* name = READ_STRING();
+        Value name = READ_CONSTANT();
         ObjClass* superclass = AS_CLASS(vmPop());
-
-        if (!bindMethod(superclass, name)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        getClassProperty(superclass, name);
         break;
       }
       case OP_GET_UPVALUE: {
@@ -518,14 +559,6 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_NOT:
         vmPush(BOOL_VAL(isFalsey(vmPop())));
-        break;
-      // unreachable.
-      case OP_NEGATE:
-        if (!IS_NUMBER(vmPeek(0))) {
-          vmRuntimeError("Operand must be a number.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
-        vmPush(NUMBER_VAL(-AS_NUMBER(vmPop())));
         break;
       case OP_PRINT: {
         printValue(vmPop());
@@ -566,6 +599,23 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(right);
 
         if (!vmCallValue(infix, 2)) {
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
+      case OP_CALL_POSTFIX: {
+        int argCount = READ_BYTE();
+        Value postfix = vmPop();
+        Value args[argCount];
+
+        int i = argCount;
+        while (i-- > 0) args[i] = vmPop();
+        vmPush(postfix);
+        while (++i < argCount) vmPush(args[i]);
+
+        if (!vmCallValue(postfix, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -644,7 +694,8 @@ InterpretResult vmExecute(int baseFrame) {
         }
 
         ObjClass* subclass = AS_CLASS(vmPeek(0));
-        mapAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
+        mapAddAll(&AS_CLASS(superclass)->fields, &subclass->fields);
+        subclass->super = AS_CLASS(superclass);
         vmPop();  // Subclass.
         break;
       }
@@ -671,7 +722,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         // classes can override the membership predicate.
         Value memFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_IN)), &memFn)) {
+        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_IN)), &memFn)) {
           vmPush(obj);
           vmPush(val);
 
@@ -748,7 +799,7 @@ InterpretResult vmExecute(int baseFrame) {
         // classes may define their own subscript access operator.
         ObjInstance* instance = AS_INSTANCE(obj);
         Value getFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_SUBSCRIPT_GET)),
+        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_SUBSCRIPT_GET)),
                    &getFn)) {
           // set up the context for the function call.
           vmPush(obj);  // receiver.
@@ -797,7 +848,7 @@ InterpretResult vmExecute(int baseFrame) {
         // classes may define their own subscript setting operator.
         ObjInstance* instance = AS_INSTANCE(vmPeek(2));
         Value setFn;
-        if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_SUBSCRIPT_SET)),
+        if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_SUBSCRIPT_SET)),
                    &setFn)) {
           // the stack is already ready for the function call.
           if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
@@ -815,7 +866,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_DESTRUCTURE: {
         Value value = vmPeek(0);
 
-        switch (value.type) {
+        switch (value.cType) {
           case VAL_OBJ: {
             switch (OBJ_TYPE(value)) {
               case OBJ_CLOSURE: {
@@ -833,6 +884,22 @@ InterpretResult vmExecute(int baseFrame) {
           default:
             vmRuntimeError("Undestructurable value.");
             return INTERPRET_RUNTIME_ERROR;
+        }
+        break;
+      }
+      case OP_SET_TYPE_LOCAL: {
+        uint8_t slot = READ_SHORT();
+        Value value = frame->slots[slot];
+        if (!vmValidateHashable(value)) return false;
+        mapSet(&frame->closure->typeEnv, value, vmPeek(0));
+        break;
+      }
+      case OP_SET_TYPE_GLOBAL: {
+        Value name = READ_CONSTANT();
+        if (mapSet(&vm.typeEnv, name, vmPeek(0))) {
+          mapDelete(&vm.typeEnv, name);
+          vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
+          return INTERPRET_RUNTIME_ERROR;
         }
         break;
       }

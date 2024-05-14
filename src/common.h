@@ -15,15 +15,32 @@
 #define S_SUBSCRIPT_GET "__get__"
 #define S_SUBSCRIPT_SET "__set__"
 
+#define S_PUSH "push"
+#define S_POP "pop"
 #define S_ADD "add"
 #define S_CALL "call"
 #define S_INIT "init"
 #define S_ITER "iter"
+#define S_CLASS "__class__"
+#define S_SUPERCLASS "__superclass__"
 
 #define S_OBJ "__obj__"
 #define S_SEQUENCE "Sequence"
+#define S_TUPLE "Tuple"
+#define S_SET "Set"
+#define S_TYPE_ENV "TypeEnv"
 #define S_AST_NODE "ASTNode"
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_SIGNATURE "ASTSignature"
+
+#define S_CTYPE_BOOL "CBool"
+#define S_CTYPE_NIL "CNil"
+#define S_CTYPE_NUMBER "CNumber"
+#define S_CTYPE_UNDEF "CUndef"
+#define S_OTYPE_CLASS "OClass"
+#define S_OTYPE_INSTANCE "OInstance"
+#define S_OTYPE_STRING "OString"
+#define S_OTYPE_CLOSURE "OClosure"
+#define S_OTYPE_SEQUENCE "OSequence"
 
 #endif

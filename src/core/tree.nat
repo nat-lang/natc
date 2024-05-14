@@ -16,12 +16,26 @@ class Tree extends Object {
     if (type(child) != Tree)
       child = Tree().setData(child);
 
-    this.children.add(child);
+    this.children.push(child);
     return this;
   }
 
   // Subscript access is to children.
   __get__(idx) => this.children[idx];
+
+  __iter__() => {
+    let nodes = this.depthFirst();
+    return Iterator(nodes, 0, len(nodes));
+  }
+
+  depthFirst() => {
+    let seq = [this];
+
+    for (child in this.children)
+      seq = seq.concat(child.depthFirst());
+
+    return seq;
+  }
 
   isLeaf() => len(this.children) == 0;
 
@@ -31,23 +45,34 @@ class Tree extends Object {
     return [leaf | child in this.children, leaf in child.leaves()];
   }
 
-  fmap(fn) => {
+  map(fn) => {
     let tree = Tree();
 
     tree.setData(fn(this.data));
-  
+
     for (child in this.children)
-      tree.addChild(child.fmap(fn));
+      tree.children.push(child.map(fn));
 
     return tree;
   }
 
-  fold(fn, acc) => {
-    if (this.isLeaf())
-      return fn(acc, this.data);
+  foldM(fn) => {
+    let acc = [];
 
-    let inner = (acc, child) => child.fold(fn, acc);
+    for (node in this.depthFirst())
+      acc = acc.mconcat(fn(node));
 
-    return this.children.fold(inner, acc);
+    return acc;
   }
+
+  reduce(fn, acc) => {
+    for (node in this.depthFirst())
+      acc = fn(acc, node);
+
+    return acc;
+  }
+
+  fold(fn, acc) => this.reduce(
+    (acc, node) => fn(acc, node.data), acc
+  );
 }

@@ -5,7 +5,7 @@
 #include "common.h"
 #include "value.h"
 
-#define OBJ_TYPE(value) (AS_OBJ(value)->type)
+#define OBJ_TYPE(value) (AS_OBJ(value)->oType)
 
 #define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
@@ -42,7 +42,7 @@ typedef enum {
 } ObjType;
 
 struct Obj {
-  ObjType type;
+  ObjType oType;
   bool isMarked;
   uint32_t hash;
   struct Obj *next;
@@ -78,6 +78,7 @@ typedef bool (*NativeFn)(int argCount, Value *args);
 typedef struct {
   Obj obj;
   int arity;
+  bool variadic;
   ObjString *name;
   NativeFn function;
 } ObjNative;
@@ -101,12 +102,14 @@ typedef struct {
   ObjFunction *function;
   ObjUpvalue **upvalues;
   int upvalueCount;
+  ObjMap typeEnv;
 } ObjClosure;
 
-typedef struct {
+typedef struct ObjClass {
   Obj obj;
   ObjString *name;
-  ObjMap methods;
+  ObjMap fields;
+  struct ObjClass *super;
 } ObjClass;
 
 typedef struct {
@@ -132,7 +135,8 @@ ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjInstance *newInstance(ObjClass *klass);
 ObjMap *newMap();
-ObjNative *newNative(int arity, ObjString *name, NativeFn function);
+ObjNative *newNative(int arity, bool variadic, ObjString *name,
+                     NativeFn function);
 ObjSequence *newSequence();
 ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
@@ -142,7 +146,7 @@ ObjUpvalue *newUpvalue(Value *slot);
 void printObject(Value value);
 
 static inline bool isObjType(Value value, ObjType type) {
-  return IS_OBJ(value) && AS_OBJ(value)->type == type;
+  return IS_OBJ(value) && AS_OBJ(value)->oType == type;
 }
 
 void initMap(ObjMap *map);
@@ -157,6 +161,9 @@ ObjString *mapFindString(ObjMap *map, const char *chars, int length,
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
 
+bool objectsEqual(Obj *a, Obj *b);
+bool classesEqual(ObjClass *a, ObjClass *b);
+bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
 uint32_t hashObject(Obj *object);
 
 #endif
