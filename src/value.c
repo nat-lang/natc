@@ -29,6 +29,8 @@ void freeValueArray(ValueArray* array) {
   initValueArray(array);
 }
 
+Value popValueArray(ValueArray* array) { return array->values[--array->count]; }
+
 bool findInValueArray(ValueArray* array, Value value) {
   for (int i = 0; i < array->count; i++) {
     if (valuesEqual(array->values[i], value)) return true;
@@ -78,7 +80,7 @@ bool valuesEqual(Value a, Value b) {
     case VAL_OBJ: {
       if (a.as.obj->hash != 0 && b.as.obj->hash != 0)
         return a.as.obj->hash == b.as.obj->hash;
-  
+
       return AS_OBJ(a) == AS_OBJ(b);
     }
     default:

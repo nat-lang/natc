@@ -78,6 +78,7 @@ typedef bool (*NativeFn)(int argCount, Value *args);
 typedef struct {
   Obj obj;
   int arity;
+  bool variadic;
   ObjString *name;
   NativeFn function;
 } ObjNative;
@@ -132,7 +133,8 @@ ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjInstance *newInstance(ObjClass *klass);
 ObjMap *newMap();
-ObjNative *newNative(int arity, ObjString *name, NativeFn function);
+ObjNative *newNative(int arity, bool variadic, ObjString *name,
+                     NativeFn function);
 ObjSequence *newSequence();
 ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);

@@ -142,7 +142,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
     vmPush(seq);
     vmPush(arg);
 
-    if (!vmInvoke(intern(S_ADD), 1)) return false;
+    if (!vmInvoke(intern(S_PUSH), 1)) return false;
     i--;
   }
 
@@ -182,7 +182,7 @@ static bool call(ObjClosure* closure, int argCount) {
 }
 
 static bool callNative(ObjNative* native, int argCount) {
-  if (!checkArity(native->arity, argCount)) return false;
+  if (!native->variadic && !checkArity(native->arity, argCount)) return false;
 
   return (native->function)(argCount, vm.stackTop - argCount);
 }
@@ -566,6 +566,23 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(right);
 
         if (!vmCallValue(infix, 2)) {
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
+      case OP_CALL_POSTFIX: {
+        int argCount = READ_BYTE();
+        Value postfix = vmPop();
+        Value args[argCount];
+
+        int i = argCount;
+        while (i-- > 0) args[i] = vmPop();
+        vmPush(postfix);
+        while (++i < argCount) vmPush(args[i]);
+
+        if (!vmCallValue(postfix, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
 

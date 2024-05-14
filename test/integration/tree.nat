@@ -49,11 +49,11 @@ assert(tree[2].data == 3);
 tree = [1 [2 3 4] [5 6 7]];
 
 // fill the interior nodes.
-tree = tree.fmap((a) => {
+tree = tree.map((a) => {
   if (!a) return 0;
   return a;
 });
 
-let sum = tree.fold(+, 0);
+let sum = tree.reduce(+, 0);
 
 assert(sum == 28);

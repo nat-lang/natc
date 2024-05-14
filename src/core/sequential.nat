@@ -1,0 +1,57 @@
+class Sequential extends Object {
+  __get__(idx) => this.values[idx];
+  __set__(idx, val) => {
+    this.values[idx] = val;
+    return this;
+  }
+  __len__() => len(this.values);
+  __eq__(seq) => {
+    if (len(this) != len(seq)) return false;
+
+    for (let i = 0; i < len(this); i = i + 1) {
+      if (this[i] != seq[i])
+        return false;
+    }
+
+    return true;
+  }
+
+  __in__(value) => value in this.values or this.has(value);
+
+  __iter__() => Iterator(this, 0, len(this));
+
+  hash() => {
+    return this.map(getHash).reduce(+, 0);
+  }
+
+  map(fn) => [fn(value) | value in this];
+
+  reduce(fn, acc) => {
+    for (x in this)
+      acc = fn(acc, x);
+
+    return acc;
+  }
+
+  concat(other) => {
+    let seq = [x | x in this];
+    for (x in other) seq.push(x);
+    return seq;
+  }
+
+  all(predicate) => this.map(predicate).reduce(and, true);
+  some(predicate) => this.map(predicate).reduce(or, false);
+}
+
+class Tuple extends Sequential {}
+
+class Sequence extends Sequential {
+  extend(elements) => {
+    for (x in elements)
+      this.push(x);
+  }
+
+  add(*elements) => this.extend(elements);
+}
+
+let infix(6) ++ = (a, b) => a.concat(b);

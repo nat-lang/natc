@@ -28,8 +28,13 @@ class Set extends Object {
     return this.has(key);
   }
 
-  // The compiler calls this method when building a set comprehension.
   add(element) => this.__set__(element, true);
+
+  // The compiler calls this method when building a set comprehension.
+  // The name may be misleading, as the set of course does not track
+  // the order of its elements. It's simply to provide a uniform
+  // interface for comprehension construction across sequence and sets.
+  push(element) => this.add(element);
 
   // The elements of the set are the keys of the underlying map.
   elements() => this.keys();

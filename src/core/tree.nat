@@ -11,17 +11,27 @@ class Tree extends Object {
   }
 
   // Add a [child] to the tree, first converting it to a [Tree]
-  // object if it's not already. The compiler uses this method.
+  // object if it's not already. The compiler uses this method
+  // to build tree literals.
   addChild(child) => {
     if (type(child) != Tree)
       child = Tree().setData(child);
 
-    this.children.add(child);
+    this.children.push(child);
     return this;
   }
 
   // Subscript access is to children.
   __get__(idx) => this.children[idx];
+
+  depthFirst() => {
+    let seq = [this];
+
+    for (child in this.children)
+      seq = seq.concat(child.depthFirst());
+
+    return seq;
+  }
 
   isLeaf() => len(this.children) == 0;
 
@@ -31,23 +41,21 @@ class Tree extends Object {
     return [leaf | child in this.children, leaf in child.leaves()];
   }
 
-  fmap(fn) => {
+  map(fn) => {
     let tree = Tree();
 
     tree.setData(fn(this.data));
   
     for (child in this.children)
-      tree.addChild(child.fmap(fn));
+      tree.addChild(child.map(fn));
 
     return tree;
   }
 
-  fold(fn, acc) => {
-    if (this.isLeaf())
-      return fn(acc, this.data);
+  reduce(fn, acc) => {
+    for (node in this.depthFirst())
+      acc = fn(acc, node.data);
 
-    let inner = (acc, child) => child.fold(fn, acc);
-
-    return this.children.fold(inner, acc);
+    return acc;
   }
 }

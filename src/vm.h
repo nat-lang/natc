@@ -22,8 +22,9 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-  ObjClass* sequence;
   ObjClass* object;
+  ObjClass* tuple;
+  ObjClass* sequence;
   ObjClass* astNode;
   ObjClass* astClosure;
   ObjClass* astSignature;

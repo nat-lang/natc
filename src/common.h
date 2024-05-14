@@ -19,9 +19,12 @@
 #define S_CALL "call"
 #define S_INIT "init"
 #define S_ITER "iter"
+#define S_PUSH "push"
+#define S_POP "pop"
 
 #define S_OBJ "__obj__"
 #define S_SEQUENCE "Sequence"
+#define S_TUPLE "Tuple"
 #define S_AST_NODE "ASTNode"
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_SIGNATURE "ASTSignature"

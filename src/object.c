@@ -75,9 +75,11 @@ ObjInstance* newInstance(ObjClass* klass) {
   return instance;
 }
 
-ObjNative* newNative(int arity, ObjString* name, NativeFn function) {
+ObjNative* newNative(int arity, bool variadic, ObjString* name,
+                     NativeFn function) {
   ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   native->arity = arity;
+  native->variadic = variadic;
   native->name = name;
   native->function = function;
   return native;
