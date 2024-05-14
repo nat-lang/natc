@@ -16,3 +16,10 @@ assert(10 - 4 / 2 == 7 / 1 + 1);
 assert(5 + 5 >= 10 and 1 <= 5 + 5);
 assert(5 + 5 > 9 and 9 < 5 + 5);
 assert(5 + 5 < 11  and 11 > 5 + 5);
+
+// core random num generator.
+
+for (let x = 0; x < 100; x = x + 1) {
+  let n = random(10);
+  assert(n >= 0 and n < 10);
+}

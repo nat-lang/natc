@@ -1,6 +1,7 @@
 #include "core.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -150,6 +151,21 @@ bool __objEntries__(int argCount, Value* args) {
   vmPop();
   vmPush(OBJ_VAL(entries));
 
+  return true;
+}
+
+bool __randomNumber__(int argCount, Value* args) {
+  Value upperBound = vmPop();
+  vmPop();  // native fn.
+
+  if (!IS_NUMBER(upperBound)) {
+    vmRuntimeError("Upper bound must be a number.");
+    return false;
+  }
+
+  int x = rand() % (uint32_t)AS_NUMBER(upperBound);
+
+  vmPush(NUMBER_VAL(x));
   return true;
 }
 
@@ -358,6 +374,7 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("type", 1, __type__);
   defineNativeFnGlobal("entries", 1, __objEntries__);
   defineNativeFnGlobal("clock", 0, __clock__);
+  defineNativeFnGlobal("random", 1, __randomNumber__);
 
   defineNativeFnGlobal("__gt__", 2, __gt__);
   defineNativeFnGlobal("__lt__", 2, __lt__);
