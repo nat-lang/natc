@@ -109,6 +109,33 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
+static bool vmClassInitializable(ObjClass* klass) {
+  return mapHas(&klass->fields, OBJ_VAL(intern(S_INIT)));
+}
+
+static bool vmInstantiateClass(ObjClass* klass, int argCount) {
+  Value initializer;
+
+  mapSet(&AS_INSTANCE(vmPeek(argCount))->fields, OBJ_VAL(intern(S_CLASS)),
+         OBJ_VAL(klass));
+
+  if (mapGet(&klass->fields, OBJ_VAL(intern(S_INIT)), &initializer)) {
+    return vmCallValue(initializer, argCount);
+  } else if (argCount != 0) {
+    vmRuntimeError("Expected 0 arguments but got %d.", argCount);
+    return false;
+  }
+  return true;
+}
+
+bool vmInitInstance(ObjClass* klass, int argCount) {
+  if (!vmInstantiateClass(klass, argCount)) return false;
+  if (vmClassInitializable(klass))
+    if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
+
+  return true;
+}
+
 static bool checkArity(int paramCount, int argCount) {
   if (argCount == paramCount) return true;
 
@@ -121,7 +148,7 @@ static bool checkArity(int paramCount, int argCount) {
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
   vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
-  vmInitClass(vm.classes.sequence, 0);
+  vmInstantiateClass(vm.classes.sequence, 0);
 
   // either the function was called (a) with arity - 1 arguments
   // or (b) with arity - n arguments for n > 1. (a) is valid;
@@ -198,7 +225,7 @@ bool vmCallValue(Value callee, int argCount) {
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
-        return vmInitClass(klass, argCount);
+        return vmInstantiateClass(klass, argCount);
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
@@ -224,18 +251,6 @@ bool vmCallValue(Value callee, int argCount) {
   vmRuntimeError(
       "Can only call functions, classes, and objects with a 'call' method.");
   return false;
-}
-
-bool vmInitClass(ObjClass* klass, int argCount) {
-  Value initializer;
-
-  if (mapGet(&klass->fields, INTERN(S_INIT), &initializer)) {
-    return vmCallValue(initializer, argCount);
-  } else if (argCount != 0) {
-    vmRuntimeError("Expected 0 arguments but got %d.", argCount);
-    return false;
-  }
-  return true;
 }
 
 static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {

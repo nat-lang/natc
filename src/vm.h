@@ -74,7 +74,7 @@ InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
-bool vmInitClass(ObjClass* klass, int argCount);
+bool vmInitInstance(ObjClass* klass, int argCount);
 bool vmInvoke(ObjString* name, int argCount);
 bool vmValidateHashable(Value value);
 bool vmCallValue(Value value, int argCount);

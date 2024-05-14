@@ -188,15 +188,8 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static void consumeQuiet(TokenType type) {
+static void consumeQuietly(TokenType type) {
   if (parser.current.type == type)
-    advance();
-  else
-    parser.hadError = true;
-}
-
-static void consumeStrQuiet(char* str) {
-  if (checkStr(str))
     advance();
   else
     parser.hadError = true;
@@ -636,13 +629,12 @@ static void namedVariable(Token name, bool canAssign) {
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
-
-  if (canAssign && match(TOKEN_ARROW_LEFT)) {
+  if (canAssign && match(TOKEN_EQUAL)) {
+    expression();
+    emitConstInstr(setOp, arg);
+  } else if (canAssign && match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
-    emitConstInstr(setOp, arg);
-  } else if (canAssign && match(TOKEN_EQUAL)) {
-    expression();
     emitConstInstr(setOp, arg);
   } else {
     emitConstInstr(getOp, arg);
@@ -761,15 +753,15 @@ static bool peekSignature() {
 
   Parser checkpoint = saveParser();
 
-  consumeQuiet(TOKEN_LEFT_PAREN);
+  consumeQuietly(TOKEN_LEFT_PAREN);
 
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      consumeQuiet(TOKEN_IDENTIFIER);
+      consumeQuietly(TOKEN_IDENTIFIER);
     } while (match(TOKEN_COMMA));
   }
-  consumeQuiet(TOKEN_RIGHT_PAREN);
-  consumeStrQuiet("=>");
+  consumeQuietly(TOKEN_RIGHT_PAREN);
+  consumeQuietly(TOKEN_FAT_ARROW);
 
   found = !parser.hadError;
 
@@ -1258,14 +1250,20 @@ static void letDeclaration() {
 
   if (match(TOKEN_EQUAL)) {
     boundExpression();
-
-    if (current->scopeDepth > 0)
-      emitConstInstr(OP_SET_LOCAL, var);
-    else
-      emitConstInstr(OP_SET_GLOBAL, var);
-
-    emitByte(OP_POP);
+  } else if (match(TOKEN_ARROW_LEFT)) {
+    expression();
+    emitByte(OP_DESTRUCTURE);
+  } else {
+    emitByte(OP_NIL);
   }
+
+  if (current->scopeDepth > 0)
+    emitConstInstr(OP_SET_LOCAL, var);
+  else
+    emitConstInstr(OP_SET_GLOBAL, var);
+
+  emitByte(OP_POP);
+
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
   if (infixPrecedence != -1) {
