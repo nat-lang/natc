@@ -13,7 +13,7 @@ bool instance(ObjClass* klass) {
   // initialize the instance.
   vmPush(OBJ_VAL(node));
 
-  if (!mapHas(&klass->methods, OBJ_VAL(intern(S_INIT)))) return true;
+  if (!mapHas(&klass->fields, OBJ_VAL(intern(S_INIT)))) return true;
   if (!vmInitClass(klass, 0)) return false;
   if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
 

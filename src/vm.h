@@ -35,7 +35,9 @@ typedef struct {
   Value* stackTop;
 
   CallFrame frames[FRAMES_MAX];
+  CallFrame* frame;
   int frameCount;
+
   ObjMap strings;
   ObjMap globals;
   ObjMap infixes;

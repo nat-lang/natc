@@ -170,3 +170,31 @@ class B extends A {
 }
 
 assert(B().method()() == "A");
+
+// class fields
+
+class A {}
+
+A.p1 = 1;
+A.p2 = "true";
+
+assert(A.p1 == 1);
+assert(A.p2 == "true");
+
+let a = A();
+
+assert(a.p1 == 1);
+assert(a.p2 == "true");
+
+a.p1 = 2;
+
+assert(a.p1 == 2);
+assert(A.p1 == 1);
+
+// bound methods.
+
+a.p1 = () => true;
+assert(a.p1());
+
+A.p2 = () => this;
+assert(!a.p2());

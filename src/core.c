@@ -24,7 +24,7 @@ static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
 
 static void defineNativeFnMethod(char* name, int arity, bool variadic,
                                  NativeFn function, ObjClass* klass) {
-  defineNativeFn(name, arity, variadic, function, &klass->methods);
+  defineNativeFn(name, arity, variadic, function, &klass->fields);
 }
 
 ObjClass* defineNativeClass(char* name) {
@@ -167,7 +167,7 @@ bool __objGet__(int argCount, Value* args) {
   Value value = NIL_VAL;
 
   if (!mapGet(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), &value))
-    mapGet(&AS_INSTANCE(vmPeek(1))->klass->methods, vmPeek(0), &value);
+    mapGet(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0), &value);
 
   vmPop();
   vmPop();
@@ -189,7 +189,7 @@ bool __objHas__(int argCount, Value* args) {
   if (!vmValidateHashable(vmPeek(0))) return false;
 
   bool hasKey = mapHas(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0)) ||
-                mapHas(&AS_INSTANCE(vmPeek(1))->klass->methods, vmPeek(0));
+                mapHas(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0));
   vmPop();
   vmPop();
   vmPush(BOOL_VAL(hasKey));
@@ -216,7 +216,7 @@ bool __length__(int argCount, Value* args) {
 
   ObjInstance* instance = AS_INSTANCE(vmPeek(0));
   Value method;
-  if (mapGet(&instance->klass->methods, OBJ_VAL(intern(S_LEN)), &method)) {
+  if (mapGet(&instance->klass->fields, OBJ_VAL(intern(S_LEN)), &method)) {
     // set up the context for the function call.
     vmPop();
     vmPop();                    // native fn.
