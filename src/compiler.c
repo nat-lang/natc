@@ -588,8 +588,20 @@ static void literal(bool canAssign) {
   }
 }
 
-static void grouping(bool canAssign) {
+static void parentheses(bool canAssign) {
   expression();
+
+  if (check(TOKEN_COMMA)) {
+    int argCount = 1;
+    do {
+      advance();
+      expression();
+      argCount++;
+    } while (check(TOKEN_COMMA));
+
+    nativeVariable(S_TUPLE);
+    emitBytes(OP_CALL_POSTFIX, argCount);
+  }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
@@ -973,7 +985,7 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     emitConstInstr(OP_GET_LOCAL, var);
     current->localCount++;
     expression();
-    methodCall(S_ADD, 1);
+    methodCall(S_PUSH, 1);
     // pop the comprehension instance.
     current->localCount--;
     emitByte(OP_POP);
@@ -1105,6 +1117,8 @@ static void braces(bool canAssign) {
 
   } else if (check(TOKEN_COLON)) {
     // otherwise it's a map: backpatch the class.
+    // TODO: now that we have a postfix operation, we should
+    // use that here instead of backpatching.
     currentChunk()->constants.values[klass] = identifier("Map");
 
     // finish the first key/val pair, then any remaining elements.
@@ -1135,11 +1149,11 @@ static void brackets(bool canAssign) {
 
   // it's a sequence.
   if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    methodCall(S_ADD, 1);
+    methodCall(S_PUSH, 1);
 
     while (match(TOKEN_COMMA)) {
       expression();
-      methodCall(S_ADD, 1);
+      methodCall(S_PUSH, 1);
     }
   } else {
     // it's a tree.
@@ -1469,7 +1483,7 @@ static void statement() {
 }
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
+    [TOKEN_LEFT_PAREN] = {parentheses, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {braces, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},

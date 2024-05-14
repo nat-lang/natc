@@ -60,6 +60,6 @@ class ASTClosure extends ASTExpr {
   }
 
   opReturn(expr) => {
-    this.block.statements.add(ASTReturnStmt(expr));
+    this.block.statements.push(ASTReturnStmt(expr));
   }
 }
