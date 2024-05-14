@@ -50,6 +50,7 @@ typedef enum {
   OP_SUBSCRIPT_GET,
   OP_SUBSCRIPT_SET,
   OP_END,
+  OP_EXPR_STATEMENT,
   OP_DESTRUCTURE,
 } OpCode;
 

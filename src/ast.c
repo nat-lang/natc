@@ -8,29 +8,16 @@
 #include "value.h"
 #include "vm.h"
 
-bool instance(ObjClass* klass) {
-  ObjInstance* node = newInstance(klass);
-  // initialize the instance.
-  vmPush(OBJ_VAL(node));
-
-  if (!mapHas(&klass->fields, INTERN(S_INIT))) return true;
-  if (!vmInitClass(klass, 0)) return false;
-  if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
-
-  return true;
-}
-
 bool closureInstance(ObjMap signature) {
-  ObjInstance* node = newInstance(vm.classes.astClosure);
-  vmPush(OBJ_VAL(node));
+  vmPush(OBJ_VAL(newInstance(vm.classes.astClosure)));
+  vmPush(OBJ_VAL(newInstance(vm.classes.astSignature)));
+  vmPush(OBJ_VAL(newInstance(vm.classes.object)));
 
-  if (!instance(vm.classes.astSignature)) return false;
+  if (!vmInitInstance(vm.classes.object, 0)) return false;
   mapAddAll(&signature, &AS_INSTANCE(vmPeek(0))->fields);
 
-  if (!vmInitClass(vm.classes.astClosure, 1)) return false;
-  if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
-
-  return true;
+  if (!vmInitInstance(vm.classes.astSignature, 1)) return false;
+  return vmInitInstance(vm.classes.astClosure, 1);
 }
 
 bool executeMethod(char* method, int argCount) {
@@ -93,6 +80,20 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
+      case OP_EXPR_STATEMENT: {
+        Value value = vmPop();
+        vmPush(root);
+        vmPush(value);
+
+        if (!executeMethod("opExprStatement", 1)) return false;
+
+        vmPop();  // nil.
+        break;
+      }
+      case OP_POP: {
+        vmPop();
+        break;
+      }
       case OP_RETURN: {
         Value value = vmPop();
         vmPush(root);
@@ -117,6 +118,18 @@ bool readAST(ObjClosure* closure) {
         vmPush(NUMBER_VAL(slot));
 
         if (!executeMethod("opGetLocal", 1)) return false;
+        break;
+      }
+      case OP_SET_LOCAL: {
+        uint8_t slot = READ_SHORT();
+        Value value = vmPop();
+
+        vmPush(root);
+        vmPush(NUMBER_VAL(slot));
+        vmPush(value);
+
+        if (!executeMethod("opSetLocal", 2)) return false;
+        vmPop();  // nil.
         break;
       }
       case OP_GET_UPVALUE: {
@@ -171,7 +184,7 @@ bool readAST(ObjClosure* closure) {
         return true;
       }
       default: {
-        vmRuntimeError("Unhandled destructured opcode.");
+        vmRuntimeError("Unhandled destructured opcode (%i).", instruction);
         return false;
       }
     }
