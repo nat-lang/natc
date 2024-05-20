@@ -24,6 +24,7 @@
 #define S_ITER "iter"
 #define S_PUSH "push"
 #define S_POP "pop"
+#define S_HASH "hash"
 
 #define S_OBJ "__obj__"
 #define S_SEQUENCE "Sequence"

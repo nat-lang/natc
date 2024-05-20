@@ -3,6 +3,8 @@
 
 class A {}
 
+assert(A.__superclass__ == __obj__);
+
 let a = A();
 a.first = 1;
 a.second = 2;

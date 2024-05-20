@@ -75,10 +75,10 @@ void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
 bool vmInitInstance(ObjClass* klass, int argCount);
-bool vmInvoke(ObjString* name, int argCount);
+bool vmExecuteMethod(char* method, int argCount);
+bool vmHashValue(Value value, uint32_t* hash);
 bool vmValidateHashable(Value value);
 bool vmCallValue(Value value, int argCount);
-bool vmInstanceHas(ObjInstance* instance, Value value);
 void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
 
 #endif

@@ -16,13 +16,11 @@ class Sequential extends Object {
     return true;
   }
 
-  __in__(value) => value in this.values or this.has(value);
+  __in__(value) => value in this.values;
 
   __iter__() => Iterator(this, 0, len(this));
 
-  hash() => {
-    return this.map(getHash).reduce(+, 0);
-  }
+  hash() => this.map(hash).reduce(+, 0);
 
   map(fn) => [fn(value) | value in this];
 
