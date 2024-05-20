@@ -1,0 +1,13 @@
+
+class Hashable {
+  init(hash) => {
+    this._hash = hash;
+  }
+  hash() => this._hash;
+}
+
+let h = Hashable(1);
+
+h[h] = 1;
+assert(h[h] == 1);
+

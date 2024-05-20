@@ -23,6 +23,14 @@ let tup = (1,2);
 assert(tup[0] == 1);
 assert(tup[1] == 2);
 
+// hashable.
+let o = Object();
+o[tup] = 1;
+assert(o[tup] == 1);
+
+o[(2,2)] = 1;
+assert(o[(2,2)] == o[tup]);
+
 // the sequence class.
 // --------------------------------------
 

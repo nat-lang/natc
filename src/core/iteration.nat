@@ -19,7 +19,7 @@ class Iterator {
 }
 
 let iter = (object) => {
-  if ("__iter__" in object) return object.__iter__();
+  if (object.has("__iter__")) return object.__iter__();
 
   throw IterationProtocolError("Must define an '__iter__' method to iterate.");
 };

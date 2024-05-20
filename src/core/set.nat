@@ -2,34 +2,20 @@
 class Set extends Object {
   init() => {
     this.map = Map();
+    super.init();
   }
 
   // Calling a set is shorthand for the membership predicate,
   // so that the set behaves like its characteristic function.
   call(element) => element in this;
 
-  setKeyHash(key) => {
-    if (type(key) == Set) 
-      setHash(key, key.hash());
-  }
-
   __set__(key, value) => {
-    this.setKeyHash(key);
-    this.map.set(key, value);
+    this.map[key] = value;
     return this;
   }
 
-  __get__(key) => {
-    this.setKeyHash(key);
-
-    return this.map.get(key);
-  }
-
-  __in__(key) => {
-    this.setKeyHash(key);
-
-    return this.map.has(key);
-  }
+  __get__(key) => this.map[key];
+  __in__(key) => key in this.map;
 
   add(element) => this.__set__(element, true);
 
@@ -47,28 +33,24 @@ class Set extends Object {
   // Iteration is over elements.
   __iter__() => iter(this.elements());
 
-  hashFor(element) => {
-    if (type(element) == Set)
-      return element.hash();
-    else
-      return getHash(element);
-  }
-
   // Hash the elements and sum them.
   hash() => {
     // begin with an offset, so that hash(1) != {1}.hash() != {{1}}.hash().
     let sum = 1;
 
-    for (x in this.elements())
-      sum = sum + this.hashFor(x);
+    for (x in this.elements()) {
+      sum = sum + hash(x);
+    }
 
     return sum;
   }
 
   // Is [this] a subset of or equal to [other]?
   subsetEq(other) => {
-    if (len(this) > len(other))
+    if (len(this) > len(other)) {
+      print "len not eq";
       return false;
+    }
 
     for (x in this) 
       if (!other(x))

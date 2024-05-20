@@ -20,11 +20,6 @@ bool closureInstance(ObjMap signature) {
   return vmInitInstance(vm.classes.astClosure, 1);
 }
 
-bool executeMethod(char* method, int argCount) {
-  return (vmInvoke(intern(method), argCount)) &&
-         (vmExecute(vm.frameCount - 1) == INTERPRET_OK);
-}
-
 // Read the syntax tree of [closure] off the tape.
 bool readAST(ObjClosure* closure) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -59,25 +54,25 @@ bool readAST(ObjClosure* closure) {
       case OP_CONSTANT: {
         vmPush(root);
         vmPush(READ_CONSTANT());
-        if (!executeMethod("opLiteral", 1)) return false;
+        if (!vmExecuteMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_NIL: {
         vmPush(root);
         vmPush(NIL_VAL);
-        if (!executeMethod("opLiteral", 1)) return false;
+        if (!vmExecuteMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_TRUE: {
         vmPush(root);
         vmPush(BOOL_VAL(true));
-        if (!executeMethod("opLiteral", 1)) return false;
+        if (!vmExecuteMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_FALSE: {
         vmPush(root);
         vmPush(BOOL_VAL(false));
-        if (!executeMethod("opLiteral", 1)) return false;
+        if (!vmExecuteMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_EXPR_STATEMENT: {
@@ -85,7 +80,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(root);
         vmPush(value);
 
-        if (!executeMethod("opExprStatement", 1)) return false;
+        if (!vmExecuteMethod("opExprStatement", 1)) return false;
 
         vmPop();  // nil.
         break;
@@ -99,7 +94,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(root);
         vmPush(value);
 
-        if (!executeMethod("opReturn", 1)) return false;
+        if (!vmExecuteMethod("opReturn", 1)) return false;
 
         vmPop();  // nil.
         break;
@@ -109,7 +104,7 @@ bool readAST(ObjClosure* closure) {
         ObjString* name = READ_STRING();
         vmPush(OBJ_VAL(name));
 
-        if (!executeMethod("opGetGlobal", 1)) return false;
+        if (!vmExecuteMethod("opGetGlobal", 1)) return false;
         break;
       }
       case OP_GET_LOCAL: {
@@ -117,7 +112,7 @@ bool readAST(ObjClosure* closure) {
         uint8_t slot = READ_SHORT();
         vmPush(NUMBER_VAL(slot));
 
-        if (!executeMethod("opGetLocal", 1)) return false;
+        if (!vmExecuteMethod("opGetLocal", 1)) return false;
         break;
       }
       case OP_SET_LOCAL: {
@@ -128,7 +123,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(NUMBER_VAL(slot));
         vmPush(value);
 
-        if (!executeMethod("opSetLocal", 2)) return false;
+        if (!vmExecuteMethod("opSetLocal", 2)) return false;
         vmPop();  // nil.
         break;
       }
@@ -137,7 +132,7 @@ bool readAST(ObjClosure* closure) {
         uint8_t slot = READ_SHORT();
         vmPush(NUMBER_VAL(slot));
 
-        if (!executeMethod("opGetUpvalue", 1)) return false;
+        if (!vmExecuteMethod("opGetUpvalue", 1)) return false;
         break;
       }
       case OP_CLOSURE: {
@@ -160,7 +155,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(fn);
         for (int i = argCount - 1; i >= 0; i--) vmPush(args[i]);
 
-        if (!executeMethod("opCall", argCount + 1)) return false;
+        if (!vmExecuteMethod("opCall", argCount + 1)) return false;
         break;
       }
       case OP_CALL_INFIX: {
@@ -173,7 +168,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(left);
         vmPush(right);
 
-        if (!executeMethod("opCall", 3)) return false;
+        if (!vmExecuteMethod("opCall", 3)) return false;
         break;
       }
       case OP_END: {

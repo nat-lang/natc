@@ -117,6 +117,8 @@ assert({3} in powerset);
 assert({} in powerset);
 
 // hash function.
-assert({1}.hash() == {1}.hash());
-assert(getHash(1) != {1}.hash());
-assert({1}.hash() != {{1}}.hash());
+
+assert(hash({1}) == hash({1}));
+assert(hash({1}) != hash({{1}}));
+
+assert(hash(1) != hash({1}));

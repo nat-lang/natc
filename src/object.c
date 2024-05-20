@@ -240,7 +240,7 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   map->capacity = capacity;
 }
 
-static bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
+bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -252,7 +252,7 @@ bool mapHas(ObjMap* map, Value key) {
   return mapHasHash(map, key, hashValue(key));
 }
 
-static bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
+bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -266,7 +266,7 @@ bool mapGet(ObjMap* map, Value key, Value* value) {
   return mapGetHash(map, key, value, hashValue(key));
 }
 
-static bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
+bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
   if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
     int capacity = GROW_CAPACITY(map->capacity);
     mapAdjustCapacity(map, capacity);

@@ -43,22 +43,6 @@ void vmRuntimeError(const char* format, ...) {
   resetStack();
 }
 
-bool vmValidateHashable(Value value) {
-  if (IS_OBJ(value) && !IS_STRING(value)) {
-    if (AS_OBJ(value)->hash == 0) {
-      vmRuntimeError("Object lacks a valid hash.");
-      return false;
-    }
-    return true;
-  }
-
-  if (!isHashable(value)) {
-    vmRuntimeError("Not a hashable type: num, nil, bool, or string.");
-    return false;
-  }
-  return true;
-}
-
 void initClasses(Classes* classes) {
   classes->object = NULL;
   classes->sequence = NULL;
@@ -109,8 +93,96 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
+static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
+  Value method;
+  if (!mapGet(&klass->fields, OBJ_VAL(name), &method)) {
+    vmRuntimeError("Undefined property '%s' for class '%s'.", name->chars,
+                   klass->name->chars);
+    return false;
+  }
+
+  return vmCallValue(method, argCount);
+}
+
+bool vmInvoke(ObjString* name, int argCount) {
+  Value receiver = vmPeek(argCount);
+
+  if (!IS_INSTANCE(receiver)) {
+    vmRuntimeError("Only instances have methods.");
+    return false;
+  }
+
+  ObjInstance* instance = AS_INSTANCE(receiver);
+
+  Value field;
+  if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
+    vm.stackTop[-argCount - 1] = field;
+    return vmCallValue(field, argCount);
+  }
+
+  return invokeFromClass(instance->klass, name, argCount);
+}
+
+bool vmExecuteMethod(char* method, int argCount) {
+  return (vmInvoke(intern(method), argCount)) &&
+         (vmExecute(vm.frameCount - 1) == INTERPRET_OK);
+}
+
+bool vmValidateHashable(Value value) {
+  if (IS_OBJ(value) && !IS_STRING(value)) {
+    if (AS_OBJ(value)->hash == 0) {
+      vmRuntimeError("Object lacks a valid hash.");
+      return false;
+    }
+    return true;
+  }
+
+  if (!isHashable(value)) {
+    vmRuntimeError("Not a hashable type: num, nil, bool, or string.");
+    return false;
+  }
+  return true;
+}
+
+// If [value] is natively hashable, then hash it. Otherwise, if it's
+// an instance and it has a hash function, then call the function.
+bool vmHashValue(Value value, uint32_t* hash) {
+  if (isHashable(value)) {
+    *hash = hashValue(value);
+    return true;
+  }
+
+  if (!IS_INSTANCE(value)) {
+    vmRuntimeError(
+        "Not a hashable type: num, nil, bool, string, or instance with '%s' "
+        "method.",
+        S_HASH);
+    return false;
+  }
+
+  vmPush(value);
+  if (!vmExecuteMethod(S_HASH, 0)) return false;
+
+  if (!IS_NUMBER(vmPeek(0))) {
+    vmRuntimeError("'%s' function must return a number.", S_HASH);
+    return false;
+  }
+
+  *hash = AS_NUMBER(vmPop());
+  AS_INSTANCE(value)->obj.hash = *hash;
+
+  return true;
+}
+
 static bool vmClassInitializable(ObjClass* klass) {
   return mapHas(&klass->fields, OBJ_VAL(intern(S_INIT)));
+}
+
+static bool vmExtendClass(ObjClass* subclass, ObjClass* superclass) {
+  mapAddAll(&superclass->fields, &subclass->fields);
+  mapSet(&subclass->fields, INTERN(S_SUPERCLASS), OBJ_VAL(superclass));
+  subclass->super = superclass;
+  return true;
 }
 
 static bool vmInstantiateClass(ObjClass* klass, int argCount) {
@@ -253,36 +325,6 @@ bool vmCallValue(Value callee, int argCount) {
   return false;
 }
 
-static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
-  Value method;
-  if (!mapGet(&klass->fields, OBJ_VAL(name), &method)) {
-    vmRuntimeError("Undefined property '%s' for class '%s'.", name->chars,
-                   klass->name->chars);
-    return false;
-  }
-
-  return vmCallValue(method, argCount);
-}
-
-bool vmInvoke(ObjString* name, int argCount) {
-  Value receiver = vmPeek(argCount);
-
-  if (!IS_INSTANCE(receiver)) {
-    vmRuntimeError("Only instances have methods.");
-    return false;
-  }
-
-  ObjInstance* instance = AS_INSTANCE(receiver);
-
-  Value field;
-  if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
-    vm.stackTop[-argCount - 1] = field;
-    return vmCallValue(field, argCount);
-  }
-
-  return invokeFromClass(instance->klass, name, argCount);
-}
-
 //
 static bool getObjectProperty(ObjMap fields, Value name, Value* value) {
   if (mapGet(&fields, name, value)) {
@@ -367,11 +409,12 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   return true;
 }
 
-bool vmInstanceHas(ObjInstance* instance, Value value) {
-  if (!vmValidateHashable(value)) return false;
+static bool vmInstanceHas(ObjInstance* instance, Value value) {
+  uint32_t hash;
+  if (!vmHashValue(value, &hash)) return false;
 
-  bool hasKey = mapHas(&instance->fields, value) ||
-                mapHas(&instance->klass->fields, value);
+  bool hasKey = mapHasHash(&instance->fields, value, hash) ||
+                mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
   return true;
 }
@@ -458,32 +501,30 @@ InterpretResult vmExecute(int baseFrame) {
         if (IS_INSTANCE(vmPeek(0))) {
           ObjInstance* instance = AS_INSTANCE(vmPeek(0));
 
-          if (getObjectProperty(instance->fields, name, &value) ||
-              getObjectProperty(instance->klass->fields, name, &value)) {
-            vmPop();  // instance.
-            vmPush(value);
-            break;
-          }
+          if (!getObjectProperty(instance->fields, name, &value))
+            getObjectProperty(instance->klass->fields, name, &value);
+          vmPop();  // instance.
+          vmPush(value);
+          break;
         }
 
         if (IS_CLASS(vmPeek(0))) {
           ObjClass* klass = AS_CLASS(vmPeek(0));
 
-          if (getObjectProperty(klass->fields, name, &value)) {
-            vmPop();  // class.
-            vmPush(value);
-            break;
-          }
+          getObjectProperty(klass->fields, name, &value);
+          vmPop();  // class.
+          vmPush(value);
+          break;
         }
 
-        vmRuntimeError("Only objects and classes have properties.");
+        vmRuntimeError("Only objects and classes have properties (get).");
         return INTERPRET_RUNTIME_ERROR;
 
         break;
       }
       case OP_SET_PROPERTY: {
         if (!IS_INSTANCE(vmPeek(1)) && !IS_CLASS(vmPeek(1))) {
-          vmRuntimeError("Only objects and classes have properties.");
+          vmRuntimeError("Only objects and classes have properties (set).");
         }
 
         if (IS_INSTANCE(vmPeek(1)))
@@ -676,6 +717,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CLASS:
         vmPush(OBJ_VAL(newClass(READ_STRING())));
+        vmExtendClass(AS_CLASS(vmPeek(0)), vm.classes.object);
         break;
       case OP_INHERIT: {
         Value superclass = vmPeek(1);
@@ -685,10 +727,7 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjClass* subclass = AS_CLASS(vmPeek(0));
-        mapAddAll(&AS_CLASS(superclass)->fields, &subclass->fields);
-        mapSet(&subclass->fields, INTERN(S_SUPERCLASS), superclass);
-        subclass->super = AS_CLASS(superclass);
+        vmExtendClass(AS_CLASS(vmPeek(0)), AS_CLASS(superclass));
         vmPop();  // Subclass.
         break;
       }
@@ -801,11 +840,12 @@ InterpretResult vmExecute(int baseFrame) {
           break;
         }
 
-        if (!vmValidateHashable(key)) return INTERPRET_RUNTIME_ERROR;
-
         // otherwise fall back to property access.
+        uint32_t hash;
+        if (!vmHashValue(key, &hash)) return false;
+
         Value value;
-        if (mapGet(&instance->fields, key, &value)) {
+        if (mapGetHash(&instance->fields, key, &value, hash)) {
           vmPush(value);
         } else {
           // we don't throw an error if the property doesn't exist.
@@ -845,9 +885,12 @@ InterpretResult vmExecute(int baseFrame) {
           frame = &vm.frames[vm.frameCount - 1];
           break;
         }
-        // otherwise fall back to property setting.
-        if (!vmValidateHashable(vmPeek(1))) return INTERPRET_RUNTIME_ERROR;
-        mapSet(&instance->fields, vmPeek(1), vmPeek(0));
+
+        // otherwise fall back to property access.
+        uint32_t hash;
+        if (!vmHashValue(vmPeek(1), &hash)) return false;
+
+        mapSetHash(&instance->fields, vmPeek(1), vmPeek(0), hash);
         // leave the object on the stack.
         vmPop();  // val.
         vmPop();  // key.

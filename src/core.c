@@ -169,43 +169,13 @@ bool __randomNumber__(int argCount, Value* args) {
   return true;
 }
 
-static bool validateHash(Value value) {
-  if (!IS_NUMBER(value)) {
-    vmRuntimeError("Hash must be a number.");
-    return false;
-  }
-  return true;
-}
-
-bool __objGet__(int argCount, Value* args) {
-  if (!vmValidateHashable(vmPeek(0))) return false;
-
-  Value value = NIL_VAL;
-
-  if (!mapGet(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), &value))
-    mapGet(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0), &value);
-
-  vmPop();
-  vmPop();
-  vmPush(value);
-  return true;
-}
-
-bool __objSet__(int argCount, Value* args) {
-  if (!vmValidateHashable(vmPeek(1))) return false;
-  mapSet(&AS_INSTANCE(vmPeek(2))->fields, vmPeek(1), vmPeek(0));
-
-  vmPop();
-  vmPop();
-  vmPop();
-  return true;
-}
-
 bool __objHas__(int argCount, Value* args) {
-  if (!vmValidateHashable(vmPeek(0))) return false;
+  uint32_t hash;
+  if (!vmHashValue(vmPeek(0), &hash)) return false;
 
-  bool hasKey = mapHas(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0)) ||
-                mapHas(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0));
+  bool hasKey =
+      mapHasHash(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), hash) ||
+      mapHasHash(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0), hash);
   vmPop();
   vmPop();
   vmPush(BOOL_VAL(hasKey));
@@ -247,37 +217,13 @@ bool __length__(int argCount, Value* args) {
   return true;
 }
 
-bool __getHash__(int argCount, Value* args) {
+bool __hash__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
 
-  uint32_t hash = hashValue(value);
+  uint32_t hash;
+  if (!vmHashValue(value, &hash)) return false;
   vmPush(NUMBER_VAL(hash));
-
-  return true;
-}
-
-bool __setHash__(int argCount, Value* args) {
-  Value hash = vmPop();
-  Value obj = vmPop();
-  vmPop();  // native fn.
-
-  if (IS_STRING(obj)) {
-    vmRuntimeError("Can't set hash of a string.");
-    return false;
-  }
-  if (!IS_OBJ(obj)) {
-    vmRuntimeError("Can only set hash of an object.");
-    return false;
-  }
-
-  if (!validateHash(hash)) return false;
-
-  obj.as.obj->hash = AS_NUMBER(hash);
-
-  // return nothing.
-  vmPush(NIL_VAL);
-
   return true;
 }
 
@@ -369,8 +315,7 @@ InterpretResult initializeCore() {
 
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFnGlobal("str", 1, __str__);
-  defineNativeFnGlobal("getHash", 1, __getHash__);
-  defineNativeFnGlobal("setHash", 2, __setHash__);
+  defineNativeFnGlobal("hash", 1, __hash__);
   defineNativeFnGlobal("type", 1, __type__);
   defineNativeFnGlobal("entries", 1, __objEntries__);
   defineNativeFnGlobal("clock", 0, __clock__);
@@ -386,8 +331,6 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("__mul__", 2, __mul__);
 
   vm.classes.object = defineNativeClass(S_OBJ);
-  defineNativeFnMethod("get", 1, false, __objGet__, vm.classes.object);
-  defineNativeFnMethod("set", 2, false, __objSet__, vm.classes.object);
   defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.object);
 
   // native classes.
