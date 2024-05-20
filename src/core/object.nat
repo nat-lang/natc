@@ -1,34 +1,7 @@
 
 
-class Object {
-  init() => {
-    this.__private__ = [
-      "__class__",
-      "__private__"
-    ];
-  }
-
+class Object extends __obj__ {
   __iter__() => Iterator(this.entries(), 0, len(this));
-
-  // The native [entries] function returns raw [ObjSequence]
-  // objects. Here we wrap them in instances of the core
-  // [Sequence] class.
-  entries() => {
-    let cSeq = entries(this);
-    let entries = Sequence();
-
-    // raw sequences don't implement the iteration protocol.
-    for (let i = 0; i < len(this); i = i + 1) {
-      let key = cSeq[i][0];
-      let val = cSeq[i][1];
-
-      if (!(key in this.__private__))
-        entries.push((key,val));
-    }
-
-    return entries;
-  }
-
   keys() => [entry[0] | entry in this.entries()];
   values() => [entry[1] | entry in this.entries()];
 }

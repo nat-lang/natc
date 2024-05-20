@@ -8,16 +8,24 @@
 #include "value.h"
 #include "vm.h"
 
+static bool executeMethod(char* method, int argCount) {
+  return vmExecuteMethod(method, argCount, 1);
+}
+
+static bool initInstance(ObjClass* klass, int argCount) {
+  return vmInitInstance(klass, argCount, 1);
+}
+
 bool closureInstance(ObjMap signature) {
   vmPush(OBJ_VAL(newInstance(vm.classes.astClosure)));
   vmPush(OBJ_VAL(newInstance(vm.classes.astSignature)));
   vmPush(OBJ_VAL(newInstance(vm.classes.object)));
 
-  if (!vmInitInstance(vm.classes.object, 0)) return false;
+  if (!initInstance(vm.classes.object, 0)) return false;
   mapAddAll(&signature, &AS_INSTANCE(vmPeek(0))->fields);
 
-  if (!vmInitInstance(vm.classes.astSignature, 1)) return false;
-  return vmInitInstance(vm.classes.astClosure, 1);
+  if (!initInstance(vm.classes.astSignature, 1)) return false;
+  return initInstance(vm.classes.astClosure, 1);
 }
 
 // Read the syntax tree of [closure] off the tape.
@@ -54,25 +62,25 @@ bool readAST(ObjClosure* closure) {
       case OP_CONSTANT: {
         vmPush(root);
         vmPush(READ_CONSTANT());
-        if (!vmExecuteMethod("opLiteral", 1)) return false;
+        if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_NIL: {
         vmPush(root);
         vmPush(NIL_VAL);
-        if (!vmExecuteMethod("opLiteral", 1)) return false;
+        if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_TRUE: {
         vmPush(root);
         vmPush(BOOL_VAL(true));
-        if (!vmExecuteMethod("opLiteral", 1)) return false;
+        if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_FALSE: {
         vmPush(root);
         vmPush(BOOL_VAL(false));
-        if (!vmExecuteMethod("opLiteral", 1)) return false;
+        if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
       case OP_EXPR_STATEMENT: {
@@ -80,7 +88,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(root);
         vmPush(value);
 
-        if (!vmExecuteMethod("opExprStatement", 1)) return false;
+        if (!executeMethod("opExprStatement", 1)) return false;
 
         vmPop();  // nil.
         break;
@@ -94,7 +102,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(root);
         vmPush(value);
 
-        if (!vmExecuteMethod("opReturn", 1)) return false;
+        if (!executeMethod("opReturn", 1)) return false;
 
         vmPop();  // nil.
         break;
@@ -104,7 +112,7 @@ bool readAST(ObjClosure* closure) {
         ObjString* name = READ_STRING();
         vmPush(OBJ_VAL(name));
 
-        if (!vmExecuteMethod("opGetGlobal", 1)) return false;
+        if (!executeMethod("opGetGlobal", 1)) return false;
         break;
       }
       case OP_GET_LOCAL: {
@@ -112,7 +120,7 @@ bool readAST(ObjClosure* closure) {
         uint8_t slot = READ_SHORT();
         vmPush(NUMBER_VAL(slot));
 
-        if (!vmExecuteMethod("opGetLocal", 1)) return false;
+        if (!executeMethod("opGetLocal", 1)) return false;
         break;
       }
       case OP_SET_LOCAL: {
@@ -123,7 +131,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(NUMBER_VAL(slot));
         vmPush(value);
 
-        if (!vmExecuteMethod("opSetLocal", 2)) return false;
+        if (!executeMethod("opSetLocal", 2)) return false;
         vmPop();  // nil.
         break;
       }
@@ -132,7 +140,7 @@ bool readAST(ObjClosure* closure) {
         uint8_t slot = READ_SHORT();
         vmPush(NUMBER_VAL(slot));
 
-        if (!vmExecuteMethod("opGetUpvalue", 1)) return false;
+        if (!executeMethod("opGetUpvalue", 1)) return false;
         break;
       }
       case OP_CLOSURE: {
@@ -155,7 +163,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(fn);
         for (int i = argCount - 1; i >= 0; i--) vmPush(args[i]);
 
-        if (!vmExecuteMethod("opCall", argCount + 1)) return false;
+        if (!executeMethod("opCall", argCount + 1)) return false;
         break;
       }
       case OP_CALL_INFIX: {
@@ -168,7 +176,7 @@ bool readAST(ObjClosure* closure) {
         vmPush(left);
         vmPush(right);
 
-        if (!vmExecuteMethod("opCall", 3)) return false;
+        if (!executeMethod("opCall", 3)) return false;
         break;
       }
       case OP_END: {

@@ -44,8 +44,10 @@ void vmRuntimeError(const char* format, ...) {
 }
 
 void initClasses(Classes* classes) {
+  classes->obj = NULL;
   classes->object = NULL;
   classes->sequence = NULL;
+  classes->iterator = NULL;
   classes->astNode = NULL;
   classes->astClosure = NULL;
   classes->astSignature = NULL;
@@ -123,25 +125,9 @@ bool vmInvoke(ObjString* name, int argCount) {
   return invokeFromClass(instance->klass, name, argCount);
 }
 
-bool vmExecuteMethod(char* method, int argCount) {
+bool vmExecuteMethod(char* method, int argCount, int frames) {
   return (vmInvoke(intern(method), argCount)) &&
-         (vmExecute(vm.frameCount - 1) == INTERPRET_OK);
-}
-
-bool vmValidateHashable(Value value) {
-  if (IS_OBJ(value) && !IS_STRING(value)) {
-    if (AS_OBJ(value)->hash == 0) {
-      vmRuntimeError("Object lacks a valid hash.");
-      return false;
-    }
-    return true;
-  }
-
-  if (!isHashable(value)) {
-    vmRuntimeError("Not a hashable type: num, nil, bool, or string.");
-    return false;
-  }
-  return true;
+         (vmExecute(vm.frameCount - frames) == INTERPRET_OK);
 }
 
 // If [value] is natively hashable, then hash it. Otherwise, if it's
@@ -161,7 +147,7 @@ bool vmHashValue(Value value, uint32_t* hash) {
   }
 
   vmPush(value);
-  if (!vmExecuteMethod(S_HASH, 0)) return false;
+  if (!vmExecuteMethod(S_HASH, 0, 1)) return false;
 
   if (!IS_NUMBER(vmPeek(0))) {
     vmRuntimeError("'%s' function must return a number.", S_HASH);
@@ -174,7 +160,7 @@ bool vmHashValue(Value value, uint32_t* hash) {
   return true;
 }
 
-static bool vmClassInitializable(ObjClass* klass) {
+bool vmClassInitializable(ObjClass* klass) {
   return mapHas(&klass->fields, OBJ_VAL(intern(S_INIT)));
 }
 
@@ -185,11 +171,8 @@ static bool vmExtendClass(ObjClass* subclass, ObjClass* superclass) {
   return true;
 }
 
-static bool vmInstantiateClass(ObjClass* klass, int argCount) {
+bool vmInstantiateClass(ObjClass* klass, int argCount) {
   Value initializer;
-
-  mapSet(&AS_INSTANCE(vmPeek(argCount))->fields, OBJ_VAL(intern(S_CLASS)),
-         OBJ_VAL(klass));
 
   if (mapGet(&klass->fields, OBJ_VAL(intern(S_INIT)), &initializer)) {
     return vmCallValue(initializer, argCount);
@@ -200,10 +183,12 @@ static bool vmInstantiateClass(ObjClass* klass, int argCount) {
   return true;
 }
 
-bool vmInitInstance(ObjClass* klass, int argCount) {
+bool vmInitInstance(ObjClass* klass, int argCount, int frames) {
   if (!vmInstantiateClass(klass, argCount)) return false;
-  if (vmClassInitializable(klass))
-    if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) return false;
+
+  if (vmClassInitializable(klass)) {
+    if (vmExecute(vm.frameCount - frames) != INTERPRET_OK) return false;
+  }
 
   return true;
 }
@@ -309,7 +294,6 @@ bool vmCallValue(Value callee, int argCount) {
         if (mapGet(&instance->klass->fields, INTERN(S_CALL), &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
         } else {
-          printValue(callee);
           vmRuntimeError("Objects require a '%s' method to be called.", S_CALL);
           return false;
         }
@@ -427,6 +411,8 @@ InterpretResult vmExecute(int baseFrame) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
   for (;;) {
+    if (vm.frameCount == baseFrame) return INTERPRET_OK;
+
 #ifdef DEBUG_TRACE_EXECUTION
     printf("          ");
     disassembleStack();
@@ -702,14 +688,11 @@ InterpretResult vmExecute(int baseFrame) {
         vm.stackTop = frame->slots;
         vmPush(value);
 
-        if (vm.frameCount == baseFrame) return INTERPRET_OK;
-
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
       case OP_CLASS:
         vmPush(OBJ_VAL(newClass(READ_STRING())));
-        vmExtendClass(AS_CLASS(vmPeek(0)), vm.classes.object);
         break;
       case OP_INHERIT: {
         Value superclass = vmPeek(1);

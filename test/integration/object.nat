@@ -1,0 +1,14 @@
+
+let o = Object();
+
+o[1] = "a";
+o[2] = "b";
+
+assert((1,"a") in o.entries());
+assert((2,"b") in o.entries());
+
+assert(1 in o.keys());
+assert(2 in o.keys());
+
+assert("a" in o.values());
+assert("b" in o.values());

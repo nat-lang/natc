@@ -27,8 +27,10 @@
 #define S_HASH "hash"
 
 #define S_OBJ "__obj__"
+#define S_OBJECT "Object"
 #define S_SEQUENCE "Sequence"
 #define S_TUPLE "Tuple"
+#define S_ITERATOR "Iterator"
 #define S_AST_NODE "ASTNode"
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_SIGNATURE "ASTSignature"

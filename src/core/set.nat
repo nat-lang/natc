@@ -2,7 +2,6 @@
 class Set extends Object {
   init() => {
     this.map = Map();
-    super.init();
   }
 
   // Calling a set is shorthand for the membership predicate,

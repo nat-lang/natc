@@ -5,6 +5,14 @@
 #include <string.h>
 #include <time.h>
 
+static bool executeMethod(char* method, int argCount) {
+  return vmExecuteMethod(method, argCount, 0);
+}
+
+static bool initInstance(ObjClass* klass, int argCount) {
+  return vmInitInstance(klass, argCount, 0);
+}
+
 static void defineNativeFn(char* name, int arity, bool variadic,
                            NativeFn function, ObjMap* dest) {
   // first put the values on the stack so they're
@@ -119,38 +127,41 @@ ObjClass* getClass(char* name) {
 }
 
 bool __objEntries__(int argCount, Value* args) {
-  if (!IS_INSTANCE(vmPeek(0))) {
-    vmRuntimeError("Only objects have entries.");
-    return false;
-  }
-
-  ObjInstance* map = AS_INSTANCE(vmPeek(0));
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
 
   // the entry sequence.
-  ObjSequence* entries = newSequence();
-  vmPush(OBJ_VAL(entries));
+  vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
+  if (!initInstance(vm.classes.sequence, 0)) return false;
 
-  for (int i = 0; i < map->fields.capacity; i++) {
-    MapEntry* entry = &map->fields.entries[i];
+  for (int i = 0; i < obj->fields.capacity; i++) {
+    MapEntry* entry = &obj->fields.entries[i];
     if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
 
-    ObjSequence* entrySeq = newSequence();
-    vmPush(OBJ_VAL(entrySeq));
-
-    writeValueArray(&entrySeq->values, entry->key);
-    writeValueArray(&entrySeq->values, entry->value);
-    writeValueArray(&entries->values, OBJ_VAL(entrySeq));
-
-    vmPop();
+    // the entry tuple.
+    vmPush(OBJ_VAL(newInstance(vm.classes.tuple)));
+    vmPush(entry->key);
+    vmPush(entry->value);
+    if (!initInstance(vm.classes.tuple, 2)) return false;
+    if (!executeMethod("push", 1)) return false;
   }
 
-  // pop the entries, map, and native fn, now that we're done
-  // with them and leave the entries on the stack.
-  vmPop();
-  vmPop();
-  vmPop();
-  vmPush(OBJ_VAL(entries));
+  Value entries = vmPop();  // map.
+  vmPop();                  // obj.
+  vmPush(entries);
 
+  return true;
+}
+
+bool __objHas__(int argCount, Value* args) {
+  uint32_t hash;
+  if (!vmHashValue(vmPeek(0), &hash)) return false;
+
+  bool hasKey =
+      mapHasHash(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), hash) ||
+      mapHasHash(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0), hash);
+  vmPop();  // key.
+  vmPop();  // obj.
+  vmPush(BOOL_VAL(hasKey));
   return true;
 }
 
@@ -166,19 +177,6 @@ bool __randomNumber__(int argCount, Value* args) {
   int x = rand() % (uint32_t)AS_NUMBER(upperBound);
 
   vmPush(NUMBER_VAL(x));
-  return true;
-}
-
-bool __objHas__(int argCount, Value* args) {
-  uint32_t hash;
-  if (!vmHashValue(vmPeek(0), &hash)) return false;
-
-  bool hasKey =
-      mapHasHash(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), hash) ||
-      mapHasHash(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0), hash);
-  vmPop();
-  vmPop();
-  vmPush(BOOL_VAL(hasKey));
   return true;
 }
 
@@ -317,7 +315,6 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);
   defineNativeFnGlobal("type", 1, __type__);
-  defineNativeFnGlobal("entries", 1, __objEntries__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
 
@@ -330,13 +327,18 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("__div__", 2, __div__);
   defineNativeFnGlobal("__mul__", 2, __mul__);
 
-  vm.classes.object = defineNativeClass(S_OBJ);
-  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.object);
-
   // native classes.
+
+  vm.classes.obj = defineNativeClass(S_OBJ);
+  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.obj);
+  defineNativeFnMethod("entries", 0, false, __objEntries__, vm.classes.obj);
+
+  // core classes.
 
   InterpretResult coreIntpt = interpretFile("src/core/__index__");
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
+
+  vm.classes.object = getClass(S_OBJECT);
 
   vm.classes.tuple = getClass(S_TUPLE);
   defineNativeFnMethod(S_INIT, 0, true, __tupleInit__, vm.classes.tuple);
@@ -346,6 +348,7 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.classes.sequence);
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.classes.sequence);
 
+  vm.classes.iterator = getClass(S_ITERATOR);
   vm.classes.astNode = getClass(S_AST_NODE);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
   vm.classes.astSignature = getClass(S_AST_SIGNATURE);

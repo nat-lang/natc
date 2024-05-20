@@ -1196,17 +1196,19 @@ static void classDeclaration() {
     if (identifiersEqual(&className, &parser.previous)) {
       error("A class can't inherit from itself.");
     }
-
-    // "super" requires independent scope for adjacent
-    // class declarations in order not to clash.
-    beginScope();
-    addLocal(syntheticToken("super"));
-    defineVariable(0);
-
-    namedVariable(className, false);
-    emitByte(OP_INHERIT);
-    classCompiler.hasSuperclass = true;
+  } else {
+    nativeVariable(S_OBJECT);
   }
+
+  // "super" requires independent scope for adjacent
+  // class declarations in order not to clash.
+  beginScope();
+  addLocal(syntheticToken("super"));
+  defineVariable(0);
+
+  namedVariable(className, false);
+  emitByte(OP_INHERIT);
+  classCompiler.hasSuperclass = true;
 
   namedVariable(className, false);
 
