@@ -544,14 +544,6 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_NOT:
         vmPush(BOOL_VAL(isFalsey(vmPop())));
         break;
-      // unreachable.
-      case OP_NEGATE:
-        if (!IS_NUMBER(vmPeek(0))) {
-          vmRuntimeError("Operand must be a number.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
-        vmPush(NUMBER_VAL(-AS_NUMBER(vmPop())));
-        break;
       case OP_PRINT: {
         printValue(vmPop());
         printf("\n");
