@@ -489,6 +489,11 @@ static uint8_t declareVariable() {
   return declareLocal(&parser.previous);
 }
 
+static void defineType(int var) {
+  emitConstInstr(
+      current->scopeDepth > 0 ? OP_SET_TYPE_LOCAL : OP_SET_TYPE_GLOBAL, var);
+}
+
 static uint16_t nativeVariable(char* name) {
   uint16_t var = makeConstant(identifier(name));
   emitConstInstr(OP_GET_GLOBAL, var);
@@ -642,9 +647,13 @@ static void namedVariable(Token name, bool canAssign) {
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
+
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitConstInstr(setOp, arg);
+  } else if (canAssign && match(TOKEN_COLON)) {
+    expression();
+    defineType(arg);
   } else if (canAssign && match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
@@ -1257,6 +1266,13 @@ static void letDeclaration() {
   uint16_t var = parseVariable("Expect variable name.");
   emitByte(OP_UNDEFINED);
   defineVariable(var);
+
+  if (match(TOKEN_COLON)) {
+    expression();
+    defineType(var);
+    consume(TOKEN_SEMICOLON, "Expect ';' after type declaration.");
+    return;
+  }
 
   if (match(TOKEN_EQUAL)) {
     boundExpression();

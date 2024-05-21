@@ -10,14 +10,7 @@ static bool executeMethod(char* method, int argCount) {
 }
 
 static bool initInstance(ObjClass* klass, int argCount) {
-  int frames = 1;
-
-  // todo: revisit the asymmetry in baseframe btw this fn and [executeMethod].
-  Value field;
-  if (mapGet(&klass->fields, INTERN(S_INIT), &field) && IS_NATIVE(field))
-    frames = 0;
-
-  return vmInitInstance(klass, argCount, frames);
+  return vmInitInstance(klass, argCount, 0);
 }
 
 static void defineNativeFn(char* name, int arity, bool variadic,
@@ -133,36 +126,6 @@ ObjClass* getClass(char* name) {
   return AS_CLASS(obj);
 }
 
-bool __objEntries__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
-
-  // the entry sequence.
-  vmPush(OBJ_VAL(vm.classes.sequence));
-  if (!initInstance(vm.classes.sequence, 0)) return false;
-
-  for (int i = 0; i < obj->fields.capacity; i++) {
-    MapEntry* entry = &obj->fields.entries[i];
-    if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
-
-    // the entry tuple.
-    vmPush(OBJ_VAL(vm.classes.tuple));
-    // arg 0.
-    vmPush(entry->key);
-    // arg 1.
-    vmPush(entry->value);
-    // init.
-    if (!initInstance(vm.classes.tuple, 2)) return false;
-    // add to sequence.
-    if (!executeMethod("push", 1)) return false;
-  }
-
-  Value entries = vmPop();
-  vmPop();  // obj.
-  vmPush(entries);
-
-  return true;
-}
-
 bool __objKeys__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
 
@@ -182,51 +145,6 @@ bool __objKeys__(int argCount, Value* args) {
   Value keys = vmPop();
   vmPop();  // obj.
   vmPush(keys);
-
-  return true;
-}
-
-bool __objValues__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
-
-  // the value sequence.
-  vmPush(OBJ_VAL(vm.classes.sequence));
-  if (!initInstance(vm.classes.sequence, 0)) return false;
-
-  for (int i = 0; i < obj->fields.capacity; i++) {
-    MapEntry* entry = &obj->fields.entries[i];
-    if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
-
-    // add to sequence.
-    vmPush(entry->value);
-    if (!executeMethod("push", 1)) return false;
-  }
-
-  Value values = vmPop();
-  vmPop();  // obj.
-  vmPush(values);
-
-  return true;
-}
-
-bool __objIter__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
-
-  // the iterator.
-  vmPush(OBJ_VAL(vm.classes.iterator));
-  // arg 0.
-  vmPush(OBJ_VAL(obj));
-  if (!executeMethod("entries", 0)) return false;
-  // arg 1.
-  vmPush(NUMBER_VAL(0));
-  // arg 2.
-  vmPush(NUMBER_VAL(obj->fields.count));
-  // init.
-  if (!initInstance(vm.classes.iterator, 3)) return false;
-
-  Value iter = vmPop();
-  vmPop();  // the object.
-  vmPush(iter);
 
   return true;
 }
@@ -254,7 +172,6 @@ bool __randomNumber__(int argCount, Value* args) {
   }
 
   int x = rand() % (uint32_t)AS_NUMBER(upperBound);
-
   vmPush(NUMBER_VAL(x));
   return true;
 }
@@ -304,11 +221,64 @@ bool __hash__(int argCount, Value* args) {
   return true;
 }
 
-bool __type__(int argCount, Value* args) {
+bool __vType__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
 
-  vmPush(typeValue(value));
+  switch (value.vType) {
+    case VAL_BOOL:
+      vmPush(OBJ_VAL(vm.classes.vTypeBool));
+      break;
+    case VAL_NUMBER:
+      vmPush(OBJ_VAL(vm.classes.vTypeNumber));
+      break;
+    case VAL_NIL:
+      vmPush(OBJ_VAL(vm.classes.vTypeNil));
+      break;
+    case VAL_OBJ:
+      switch (AS_OBJ(value)->oType) {
+        case OBJ_CLASS:
+          vmPush(OBJ_VAL(vm.classes.oTypeClass));
+          break;
+        case OBJ_INSTANCE:
+          vmPush(OBJ_VAL(vm.classes.oTypeInstance));
+          break;
+        case OBJ_STRING:
+          vmPush(OBJ_VAL(vm.classes.oTypeString));
+          break;
+        case OBJ_CLOSURE:
+          vmPush(OBJ_VAL(vm.classes.oTypeClosure));
+          break;
+        default: {
+          printValue(value);
+          vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
+          return false;
+        }
+      }
+      break;
+    case VAL_UNDEF:
+      vmPush(OBJ_VAL(vm.classes.vTypeUndef));
+      break;
+    default:
+      vmRuntimeError("Unexpected value.");
+      return false;
+  }
+  return true;
+}
+
+bool __localTypeEnv__(int argCount, Value* args) {
+  vmPop();  // native fn.
+  vmPush(OBJ_VAL(newInstance(vm.classes.typeEnv)));
+  initInstance(vm.classes.typeEnv, 0);
+  mapAddAll(&vm.frame->closure->typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
+  return true;
+}
+
+bool __globalTypeEnv__(int argCount, Value* args) {
+  vmPop();  // native fn.
+  vmPush(OBJ_VAL(newInstance(vm.classes.typeEnv)));
+  initInstance(vm.classes.typeEnv, 0);
+  mapAddAll(&vm.typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
   return true;
 }
 
@@ -322,7 +292,7 @@ bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
 
-  switch (value.type) {
+  switch (value.vType) {
     case VAL_NUMBER: {
       double num = AS_NUMBER(value);
 
@@ -334,17 +304,17 @@ bool __str__(int argCount, Value* args) {
     }
     case VAL_NIL: {
       string = copyString("nil", 4);
-
       break;
     }
     case VAL_BOOL: {
       string =
           (AS_BOOL(value) ? copyString("true", 4) : copyString("false", 5));
-
       break;
     }
-    default:
+    default: {
+      vmRuntimeError("Can't turn x into a string.");
       return false;
+    }
   }
 
   vmPop();
@@ -393,7 +363,9 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);
-  defineNativeFnGlobal("type", 1, __type__);
+  defineNativeFnGlobal("vType", 1, __vType__);
+  defineNativeFnGlobal("localTypeEnv", 0, __localTypeEnv__);
+  defineNativeFnGlobal("globalTypeEnv", 0, __globalTypeEnv__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
 
@@ -408,12 +380,9 @@ InterpretResult initializeCore() {
 
   // native classes.
 
-  vm.classes.object = defineNativeClass(S_OBJECT);
-  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.object);
-  defineNativeFnMethod("entries", 0, false, __objEntries__, vm.classes.object);
-  defineNativeFnMethod("keys", 0, false, __objKeys__, vm.classes.object);
-  defineNativeFnMethod("values", 0, false, __objValues__, vm.classes.object);
-  defineNativeFnMethod("__iter__", 0, false, __objIter__, vm.classes.object);
+  vm.classes.base = defineNativeClass(S_BASE);
+  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.base);
+  defineNativeFnMethod("keys", 0, false, __objKeys__, vm.classes.base);
 
   // core classes.
 
@@ -431,9 +400,19 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.classes.sequence);
 
   vm.classes.iterator = getClass(S_ITERATOR);
+  vm.classes.typeEnv = getClass(S_TYPE_ENV);
   vm.classes.astNode = getClass(S_AST_NODE);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
   vm.classes.astSignature = getClass(S_AST_SIGNATURE);
 
+  vm.classes.vTypeBool = getClass(S_CTYPE_BOOL);
+  vm.classes.vTypeNil = getClass(S_CTYPE_NIL);
+  vm.classes.vTypeNumber = getClass(S_CTYPE_NUMBER);
+  vm.classes.vTypeUndef = getClass(S_CTYPE_UNDEF);
+  vm.classes.oTypeClass = getClass(S_OTYPE_CLASS);
+  vm.classes.oTypeInstance = getClass(S_OTYPE_INSTANCE);
+  vm.classes.oTypeString = getClass(S_OTYPE_STRING);
+  vm.classes.oTypeClosure = getClass(S_OTYPE_CLOSURE);
+  vm.classes.oTypeSequence = getClass(S_OTYPE_SEQUENCE);
   return INTERPRET_OK;
 }

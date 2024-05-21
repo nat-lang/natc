@@ -1,0 +1,257 @@
+class TypeError extends Error {}
+
+let isSubclass = (a, b) => {
+  if (vType(a) != OClass or vType(b) != OClass) 
+    return false;
+  
+  let klass = a;
+
+  while (klass != nil) {
+    if (klass == b) return true;
+    klass = klass.__superclass__;
+  }
+
+  return false;
+};
+
+// Is [a] an instance of [b]?
+let infix(5) is = (a, b) => {
+  let aVmType = vType(a);
+  let bVmType = vType(b);
+
+  if (aVmType != OInstance or bVmType != OClass)
+    return false;
+
+  return isSubclass(a.__class__, b);
+};
+
+class CType {}
+
+class CBool extends CType {}
+class CNil extends CType {}
+class CNumber extends CType {}
+class CObject extends CType {}
+class CUndef extends CType {}
+
+class OClass extends CObject {}
+class OInstance extends CObject {}
+class OString extends CObject {}
+class OClosure extends CObject {}
+class OSequence extends CObject {}
+
+class Type {}
+
+class TVar extends Type {
+  init(name) => {
+    this.name = name;
+  }
+  hash() => hash(this.name);
+  __eq__(other) => this.name == other.name;
+}
+class TSum extends Type {}
+class TProduct extends Type {
+  init(elements) => {
+    this.elements = elements;
+  }
+  __eq__(other) => this.elements == other.elements;
+}
+
+class TVoid extends Type {}
+class TBoolean extends Type {}
+class TNumber extends Type {}
+class TString extends Type {}
+class TFunction extends Type {
+  init(domain, range) => {
+    if (domain is Tuple)
+      this.domain = TProduct(domain);
+    else
+      this.domain = domain;
+    this.range = range;
+  }
+
+  // the subtype relation.
+  __eq__(other) => this.domain == other.domain and this.range == other.range;
+}
+class TClass extends Type {}
+
+class TypeEnv extends Object {
+  apply(constraint) => constraint.apply(this);
+  extend(other) => {
+    for (entry in other)
+      this[entry[0]] = entry[1];
+  }
+}
+
+class Constraint extends Object {
+  init(left, right) => {
+    this.left = left;
+    this.right = right;
+  }
+  apply(substitution) => {
+    let left = this.left;
+    let right = this.right;
+
+    for (sub in substitution.entries()) {
+      if (left == sub[0]) left = sub[1];
+      if (right == sub[0]) right = sub[1];
+    }
+
+    return Constraint(left, right);
+  }
+}
+
+class NameSupply {
+  init() => {
+    this.next = 0;
+  }
+  fresh() => {
+    this.next = this.next + 1;
+    return TVar(this.next);
+  }
+}
+
+let void = TVoid();
+let bool = TBoolean();
+let num = TNumber();
+let string = TString();
+let infix -> = TFunction;
+let tClass = TClass();
+
+// Map vm types to object language types.
+let type = (value) => {
+  let vmType = vType(value);
+
+  if (vmType == CNil) return void;
+  if (vmType == CBool) return bool;
+  if (vmType == CNumber) return num;
+  if (vmType == OString) return string; 
+  if (vmType == OInstance) return value.__class__;
+  if (vmType == OClass) return tClass;
+};
+
+class TypeState {
+  init(exprEnv, typeEnv, names, constraints) => {
+    // env mapping expressions to annotations.
+    this.exprEnv = exprEnv;
+    // env mapping type variables to types.
+    this.typeEnv = typeEnv;
+    // name supply.
+    this.names = names;
+    // constraint stack.
+    this.constraints = constraints;
+  }
+
+  lookup(node) => {
+    if (this.exprEnv[node.data])
+      return this.exprEnv[node.data];
+
+    if (!this.typeEnv[node.data])
+      this.typeEnv[node.data] = this.names.fresh();
+    
+    return this.typeEnv[node.data];
+  }
+
+  constrain(node) => {
+    if (node is ASTClosure) {
+      node.children.map(this.constrain);
+      return this.names.fresh();
+    }
+
+    if (node is ASTLiteral)
+      return type(node.data);
+
+    if (node is ASTVar)
+      return this.lookup(node);
+    
+    if (node is ASTArgumentSequence) {
+      let tArgs = node.children.map(this.constrain);
+
+      if (len(tArgs) > 1)
+        return TProduct(tArgs);
+      else
+        return tArgs[0];
+    }
+
+    if (node is ASTApp) {
+      let func = node[0];
+      let args = node[1];
+
+      let tFunc = this.constrain(func);
+      let tArgs = this.constrain(args);
+
+      let tApp = this.names.fresh();
+      this.constraints.push(Constraint(tFunc, tArgs -> tApp));
+      return tApp;
+    }
+
+    if (node is ASTAssignment) {
+      let var = node[0];
+      let val = node[1];
+
+      let tVar = this.lookup(var);
+      let tVal = this.constrain(val);
+
+      this.constraints.push(Constraint(tVar, tVal));
+
+      // this should actually respect a possible user
+      // defined __set__ method that returns something.
+      return void;
+    }
+
+    if (node is ASTExprStatement)
+      return this.constrain(node[0]);
+
+    if (node is ASTReturn) 
+      return this.constrain(node[0]);
+
+    throw TypeError("Unexpected syntax.");
+  } 
+
+  unify() => {
+    let env = TypeEnv();
+    let unsolved = [];
+
+    while (len(this.constraints) > 0) {
+      let constraint = this.constraints.pop();
+
+      if (constraint.left is TVar) {
+        env.extend({constraint.left: constraint.right});
+        this.constraints = this.constraints.map(env.apply);
+  
+      } else if (constraint.right is TVar) {
+        env.extend({constraint.right: constraint.left});
+        this.constraints = this.constraints.map(env.apply);
+        
+      } else if (constraint.left is TFunction and constraint.right is TFunction) {
+        let left = constraint.left;
+        let right = constraint.right;
+
+        this.constraints.add(
+          Constraint(left.domain, right.domain),
+          Constraint(left.range, right.range)
+        );
+      } else if (constraint.left != constraint.right) {
+        unsolved.push(constraint);
+      }
+    }
+
+    this.constraints = unsolved;
+    this.typeEnv.extend(env);
+  }
+
+  unified() => len(this.constraints) == 0;
+}
+
+let typecheck = (expr) => {
+  let exprEnv = globalTypeEnv();
+  let typeEnv = TypeEnv();
+  let names = NameSupply();
+  let state = TypeState(exprEnv, typeEnv, names, []);
+
+  let ast <- expr;
+
+  state.constrain(ast);
+  state.unify();
+
+  return state;
+};

@@ -16,7 +16,7 @@
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
 
-  object->type = type;
+  object->oType = type;
   object->isMarked = false;
   object->next = vm.objects;
   object->hash = 0;
@@ -63,6 +63,7 @@ ObjClosure* newClosure(ObjFunction* function) {
   closure->function = function;
   closure->upvalues = upvalues;
   closure->upvalueCount = function->upvalueCount;
+  initMap(&closure->typeEnv);
   return closure;
 }
 
@@ -125,7 +126,7 @@ static uint32_t hashString(const char* key, int length) {
 
 // Generate a hash code for [object].
 uint32_t hashObject(Obj* object) {
-  switch (object->type) {
+  switch (object->oType) {
     case OBJ_STRING:
       return ((ObjString*)object)->hash;
     default:
@@ -384,6 +385,12 @@ bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
   return false;
 }
 
+bool objectsEqual(Obj* a, Obj* b) {
+  if (a->hash != 0 && b->hash != 0) return a->hash == b->hash;
+
+  return a == b;
+}
+
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_BOUND_FUNCTION: {
@@ -403,7 +410,7 @@ void printObject(Value value) {
       break;
     }
     case OBJ_CLASS:
-      printf("%s", AS_CLASS(value)->name->chars);
+      printf("<%s class>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
       printFunction(AS_CLOSURE(value)->function);

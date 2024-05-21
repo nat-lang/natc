@@ -19,6 +19,9 @@ class Iterator {
 }
 
 let iter = (object) => {
+  if (vType(object) != OInstance)
+    throw IterationProtocolError("Only objects can be iterated over.");
+
   if (object.has("__iter__")) return object.__iter__();
 
   throw IterationProtocolError("Must define an '__iter__' method to iterate.");

@@ -46,6 +46,8 @@ typedef enum {
   OP_END,
   OP_EXPR_STATEMENT,
   OP_DESTRUCTURE,
+  OP_SET_TYPE_LOCAL,
+  OP_SET_TYPE_GLOBAL,
 } OpCode;
 
 typedef struct {

@@ -26,5 +26,6 @@ import test/integration/sequential
 import test/integration/set
 import test/integration/string
 import test/integration/tree
+import test/integration/type
 
 conclude("integration");
