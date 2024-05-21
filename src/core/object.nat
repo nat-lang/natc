@@ -1,7 +1,0 @@
-
-
-class Object extends __obj__ {
-  __iter__() => Iterator(this.entries(), 0, len(this));
-  keys() => [entry[0] | entry in this.entries()];
-  values() => [entry[1] | entry in this.entries()];
-}

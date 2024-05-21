@@ -1,4 +1,3 @@
-import src/core/object
 import src/core/error
 import src/core/logic
 import src/core/math

@@ -26,7 +26,6 @@
 #define S_POP "pop"
 #define S_HASH "hash"
 
-#define S_OBJ "__obj__"
 #define S_OBJECT "Object"
 #define S_SEQUENCE "Sequence"
 #define S_TUPLE "Tuple"

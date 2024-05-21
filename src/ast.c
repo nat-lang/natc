@@ -17,9 +17,9 @@ static bool initInstance(ObjClass* klass, int argCount) {
 }
 
 bool closureInstance(ObjMap signature) {
-  vmPush(OBJ_VAL(newInstance(vm.classes.astClosure)));
-  vmPush(OBJ_VAL(newInstance(vm.classes.astSignature)));
-  vmPush(OBJ_VAL(newInstance(vm.classes.object)));
+  vmPush(OBJ_VAL(vm.classes.astClosure));
+  vmPush(OBJ_VAL(vm.classes.astSignature));
+  vmPush(OBJ_VAL(vm.classes.object));
 
   if (!initInstance(vm.classes.object, 0)) return false;
   mapAddAll(&signature, &AS_INSTANCE(vmPeek(0))->fields);

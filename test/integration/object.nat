@@ -3,12 +3,24 @@ let o = Object();
 
 o[1] = "a";
 o[2] = "b";
+o[3] = "c";
 
+// entries.
 assert((1,"a") in o.entries());
 assert((2,"b") in o.entries());
+assert((3,"c") in o.entries());
 
+// keys.
 assert(1 in o.keys());
 assert(2 in o.keys());
+assert(3 in o.keys());
 
+// values.
 assert("a" in o.values());
 assert("b" in o.values());
+assert("c" in o.values());
+
+// iteration.
+for (x in o) {
+  assert(x in [(1, "a"), (2, "b"), (3, "c")]);
+}

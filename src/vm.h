@@ -22,7 +22,6 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-  ObjClass* obj;
   ObjClass* object;
   ObjClass* tuple;
   ObjClass* sequence;

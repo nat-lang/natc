@@ -10,13 +10,20 @@ static bool executeMethod(char* method, int argCount) {
 }
 
 static bool initInstance(ObjClass* klass, int argCount) {
-  return vmInitInstance(klass, argCount, 0);
+  int frames = 1;
+
+  // todo: revisit the asymmetry in baseframe btw this fn and [executeMethod].
+  Value field;
+  if (mapGet(&klass->fields, INTERN(S_INIT), &field) && IS_NATIVE(field))
+    frames = 0;
+
+  return vmInitInstance(klass, argCount, frames);
 }
 
 static void defineNativeFn(char* name, int arity, bool variadic,
                            NativeFn function, ObjMap* dest) {
-  // first put the values on the stack so they're
-  // not gc'd if/when the map is recapacitated.
+  // keep the values on the stack so they're
+  // not gc'd if/when the [dest] map is recapacitated.
   ObjString* objName = intern(name);
   vmPush(OBJ_VAL(objName));
   ObjNative* native = newNative(arity, variadic, objName, function);
@@ -130,7 +137,7 @@ bool __objEntries__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
 
   // the entry sequence.
-  vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
+  vmPush(OBJ_VAL(vm.classes.sequence));
   if (!initInstance(vm.classes.sequence, 0)) return false;
 
   for (int i = 0; i < obj->fields.capacity; i++) {
@@ -138,16 +145,88 @@ bool __objEntries__(int argCount, Value* args) {
     if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
 
     // the entry tuple.
-    vmPush(OBJ_VAL(newInstance(vm.classes.tuple)));
+    vmPush(OBJ_VAL(vm.classes.tuple));
+    // arg 0.
     vmPush(entry->key);
+    // arg 1.
     vmPush(entry->value);
+    // init.
     if (!initInstance(vm.classes.tuple, 2)) return false;
+    // add to sequence.
     if (!executeMethod("push", 1)) return false;
   }
 
-  Value entries = vmPop();  // map.
-  vmPop();                  // obj.
+  Value entries = vmPop();
+  vmPop();  // obj.
   vmPush(entries);
+
+  return true;
+}
+
+bool __objKeys__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+
+  // the key sequence.
+  vmPush(OBJ_VAL(vm.classes.sequence));
+  if (!initInstance(vm.classes.sequence, 0)) return false;
+
+  for (int i = 0; i < obj->fields.capacity; i++) {
+    MapEntry* entry = &obj->fields.entries[i];
+    if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
+
+    // add to sequence.
+    vmPush(entry->key);
+    if (!executeMethod("push", 1)) return false;
+  }
+
+  Value keys = vmPop();
+  vmPop();  // obj.
+  vmPush(keys);
+
+  return true;
+}
+
+bool __objValues__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+
+  // the value sequence.
+  vmPush(OBJ_VAL(vm.classes.sequence));
+  if (!initInstance(vm.classes.sequence, 0)) return false;
+
+  for (int i = 0; i < obj->fields.capacity; i++) {
+    MapEntry* entry = &obj->fields.entries[i];
+    if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
+
+    // add to sequence.
+    vmPush(entry->value);
+    if (!executeMethod("push", 1)) return false;
+  }
+
+  Value values = vmPop();
+  vmPop();  // obj.
+  vmPush(values);
+
+  return true;
+}
+
+bool __objIter__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+
+  // the iterator.
+  vmPush(OBJ_VAL(vm.classes.iterator));
+  // arg 0.
+  vmPush(OBJ_VAL(obj));
+  if (!executeMethod("entries", 0)) return false;
+  // arg 1.
+  vmPush(NUMBER_VAL(0));
+  // arg 2.
+  vmPush(NUMBER_VAL(obj->fields.count));
+  // init.
+  if (!initInstance(vm.classes.iterator, 3)) return false;
+
+  Value iter = vmPop();
+  vmPop();  // the object.
+  vmPush(iter);
 
   return true;
 }
@@ -329,9 +408,12 @@ InterpretResult initializeCore() {
 
   // native classes.
 
-  vm.classes.obj = defineNativeClass(S_OBJ);
-  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.obj);
-  defineNativeFnMethod("entries", 0, false, __objEntries__, vm.classes.obj);
+  vm.classes.object = defineNativeClass(S_OBJECT);
+  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.object);
+  defineNativeFnMethod("entries", 0, false, __objEntries__, vm.classes.object);
+  defineNativeFnMethod("keys", 0, false, __objKeys__, vm.classes.object);
+  defineNativeFnMethod("values", 0, false, __objValues__, vm.classes.object);
+  defineNativeFnMethod("__iter__", 0, false, __objIter__, vm.classes.object);
 
   // core classes.
 

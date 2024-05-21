@@ -44,7 +44,6 @@ void vmRuntimeError(const char* format, ...) {
 }
 
 void initClasses(Classes* classes) {
-  classes->obj = NULL;
   classes->object = NULL;
   classes->sequence = NULL;
   classes->iterator = NULL;
@@ -160,10 +159,6 @@ bool vmHashValue(Value value, uint32_t* hash) {
   return true;
 }
 
-bool vmClassInitializable(ObjClass* klass) {
-  return mapHas(&klass->fields, OBJ_VAL(intern(S_INIT)));
-}
-
 static bool vmExtendClass(ObjClass* subclass, ObjClass* superclass) {
   mapAddAll(&superclass->fields, &subclass->fields);
   mapSet(&subclass->fields, INTERN(S_SUPERCLASS), OBJ_VAL(superclass));
@@ -171,7 +166,7 @@ static bool vmExtendClass(ObjClass* subclass, ObjClass* superclass) {
   return true;
 }
 
-bool vmInstantiateClass(ObjClass* klass, int argCount) {
+static bool vmInstantiateClass(ObjClass* klass, int argCount) {
   Value initializer;
 
   if (mapGet(&klass->fields, OBJ_VAL(intern(S_INIT)), &initializer)) {
@@ -184,9 +179,9 @@ bool vmInstantiateClass(ObjClass* klass, int argCount) {
 }
 
 bool vmInitInstance(ObjClass* klass, int argCount, int frames) {
-  if (!vmInstantiateClass(klass, argCount)) return false;
+  if (!vmCallValue(OBJ_VAL(klass), argCount)) return false;
 
-  if (vmClassInitializable(klass)) {
+  if (mapHas(&klass->fields, INTERN(S_INIT))) {
     if (vmExecute(vm.frameCount - frames) != INTERPRET_OK) return false;
   }
 
