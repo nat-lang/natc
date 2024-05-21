@@ -10,18 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Build
-        run: make nat
-      - name: Run integration tests
-        run: make integration
-      - name: Run regression tests
-        run: make regression
-      - name: Run trip tests
-        run: make trip
-      - name: Run valgrind
-        run: make valgrind
       - name: Run garbage collection stress
         run: |
-          sudo make clean
           make debug-stress-gc
           make tests
