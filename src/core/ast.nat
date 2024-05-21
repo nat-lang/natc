@@ -12,6 +12,18 @@ class ASTReturn extends ASTStatement {
   }
 }
 
+class ASTStatement extends ASTNode {}
+class ASTAssignment extends ASTStatement {
+  init(var, value) => {
+    this.children = [var, value];
+  }
+}
+class ASTReturn extends ASTStatement {
+  init(expr) => {
+    this.children = [expr];
+  }
+}
+
 class ASTExprStatement extends ASTStatement {
   init(expr) => {
     this.children = [expr];

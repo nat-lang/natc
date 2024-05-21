@@ -24,6 +24,11 @@ class Tree extends Object {
   // Subscript access is to children.
   __get__(idx) => this.children[idx];
 
+  __iter__() => {
+    let nodes = this.depthFirst();
+    return Iterator(nodes, 0, len(nodes));
+  }
+
   depthFirst() => {
     let seq = [this];
 
@@ -45,9 +50,9 @@ class Tree extends Object {
     let tree = Tree();
 
     tree.setData(fn(this.data));
-  
+
     for (child in this.children)
-      tree.addChild(child.map(fn));
+      tree.children.push(child.map(fn));
 
     return tree;
   }

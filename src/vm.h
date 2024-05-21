@@ -22,24 +22,39 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjClass* base;
   ObjClass* object;
   ObjClass* tuple;
   ObjClass* sequence;
   ObjClass* iterator;
+
+  ObjClass* typeEnv;
   ObjClass* astNode;
   ObjClass* astClosure;
   ObjClass* astSignature;
+
+  ObjClass* vTypeBool;
+  ObjClass* vTypeNil;
+  ObjClass* vTypeNumber;
+  ObjClass* vTypeUndef;
+  ObjClass* oTypeClass;
+  ObjClass* oTypeInstance;
+  ObjClass* oTypeString;
+  ObjClass* oTypeClosure;
+  ObjClass* oTypeSequence;
 } Classes;
 
 typedef struct {
   Value stack[STACK_MAX];
   Value* stackTop;
+  CallFrame* frame;
 
   CallFrame frames[FRAMES_MAX];
   int frameCount;
 
   ObjMap strings;
   ObjMap globals;
+  ObjMap typeEnv;
   ObjMap infixes;
 
   Obj* objects;
