@@ -1,0 +1,16 @@
+let private = () => [
+  "__class__"
+];
+
+class Object extends Base {
+  keys() => super.keys().filter((x) => x in private());
+  values() => [this[key] | key in this.keys()];
+  entries() => [(key, this[key]) | key in this.keys()];
+
+  __len__() => len(this.keys());
+  __iter__() => {
+    let entries = this.entries();
+  
+    return Iterator(entries, 0, len(entries));
+  }
+}

@@ -1,0 +1,86 @@
+
+// seperate function and type declarations.
+// --------------------------------------------
+
+let f;
+let env;
+let check;
+
+// (single) implicit return, single argument.
+
+f : num -> num;
+f = (a) => a + 1;
+
+env = globalTypeEnv();
+assert(env["f"] == num -> num);
+
+check = typecheck(() => f(1));
+assert(check.unified() == true);
+
+check = typecheck(() => f(true));
+assert(check.unified() == false);
+
+// block, single argument.
+
+check = typecheck(() => {
+  let a = 1;
+  return f(a);
+});
+assert(check.unified() == true);
+
+check = typecheck(() => {
+  let a = true;
+  return f(a);
+});
+assert(check.unified() == false);
+
+// (single) implicit return, multiple arguments.
+
+f : (num, num) -> num;
+f = (a, b) => a + b + 1;
+
+env = globalTypeEnv();
+assert(env["f"] == (num, num) -> num);
+
+check = typecheck(() => f(1,1));
+assert(check.unified() == true);
+
+check = typecheck(() => f(true, true));
+assert(check.unified() == false);
+
+// inference.
+
+check = typecheck(() => g(1));
+
+let gType = check.typeEnv[TVar(1)];
+assert(gType is TFunction);
+assert(gType.domain is TNumber);
+assert(gType.range is TVar);
+
+check = typecheck(() => g(true));
+
+let gType = check.typeEnv[TVar(1)];
+assert(gType is TFunction);
+assert(gType.domain is TBoolean);
+assert(gType.range is TVar);
+
+check = typecheck(() => g("a"));
+
+let gType = check.typeEnv[TVar(1)];
+assert(gType is TFunction);
+assert(gType.domain is TString);
+assert(gType.range is TVar);
+
+// inline type declaration (a).
+// --------------------------------------------
+// let g = (a: num): num => {
+//   return a + 1;
+// };
+
+// inline type declaration (b).
+// --------------------------------------------
+// let h: num -> num = (a) => {
+//   return a + 1;
+// };
+
+// let x: int = 1;

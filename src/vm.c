@@ -29,9 +29,9 @@ void vmRuntimeError(const char* format, ...) {
   fputs("\n", stderr);
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
-    CallFrame* frame = &vm.frames[i];
-    ObjFunction* function = frame->closure->function;
-    size_t instruction = frame->ip - function->chunk.code - 1;
+    vm.frame = &vm.frames[i];
+    ObjFunction* function = vm.frame->closure->function;
+    size_t instruction = vm.frame->ip - function->chunk.code - 1;
     fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
     if (function->name == NULL) {
       fprintf(stderr, "script\n");
@@ -44,12 +44,24 @@ void vmRuntimeError(const char* format, ...) {
 }
 
 void initClasses(Classes* classes) {
+  classes->base = NULL;
   classes->object = NULL;
+  classes->tuple = NULL;
   classes->sequence = NULL;
   classes->iterator = NULL;
+  classes->typeEnv = NULL;
   classes->astNode = NULL;
   classes->astClosure = NULL;
   classes->astSignature = NULL;
+  classes->vTypeBool = NULL;
+  classes->vTypeNil = NULL;
+  classes->vTypeNumber = NULL;
+  classes->vTypeUndef = NULL;
+  classes->oTypeClass = NULL;
+  classes->oTypeInstance = NULL;
+  classes->oTypeString = NULL;
+  classes->oTypeClosure = NULL;
+  classes->oTypeSequence = NULL;
 }
 
 bool initVM() {
@@ -64,6 +76,7 @@ bool initVM() {
   vm.grayStack = NULL;
 
   initMap(&vm.globals);
+  initMap(&vm.typeEnv);
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
@@ -169,6 +182,9 @@ static bool vmExtendClass(ObjClass* subclass, ObjClass* superclass) {
 static bool vmInstantiateClass(ObjClass* klass, int argCount) {
   Value initializer;
 
+  mapSet(&AS_INSTANCE(vmPeek(argCount))->fields, OBJ_VAL(intern(S_CLASS)),
+         OBJ_VAL(klass));
+
   if (mapGet(&klass->fields, OBJ_VAL(intern(S_INIT)), &initializer)) {
     return vmCallValue(initializer, argCount);
   } else if (argCount != 0) {
@@ -196,7 +212,7 @@ static bool checkArity(int paramCount, int argCount) {
 }
 
 // Collapse [argCount] - [arity] + 1 arguments into a final
-// sequence argument.
+// [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
   vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
@@ -252,10 +268,10 @@ static bool call(ObjClosure* closure, int argCount) {
     return false;
   }
 
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = vm.stackTop - argCount - 1;
+  vm.frame = &vm.frames[vm.frameCount++];
+  vm.frame->closure = closure;
+  vm.frame->ip = closure->function->chunk.code;
+  vm.frame->slots = vm.stackTop - argCount - 1;
 
   return true;
 }
@@ -381,7 +397,8 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   int intIdx = AS_NUMBER(idx);
 
   if (intIdx > seq->values.count - 1 || intIdx < 0) {
-    vmRuntimeError("Index %i out of bounds [0:%i]", intIdx, seq->values.count);
+    vmRuntimeError("Index %i out of bounds for sequence (length %i).", intIdx,
+                   seq->values.count);
     return false;
   }
 
@@ -403,7 +420,9 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
 // middle of interpretation without overflowing its scope, we can
 // let [baseFrame] = the current frame.
 InterpretResult vmExecute(int baseFrame) {
-  CallFrame* frame = &vm.frames[vm.frameCount - 1];
+  vm.frame = &vm.frames[vm.frameCount - 1];
+
+  CallFrame* frame = vm.frame;
 
   for (;;) {
     if (vm.frameCount == baseFrame) return INTERPRET_OK;
@@ -463,6 +482,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
         mapSet(&vm.globals, name, vmPeek(0));
+        mapSet(&vm.typeEnv, name, NIL_VAL);
         vmPop();
         break;
       }
@@ -812,7 +832,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         // otherwise fall back to property access.
         uint32_t hash;
-        if (!vmHashValue(key, &hash)) return false;
+        if (!vmHashValue(key, &hash)) return INTERPRET_RUNTIME_ERROR;
 
         Value value;
         if (mapGetHash(&instance->fields, key, &value, hash)) {
@@ -858,7 +878,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         // otherwise fall back to property access.
         uint32_t hash;
-        if (!vmHashValue(vmPeek(1), &hash)) return false;
+        if (!vmHashValue(vmPeek(1), &hash)) return INTERPRET_RUNTIME_ERROR;
 
         mapSetHash(&instance->fields, vmPeek(1), vmPeek(0), hash);
         // leave the object on the stack.
@@ -869,7 +889,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_DESTRUCTURE: {
         Value value = vmPeek(0);
 
-        switch (value.type) {
+        switch (value.vType) {
           case VAL_OBJ: {
             switch (OBJ_TYPE(value)) {
               case OBJ_CLOSURE: {
@@ -887,6 +907,23 @@ InterpretResult vmExecute(int baseFrame) {
           default:
             vmRuntimeError("Undestructurable value.");
             return INTERPRET_RUNTIME_ERROR;
+        }
+        break;
+      }
+      case OP_SET_TYPE_LOCAL: {
+        uint8_t slot = READ_SHORT();
+        Value value = frame->slots[slot];
+        uint32_t hash;
+        if (!vmHashValue(value, &hash)) return INTERPRET_RUNTIME_ERROR;
+        mapSetHash(&frame->closure->typeEnv, value, vmPeek(0), hash);
+        break;
+      }
+      case OP_SET_TYPE_GLOBAL: {
+        Value name = READ_CONSTANT();
+        if (mapSet(&vm.typeEnv, name, vmPeek(0))) {
+          mapDelete(&vm.typeEnv, name);
+          vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
+          return INTERPRET_RUNTIME_ERROR;
         }
         break;
       }

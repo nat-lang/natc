@@ -78,7 +78,7 @@ static void blackenObject(Obj* object) {
   printf("\n");
 #endif
 
-  switch (object->type) {
+  switch (object->oType) {
     case OBJ_BOUND_METHOD: {
       ObjBoundMethod* bound = (ObjBoundMethod*)object;
       markValue(bound->receiver);
@@ -95,6 +95,7 @@ static void blackenObject(Obj* object) {
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
+      markMap(&closure->typeEnv);
       for (int i = 0; i < closure->upvalueCount; i++) {
         markObject((Obj*)closure->upvalues[i]);
       }
@@ -136,7 +137,7 @@ static void freeObject(Obj* object) {
   printf("%p free type %d\n", (void*)object, object->type);
 #endif
 
-  switch (object->type) {
+  switch (object->oType) {
     case OBJ_BOUND_METHOD:
       FREE(ObjBoundMethod, object);
       break;
@@ -149,6 +150,7 @@ static void freeObject(Obj* object) {
     }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
+      freeMap(&closure->typeEnv);
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
       FREE(ObjClosure, object);
       break;
@@ -204,6 +206,7 @@ static void markRoots() {
     markObject((Obj*)upvalue);
   }
   markMap(&vm.globals);
+  markMap(&vm.typeEnv);
   markMap(&vm.infixes);
   markCompilerRoots();
 }
