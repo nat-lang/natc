@@ -8,6 +8,6 @@ class Hashable {
 
 let h = Hashable(1);
 
-h[h] = 1;
-assert(h[h] == 1);
+h[h] = 2;
+assert(h[h] == 2);
 

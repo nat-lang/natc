@@ -25,6 +25,7 @@ typedef struct {
   ObjClass* object;
   ObjClass* tuple;
   ObjClass* sequence;
+  ObjClass* iterator;
   ObjClass* astNode;
   ObjClass* astClosure;
   ObjClass* astSignature;
@@ -74,10 +75,9 @@ InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
-bool vmInitInstance(ObjClass* klass, int argCount);
-bool vmExecuteMethod(char* method, int argCount);
+bool vmInitInstance(ObjClass* klass, int argCount, int frames);
+bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
-bool vmValidateHashable(Value value);
 bool vmCallValue(Value value, int argCount);
 void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
 

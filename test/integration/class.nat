@@ -3,7 +3,7 @@
 
 class A {}
 
-assert(A.__superclass__ == __obj__);
+assert(A.__superclass__ == Object);
 
 let a = A();
 a.first = 1;

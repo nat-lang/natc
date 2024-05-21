@@ -16,7 +16,12 @@ class Sequential extends Object {
     return true;
   }
 
-  __in__(value) => value in this.values;
+  __in__(value) => {
+    for (x in this)
+      if (value == x) return true;
+
+    return false;
+  }
 
   __iter__() => Iterator(this, 0, len(this));
 
@@ -51,5 +56,3 @@ class Sequence extends Sequential {
 
   add(*elements) => this.extend(elements);
 }
-
-let infix(6) ++ = (a, b) => a.concat(b);
