@@ -73,22 +73,52 @@ assert(gType.range is TVar);
 
 // inline type declaration (a).
 // --------------------------------------------
+let x: num = 1;
+
+f : num -> num;
+f = (a) => a;
+
+check = typecheck(() => { f(x); });
+assert(check.unified());
+
 let h: num -> num = (a) => {
   return a + 1;
 };
 
-let g: num -> num;
-
 env = globalTypeEnv();
-
 assert(env["h"] == num -> num);
+
+check = typecheck(() => {
+  let a = 1;
+  return h(a);
+});
+assert(check.unified() == true);
+
+check = typecheck(() => {
+  let a = true;
+  return h(a);
+});
+assert(check.unified() == false);
+
+// uninitialized.
+let g: num -> num;
+env = globalTypeEnv();
 assert(env["g"] == num -> num);
+
+check = typecheck(() => {
+  let a = 1;
+  return g(a);
+});
+assert(check.unified() == true);
+
+check = typecheck(() => {
+  let a = true;
+  return g(a);
+});
+assert(check.unified() == false);
 
 // inline type declaration (b).
 // --------------------------------------------
 // let g = (a: num): num => {
 //   return a + 1;
 // };
-
-
-// let x: int = 1;
