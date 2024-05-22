@@ -3,8 +3,8 @@
 
 let f <- (a) => 1;
 
-assert(type(f.signature) == ASTSignature);
-assert(f.signature.parameters[1] == "a");
+assert(f.typeEnv is TypeEnv);
+assert(type(f.function) == TFunction);
 
 // explicit and implicit returns.
 assert(len(f.children) == 2);

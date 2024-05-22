@@ -62,16 +62,11 @@ class ASTApp extends ASTExpr {
   }
 }
 
-class ASTSignature extends Object {
-  init(parameters) => {
-    this.parameters = parameters;
-  }
-}
-
 class ASTClosure extends ASTExpr {
-  init(signature) => {
+  init(function, typeEnv) => {
     super.init();
-    this.signature = signature;
+    this.function = function;
+    this.typeEnv = typeEnv;
     this.children = [];
   }
 

@@ -16,16 +16,15 @@ static bool initInstance(ObjClass* klass, int argCount) {
   return vmInitInstance(klass, argCount, 1);
 }
 
-bool closureInstance(ObjMap signature) {
+bool closureInstance(ObjClosure* closure) {
   vmPush(OBJ_VAL(vm.classes.astClosure));
-  vmPush(OBJ_VAL(vm.classes.astSignature));
-  vmPush(OBJ_VAL(vm.classes.object));
+  vmPush(OBJ_VAL(closure));
+  vmPush(OBJ_VAL(vm.classes.typeEnv));
 
-  if (!initInstance(vm.classes.object, 0)) return false;
-  mapAddAll(&signature, &AS_INSTANCE(vmPeek(0))->fields);
+  if (!initInstance(vm.classes.typeEnv, 0)) return false;
+  mapAddAll(&closure->typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
 
-  if (!initInstance(vm.classes.astSignature, 1)) return false;
-  return initInstance(vm.classes.astClosure, 1);
+  return initInstance(vm.classes.astClosure, 2);
 }
 
 // Read the syntax tree of [closure] off the tape.
@@ -36,7 +35,7 @@ bool readAST(ObjClosure* closure) {
 #endif
 
   // the root of the tree.
-  if (!closureInstance(closure->function->signature)) return false;
+  if (!closureInstance(closure)) return false;
 
   Value root = vmPeek(0);
 

@@ -29,9 +29,8 @@ typedef struct {
   ObjClass* iterator;
 
   ObjClass* typeEnv;
-  ObjClass* astNode;
+
   ObjClass* astClosure;
-  ObjClass* astSignature;
 
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;

@@ -401,9 +401,7 @@ InterpretResult initializeCore() {
 
   vm.classes.iterator = getClass(S_ITERATOR);
   vm.classes.typeEnv = getClass(S_TYPE_ENV);
-  vm.classes.astNode = getClass(S_AST_NODE);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
-  vm.classes.astSignature = getClass(S_AST_SIGNATURE);
 
   vm.classes.vTypeBool = getClass(S_CTYPE_BOOL);
   vm.classes.vTypeNil = getClass(S_CTYPE_NIL);

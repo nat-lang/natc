@@ -127,6 +127,7 @@ let type = (value) => {
   if (vmType == OString) return string; 
   if (vmType == OInstance) return value.__class__;
   if (vmType == OClass) return tClass;
+  if (vmType == OClosure) return TFunction;
 };
 
 class TypeState {

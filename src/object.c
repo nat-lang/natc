@@ -66,7 +66,6 @@ ObjFunction* newFunction() {
   function->variadic = false;
   initChunk(&function->chunk);
   initMap(&function->constants);
-  initMap(&function->signature);
   return function;
 }
 
@@ -166,14 +165,6 @@ ObjUpvalue* newUpvalue(Value* slot) {
   upvalue->closed = NIL_VAL;
   upvalue->next = NULL;
   return upvalue;
-}
-
-static void printFunction(ObjFunction* function) {
-  if (function->name == NULL) {
-    printf("<script>");
-  } else {
-    printf("<fn %s>", function->name->chars);
-  }
 }
 
 void initMap(ObjMap* map) {
@@ -385,16 +376,20 @@ bool objectsEqual(Obj* a, Obj* b) {
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_BOUND_METHOD:
-      printFunction(AS_BOUND_METHOD(value)->method->function);
+      printf("<bound %s at %p>",
+             AS_BOUND_METHOD(value)->method->function->name->chars,
+             AS_BOUND_METHOD(value));
       break;
     case OBJ_CLASS:
       printf("<%s class>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
-      printFunction(AS_CLOSURE(value)->function);
+      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
+             AS_CLOSURE(value));
       break;
     case OBJ_FUNCTION:
-      printFunction(AS_FUNCTION(value));
+      printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,
+             AS_FUNCTION(value));
       break;
     case OBJ_INSTANCE:
       printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
@@ -404,7 +399,7 @@ void printObject(Value value) {
       printMap(AS_MAP(value));
       break;
     case OBJ_NATIVE:
-      printf("<fn %s>", AS_NATIVE(value)->name->chars);
+      printf("<native %s>", AS_NATIVE(value)->name->chars);
       break;
     case OBJ_STRING:
       printf("%s", AS_CSTRING(value));
