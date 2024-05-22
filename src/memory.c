@@ -122,7 +122,6 @@ static void blackenObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
       markArray(&function->chunk.constants);
-      markMap(&function->signature);
       break;
     }
     case OBJ_MAP: {
@@ -167,7 +166,6 @@ static void freeObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
       freeMap(&function->constants);
-      freeMap(&function->signature);
       FREE(ObjFunction, object);
       break;
     }

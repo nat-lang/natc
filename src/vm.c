@@ -50,9 +50,7 @@ void initClasses(Classes* classes) {
   classes->sequence = NULL;
   classes->iterator = NULL;
   classes->typeEnv = NULL;
-  classes->astNode = NULL;
   classes->astClosure = NULL;
-  classes->astSignature = NULL;
   classes->vTypeBool = NULL;
   classes->vTypeNil = NULL;
   classes->vTypeNumber = NULL;
@@ -328,19 +326,14 @@ bool vmCallValue(Value callee, int argCount) {
   return false;
 }
 
-//
-static bool getObjectProperty(ObjMap fields, Value name, Value* value) {
-  if (mapGet(&fields, name, value)) {
-    if (IS_CLOSURE(*value)) {
-      ObjBoundFunction* obj = newBoundMethod(vmPeek(0), AS_CLOSURE(*value));
-      *value = OBJ_VAL(obj);
-    } else if (IS_NATIVE(*value)) {
-      ObjBoundFunction* obj = newBoundNative(vmPeek(0), AS_NATIVE(*value));
-      *value = OBJ_VAL(obj);
-    }
-    return true;
+static void bindClosure(Value receiver, Value* value) {
+  if (IS_CLOSURE(*value)) {
+    ObjBoundFunction* obj = newBoundMethod(vmPeek(0), AS_CLOSURE(*value));
+    *value = OBJ_VAL(obj);
+  } else if (IS_NATIVE(*value)) {
+    ObjBoundFunction* obj = newBoundNative(vmPeek(0), AS_NATIVE(*value));
+    *value = OBJ_VAL(obj);
   }
-  return false;
 }
 
 static ObjUpvalue* captureUpvalue(Value* local) {
@@ -516,8 +509,12 @@ InterpretResult vmExecute(int baseFrame) {
         if (IS_INSTANCE(vmPeek(0))) {
           ObjInstance* instance = AS_INSTANCE(vmPeek(0));
 
-          if (!getObjectProperty(instance->fields, name, &value))
-            getObjectProperty(instance->klass->fields, name, &value);
+          if (!mapGet(&instance->fields, name, &value)) {
+            // class prop. must be a method.
+            if (mapGet(&instance->klass->fields, name, &value))
+              bindClosure(vmPeek(0), &value);
+          }
+
           vmPop();  // instance.
           vmPush(value);
           break;
@@ -526,7 +523,8 @@ InterpretResult vmExecute(int baseFrame) {
         if (IS_CLASS(vmPeek(0))) {
           ObjClass* klass = AS_CLASS(vmPeek(0));
 
-          getObjectProperty(klass->fields, name, &value);
+          mapGet(&klass->fields, name, &value);
+          bindClosure(vmPeek(0), &value);
           vmPop();  // class.
           vmPush(value);
           break;
@@ -581,8 +579,9 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-        getObjectProperty(AS_CLASS(vmPeek(0))->fields, name, &value);
-        vmPop();  // super;
+        mapGet(&AS_CLASS(vmPeek(0))->fields, name, &value);
+        bindClosure(vmPeek(0), &value);
+        vmPop();  // superclass;
         vmPush(value);
 
         break;
@@ -929,7 +928,10 @@ InterpretResult vmExecute(int baseFrame) {
         Value value = frame->slots[slot];
         uint32_t hash;
         if (!vmHashValue(value, &hash)) return INTERPRET_RUNTIME_ERROR;
-        mapSetHash(&frame->closure->typeEnv, value, vmPeek(0), hash);
+        if (!mapSetHash(&frame->closure->typeEnv, value, vmPeek(0), hash)) {
+          vmRuntimeError("Value already has a type annotation.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
         break;
       }
       case OP_SET_TYPE_GLOBAL: {

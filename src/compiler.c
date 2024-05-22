@@ -849,8 +849,6 @@ static void function(FunctionType type, Token name) {
 
       uint16_t constant = parseVariable("Expect parameter name.");
       defineVariable(constant);
-      mapSet(&current->function->signature, NUMBER_VAL(constant),
-             identifierToken(current->locals[constant].name));
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
@@ -1255,6 +1253,7 @@ static void letDeclaration() {
   }
 
   uint16_t var = parseVariable("Expect variable name.");
+  Token name = parser.previous;
   emitByte(OP_UNDEFINED);
   defineVariable(var);
 

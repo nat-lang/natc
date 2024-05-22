@@ -74,7 +74,6 @@ typedef struct {
   // cache from values to constant indices
   // in the function's chunk.constants.
   ObjMap constants;
-  ObjMap signature;
 } ObjFunction;
 
 typedef bool (*NativeFn)(int argCount, Value *args);
