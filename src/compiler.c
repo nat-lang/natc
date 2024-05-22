@@ -22,15 +22,16 @@ typedef struct {
 
 typedef enum {
   PREC_NONE,
-  PREC_ASSIGNMENT,  // =
-  PREC_OR,          // or
-  PREC_AND,         // and
-  PREC_EQUALITY,    // == !=
-  PREC_COMPARISON,  // < > <= >=
-  PREC_TERM,        // + -
-  PREC_FACTOR,      // * /
-  PREC_UNARY,       // ! -
-  PREC_CALL,        // . ()
+  PREC_ASSIGNMENT,   // =
+  PREC_INLINE_TYPE,  // : _ =
+  PREC_OR,           // or
+  PREC_AND,          // and
+  PREC_EQUALITY,     // == !=
+  PREC_COMPARISON,   // < > <= >=
+  PREC_TERM,         // + -
+  PREC_FACTOR,       // * /
+  PREC_UNARY,        // ! -
+  PREC_CALL,         // . ()
   PREC_PRIMARY
 } Precedence;
 
@@ -297,22 +298,7 @@ static void patchJump(int offset) {
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
-static ObjString* functionName(FunctionType type, char* name) {
-  switch (type) {
-    case TYPE_INITIALIZER:
-    case TYPE_METHOD:
-      return copyString(parser.previous.start, parser.previous.length);
-    case TYPE_BOUND:
-      return copyString(parser.penult.start, parser.penult.length);
-    case TYPE_ANONYMOUS:
-      return copyString("lambda", 6);
-    case TYPE_SCRIPT:
-    default:
-      return intern(name);
-  }
-}
-
-static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
+static void initCompiler(Compiler* compiler, FunctionType type, Token name) {
   compiler->enclosing = current;
   compiler->function = NULL;
   compiler->function = newFunction();
@@ -321,7 +307,7 @@ static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
   compiler->scopeDepth = 0;
 
   current = compiler;
-  current->function->name = functionName(type, name);
+  current->function->name = copyString(name.start, name.length);
 
   for (int i = 0; i < UINT8_COUNT; i++) {
     compiler->locals[i].depth = 0;
@@ -376,17 +362,15 @@ static void endScope() {
   }
 }
 
-static void function(FunctionType type);
+static void function(FunctionType type, Token name);
 static void expression();
-static void boundExpression();
+static void boundExpression(Token name);
 static void statement();
 static void declaration();
 static void classDeclaration();
 static ParseRule* getRule(Token token);
 static void parseDelimitedPrecedence(Precedence precedence, DelimitFn fn);
 static void parsePrecedence(Precedence precedence);
-
-static Value identifier(char* name) { return INTERN(name); }
 
 static Value identifierToken(Token token) {
   return OBJ_VAL(copyString(token.start, token.length));
@@ -495,7 +479,7 @@ static void defineType(int var) {
 }
 
 static uint16_t nativeVariable(char* name) {
-  uint16_t var = makeConstant(identifier(name));
+  uint16_t var = makeConstant(INTERN(name));
   emitConstInstr(OP_GET_GLOBAL, var);
   return var;
 }
@@ -670,7 +654,7 @@ static int nativeCall(char* name, int argCount) {
 }
 
 static void methodCall(char* name, int argCount) {
-  Value method = identifier(name);
+  Value method = INTERN(name);
   uint16_t constant = makeConstant(method);
   emitConstInstr(OP_INVOKE, constant);
   emitByte(argCount);
@@ -789,28 +773,34 @@ static bool peekSignature() {
   return found;
 }
 
-static bool tryFunction(FunctionType fnType) {
+static bool tryFunction(FunctionType fnType, Token name) {
   if (peekSignature()) {
-    function(fnType);
+    function(fnType, name);
     return true;
   }
   return false;
 }
 
-static void boundExpression() {
-  if (tryFunction(TYPE_BOUND)) return;
+static void boundExpression(Token name) {
+  if (tryFunction(TYPE_BOUND, name)) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
 
 static void whiteDelimitedExpression() {
-  if (tryFunction(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS, newToken("lambda", 6))) return;
 
   parseDelimitedPrecedence(PREC_ASSIGNMENT, prevWhite);
 }
 
+void inlineTypeExpression() {
+  if (tryFunction(TYPE_ANONYMOUS, newToken("lambda", 6))) return;
+
+  parsePrecedence(PREC_INLINE_TYPE);
+}
+
 static void expression() {
-  if (tryFunction(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS, newToken("lambda", 6))) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -833,9 +823,9 @@ static void blockOrExpression() {
   }
 }
 
-static void function(FunctionType type) {
+static void function(FunctionType type, Token name) {
   Compiler compiler;
-  initCompiler(&compiler, type, NULL);
+  initCompiler(&compiler, type, name);
 
   beginScope();
 
@@ -881,12 +871,13 @@ static void method() {
   consume(TOKEN_IDENTIFIER, "Expect method name.");
   uint16_t constant = identifierConstant(&parser.previous);
   FunctionType type = TYPE_METHOD;
+
   if (parser.previous.length == 4 &&
       memcmp(parser.previous.start, S_INIT, 4) == 0) {
     type = TYPE_INITIALIZER;
   }
 
-  function(type);
+  function(type, parser.previous);
   emitConstInstr(OP_METHOD, constant);
 
   if (!prev(TOKEN_RIGHT_BRACE)) {
@@ -1130,7 +1121,7 @@ static void braces(bool canAssign) {
     // otherwise it's a map: backpatch the class.
     // TODO: now that we have a postfix operation, we should
     // use that here instead of backpatching.
-    currentChunk()->constants.values[klass] = identifier("Map");
+    currentChunk()->constants.values[klass] = INTERN("Map");
 
     // finish the first key/val pair, then any remaining elements.
     finishMapVal();
@@ -1168,7 +1159,7 @@ static void brackets(bool canAssign) {
     }
   } else {
     // it's a tree.
-    currentChunk()->constants.values[klass] = identifier("Tree");
+    currentChunk()->constants.values[klass] = INTERN("Tree");
     methodCall("addChild", 1);
 
     // and it may have branches.
@@ -1268,14 +1259,17 @@ static void letDeclaration() {
   defineVariable(var);
 
   if (match(TOKEN_COLON)) {
-    expression();
+    inlineTypeExpression();
     defineType(var);
-    consume(TOKEN_SEMICOLON, "Expect ';' after type declaration.");
-    return;
+
+    if (check(TOKEN_SEMICOLON)) {
+      advance();
+      return;
+    }
   }
 
   if (match(TOKEN_EQUAL)) {
-    boundExpression();
+    boundExpression(name);
   } else if (match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
@@ -1558,7 +1552,7 @@ static void parseDelimitedPrecedence(Precedence precedence, DelimitFn delimit) {
   ParseFn prefixRule = getRule(parser.previous)->prefix;
 
   if (prefixRule == NULL) {
-    error("Expect expression.");
+    error("Expect expression (1).");
     return;
   }
 
@@ -1571,7 +1565,7 @@ static void parseDelimitedPrecedence(Precedence precedence, DelimitFn delimit) {
     ParseFn infixRule = getRule(parser.previous)->infix;
 
     if (infixRule == NULL) {
-      error("Expect expression.");
+      error("Expect expression (2).");
       return;
     }
 
@@ -1592,7 +1586,7 @@ ObjFunction* compile(const char* source, char* path) {
   initParser(sc);
 
   Compiler compiler;
-  initCompiler(&compiler, TYPE_SCRIPT, path);
+  initCompiler(&compiler, TYPE_SCRIPT, newToken(path, strlen(path)));
 
   while (!match(TOKEN_EOF)) {
     declaration();
