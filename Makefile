@@ -52,7 +52,7 @@ tests:
 
 # Compile with debugging enabled, sign the binary, and create a symbol map
 # before running leaks against the integration tests.
-leaks:
+test-leaks:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 	@ codesign -s - --entitlements $(BUILD_DIR)/nat.entitlements -f build/nat
 	@ dsymutil build/nat
@@ -60,8 +60,9 @@ leaks:
 
 # Run valgrind against the integration tests.
 test-valgrind:
+	@ $(MAKE) clean
 	@ $(MAKE) debug
-	@ valgrind --leak-check=full --track-origins=yes --error-exitcode=1 -s build/nat test/integration/__index__
+	@ valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=1 -s build/nat test/integration/__index__
 
 # Run valgrind against the integration tests in a container.
 valgrind:

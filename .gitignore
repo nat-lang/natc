@@ -3,5 +3,6 @@ build/**/*
 !build/Dockerfile
 !build/Dockerfile.valgrind
 !build/c.make
+!build/nat.entitlements
 
 **/*/.DS_Store
