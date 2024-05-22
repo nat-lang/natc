@@ -6,8 +6,12 @@ on:
       - '**'
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       - name: Build
@@ -18,9 +22,15 @@ jobs:
         run: make regression
       - name: Run trip tests
         run: make trip
-      - name: Run valgrind
-        run: make valgrind
-      - name: Run garbage collection stress
+      - name: Run integration tests against valgrind
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update && sudo apt install -y valgrind
+          make test-valgrind
+      - name: Run integration tests against leaks
+        if: matrix.os == 'macos-latest'
+        run: make test-leaks
+      - name: Stress the garbage collector
         run: |
           sudo make clean
           make debug-stress-gc
