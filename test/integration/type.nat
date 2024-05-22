@@ -73,14 +73,22 @@ assert(gType.range is TVar);
 
 // inline type declaration (a).
 // --------------------------------------------
+let h: num -> num = (a) => {
+  return a + 1;
+};
+
+let g: num -> num;
+
+env = globalTypeEnv();
+
+assert(env["h"] == num -> num);
+assert(env["g"] == num -> num);
+
+// inline type declaration (b).
+// --------------------------------------------
 // let g = (a: num): num => {
 //   return a + 1;
 // };
 
-// inline type declaration (b).
-// --------------------------------------------
-// let h: num -> num = (a) => {
-//   return a + 1;
-// };
 
 // let x: int = 1;

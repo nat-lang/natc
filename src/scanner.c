@@ -20,6 +20,14 @@ void initToken(Token *token) {
   token->line = -1;
 }
 
+Token newToken(char *start, int length) {
+  Token token;
+  initToken(&token);
+  token.start = start;
+  token.length = length;
+  return token;
+}
+
 void printScanner(Scanner sc) {
   fprintf(stderr, "(scanner current): %s\n", scanner.current);
 }
