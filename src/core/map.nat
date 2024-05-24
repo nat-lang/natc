@@ -9,6 +9,16 @@ class Map extends Object {
     return true;
   }
 
+  // Find the first key for which [predicate] is true
+  // and return its value.
+  find(predicate) => {
+    for (key in this.keys()) {
+      if (predicate(key)) {
+        return this[key];
+      }
+    }
+  }
+
   __eq__(other) => {
     if (len(this) != len(other)) return false;
 

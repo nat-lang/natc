@@ -266,18 +266,20 @@ bool __vType__(int argCount, Value* args) {
   return true;
 }
 
-bool __localTypeEnv__(int argCount, Value* args) {
+bool __globals__(int argCount, Value* args) {
   vmPop();  // native fn.
-  vmPush(OBJ_VAL(newInstance(vm.classes.typeEnv)));
-  initInstance(vm.classes.typeEnv, 0);
-  mapAddAll(&vm.frame->closure->typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
+
+  vmPush(OBJ_VAL(vm.classes.map));
+  initInstance(vm.classes.map, 0);
+  mapAddAll(&vm.globals, &AS_INSTANCE(vmPeek(0))->fields);
+
   return true;
 }
 
 bool __globalTypeEnv__(int argCount, Value* args) {
   vmPop();  // native fn.
-  vmPush(OBJ_VAL(newInstance(vm.classes.typeEnv)));
-  initInstance(vm.classes.typeEnv, 0);
+  vmPush(OBJ_VAL(newInstance(vm.classes.map)));
+  initInstance(vm.classes.map, 0);
   mapAddAll(&vm.typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
   return true;
 }
@@ -364,7 +366,7 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);
   defineNativeFnGlobal("vType", 1, __vType__);
-  defineNativeFnGlobal("localTypeEnv", 0, __localTypeEnv__);
+  defineNativeFnGlobal("globals", 0, __globals__);
   defineNativeFnGlobal("globalTypeEnv", 0, __globalTypeEnv__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
@@ -399,8 +401,9 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.classes.sequence);
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.classes.sequence);
 
+  vm.classes.map = getClass(S_MAP);
+  vm.classes.set = getClass(S_SET);
   vm.classes.iterator = getClass(S_ITERATOR);
-  vm.classes.typeEnv = getClass(S_TYPE_ENV);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
 
   vm.classes.vTypeBool = getClass(S_CTYPE_BOOL);

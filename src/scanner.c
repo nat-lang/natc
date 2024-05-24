@@ -217,7 +217,7 @@ static Token identifier() {
   return makeToken(identifierType());
 }
 
-Token dottedIdentifier() {
+Token slashedIdentifier() {
   while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
   return scanner.current == scanner.start ? errorToken("Unexpected character.")
                                           : makeToken(TOKEN_IDENTIFIER);

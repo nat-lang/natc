@@ -164,9 +164,9 @@ static void advance() {
   checkError();
 }
 
-static void advanceDottedIdentifier() {
+static void advanceSlashedIdentifier() {
   shiftParser();
-  parser.next = dottedIdentifier();
+  parser.next = slashedIdentifier();
   checkError();
 }
 
@@ -748,6 +748,10 @@ static bool peekSignature() {
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       consumeQuietly(TOKEN_IDENTIFIER);
+      if (check(TOKEN_COLON)) {
+        advance();
+        expression();
+      }
     } while (match(TOKEN_COMMA));
   }
   consumeQuietly(TOKEN_RIGHT_PAREN);
@@ -836,6 +840,16 @@ static void function(FunctionType type, Token name) {
 
       uint16_t constant = parseVariable("Expect parameter name.");
       defineVariable(constant);
+
+      // type annotations for parameters default to nil.
+      if (check(TOKEN_COLON)) {
+        advance();
+        expression();
+      } else {
+        emitByte(OP_NIL);
+      }
+      defineType(constant);
+
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
@@ -1075,7 +1089,7 @@ static void finishSetVal() {
 
 // A map literal, set literal, or set comprehension.
 static void braces(bool canAssign) {
-  int klass = nativeCall("Set", 0);
+  int klass = nativeCall(S_SET, 0);
 
   // empty braces is an empty set.
   if (check(TOKEN_RIGHT_BRACE)) return advance();
@@ -1106,7 +1120,7 @@ static void braces(bool canAssign) {
     // otherwise it's a map: backpatch the class.
     // TODO: now that we have a postfix operation, we should
     // use that here instead of backpatching.
-    currentChunk()->constants.values[klass] = INTERN("Map");
+    currentChunk()->constants.values[klass] = INTERN(S_MAP);
 
     // finish the first key/val pair, then any remaining elements.
     finishMapVal();
@@ -1245,13 +1259,10 @@ static void letDeclaration() {
 
   if (match(TOKEN_COLON)) {
     inlineTypeExpression();
-    defineType(var);
-
-    if (check(TOKEN_SEMICOLON)) {
-      advance();
-      return;
-    }
+  } else {
+    emitByte(OP_NIL);
   }
+  defineType(var);
 
   if (match(TOKEN_EQUAL)) {
     boundExpression(name);
@@ -1373,7 +1384,7 @@ static void ifStatement() {
 }
 
 static void importStatement() {
-  advanceDottedIdentifier();
+  advanceSlashedIdentifier();
   consume(TOKEN_IDENTIFIER, "Expect path to import.");
   advance();
   bareString();

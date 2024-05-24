@@ -13,4 +13,9 @@ class Object extends Base {
   
     return Iterator(entries, 0, len(entries));
   }
+
+  extend(other: Object) => {
+    for (x in other)
+      this[x[0]] = x[1];
+  }
 }

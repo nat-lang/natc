@@ -3,7 +3,8 @@
 
 let f <- (a) => 1;
 
-assert(f.typeEnv is TypeEnv);
+assert(f.name == "lambda");
+assert(type(f.signature) == ASTSignature);
 assert(type(f.function) == TFunction);
 
 // explicit and implicit returns.
@@ -36,7 +37,6 @@ assert(type(f[1][0]) == ASTLiteral);
 assert(f[1][0].data == nil);
 
 // constant function to local.
-
 f <- (a) => a;
 
 // explicit and implicit returns.
@@ -113,5 +113,4 @@ f <- (g) => {
   let a = 1;
   return a;
 };
-
-assert(len(f.children) == 3);
+assert(len(f.children) == 4);
