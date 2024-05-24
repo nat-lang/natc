@@ -48,7 +48,7 @@ ObjClass* defineNativeClass(char* name) {
 }
 
 bool __sequentialInit__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+  ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
 
   vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();

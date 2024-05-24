@@ -639,6 +639,12 @@ static int nativeCall(char* name, int argCount) {
   return address;
 }
 
+static int nativePostfix(char* name, int argCount) {
+  int address = nativeVariable(name);
+  emitBytes(OP_CALL_POSTFIX, argCount);
+  return address;
+}
+
 static void methodCall(char* name, int argCount) {
   Value method = INTERN(name);
   uint16_t constant = makeConstant(method);
@@ -1007,10 +1013,10 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   return checkpointB;
 }
 
-// Find an occurance of '|' that isn't nested within
+// Find an occurance of [type] that isn't nested within
 // braces or brackets, given some [initialBraceDepth]
 // and [initialBracketDepth].
-bool advanceToPipe(int initialBraceDepth, int initialBracketDepth) {
+bool findToken(int initialBraceDepth, int initialBracketDepth, TokenType type) {
   int braceDepth = initialBraceDepth;
   int bracketDepth = initialBracketDepth;
 
@@ -1026,7 +1032,7 @@ bool advanceToPipe(int initialBraceDepth, int initialBracketDepth) {
     nested = (braceDepth > initialBraceDepth) ||
              (bracketDepth > initialBracketDepth);
 
-    if (check(TOKEN_PIPE) && !nested) return true;
+    if (check(type) && !nested) return true;
 
     if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1)
       return false;
@@ -1041,7 +1047,7 @@ static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
                              int initialBracketDepth) {
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe(initialBraceDepth, initialBracketDepth)) {
+  if (findToken(initialBraceDepth, initialBracketDepth, TOKEN_PIPE)) {
     advance();  // eat the pipe.
 
     // the comprehension instance is on top of the stack now;
@@ -1134,13 +1140,38 @@ static void braces(bool canAssign) {
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
-// A tree literal, sequence literal, or sequence comprehension.
-static void brackets(bool canAssign) {
-  int klass = nativeCall(S_SEQUENCE, 0);
+static bool sequence() {
+  // it's a sequence.
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    nativeCall(S_SEQUENCE, 0);
+    return true;
+  } else if (trySeqComprehension()) {
+    return true;
+  }
+
+  Parser checkpoint = saveParser();
+  if (findToken(0, 1, TOKEN_COMMA)) {
+    gotoParser(checkpoint);
+
+    int elements = 0;
+    do {
+      expression();
+      elements++;
+    } while (match(TOKEN_COMMA));
+    nativePostfix(S_SEQUENCE, elements);
+
+    return true;
+  }
+
+  return false;
+}
+
+void tree() {
+  int elements = 0;
 
   // empty brackets is an empty sequence.
   if (check(TOKEN_RIGHT_BRACKET)) {
-    nativeCall(S_SEQUENCE, 0);
+    nativeCall(S_SEQUENCE, elements);
     advance();
     return;
   }
@@ -1149,28 +1180,38 @@ static void brackets(bool canAssign) {
     return;
   }
 
-  // first datum.
+  // first datum. could be a tree node or a seq element.
   whiteDelimitedExpression();
+  elements++;
 
   // it's a sequence.
   if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    methodCall(S_PUSH, 1);
-
     while (match(TOKEN_COMMA)) {
       expression();
-      methodCall(S_PUSH, 1);
+      elements++;
     }
+
+    nativePostfix(S_SEQUENCE, elements);
   } else {
     // it's a tree.
-    currentChunk()->constants.values[klass] = INTERN("Tree");
-    methodCall("addChild", 1);
 
-    // and it may have branches.
+    // make a node of the first child.
+    nativePostfix(S_TREE, 1);
+
+    // and now subsequent children.
     while (!check(TOKEN_RIGHT_BRACKET)) {
       whiteDelimitedExpression();
-      methodCall("addChild", 1);
+      nativePostfix(S_TREE, 1);
+      elements++;
     }
+
+    nativePostfix(S_TREE, elements);
   }
+}
+
+// A tree literal, sequence literal, or sequence comprehension.
+static void brackets(bool canAssign) {
+  sequence();
 
   consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }

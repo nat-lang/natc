@@ -1,8 +1,8 @@
 
 class Tree extends Object {
-  init() => {
+  init(*children) => {
     this.data = nil;
-    this.children = [];
+    this.children = children;
   }
 
   setData(data) => {
