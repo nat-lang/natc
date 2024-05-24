@@ -39,7 +39,11 @@ class OString extends CObject {}
 class OClosure extends CObject {}
 class OSequence extends CObject {}
 
-class Type {}
+class Type {
+  pp() => {
+    print this;
+  }
+}
 
 class TVar extends Type {
   init(name) => {
@@ -48,13 +52,9 @@ class TVar extends Type {
   hash() => hash(this.name);
   __eq__(other) => this.name == other.name;
 }
+
 class TSum extends Type {}
-class TProduct extends Type {
-  init(elements) => {
-    this.elements = elements;
-  }
-  __eq__(other) => this.elements == other.elements;
-}
+class TProduct extends Tuple {}
 
 class TVoid extends Type {}
 class TBoolean extends Type {}
@@ -62,41 +62,57 @@ class TNumber extends Type {}
 class TString extends Type {}
 class TFunction extends Type {
   init(domain, range) => {
-    if (domain is Tuple)
-      this.domain = TProduct(domain);
-    else
-      this.domain = domain;
+    this.domain = domain;
     this.range = range;
   }
 
   // the subtype relation.
   __eq__(other) => this.domain == other.domain and this.range == other.range;
+
+  pp() => {
+    print this.domain;
+    print this.range;
+  }
 }
 class TClass extends Type {}
 
-class TypeEnv extends Object {
-  apply(constraint) => constraint.apply(this);
-  extend(other) => {
-    for (entry in other)
-      this[entry[0]] = entry[1];
-  }
-}
-
-class Constraint extends Object {
+class Constraint {
   init(left, right) => {
     this.left = left;
     this.right = right;
   }
-  apply(substitution) => {
-    let left = this.left;
-    let right = this.right;
+  substitute(type: Type) => {
+    if (type == this.left)
+      return this.right;
+    return type;
+  }
+}
 
-    for (sub in substitution.entries()) {
-      if (left == sub[0]) left = sub[1];
-      if (right == sub[0]) right = sub[1];
+class Solution extends Map {
+  // fix me
+  // __iter__() => iter([Constraint(e[0], e[1]) | e in this.entries()]);
+
+  __iter__() => {
+    let seq = [];
+    for (x in this.entries())
+      seq.push(Constraint(x[0], x[1]));
+    return iter(seq);
+  }
+
+  apply(c: Constraint) => {
+    for (sub in this) {
+      c.left = sub.substitute(c.left);
+      c.right = sub.substitute(c.right);
     }
 
-    return Constraint(left, right);
+    return c;
+  }
+
+  update(constraint: Constraint) => {
+    if (constraint.left is TVar)
+      this[constraint.left] = constraint.right;
+    else if (constraint.right is TVar)
+      this[constraint.right] = constraint.left;
   }
 }
 
@@ -106,8 +122,12 @@ class NameSupply {
   }
   fresh() => {
     this.next = this.next + 1;
-    return TVar(this.next);
+    return this.next;
   }
+}
+
+class TypeVarSupply extends NameSupply {
+  fresh() => TVar(super.fresh());
 }
 
 let void = TVoid();
@@ -131,31 +151,55 @@ let type = (value) => {
 };
 
 class TypeState {
-  init(exprEnv, typeEnv, names, constraints) => {
-    // env mapping expressions to annotations.
-    this.exprEnv = exprEnv;
-    // env mapping type variables to types.
+  init(typeEnv: Map) => {
+    // map from variables to types.
     this.typeEnv = typeEnv;
     // name supply.
-    this.names = names;
+    this.typeVars = TypeVarSupply();
     // constraint stack.
-    this.constraints = constraints;
+    this.constraints = [];
+    // mgu.
+    this.sigma = Solution();
   }
 
-  lookup(node) => {
-    if (this.exprEnv[node.data])
-      return this.exprEnv[node.data];
+  lookup(node: ASTVar) => {
+    if (!this.typeEnv[node])
+      this.typeEnv[node] = this.typeVars.fresh();
 
-    if (!this.typeEnv[node.data])
-      this.typeEnv[node.data] = this.names.fresh();
-    
-    return this.typeEnv[node.data];
+    return this.typeEnv[node];
   }
 
   constrain(node) => {
     if (node is ASTClosure) {
+      let f = (env: Map, node: ASTLocalTypeAssignment) => {
+        let var = node[0];
+        let val = node[1];
+
+        let pType = val.resolve();
+
+        if (pType == nil)
+          env[var.uuid] = this.typeVars.fresh();
+        else
+          env[var.uuid] = pType;
+
+        return env;
+      };
+  
+      let localEnv = node.signature.params.reduce(f, Map());
+      let params = localEnv.values();
+
+      // this needs to happen in localEnv.
       node.children.map(this.constrain);
-      return this.names.fresh();
+  
+      // type of a constant function? type of return value(s)?
+      if (len(params) == 0)
+        return this.typeVars.fresh();
+      if (len(params) == 1)
+        // fixme:
+        // return params[0] -> this.typeVars.fresh();
+        return TFunction(params[0], this.typeVars.fresh());
+      else
+        return params -> this.typeVars.fresh();
     }
 
     if (node is ASTLiteral)
@@ -168,7 +212,7 @@ class TypeState {
       let tArgs = node.children.map(this.constrain);
 
       if (len(tArgs) > 1)
-        return TProduct(tArgs);
+        return tArgs;
       else
         return tArgs[0];
     }
@@ -180,9 +224,21 @@ class TypeState {
       let tFunc = this.constrain(func);
       let tArgs = this.constrain(args);
 
-      let tApp = this.names.fresh();
+      let tApp = this.typeVars.fresh();
       this.constraints.push(Constraint(tFunc, tArgs -> tApp));
       return tApp;
+    }
+
+    if (node is ASTLocalTypeAssignment) {
+      let var = node[0];
+      let val = node[1];
+
+      if (var.uuid in this.typeEnv)
+        throw TypeError("Variable already has a type annotation.");
+    
+      this.typeEnv[var.uuid] = val.resolve();
+
+      return void;
     }
 
     if (node is ASTAssignment) {
@@ -194,7 +250,7 @@ class TypeState {
 
       this.constraints.push(Constraint(tVar, tVal));
 
-      // this should actually respect a possible user
+      // this should eventually respect a possibly user
       // defined __set__ method that returns something.
       return void;
     }
@@ -209,20 +265,18 @@ class TypeState {
   } 
 
   unify() => {
-    let env = TypeEnv();
     let unsolved = [];
 
+    // fixme:
+    // [Constraint(x.left, x.right) | x in this.constraints];
+    
     while (len(this.constraints) > 0) {
       let constraint = this.constraints.pop();
 
-      if (constraint.left is TVar) {
-        env.extend({constraint.left: constraint.right});
-        this.constraints = this.constraints.map(env.apply);
-  
-      } else if (constraint.right is TVar) {
-        env.extend({constraint.right: constraint.left});
-        this.constraints = this.constraints.map(env.apply);
-        
+      if (constraint.left is TVar or constraint.right is TVar) {
+        this.sigma.update(constraint);
+        this.constraints = this.constraints.map(this.sigma.apply);
+
       } else if (constraint.left is TFunction and constraint.right is TFunction) {
         let left = constraint.left;
         let right = constraint.right;
@@ -237,19 +291,68 @@ class TypeState {
     }
 
     this.constraints = unsolved;
-    this.typeEnv.extend(env);
+  }
+
+  // Compute the most general type for each variable in
+  // the original environment.
+  principal() => {
+    let env = Map();
+
+    for (x in this.typeEnv) {
+      for (s in this.sigma) {
+        let k = x[0];
+        let v = x[1];
+
+        env[k] = s.substitute(v);
+      }
+    }
+
+    return env;
   }
 
   unified() => len(this.constraints) == 0;
+  success() => this.unified();
+  failure() => !this.unified();
 }
 
 let typecheck = (expr) => {
-  let exprEnv = globalTypeEnv();
-  let typeEnv = TypeEnv();
-  let names = NameSupply();
-  let state = TypeState(exprEnv, typeEnv, names, []);
-
   let ast <- expr;
+  let uuids = NameSupply();
+
+  let typeEnv = Map();
+
+  // give the variables uuids.
+
+  let globals = Map();
+  let annotations = globalTypeEnv();
+
+  ast.visit((node, locals) => {
+    let rename = (node, env) => {
+      if (!env[node.data])
+        env[node.data] = uuids.fresh();
+      node.uuid = env[node.data];
+    };
+
+    if (node is ASTClosure) {
+      let localEnv = Map();
+      for (param in node.signature.params)
+        rename(param, localEnv);
+      return localEnv;
+    }
+  
+    if (node is ASTLocal) rename(node, locals);
+    if (node is ASTGlobal) {
+      rename(node, globals);
+
+      if (node.data in annotations) {
+        typeEnv[node] = annotations[node.data];
+      }
+    }
+
+    return locals;
+  }, Map());
+
+  let state = TypeState(typeEnv);
 
   state.constrain(ast);
   state.unify();

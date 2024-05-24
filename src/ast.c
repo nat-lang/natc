@@ -16,17 +16,6 @@ static bool initInstance(ObjClass* klass, int argCount) {
   return vmInitInstance(klass, argCount, 1);
 }
 
-bool closureInstance(ObjClosure* closure) {
-  vmPush(OBJ_VAL(vm.classes.astClosure));
-  vmPush(OBJ_VAL(closure));
-  vmPush(OBJ_VAL(vm.classes.typeEnv));
-
-  if (!initInstance(vm.classes.typeEnv, 0)) return false;
-  mapAddAll(&closure->typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
-
-  return initInstance(vm.classes.astClosure, 2);
-}
-
 // Read the syntax tree of [closure] off the tape.
 bool readAST(ObjClosure* closure) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -35,7 +24,11 @@ bool readAST(ObjClosure* closure) {
 #endif
 
   // the root of the tree.
-  if (!closureInstance(closure)) return false;
+  vmPush(OBJ_VAL(vm.classes.astClosure));
+  vmPush(OBJ_VAL(closure->function->name));
+  vmPush(OBJ_VAL(closure));
+  vmPush(NUMBER_VAL(closure->function->arity));
+  if (!initInstance(vm.classes.astClosure, 3)) return false;
 
   Value root = vmPeek(0);
 
@@ -50,7 +43,7 @@ bool readAST(ObjClosure* closure) {
     printf("\t");
     disassembleStack();
     printf("\n");
-    printf("\t");
+    printf("\t (destruct) ");
     disassembleInstruction(
         &frame->closure->function->chunk,
         (int)(frame->ip - frame->closure->function->chunk.code));
@@ -136,8 +129,8 @@ bool readAST(ObjClosure* closure) {
         vmPush(NUMBER_VAL(slot));
         vmPush(value);
 
-        if (!executeMethod("opSetLocal", 2)) return false;
-        vmPop();  // nil.
+        if (!executeMethod("opSetLocalValue", 2)) return false;
+        vmPop();  // ASTLocal obj.
         break;
       }
       case OP_GET_UPVALUE: {
@@ -155,7 +148,6 @@ bool readAST(ObjClosure* closure) {
         vmCaptureUpvalues(closure, frame);
 
         if (!readAST(closure)) return false;
-
         break;
       }
       case OP_CALL: {
@@ -191,6 +183,20 @@ bool readAST(ObjClosure* closure) {
         vm.frameCount--;
         return true;
       }
+      case OP_SET_TYPE_LOCAL: {
+        uint8_t slot = READ_SHORT();
+        Value value = vmPop();
+
+        vmPush(root);
+        vmPush(NUMBER_VAL(slot));
+        vmPush(value);
+
+        if (!executeMethod("opSetLocalType", 2)) return false;
+        vmPop();  // nil.
+        break;
+      }
+      case OP_SET_TYPE_GLOBAL:
+        break;
       default: {
         vmRuntimeError("Unhandled destructured opcode (%i).", instruction);
         return false;

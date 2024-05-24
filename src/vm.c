@@ -48,8 +48,9 @@ void initClasses(Classes* classes) {
   classes->object = NULL;
   classes->tuple = NULL;
   classes->sequence = NULL;
+  classes->map = NULL;
+  classes->set = NULL;
   classes->iterator = NULL;
-  classes->typeEnv = NULL;
   classes->astClosure = NULL;
   classes->vTypeBool = NULL;
   classes->vTypeNil = NULL;
@@ -120,6 +121,8 @@ bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
 
   if (!IS_INSTANCE(receiver)) {
+    disassembleStack();
+    printf("\n %s", name->chars);
     vmRuntimeError("Only instances have methods.");
     return false;
   }
@@ -381,13 +384,6 @@ static void closeUpvalues(Value* last) {
   }
 }
 
-static void defineMethod(Value name) {
-  Value method = vmPeek(0);
-  ObjClass* klass = AS_CLASS(vmPeek(1));
-  mapSet(&klass->fields, name, method);
-  vmPop();
-}
-
 static bool isFalsey(Value value) {
   return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
@@ -489,7 +485,6 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
         mapSet(&vm.globals, name, vmPeek(0));
-        mapSet(&vm.typeEnv, name, NIL_VAL);
         vmPop();
         break;
       }
@@ -687,16 +682,7 @@ InterpretResult vmExecute(int baseFrame) {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
         vmPush(OBJ_VAL(closure));
-
-        for (int i = 0; i < closure->upvalueCount; i++) {
-          uint8_t isLocal = READ_BYTE();
-          uint8_t index = READ_BYTE();
-          if (isLocal) {
-            closure->upvalues[i] = captureUpvalue(frame->slots + index);
-          } else {
-            closure->upvalues[i] = frame->closure->upvalues[index];
-          }
-        }
+        vmCaptureUpvalues(closure, frame);
         break;
       }
       case OP_CLOSE_UPVALUE:
@@ -734,9 +720,14 @@ InterpretResult vmExecute(int baseFrame) {
         vmPop();  // Subclass.
         break;
       }
-      case OP_METHOD:
-        defineMethod(READ_CONSTANT());
+      case OP_METHOD: {
+        Value name = READ_CONSTANT();
+        Value method = vmPeek(0);
+        ObjClass* klass = AS_CLASS(vmPeek(1));
+        mapSet(&klass->fields, name, method);
+        vmPop();
         break;
+      }
       case OP_MEMBER: {
         Value obj = vmPop();
         Value val = vmPop();
@@ -925,22 +916,19 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_SET_TYPE_LOCAL: {
         uint8_t slot = READ_SHORT();
-        Value value = frame->slots[slot];
-        uint32_t hash;
-        if (!vmHashValue(value, &hash)) return INTERPRET_RUNTIME_ERROR;
-        if (!mapSetHash(&frame->closure->typeEnv, value, vmPeek(0), hash)) {
-          vmRuntimeError("Value already has a type annotation.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        Value key = NUMBER_VAL(slot);
+        mapSet(&frame->closure->typeEnv, key, vmPeek(0));
+        vmPop();  // type expression.
         break;
       }
       case OP_SET_TYPE_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (mapSet(&vm.typeEnv, name, vmPeek(0))) {
-          mapDelete(&vm.typeEnv, name);
+        if (!mapHas(&vm.globals, name)) {
           vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
+        mapSet(&vm.typeEnv, name, vmPeek(0));
+        vmPop();  // type expression.
         break;
       }
       default:

@@ -1,8 +1,6 @@
 #ifndef nat_memory_h
 #define nat_memory_h
 
-#include <string.h>
-
 #include "common.h"
 #include "object.h"
 

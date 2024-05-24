@@ -72,7 +72,7 @@ void gotoScanner(Scanner scanner);
 void printScanner(Scanner sc);
 void skipWhitespace();
 Token scanToken();
-Token dottedIdentifier();
+Token slashedIdentifier();
 char charAt(int i);
 bool isWhite(char c);
 

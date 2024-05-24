@@ -58,9 +58,16 @@ class Tree extends Object {
   }
 
   reduce(fn, acc) => {
-    for (node in this.depthFirst())
-      acc = fn(acc, node.data);
+    for (child in this.depthFirst())
+      acc = fn(acc, child.data);
 
     return acc;
+  }
+
+  visit(fn, acc) => {
+    acc = fn(this, acc);
+
+    for (child in this.children)
+      child.visit(fn, acc);
   }
 }

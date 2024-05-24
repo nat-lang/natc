@@ -26,9 +26,9 @@ typedef struct {
   ObjClass* object;
   ObjClass* tuple;
   ObjClass* sequence;
+  ObjClass* map;
+  ObjClass* set;
   ObjClass* iterator;
-
-  ObjClass* typeEnv;
 
   ObjClass* astClosure;
 
