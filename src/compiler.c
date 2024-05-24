@@ -1139,7 +1139,11 @@ static void brackets(bool canAssign) {
   int klass = nativeCall(S_SEQUENCE, 0);
 
   // empty brackets is an empty sequence.
-  if (check(TOKEN_RIGHT_BRACKET)) return advance();
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    nativeCall(S_SEQUENCE, 0);
+    advance();
+    return;
+  }
   if (trySeqComprehension()) {
     consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
     return;

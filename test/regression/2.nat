@@ -1,0 +1,11 @@
+
+let infix * = (x,y) => x + y;
+
+class A {
+  foo() => {
+    return 1 * this.bar();
+  }
+  bar() => 2;
+}
+
+A().foo();

@@ -266,9 +266,6 @@ class TypeState {
 
   unify() => {
     let unsolved = [];
-
-    // fixme:
-    // [Constraint(x.left, x.right) | x in this.constraints];
     
     while (len(this.constraints) > 0) {
       let constraint = this.constraints.pop();

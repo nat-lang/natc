@@ -46,6 +46,7 @@ void vmRuntimeError(const char* format, ...) {
 void initClasses(Classes* classes) {
   classes->base = NULL;
   classes->object = NULL;
+  classes->sequential = NULL;
   classes->tuple = NULL;
   classes->sequence = NULL;
   classes->map = NULL;
@@ -121,9 +122,7 @@ bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
 
   if (!IS_INSTANCE(receiver)) {
-    disassembleStack();
-    printf("\n %s", name->chars);
-    vmRuntimeError("Only instances have methods.");
+    vmRuntimeError("Non instance has no method '%s'.", name->chars);
     return false;
   }
 

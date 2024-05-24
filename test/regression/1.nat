@@ -1,0 +1,9 @@
+
+
+class A {
+  foo() => {
+    this.y = [z | z in [1,2]];
+  }
+}
+
+A().foo();

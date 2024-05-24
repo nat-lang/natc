@@ -28,6 +28,7 @@
 
 #define S_BASE "Base"
 #define S_OBJECT "Object"
+#define S_SEQUENTIAL "Sequential"
 #define S_SEQUENCE "Sequence"
 #define S_TUPLE "Tuple"
 #define S_MAP "Map"

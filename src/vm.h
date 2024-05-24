@@ -24,6 +24,7 @@ typedef struct {
 typedef struct {
   ObjClass* base;
   ObjClass* object;
+  ObjClass* sequential;
   ObjClass* tuple;
   ObjClass* sequence;
   ObjClass* map;
