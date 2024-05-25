@@ -65,7 +65,7 @@ typedef enum {
 
 typedef struct {
   // bound variable token.
-  Token var;
+  int var;
   // local slot of the object that implements the protocol.
   int iter;
   // stack offset of the first instruction of the body.
@@ -135,7 +135,7 @@ static void errorAtCurrent(const char* message) {
   errorAt(&parser.current, message);
 }
 
-static void initIterator(Iterator* iter, Token var) {
+static void initIterator(Iterator* iter, int var) {
   iter->var = var;
   iter->iter = 0;
   iter->loopStart = 0;
@@ -913,10 +913,13 @@ static Iterator iterator() {
 
   current->iterationDepth++;
 
-  // consume the identifier and store it.
-  uint16_t var = parseVariable("Expect identifier.");
-  defineVariable(var);
-  initIterator(&iter, parser.previous);
+  // consume the identifier.
+  consume(TOKEN_IDENTIFIER, "Expect variable name.");
+
+  // store the bound variable.
+  loadConstant(NIL_VAL);
+  initIterator(&iter, declareVariable());
+  markInitialized();
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
 
@@ -943,14 +946,8 @@ static int iterationNext(Iterator iter) {
   // otherwise continue iterating.
   emitConstInstr(OP_GET_GLOBAL, iter.iter);
   methodCall("next", 0);
-
-  int arg = resolveLocal(current, &iter.var);
-  if (arg != -1) {
-    emitConstInstr(OP_SET_LOCAL, arg);
-  } else {
-    arg = identifierConstant(&iter.var);
-    emitConstInstr(OP_SET_GLOBAL, arg);
-  }
+  emitConstInstr(OP_SET_LOCAL, iter.var);
+  emitByte(OP_POP);
 
   return exitJump;
 }
@@ -959,7 +956,7 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitLoop(iter.loopStart);
   patchJump(exitJump);
   emitByte(OP_POP);  // jump condition.
-  emitByte(OP_POP);  // bound variable.
+  emitByte(OP_POP);
   current->iterationDepth--;
 }
 
