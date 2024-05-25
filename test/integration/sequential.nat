@@ -165,6 +165,9 @@ assert(seq == [
 
 // nested body comprehension.
 
+seq = [x | y in [[1,2], [3,4]], x in y];
+assert(seq == [1,2,3,4]);
+
 seq = [[[c | c in b] | b in a] | a in [[[1,2]],[[3]], [[4,5]]]];
 assert(seq == [[[1,2]],[[3]], [[4,5]]]);
 
@@ -177,6 +180,3 @@ let f = () => {
 
 assert(f() == [1,2,3]);
 
-// 
-
-assert([x | y in [[1,2]], x in y] == [1,2]);

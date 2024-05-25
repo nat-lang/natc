@@ -914,7 +914,8 @@ static Iterator iterator() {
   current->iterationDepth++;
 
   // consume the identifier and store it.
-  consume(TOKEN_IDENTIFIER, "Expect variable name.");
+  uint16_t var = parseVariable("Expect identifier.");
+  defineVariable(var);
   initIterator(&iter, parser.previous);
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
@@ -942,11 +943,14 @@ static int iterationNext(Iterator iter) {
   // otherwise continue iterating.
   emitConstInstr(OP_GET_GLOBAL, iter.iter);
   methodCall("next", 0);
-  printf("-->> %s <<---\n", AS_STRING(identifierToken(iter.var))->chars);
-  addLocal(iter.var);
-  markInitialized();
 
-  emitByte(OP_POP);
+  int arg = resolveLocal(current, &iter.var);
+  if (arg != -1) {
+    emitConstInstr(OP_SET_LOCAL, arg);
+  } else {
+    arg = identifierConstant(&iter.var);
+    emitConstInstr(OP_SET_GLOBAL, arg);
+  }
 
   return exitJump;
 }
@@ -955,6 +959,7 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitLoop(iter.loopStart);
   patchJump(exitJump);
   emitByte(OP_POP);  // jump condition.
+  emitByte(OP_POP);  // bound variable.
   current->iterationDepth--;
 }
 
