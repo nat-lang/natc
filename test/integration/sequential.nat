@@ -148,7 +148,13 @@ assert(seq == [
   [4,4]
 ]);
 
-// nested body comprehension.
+// nested condition comprehension.
+
+seq = [a | a in [a | a in [1,2,3]]];
+assert(seq == [1,2,3]);
+
+
+// body comprehension.
 
 seq = [[true | b in a] | a in [[1,2],[3], [4,5]]];
 assert(seq == [
@@ -157,10 +163,8 @@ assert(seq == [
   [true, true]
 ]);
 
-// nested condition comprehension.
-
-seq = [a | a in [a | a in [1,2,3]]];
-assert(seq == [1,2,3]);
+// nested body comprehension.
+// seq = [[[true | c in b] | b in a] | a in [[1,2],[3], [4,5]]];
 
 // assignment to a local.
 

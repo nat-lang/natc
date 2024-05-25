@@ -1,0 +1,7 @@
+
+// natively defined methods can be bound.
+
+let seq = [1,2,3];
+let push = seq.push; // native.
+push(4);
+assert(seq[3] == 4);

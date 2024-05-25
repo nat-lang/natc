@@ -81,6 +81,8 @@ typedef struct Compiler {
   int localCount;
   Upvalue upvalues[UINT8_COUNT];
   int scopeDepth;
+  int comprehensionDepth;
+  int iterationDepth;
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -305,6 +307,8 @@ static void initCompiler(Compiler* compiler, FunctionType type, Token name) {
   compiler->type = type;
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
+  compiler->comprehensionDepth = 0;
+  compiler->iterationDepth = 0;
 
   current = compiler;
   current->function->name = copyString(name.start, name.length);
@@ -378,6 +382,13 @@ static Value identifierToken(Token token) {
 
 static uint16_t identifierConstant(Token* token) {
   return makeConstant(identifierToken(*token));
+}
+
+static uint16_t join(char* s, int i) {
+  int length = snprintf(NULL, 0, "%d", i);
+  char str[strlen(s) + length + 1];
+  sprintf(str, "%s%d", s, i);
+  return makeConstant(INTERN(str));
 }
 
 static bool identifiersEqual(Token* a, Token* b) {
@@ -480,6 +491,11 @@ static uint16_t nativeVariable(char* name) {
   uint16_t var = makeConstant(INTERN(name));
   emitConstInstr(OP_GET_GLOBAL, var);
   return var;
+}
+
+static void getProperty(char* name) {
+  uint16_t var = makeConstant(INTERN(name));
+  emitConstInstr(OP_GET_PROPERTY, var);
 }
 
 static uint8_t argumentList() {
@@ -896,6 +912,8 @@ static Iterator iterator() {
   Iterator iter;
   initIterator(&iter);
 
+  current->iterationDepth++;
+
   // consume the identifier.
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
 
@@ -906,18 +924,13 @@ static Iterator iterator() {
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
 
-  // initialize the iterator object, adjusting the local
-  // count to reflect the iter fn's presence on the stack
-  // during the iterator-yielding expression.
-  nativeVariable(S_ITER);
-  current->localCount++;
+  // initialize the iterator object.
   expression();
-  emitBytes(OP_CALL, 1);
-  current->localCount--;
+  nativePostfix(S_ITER, 1);
 
   // store it.
-  iter.iter = addLocal(syntheticToken("#iter"));
-  markInitialized();
+  iter.iter = join("#iter", current->iterationDepth);
+  emitConstInstr(OP_DEFINE_GLOBAL, iter.iter);
 
   iter.loopStart = currentChunk()->count;
   return iter;
@@ -925,14 +938,14 @@ static Iterator iterator() {
 
 static int iterationNext(Iterator iter) {
   // call "more" on the iterator and bail if false.
-  emitConstInstr(OP_GET_LOCAL, iter.iter);
+  emitConstInstr(OP_GET_GLOBAL, iter.iter);
 
   methodCall("more", 0);
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);
 
   // otherwise continue iterating.
-  emitConstInstr(OP_GET_LOCAL, iter.iter);
+  emitConstInstr(OP_GET_GLOBAL, iter.iter);
   methodCall("next", 0);
   emitConstInstr(OP_SET_LOCAL, iter.var);
   emitByte(OP_POP);
@@ -944,11 +957,12 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitLoop(iter.loopStart);
   patchJump(exitJump);
   emitByte(OP_POP);  // jump condition.
+  current->iterationDepth--;
 }
 
 // Parse a comprehension, given the stack address [var] of the
 // sequence under construction and the type of [closingToken].
-Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
+Parser comprehension(Parser checkpointA, uint16_t var, TokenType closingToken) {
   Iterator iter;
   initIterator(&iter);
 
@@ -987,14 +1001,12 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    // load the comprehension instance, offsetting the local
-    // count appropriately, and append the expression.
-    emitConstInstr(OP_GET_LOCAL, var);
-    current->localCount++;
+    // parse the expression, load the comprehension, and append.
     expression();
-    methodCall(S_PUSH, 1);
-    // pop the comprehension instance.
-    current->localCount--;
+    emitConstInstr(OP_GET_GLOBAL, var);
+    getProperty(S_PUSH);
+    emitBytes(OP_CALL_POSTFIX, 1);
+    // the comprehension.
     emitByte(OP_POP);
   }
 
@@ -1011,36 +1023,6 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   }
 
   return checkpointB;
-}
-
-// Find an occurance of [type] that isn't nested within
-// braces or brackets, given some [initialBraceDepth]
-// and [initialBracketDepth].
-bool findToken(int initialBraceDepth, int initialBracketDepth, TokenType type) {
-  int braceDepth = initialBraceDepth;
-  int bracketDepth = initialBracketDepth;
-
-  bool nested;
-
-  for (;;) {
-    if (check(TOKEN_LEFT_BRACE)) braceDepth++;
-    if (check(TOKEN_RIGHT_BRACE)) braceDepth--;
-
-    if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
-    if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
-
-    nested = (braceDepth > initialBraceDepth) ||
-             (bracketDepth > initialBracketDepth);
-
-    if (check(type) && !nested) return true;
-
-    if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1)
-      return false;
-    if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == initialBracketDepth - 1)
-      return false;
-
-    advance();
-  }
 }
 
 // Find a pipe that isn't nested within [left] and [right].
@@ -1062,104 +1044,28 @@ bool advanceToPipe(TokenType left, TokenType right) {
   }
 }
 
-static Parser comprehensionClauses(Parser checkpointA, TokenType closingToken) {
-  Iterator iter;
-  initIterator(&iter);
-
-  int exitJump = 0;
-  int predJump = 0;
-  bool isIteration = false;
-  bool isPredicate = false;
-  Parser checkpointB = checkpointA;
-
-  if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
-    // bound variable and iterable to draw from.
-    isIteration = true;
-
-    beginScope();
-    iter = iterator();
-    exitJump = iterationNext(iter);
-  } else {
-    // a predicate to test against.
-    isPredicate = true;
-
-    expression();
-    predJump = emitJump(OP_JUMP_IF_FALSE);
-    emitByte(OP_POP);
-  }
-
-  if (match(TOKEN_COMMA)) {
-    // parse the conditions recursively, since this
-    // makes scope management simple. in particular,
-    // variables will be in scope in every condition
-    // to their right, and all we have to do is conclude
-    // each scope at the end of this function.
-    checkpointB = comprehension(checkpointA, closingToken);
-  } else if (check(closingToken)) {
-    // now we parse the body, first saving the point
-    // where the generator ends.
-    checkpointB = saveParser();
-    gotoParser(checkpointA);
-
-    // parse the expression and leave it on the stack.
-    expression();
-  }
-
-  if (isIteration) {
-    iterationEnd(iter, exitJump);
-    endScope();
-  } else if (isPredicate) {
-    // we need to jump over this last condition.
-    // pop if the condition was truthy.
-    int elseJump = emitJump(OP_JUMP);
-    patchJump(predJump);
-    emitByte(OP_POP);
-    patchJump(elseJump);
-  }
-
-  return checkpointB;
-}
-
-static bool doSeqComprehension() {
+static bool tryComprehension(char* klass, TokenType openingToken,
+                             TokenType closingToken) {
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe(TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET)) {
+  if (advanceToPipe(openingToken, closingToken)) {
     advance();  // eat the pipe.
 
-    // this is the end of the comprehension.
-    Parser checkpointB = comprehensionClauses(checkpointA, TOKEN_RIGHT_BRACKET);
-
-    // wrap up.
-    gotoParser(checkpointB);
-    return true;
-  }
-
-  gotoParser(checkpointA);
-  return false;
-}
-
-static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
-                             int initialBracketDepth) {
-  Parser checkpointA = saveParser();
-
-  if (findToken(initialBraceDepth, initialBracketDepth, TOKEN_PIPE)) {
-    advance();  // eat the pipe.
-
-    // the comprehension instance is on top of the stack now;
+    //  comprehension instance is on top of the stack now;
     // we'll need to refer to it when we hit the bottom
-    // of the condition clauses. we'll also need the local
-    // slots to be offset by 1.
-    int var = addLocal(syntheticToken("#comprehension"));
-    markInitialized();
+    // of the condition clauses.
+    uint16_t var = join("#comprehension", current->comprehensionDepth);
+    nativeCall(klass, 0);
+    emitConstInstr(OP_DEFINE_GLOBAL, var);
 
+    current->comprehensionDepth++;
     Parser checkpointB = comprehension(checkpointA, var, closingToken);
-
-    // reclaim the local slot but leave the sequence instance
-    // on the stack.
-    current->localCount--;
+    current->comprehensionDepth--;
 
     // finally we pick up at the end of the expression.
     gotoParser(checkpointB);
+
+    emitConstInstr(OP_GET_GLOBAL, var);
 
     return true;
   }
@@ -1169,11 +1075,11 @@ static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
 }
 
 static bool trySetComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACE, 1, 0);
+  return tryComprehension(S_SET, TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE);
 }
 
 static bool trySeqComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACKET, 0, 1);
+  return tryComprehension(S_SEQUENCE, TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET);
 }
 
 static void finishMapVal() {
@@ -1243,8 +1149,7 @@ static bool sequence() {
     return true;
   }
 
-  if (findNonNestedPipe(TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET)) {
-    doSeqComprehension();
+  if (trySeqComprehension()) {
     return true;
   }
 
@@ -1272,46 +1177,19 @@ static bool sequence() {
 }
 
 void tree() {
-  int elements = 0;
+  int elements = 1;
 
-  // empty brackets is an empty sequence.
-  if (check(TOKEN_RIGHT_BRACKET)) {
-    nativeCall(S_SEQUENCE, elements);
-    advance();
-    return;
-  }
-  if (trySeqComprehension()) {
-    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
-    return;
-  }
+  // make a node of the first child.
+  nativePostfix(S_TREE, 1);
 
-  // first datum. could be a tree node or a seq element.
-  whiteDelimitedExpression();
-  elements++;
-
-  // it's a sequence.
-  if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    while (match(TOKEN_COMMA)) {
-      expression();
-      elements++;
-    }
-
-    nativePostfix(S_SEQUENCE, elements);
-  } else {
-    // it's a tree.
-
-    // make a node of the first child.
+  // and now subsequent children.
+  while (!check(TOKEN_RIGHT_BRACKET)) {
+    whiteDelimitedExpression();
     nativePostfix(S_TREE, 1);
-
-    // and now subsequent children.
-    while (!check(TOKEN_RIGHT_BRACKET)) {
-      whiteDelimitedExpression();
-      nativePostfix(S_TREE, 1);
-      elements++;
-    }
-
-    nativePostfix(S_TREE, elements);
+    elements++;
   }
+
+  nativePostfix(S_TREE, elements);
 }
 
 // A tree literal, sequence literal, or sequence comprehension.

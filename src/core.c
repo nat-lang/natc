@@ -76,6 +76,7 @@ bool sequenceValueField(ObjInstance* obj, Value* seq) {
   return true;
 }
 
+// Leaves the instance on the stack.
 bool __sequencePush__(int argCount, Value* args) {
   Value val = vmPeek(0);
   ObjInstance* obj = AS_INSTANCE(vmPeek(1));
