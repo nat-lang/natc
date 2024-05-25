@@ -37,7 +37,7 @@ class Iterable {
 
 for (x in Iterable()) { 
   assert(
-    (x == "a") or (x == "b") or (x == "c")
+    x == "a" or x == "b" or x == "c"
   );
 }
 

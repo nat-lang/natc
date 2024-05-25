@@ -1043,6 +1043,101 @@ bool findToken(int initialBraceDepth, int initialBracketDepth, TokenType type) {
   }
 }
 
+// Find a pipe that isn't nested within [left] and [right].
+// Assume that the initial nesting depth is 1, i.e., we've
+// already consumed an instance of [left].
+bool advanceToPipe(TokenType left, TokenType right) {
+  int depth = 1;
+
+  for (;;) {
+    if (check(left)) depth++;
+    if (check(right)) depth--;
+
+    // found one.
+    if (check(TOKEN_PIPE) && depth == 1) return true;
+    // reached the end.
+    if (check(right) && depth == 0) return false;
+
+    advance();
+  }
+}
+
+static Parser comprehensionClauses(Parser checkpointA, TokenType closingToken) {
+  Iterator iter;
+  initIterator(&iter);
+
+  int exitJump = 0;
+  int predJump = 0;
+  bool isIteration = false;
+  bool isPredicate = false;
+  Parser checkpointB = checkpointA;
+
+  if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
+    // bound variable and iterable to draw from.
+    isIteration = true;
+
+    beginScope();
+    iter = iterator();
+    exitJump = iterationNext(iter);
+  } else {
+    // a predicate to test against.
+    isPredicate = true;
+
+    expression();
+    predJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+  }
+
+  if (match(TOKEN_COMMA)) {
+    // parse the conditions recursively, since this
+    // makes scope management simple. in particular,
+    // variables will be in scope in every condition
+    // to their right, and all we have to do is conclude
+    // each scope at the end of this function.
+    checkpointB = comprehension(checkpointA, closingToken);
+  } else if (check(closingToken)) {
+    // now we parse the body, first saving the point
+    // where the generator ends.
+    checkpointB = saveParser();
+    gotoParser(checkpointA);
+
+    // parse the expression and leave it on the stack.
+    expression();
+  }
+
+  if (isIteration) {
+    iterationEnd(iter, exitJump);
+    endScope();
+  } else if (isPredicate) {
+    // we need to jump over this last condition.
+    // pop if the condition was truthy.
+    int elseJump = emitJump(OP_JUMP);
+    patchJump(predJump);
+    emitByte(OP_POP);
+    patchJump(elseJump);
+  }
+
+  return checkpointB;
+}
+
+static bool doSeqComprehension() {
+  Parser checkpointA = saveParser();
+
+  if (advanceToPipe(TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET)) {
+    advance();  // eat the pipe.
+
+    // this is the end of the comprehension.
+    Parser checkpointB = comprehensionClauses(checkpointA, TOKEN_RIGHT_BRACKET);
+
+    // wrap up.
+    gotoParser(checkpointB);
+    return true;
+  }
+
+  gotoParser(checkpointA);
+  return false;
+}
+
 static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
                              int initialBracketDepth) {
   Parser checkpointA = saveParser();
@@ -1140,20 +1235,30 @@ static void braces(bool canAssign) {
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
+// Parse a sequence if appropriate and indicate
+// if it is.
 static bool sequence() {
-  // it's a sequence.
   if (check(TOKEN_RIGHT_BRACKET)) {
     nativeCall(S_SEQUENCE, 0);
     return true;
-  } else if (trySeqComprehension()) {
+  }
+
+  if (findNonNestedPipe(TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET)) {
+    doSeqComprehension();
     return true;
   }
 
-  Parser checkpoint = saveParser();
-  if (findToken(0, 1, TOKEN_COMMA)) {
-    gotoParser(checkpoint);
+  // first datum. could be a tree node or a seq element.
+  whiteDelimitedExpression();
 
-    int elements = 0;
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    nativePostfix(S_SEQUENCE, 1);
+    return true;
+  }
+
+  if (match(TOKEN_COMMA)) {
+    int elements = 1;
+
     do {
       expression();
       elements++;
