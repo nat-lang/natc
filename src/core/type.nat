@@ -158,8 +158,8 @@ class TypeState {
     this.typeVars = TypeVarSupply();
     // constraint stack.
     this.constraints = [];
-    // mgu.
-    this.sigma = Solution();
+    // most general unifiers.
+    this.solution = Solution();
   }
 
   lookup(node: ASTVar) => {
@@ -271,8 +271,8 @@ class TypeState {
       let constraint = this.constraints.pop();
 
       if (constraint.left is TVar or constraint.right is TVar) {
-        this.sigma.update(constraint);
-        this.constraints = this.constraints.map(this.sigma.apply);
+        this.solution.update(constraint);
+        this.constraints = this.constraints.map(this.solution.apply);
 
       } else if (constraint.left is TFunction and constraint.right is TFunction) {
         let left = constraint.left;
@@ -296,7 +296,7 @@ class TypeState {
     let env = Map();
 
     for (x in this.typeEnv) {
-      for (s in this.sigma) {
+      for (s in this.solution) {
         let k = x[0];
         let v = x[1];
 

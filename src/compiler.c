@@ -918,13 +918,14 @@ static Iterator iterator() {
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
 
   // store the bound variable.
+  // can we just declare this freshly at each iteration instead?
   loadConstant(NIL_VAL);
   iter.var = declareVariable();
   markInitialized();
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
 
-  // initialize the iterator object.
+  // initialize the iterator instance.
   expression();
   nativePostfix(S_ITER, 1);
 
@@ -960,8 +961,8 @@ static void iterationEnd(Iterator iter, int exitJump) {
   current->iterationDepth--;
 }
 
-// Parse a comprehension, given the stack address [var] of the
-// sequence under construction and the type of [closingToken].
+// Parse a comprehension, given the constant address of the global [var]
+// of the comprehension under construction and the type of its [closingToken].
 Parser comprehension(Parser checkpointA, uint16_t var, TokenType closingToken) {
   Iterator iter;
   initIterator(&iter);
@@ -970,6 +971,7 @@ Parser comprehension(Parser checkpointA, uint16_t var, TokenType closingToken) {
   int predJump = 0;
   bool isIteration = false;
   bool isPredicate = false;
+
   Parser checkpointB = checkpointA;
 
   if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
@@ -1026,8 +1028,8 @@ Parser comprehension(Parser checkpointA, uint16_t var, TokenType closingToken) {
 }
 
 // Find a pipe that isn't nested within [left] and [right].
-// Assume that the initial nesting depth is 1, i.e., we've
-// already consumed an instance of [left].
+// Assume that the initial nesting depth is 1, i.e., that
+// we've already consumed an instance of [left].
 bool advanceToPipe(TokenType left, TokenType right) {
   int depth = 1;
 
@@ -1037,7 +1039,7 @@ bool advanceToPipe(TokenType left, TokenType right) {
 
     // found one.
     if (check(TOKEN_PIPE) && depth == 1) return true;
-    // reached the end.
+    // found none.
     if (check(right) && depth == 0) return false;
 
     advance();
@@ -1046,14 +1048,21 @@ bool advanceToPipe(TokenType left, TokenType right) {
 
 static bool tryComprehension(char* klass, TokenType openingToken,
                              TokenType closingToken) {
+  // right now we're at the body of a possible comprehension.
+  // we need to save our location for two reasons:
+  // (a) if it *is* a comprehension, we can't parse the body
+  // until we're in the scope of its conditions;
+  // (b) if it *isn't*, we need to rewind after we've looked ahead.
   Parser checkpointA = saveParser();
 
+  // lookahead.
   if (advanceToPipe(openingToken, closingToken)) {
     advance();  // eat the pipe.
 
-    //  comprehension instance is on top of the stack now;
-    // we'll need to refer to it when we hit the bottom
-    // of the condition clauses.
+    // initialize the instance that we're generating and
+    // store it in a global. we'll need to refer to it when
+    // we hit the bottom of the condition clauses. why a global?
+    // because it frees us from worrying about the stack.
     uint16_t var = join("#comprehension", current->comprehensionDepth);
     nativeCall(klass, 0);
     emitConstInstr(OP_DEFINE_GLOBAL, var);
@@ -1062,24 +1071,16 @@ static bool tryComprehension(char* klass, TokenType openingToken,
     Parser checkpointB = comprehension(checkpointA, var, closingToken);
     current->comprehensionDepth--;
 
-    // finally we pick up at the end of the expression.
+    // pick up at the end of the expression and leave the
+    // comprehension on the stack.
     gotoParser(checkpointB);
-
     emitConstInstr(OP_GET_GLOBAL, var);
-
     return true;
   }
 
+  // rewind.
   gotoParser(checkpointA);
   return false;
-}
-
-static bool trySetComprehension() {
-  return tryComprehension(S_SET, TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE);
-}
-
-static bool trySeqComprehension() {
-  return tryComprehension(S_SEQUENCE, TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET);
 }
 
 static void finishMapVal() {
@@ -1100,7 +1101,7 @@ static void braces(bool canAssign) {
 
   // empty braces is an empty set.
   if (check(TOKEN_RIGHT_BRACE)) return advance();
-  if (trySetComprehension()) {
+  if (tryComprehension(S_SET, TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE)) {
     consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
     return;
   }
@@ -1141,29 +1142,30 @@ static void braces(bool canAssign) {
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
-// Parse a sequence if appropriate and indicate
-// if it is.
+// Parse a sequence if appropriate and indicate if it is.
 static bool sequence() {
+  int elements = 0;
+
+  // empty seq.
   if (check(TOKEN_RIGHT_BRACKET)) {
-    nativeCall(S_SEQUENCE, 0);
+    nativeCall(S_SEQUENCE, elements);
     return true;
   }
 
-  if (trySeqComprehension()) {
+  if (tryComprehension(S_SEQUENCE, TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET))
     return true;
-  }
 
   // first datum. could be a tree node or a seq element.
   whiteDelimitedExpression();
+  elements++;
 
+  // singleton.
   if (check(TOKEN_RIGHT_BRACKET)) {
-    nativePostfix(S_SEQUENCE, 1);
+    nativePostfix(S_SEQUENCE, elements);
     return true;
   }
 
   if (match(TOKEN_COMMA)) {
-    int elements = 1;
-
     do {
       expression();
       elements++;
@@ -1192,9 +1194,9 @@ void tree() {
   nativePostfix(S_TREE, elements);
 }
 
-// A tree literal, sequence literal, or sequence comprehension.
+// A sequence literal, sequence comprehension, or tree.
 static void brackets(bool canAssign) {
-  sequence();
+  if (!sequence()) tree();
 
   consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }
