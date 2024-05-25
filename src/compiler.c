@@ -64,8 +64,8 @@ typedef enum {
 } FunctionType;
 
 typedef struct {
-  // local slot of the bound variable.
-  int var;
+  // bound variable token.
+  Token var;
   // local slot of the object that implements the protocol.
   int iter;
   // stack offset of the first instruction of the body.
@@ -135,8 +135,8 @@ static void errorAtCurrent(const char* message) {
   errorAt(&parser.current, message);
 }
 
-static void initIterator(Iterator* iter) {
-  iter->var = 0;
+static void initIterator(Iterator* iter, Token var) {
+  iter->var = var;
   iter->iter = 0;
   iter->loopStart = 0;
 }
@@ -910,18 +910,12 @@ static void method() {
 // [Iterator] struct.
 static Iterator iterator() {
   Iterator iter;
-  initIterator(&iter);
 
   current->iterationDepth++;
 
-  // consume the identifier.
+  // consume the identifier and store it.
   consume(TOKEN_IDENTIFIER, "Expect variable name.");
-
-  // store the bound variable.
-  // can we just declare this freshly at each iteration instead?
-  loadConstant(NIL_VAL);
-  iter.var = declareVariable();
-  markInitialized();
+  initIterator(&iter, parser.previous);
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
 
@@ -948,7 +942,10 @@ static int iterationNext(Iterator iter) {
   // otherwise continue iterating.
   emitConstInstr(OP_GET_GLOBAL, iter.iter);
   methodCall("next", 0);
-  emitConstInstr(OP_SET_LOCAL, iter.var);
+  printf("-->> %s <<---\n", AS_STRING(identifierToken(iter.var))->chars);
+  addLocal(iter.var);
+  markInitialized();
+
   emitByte(OP_POP);
 
   return exitJump;
@@ -965,7 +962,7 @@ static void iterationEnd(Iterator iter, int exitJump) {
 // of the comprehension under construction and the type of its [closingToken].
 Parser comprehension(Parser checkpointA, uint16_t var, TokenType closingToken) {
   Iterator iter;
-  initIterator(&iter);
+  // initIterator(&iter);
 
   int exitJump = 0;
   int predJump = 0;
@@ -1179,19 +1176,20 @@ static bool sequence() {
 }
 
 void tree() {
+  // if we're here, the sequence check has already
+  // parsed the first element.
   int elements = 1;
 
-  // make a node of the first child.
-  nativePostfix(S_TREE, 1);
+  // make a node of it.
+  nativePostfix("treeFromData", 1);
 
-  // and now subsequent children.
+  // and now the children.
   while (!check(TOKEN_RIGHT_BRACKET)) {
     whiteDelimitedExpression();
-    nativePostfix(S_TREE, 1);
     elements++;
   }
 
-  nativePostfix(S_TREE, elements);
+  nativePostfix("treeFromChildren", elements);
 }
 
 // A sequence literal, sequence comprehension, or tree.

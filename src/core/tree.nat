@@ -1,24 +1,8 @@
 
 class Tree extends Object {
-  init(*children) => {
-    this.data = nil;
-    this.children = children;
-  }
-
-  setData(data) => {
+  init(data, children) => {
     this.data = data;
-    return this;
-  }
-
-  // Add a [child] to the tree, first converting it to a [Tree]
-  // object if it's not already. The compiler uses this method
-  // to build tree literals.
-  addChild(child) => {
-    if (type(child) != Tree)
-      child = Tree().setData(child);
-
-    this.children.push(child);
-    return this;
+    this.children = children;
   }
 
   // Subscript access is to children.
@@ -43,13 +27,24 @@ class Tree extends Object {
   leaves() => {
     if (this.isLeaf()) return [this.data];
 
+    let seq = [];
+
+    for (child in this.children) {
+      print child;
+      for (leaf in child.leaves()) {
+        seq.push(leaf);
+      }
+    }
+
+    return seq;
+
     return [leaf | child in this.children, leaf in child.leaves()];
   }
 
   map(fn) => {
     let tree = Tree();
 
-    tree.setData(fn(this.data));
+    tree.data = fn(this.data);
 
     for (child in this.children)
       tree.children.push(child.map(fn));
@@ -71,3 +66,14 @@ class Tree extends Object {
       child.visit(fn, acc);
   }
 }
+
+// factory functions used by the compiler.
+let treeFromData = (data) => Tree(data, []);
+let treeFromChildren = (*children) => {
+  for (let i = 0; i < len(children); i = i + 1) {
+    if (type(children[i]) != Tree) {
+      children[i] = treeFromData(children[i]);
+    }
+  }
+  return Tree(nil, children);
+};
