@@ -135,8 +135,8 @@ static void errorAtCurrent(const char* message) {
   errorAt(&parser.current, message);
 }
 
-static void initIterator(Iterator* iter, int var) {
-  iter->var = var;
+static void initIterator(Iterator* iter) {
+  iter->var = 0;
   iter->iter = 0;
   iter->loopStart = 0;
 }
@@ -910,6 +910,7 @@ static void method() {
 // [Iterator] struct.
 static Iterator iterator() {
   Iterator iter;
+  initIterator(&iter);
 
   current->iterationDepth++;
 
@@ -918,7 +919,7 @@ static Iterator iterator() {
 
   // store the bound variable.
   loadConstant(NIL_VAL);
-  initIterator(&iter, declareVariable());
+  iter.var = declareVariable();
   markInitialized();
 
   consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
@@ -956,7 +957,6 @@ static void iterationEnd(Iterator iter, int exitJump) {
   emitLoop(iter.loopStart);
   patchJump(exitJump);
   emitByte(OP_POP);  // jump condition.
-  emitByte(OP_POP);
   current->iterationDepth--;
 }
 

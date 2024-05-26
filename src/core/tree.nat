@@ -29,10 +29,12 @@ class Tree extends Object {
 
     let seq = [];
 
-    for (child in this.children) {
-      print child;
-      for (leaf in child.leaves()) {
-        seq.push(leaf);
+    for (x in this.children) {
+      print x;
+      for (y in x.leaves()) {
+        print "pushing";
+        print y;
+        seq.push(y);
       }
     }
 
@@ -42,9 +44,7 @@ class Tree extends Object {
   }
 
   map(fn) => {
-    let tree = Tree();
-
-    tree.data = fn(this.data);
+    let tree = Tree(fn(this.data), []);
 
     for (child in this.children)
       tree.children.push(child.map(fn));
