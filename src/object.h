@@ -7,7 +7,7 @@
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
-#define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
+#define IS_BOUND_FUNCTION(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
@@ -17,7 +17,7 @@
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
 
-#define AS_BOUND_METHOD(value) ((ObjBoundMethod *)AS_OBJ(value))
+#define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
@@ -28,10 +28,12 @@
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
 
+#define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
+
 #define INTERN(value) ((OBJ_VAL(intern(value))))
 
 typedef enum {
-  OBJ_BOUND_METHOD,
+  OBJ_BOUND_FUNCTION,
   OBJ_CLASS,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
@@ -119,18 +121,25 @@ typedef struct {
   ObjMap fields;
 } ObjInstance;
 
+typedef enum { BOUND_METHOD, BOUND_NATIVE } BoundFunctionType;
+
 typedef struct {
   Obj obj;
+  BoundFunctionType type;
   Value receiver;
-  ObjClosure *method;
-} ObjBoundMethod;
+  union {
+    ObjClosure *method;
+    ObjNative *native;
+  } bound;
+} ObjBoundFunction;
 
 typedef struct {
   Obj obj;
   ValueArray values;
 } ObjSequence;
 
-ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
+ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
+ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();

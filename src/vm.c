@@ -269,10 +269,18 @@ static bool callNative(ObjNative* native, int argCount) {
 bool vmCallValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
-      case OBJ_BOUND_METHOD: {
-        ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
-        vm.stackTop[-argCount - 1] = bound->receiver;
-        return call(bound->method, argCount);
+      case OBJ_BOUND_FUNCTION: {
+        ObjBoundFunction* obj = AS_BOUND_FUNCTION(callee);
+        vm.stackTop[-argCount - 1] = obj->receiver;
+        switch (BOUND_FUNCTION_TYPE(callee)) {
+          case BOUND_METHOD:
+            return call(obj->bound.method, argCount);
+          case BOUND_NATIVE:
+            return callNative(obj->bound.native, argCount);
+          default:
+            vmRuntimeError("Unexpected bound function type");
+            return false;
+        }
       }
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
@@ -308,8 +316,11 @@ bool vmCallValue(Value callee, int argCount) {
 static bool getObjectProperty(ObjMap fields, Value name, Value* value) {
   if (mapGet(&fields, name, value)) {
     if (IS_CLOSURE(*value)) {
-      ObjBoundMethod* bound = newBoundMethod(vmPeek(0), AS_CLOSURE(*value));
-      *value = OBJ_VAL(bound);
+      ObjBoundFunction* obj = newBoundMethod(vmPeek(0), AS_CLOSURE(*value));
+      *value = OBJ_VAL(obj);
+    } else if (IS_NATIVE(*value)) {
+      ObjBoundFunction* obj = newBoundNative(vmPeek(0), AS_NATIVE(*value));
+      *value = OBJ_VAL(obj);
     }
     return true;
   }

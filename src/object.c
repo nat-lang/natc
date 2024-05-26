@@ -29,11 +29,20 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
-ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
-  ObjBoundMethod* bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
-  bound->receiver = receiver;
-  bound->method = method;
-  return bound;
+ObjBoundFunction* newBoundMethod(Value receiver, ObjClosure* method) {
+  ObjBoundFunction* obj = ALLOCATE_OBJ(ObjBoundFunction, OBJ_BOUND_FUNCTION);
+  obj->type = BOUND_METHOD;
+  obj->receiver = receiver;
+  obj->bound.method = method;
+  return obj;
+}
+
+ObjBoundFunction* newBoundNative(Value receiver, ObjNative* native) {
+  ObjBoundFunction* obj = ALLOCATE_OBJ(ObjBoundFunction, OBJ_BOUND_FUNCTION);
+  obj->type = BOUND_NATIVE;
+  obj->receiver = receiver;
+  obj->bound.native = native;
+  return obj;
 }
 
 ObjClass* newClass(ObjString* name) {
@@ -377,9 +386,22 @@ bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
-    case OBJ_BOUND_METHOD:
-      printFunction(AS_BOUND_METHOD(value)->method->function);
+    case OBJ_BOUND_FUNCTION: {
+      ObjBoundFunction* obj = AS_BOUND_FUNCTION(value);
+
+      switch (obj->type) {
+        case BOUND_METHOD: {
+          printf("<bound method %s at %p>",
+                 obj->bound.method->function->name->chars, obj);
+          break;
+        }
+        case BOUND_NATIVE: {
+          printf("<bound native %s>", obj->bound.native->name->chars);
+          break;
+        }
+      }
       break;
+    }
     case OBJ_CLASS:
       printf("%s", AS_CLASS(value)->name->chars);
       break;
