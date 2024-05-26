@@ -167,7 +167,7 @@ class A {
 class B extends A {
   method() => {
     let closure = super.method;
-    
+
     return closure;
   }
 }

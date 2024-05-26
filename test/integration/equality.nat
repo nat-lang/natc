@@ -47,9 +47,11 @@ class C' extends Comparable {
 let c1 = C'(1);
 let c2 = C'(2);
 
+// invokes Comparable.__eq__.
 assert(c1 == a);
 assert(c2 != a);
 assert(c2 == c);
 
+// invokes C'.__eq__.
 assert(c1 == c2);
 assert(c2 != c1);

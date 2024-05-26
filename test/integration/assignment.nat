@@ -1,0 +1,38 @@
+
+// assignment of a global from an immediate lambda invocation.
+
+let a = (() => {
+  return 1 + 1;
+})();
+
+assert(a == 2);
+
+// assignment of a global property from an immediate lambda invocation.
+
+class A {}
+
+let a = A();
+a.z = (() => {
+  return 1 + 1;
+})();
+
+// assignment of a local from an immediate lambda invocation.
+
+(() => {
+  let a = (() => {
+    return 1 + 2;
+  })();
+
+  assert(a == 3);
+})();
+
+// assignment of a local property from an immediate lambda invocation.
+
+(() => {
+  let a = A();
+  a.z = (() => {
+    return 1 + 4;
+  })();
+
+  assert(a.z == 5);
+})();
