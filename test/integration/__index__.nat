@@ -17,6 +17,7 @@ import test/integration/logic
 import test/integration/math
 import test/integration/map
 import test/integration/membership
+import test/integration/native
 import test/integration/object
 import test/integration/recursion
 import test/integration/return

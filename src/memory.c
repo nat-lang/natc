@@ -79,10 +79,18 @@ static void blackenObject(Obj* object) {
 #endif
 
   switch (object->type) {
-    case OBJ_BOUND_METHOD: {
-      ObjBoundMethod* bound = (ObjBoundMethod*)object;
-      markValue(bound->receiver);
-      markObject((Obj*)bound->method);
+    case OBJ_BOUND_FUNCTION: {
+      ObjBoundFunction* obj = (ObjBoundFunction*)object;
+      markValue(obj->receiver);
+
+      switch (obj->type) {
+        case BOUND_METHOD: {
+          markObject((Obj*)obj->bound.method);
+          break;
+        }
+        case BOUND_NATIVE:
+          break;
+      }
       break;
     }
     case OBJ_CLASS: {
@@ -137,8 +145,8 @@ static void freeObject(Obj* object) {
 #endif
 
   switch (object->type) {
-    case OBJ_BOUND_METHOD:
-      FREE(ObjBoundMethod, object);
+    case OBJ_BOUND_FUNCTION:
+      FREE(ObjBoundFunction, object);
       break;
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
