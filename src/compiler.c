@@ -691,9 +691,11 @@ static void super_(bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
   uint16_t name = identifierConstant(&parser.previous);
 
+  namedVariable(syntheticToken("this"), false);
+
   if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
-    namedVariable(syntheticToken("this"), false);
+
     namedVariable(syntheticToken("super"), false);
     emitConstInstr(OP_SUPER_INVOKE, name);
     emitByte(argCount);

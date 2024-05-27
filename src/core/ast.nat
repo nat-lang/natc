@@ -7,7 +7,7 @@ class ASTStatement extends ASTNode {
 }
 
 class ASTExpr extends ASTNode {
-  init (data) => {
+  init(data) => {
     this.data = data;
     this.children = [];
   }
