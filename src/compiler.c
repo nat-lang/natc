@@ -1237,7 +1237,7 @@ static void letDeclaration() {
 
       consume(TOKEN_RIGHT_PAREN, "Expect closing ')'.");
     } else {
-      infixPrecedence = PREC_CALL;
+      infixPrecedence = PREC_FACTOR;
     }
   }
   uint16_t var = parseVariable("Expect variable name.");
