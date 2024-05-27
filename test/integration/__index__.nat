@@ -3,6 +3,7 @@ import test/utils
 let conclude = begin();
 
 import test/integration/affix
+import test/integration/assignment
 import test/integration/block
 import test/integration/class
 import test/integration/closure

@@ -468,11 +468,7 @@ static uint8_t addLocal(Token name) {
   return current->localCount - 1;
 }
 
-static uint8_t declareVariable() {
-  if (current->scopeDepth == 0) return 0;
-
-  Token* name = &parser.previous;
-
+static uint8_t declareLocal(Token* name) {
   for (int i = current->localCount - 1; i >= 0; i--) {
     Local* local = &current->locals[i];
     if (local->depth != -1 && local->depth < current->scopeDepth) {
@@ -487,10 +483,21 @@ static uint8_t declareVariable() {
   return addLocal(*name);
 }
 
+static uint8_t declareVariable() {
+  if (current->scopeDepth == 0) return 0;
+
+  return declareLocal(&parser.previous);
+}
+
 static uint16_t nativeVariable(char* name) {
   uint16_t var = makeConstant(identifier(name));
   emitConstInstr(OP_GET_GLOBAL, var);
   return var;
+}
+
+void getProperty(char* name) {
+  uint16_t var = makeConstant(INTERN(name));
+  emitConstInstr(OP_GET_PROPERTY, var);
 }
 
 static uint8_t argumentList() {
@@ -538,7 +545,14 @@ static void property(bool canAssign) {
   uint16_t name = identifierConstant(&parser.previous);
 
   if (canAssign && match(TOKEN_EQUAL)) {
+    // if we're here, then there's a value on the stack
+    // that's not reflected in the local count. that won't
+    // matter *unless* we're assigning a comprehension, which
+    // allocates its own locals in the *same scope* as the
+    // assignment.
+    current->localCount++;
     expression();
+    current->localCount--;
     emitConstInstr(OP_SET_PROPERTY, name);
   } else if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
@@ -684,10 +698,9 @@ static void super_(bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
   uint16_t name = identifierConstant(&parser.previous);
 
-  namedVariable(syntheticToken("this"), false);
-
   if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
+    namedVariable(syntheticToken("this"), false);
     namedVariable(syntheticToken("super"), false);
     emitConstInstr(OP_SUPER_INVOKE, name);
     emitByte(argCount);
@@ -878,42 +891,38 @@ static Iterator iterator() {
   Iterator iter;
   initIterator(&iter);
 
-  // consume the identifier.
-  consume(TOKEN_IDENTIFIER, "Expect variable name.");
-
   // store the bound variable.
-  loadConstant(NIL_VAL);
-  iter.var = declareVariable();
-  markInitialized();
+  iter.var = parseVariable("Expect identifier.");
+  emitByte(OP_NIL);
+  defineVariable(iter.var);
 
-  consume(TOKEN_IN, "Expect 'in' between identifier and sequence.");
+  consume(TOKEN_IN, "Expect 'in' between identifier and iterable.");
 
-  // initialize the iterator object, adjusting the local
-  // count to reflect the iter fn's presence on the stack
-  // during the iterator-yielding expression.
-  nativeVariable(S_ITER);
-  current->localCount++;
+  // the potentially iterable expression.
   expression();
-  emitBytes(OP_CALL, 1);
-  current->localCount--;
 
-  // store it.
+  // turn the expression into an iterator instance and store it.
+  nativeVariable(S_ITER);
+  emitBytes(OP_CALL_POSTFIX, 1);
   iter.iter = addLocal(syntheticToken("#iter"));
   markInitialized();
 
   iter.loopStart = currentChunk()->count;
+
   return iter;
 }
 
 static int iterationNext(Iterator iter) {
-  // call "more" on the iterator and bail if false.
+  // more().
   emitConstInstr(OP_GET_LOCAL, iter.iter);
-
   methodCall("more", 0);
+
+  // jump out of the loop if more() false.
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
+  // condition.
   emitByte(OP_POP);
 
-  // otherwise continue iterating.
+  // next().
   emitConstInstr(OP_GET_LOCAL, iter.iter);
   methodCall("next", 0);
   emitConstInstr(OP_SET_LOCAL, iter.var);
@@ -925,14 +934,21 @@ static int iterationNext(Iterator iter) {
 static void iterationEnd(Iterator iter, int exitJump) {
   emitLoop(iter.loopStart);
   patchJump(exitJump);
-  emitByte(OP_POP);  // jump condition.
+  // condition.
+  emitByte(OP_POP);
+}
+static void forInStatement() {
+  Iterator iter = iterator();
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
+  int exitJump = iterationNext(iter);
+  statement();
+  iterationEnd(iter, exitJump);
 }
 
 // Parse a comprehension, given the stack address [var] of the
 // sequence under construction and the type of [closingToken].
 Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   Iterator iter;
-  initIterator(&iter);
 
   int exitJump = 0;
   int predJump = 0;
@@ -969,15 +985,12 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    // load the comprehension instance, offsetting the local
-    // count appropriately, and append the expression.
-    emitConstInstr(OP_GET_LOCAL, var);
-    current->localCount++;
+    // load the comprehension instance and append the expression.
     expression();
-    methodCall(S_PUSH, 1);
-    // pop the comprehension instance.
-    current->localCount--;
-    emitByte(OP_POP);
+    emitConstInstr(OP_GET_LOCAL, var);
+    getProperty(S_PUSH);
+    emitBytes(OP_CALL_POSTFIX, 1);
+    emitByte(OP_POP);  // comprehension instance.
   }
 
   if (isIteration) {
@@ -1071,7 +1084,7 @@ static void finishMapVal() {
 }
 
 static void finishSetVal() {
-  loadConstant(BOOL_VAL(true));
+  emitByte(OP_TRUE);
   emitByte(OP_SUBSCRIPT_SET);
 }
 
@@ -1240,8 +1253,9 @@ static void letDeclaration() {
       infixPrecedence = PREC_CALL;
     }
   }
+
   uint16_t var = parseVariable("Expect variable name.");
-  emitByte(OP_NIL);
+  emitByte(OP_UNDEFINED);
   defineVariable(var);
 
   if (match(TOKEN_EQUAL)) {
@@ -1253,19 +1267,19 @@ static void letDeclaration() {
     emitByte(OP_NIL);
   }
 
-  if (current->scopeDepth > 0)
+  if (current->scopeDepth > 0) {
     emitConstInstr(OP_SET_LOCAL, var);
-  else
+  } else {
     emitConstInstr(OP_SET_GLOBAL, var);
 
-  emitByte(OP_POP);
-
-  consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
-
-  if (infixPrecedence != -1) {
-    Value name = currentChunk()->constants.values[var];
-    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
+    if (infixPrecedence != -1) {
+      Value name = currentChunk()->constants.values[var];
+      mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
+    }
   }
+
+  emitByte(OP_POP);
+  consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 }
 
 static void expressionStatement() {
@@ -1291,21 +1305,12 @@ static int loopIncrement(int loopStart) {
   int incrementStart = currentChunk()->count;
   expression();
   emitByte(OP_POP);
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
 
   emitLoop(loopStart);
   patchJump(bodyJump);
 
   return incrementStart;
-}
-
-// Invokes the iteration protocol.
-static void forInStatement() {
-  Iterator iter = iterator();
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
-  int exitJump = iterationNext(iter);
-  statement();
-  iterationEnd(iter, exitJump);
 }
 
 static void forConditionStatement() {

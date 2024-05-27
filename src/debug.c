@@ -74,6 +74,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
 
   uint8_t instruction = chunk->code[offset];
   switch (instruction) {
+    case OP_UNDEFINED:
+      return simpleInstruction("OP_UNDEFINED", offset);
     case OP_CONSTANT:
       return constantInstruction("OP_CONSTANT", chunk, offset);
     case OP_NIL:

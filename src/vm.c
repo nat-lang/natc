@@ -431,6 +431,9 @@ InterpretResult vmExecute(int baseFrame) {
     uint8_t instruction;
 
     switch (instruction = READ_BYTE()) {
+      case OP_UNDEFINED:
+        vmPush(UNDEF_VAL);
+        break;
       case OP_CONSTANT: {
         Value constant = READ_CONSTANT();
         vmPush(constant);
@@ -559,7 +562,7 @@ InterpretResult vmExecute(int baseFrame) {
         Value value = NIL_VAL;
 
         getObjectProperty(AS_CLASS(vmPeek(0))->fields, name, &value);
-        vmPop();  // superclass;
+        vmPop();  // super;
         vmPush(value);
 
         break;

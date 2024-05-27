@@ -148,7 +148,7 @@ assert(seq == [
   [4,4]
 ]);
 
-// nested body comprehension.
+// body comprehension.
 
 seq = [[true | b in a] | a in [[1,2],[3], [4,5]]];
 assert(seq == [
@@ -157,16 +157,39 @@ assert(seq == [
   [true, true]
 ]);
 
+// nested body comprehension.
+
+seq = [[[c | c in b] | b in a] | a in [[[1,2]],[[3]], [[4,5]]]];
+assert(seq == [[[1,2]],[[3]], [[4,5]]]);
+
 // nested condition comprehension.
+
+seq = [x | x in [a | a in [1,2,3]]];
+assert(seq == [1,2,3]);
+
+// nested condition comprehension, rebound variable.
 
 seq = [a | a in [a | a in [1,2,3]]];
 assert(seq == [1,2,3]);
 
 // assignment to a local.
 
-let f = () => {
+(() => {
   let seq = [x | x in [1,2,3]];
-  return seq;
-};
+  assert(seq == [1,2,3]);
+})();
 
-assert(f() == [1,2,3]);
+// assignment to a global property.
+
+class A {}
+let a = A();
+a.y = [z | z in [1,2]];
+assert(a.y == [1,2]);
+
+// assignment to a local property.
+
+(() => {
+  let a = A();
+  a.y = [z | z in [1,2]];
+  assert(a.y == [1,2]);
+})();

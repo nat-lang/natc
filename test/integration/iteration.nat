@@ -1,5 +1,6 @@
 
 // native for-loop.
+
 for (let i = 0; i < 10; i = i + 1) {
   assert(i < 10 and i >= 0);
 }
@@ -15,12 +16,18 @@ while (i < 10) {
 
 // core sequence iteration.
 
+for (y in []) {
+  assert(false);
+}
+
 for (y in [1,2,3]) {
   assert(y == 1 or y == 2 or y == 3);
 }
 
-for (y in []) {
-  assert(false);
+for (x in [[1,2], [3,4]]) {
+  for (a in x) {
+    assert(a == 1 or a == 2 or a == 3 or a == 4);
+  }
 }
 
 // iteration protocol.
@@ -47,9 +54,12 @@ assert(len(iterator) == 3);
 
 assert(iterator.next() == "a");
 assert(len(iterator) == 2);
+assert(iterator.more());
 
 assert(iterator.next() == "b");
 assert(len(iterator) == 1);
+assert(iterator.more());
 
 assert(iterator.next() == "c");
 assert(len(iterator) == 0);
+assert(!iterator.more());

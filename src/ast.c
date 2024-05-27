@@ -59,6 +59,12 @@ bool readAST(ObjClosure* closure) {
     uint8_t instruction = READ_BYTE();
 
     switch (instruction) {
+      case OP_UNDEFINED: {
+        vmPush(root);
+        vmPush(UNDEF_VAL);
+        if (!executeMethod("opLiteral", 1)) return false;
+        break;
+      }
       case OP_CONSTANT: {
         vmPush(root);
         vmPush(READ_CONSTANT());
