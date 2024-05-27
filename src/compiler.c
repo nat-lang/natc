@@ -675,13 +675,6 @@ static void infix(bool canAssign) {
   }
 }
 
-static Token syntheticToken(const char* text) {
-  Token token;
-  token.start = text;
-  token.length = (int)strlen(text);
-  return token;
-}
-
 static void super_(bool canAssign) {
   if (currentClass == NULL) {
     error("Can't use 'super' outside of a class.");
@@ -691,18 +684,11 @@ static void super_(bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
   uint16_t name = identifierConstant(&parser.previous);
 
+  // load the instance first, which is necessary for
+  // binding any method detached from the superclass.
   namedVariable(syntheticToken("this"), false);
-
-  if (match(TOKEN_LEFT_PAREN)) {
-    uint8_t argCount = argumentList();
-
-    namedVariable(syntheticToken("super"), false);
-    emitConstInstr(OP_SUPER_INVOKE, name);
-    emitByte(argCount);
-  } else {
-    namedVariable(syntheticToken("super"), false);
-    emitConstInstr(OP_GET_SUPER, name);
-  }
+  namedVariable(syntheticToken("super"), false);
+  emitConstInstr(OP_GET_SUPER, name);
 }
 
 static void this_(bool canAssign) {
@@ -794,19 +780,19 @@ static void boundExpression(Token name) {
 }
 
 static void whiteDelimitedExpression() {
-  if (tryFunction(TYPE_ANONYMOUS, newToken("lambda", 6))) return;
+  if (tryFunction(TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
 
   parseDelimitedPrecedence(PREC_ASSIGNMENT, prevWhite);
 }
 
 void inlineTypeExpression() {
-  if (tryFunction(TYPE_ANONYMOUS, newToken("lambda", 6))) return;
+  if (tryFunction(TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
 
   parsePrecedence(PREC_INLINE_TYPE);
 }
 
 static void expression() {
-  if (tryFunction(TYPE_ANONYMOUS, newToken("lambda", 6))) return;
+  if (tryFunction(TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -1564,7 +1550,7 @@ static void parseDelimitedPrecedence(Precedence precedence, DelimitFn delimit) {
   ParseFn prefixRule = getRule(parser.previous)->prefix;
 
   if (prefixRule == NULL) {
-    error("Expect expression (1).");
+    error("Expect expression.");
     return;
   }
 
@@ -1577,7 +1563,7 @@ static void parseDelimitedPrecedence(Precedence precedence, DelimitFn delimit) {
     ParseFn infixRule = getRule(parser.previous)->infix;
 
     if (infixRule == NULL) {
-      error("Expect expression (2).");
+      error("Expect expression.");
       return;
     }
 
@@ -1598,7 +1584,7 @@ ObjFunction* compile(const char* source, char* path) {
   initParser(sc);
 
   Compiler compiler;
-  initCompiler(&compiler, TYPE_SCRIPT, newToken(path, strlen(path)));
+  initCompiler(&compiler, TYPE_SCRIPT, syntheticToken(path));
 
   while (!match(TOKEN_EOF)) {
     declaration();

@@ -329,10 +329,10 @@ bool vmCallValue(Value callee, int argCount) {
 
 static void bindClosure(Value receiver, Value* value) {
   if (IS_CLOSURE(*value)) {
-    ObjBoundFunction* obj = newBoundMethod(vmPeek(0), AS_CLOSURE(*value));
+    ObjBoundFunction* obj = newBoundMethod(receiver, AS_CLOSURE(*value));
     *value = OBJ_VAL(obj);
   } else if (IS_NATIVE(*value)) {
-    ObjBoundFunction* obj = newBoundNative(vmPeek(0), AS_NATIVE(*value));
+    ObjBoundFunction* obj = newBoundNative(receiver, AS_NATIVE(*value));
     *value = OBJ_VAL(obj);
   }
 }
@@ -571,8 +571,11 @@ InterpretResult vmExecute(int baseFrame) {
         Value value = NIL_VAL;
 
         mapGet(&AS_CLASS(vmPeek(0))->fields, name, &value);
-        bindClosure(vmPeek(0), &value);
-        vmPop();  // superclass;
+
+        bindClosure(vmPeek(1), &value);
+
+        vmPop();  // superclass.
+        vmPop();  // instance.
         vmPush(value);
 
         break;
@@ -659,16 +662,6 @@ InterpretResult vmExecute(int baseFrame) {
         int argCount = READ_BYTE();
 
         if (!vmInvoke(method, argCount)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
-        frame = &vm.frames[vm.frameCount - 1];
-        break;
-      }
-      case OP_SUPER_INVOKE: {
-        ObjString* method = READ_STRING();
-        int argCount = READ_BYTE();
-        ObjClass* superclass = AS_CLASS(vmPop());
-        if (!invokeFromClass(superclass, method, argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
         frame = &vm.frames[vm.frameCount - 1];

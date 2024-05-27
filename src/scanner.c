@@ -20,11 +20,10 @@ void initToken(Token *token) {
   token->line = -1;
 }
 
-Token newToken(char *start, int length) {
+Token syntheticToken(const char *start) {
   Token token;
-  initToken(&token);
   token.start = start;
-  token.length = length;
+  token.length = (int)strlen(start);
   return token;
 }
 
