@@ -29,9 +29,9 @@ void vmRuntimeError(const char* format, ...) {
   fputs("\n", stderr);
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
-    vm.frame = &vm.frames[i];
-    ObjFunction* function = vm.frame->closure->function;
-    size_t instruction = vm.frame->ip - function->chunk.code - 1;
+    CallFrame* frame = &vm.frames[i];
+    ObjFunction* function = frame->closure->function;
+    size_t instruction = frame->ip - function->chunk.code - 1;
     fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
     if (function->name == NULL) {
       fprintf(stderr, "script\n");
@@ -121,8 +121,6 @@ bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
 
   if (!IS_INSTANCE(receiver)) {
-    disassembleStack();
-    printf("\n %s", name->chars);
     vmRuntimeError("Only instances have methods.");
     return false;
   }
@@ -269,10 +267,10 @@ static bool call(ObjClosure* closure, int argCount) {
     return false;
   }
 
-  vm.frame = &vm.frames[vm.frameCount++];
-  vm.frame->closure = closure;
-  vm.frame->ip = closure->function->chunk.code;
-  vm.frame->slots = vm.stackTop - argCount - 1;
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->closure = closure;
+  frame->ip = closure->function->chunk.code;
+  frame->slots = vm.stackTop - argCount - 1;
 
   return true;
 }
@@ -420,9 +418,7 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
 // middle of interpretation without overflowing its scope, we can
 // let [baseFrame] = the current frame.
 InterpretResult vmExecute(int baseFrame) {
-  vm.frame = &vm.frames[vm.frameCount - 1];
-
-  CallFrame* frame = vm.frame;
+  CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
   for (;;) {
     if (vm.frameCount == baseFrame) return INTERPRET_OK;

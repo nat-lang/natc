@@ -46,7 +46,6 @@ typedef struct {
 typedef struct {
   Value stack[STACK_MAX];
   Value* stackTop;
-  CallFrame* frame;
 
   CallFrame frames[FRAMES_MAX];
   int frameCount;
