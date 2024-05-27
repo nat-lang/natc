@@ -1,24 +1,8 @@
 
 class Tree extends Object {
-  init() => {
-    this.data = nil;
-    this.children = [];
-  }
-
-  setData(data) => {
+  init(data, children) => {
     this.data = data;
-    return this;
-  }
-
-  // Add a [child] to the tree, first converting it to a [Tree]
-  // object if it's not already. The compiler uses this method
-  // to build tree literals.
-  addChild(child) => {
-    if (type(child) != Tree)
-      child = Tree().setData(child);
-
-    this.children.push(child);
-    return this;
+    this.children = children;
   }
 
   // Subscript access is to children.
@@ -47,9 +31,7 @@ class Tree extends Object {
   }
 
   map(fn) => {
-    let tree = Tree();
-
-    tree.setData(fn(this.data));
+    let tree = Tree(fn(this.data), []);
 
     for (child in this.children)
       tree.children.push(child.map(fn));
@@ -71,3 +53,24 @@ class Tree extends Object {
       child.visit(fn, acc);
   }
 }
+
+class Leaf extends Tree {
+  init(data) => {
+    super.init(data, []);
+  }
+}
+
+// Functions for building tree literals during compilation.
+
+// Childless tree.
+let LeafNode = (data) => Tree(data, []);
+
+// Dataless tree.
+let Root = (*children) => Tree(nil, children);
+
+// Convert [data] to a [Tree] if it's not already.
+let Node = (value) => {
+  if (type(value) != Tree)
+    return LeafNode(value);
+  return value;
+};

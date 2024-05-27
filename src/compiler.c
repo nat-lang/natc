@@ -362,6 +362,23 @@ static void endScope() {
   }
 }
 
+static Compiler openFunction(FunctionType type, Token name) {
+  Compiler compiler;
+  initCompiler(&compiler, type, name);
+  beginScope();
+  return compiler;
+}
+
+static void closeFunction(Compiler compiler) {
+  ObjFunction* function = endCompiler();
+  emitConstInstr(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+
+  for (int i = 0; i < function->upvalueCount; i++) {
+    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+    emitByte(compiler.upvalues[i].index);
+  }
+}
+
 static void function(FunctionType type, Token name);
 static void expression();
 static void boundExpression(Token name);
@@ -534,14 +551,7 @@ static void property(bool canAssign) {
   uint16_t name = identifierConstant(&parser.previous);
 
   if (canAssign && match(TOKEN_EQUAL)) {
-    // if we're here, then there's a value on the stack
-    // that's not reflected in the local count. that won't
-    // matter *unless* we're assigning a comprehension, which
-    // allocates its own locals in the *same scope* as the
-    // assignment.
-    current->localCount++;
     expression();
-    current->localCount--;
     emitConstInstr(OP_SET_PROPERTY, name);
   } else if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
@@ -650,6 +660,12 @@ static void namedVariable(Token name, bool canAssign) {
 static int nativeCall(char* name, int argCount) {
   int address = nativeVariable(name);
   emitBytes(OP_CALL, argCount);
+  return address;
+}
+
+static int nativePostfix(char* name, int argCount) {
+  int address = nativeVariable(name);
+  emitBytes(OP_CALL_POSTFIX, argCount);
   return address;
 }
 
@@ -816,10 +832,7 @@ static void blockOrExpression() {
 }
 
 static void function(FunctionType type, Token name) {
-  Compiler compiler;
-  initCompiler(&compiler, type, name);
-
-  beginScope();
+  Compiler compiler = openFunction(type, name);
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
@@ -858,13 +871,7 @@ static void function(FunctionType type, Token name) {
 
   blockOrExpression();
 
-  ObjFunction* function = endCompiler();
-  emitConstInstr(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
-
-  for (int i = 0; i < function->upvalueCount; i++) {
-    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
-    emitByte(compiler.upvalues[i].index);
-  }
+  closeFunction(compiler);
 }
 
 static void method() {
@@ -985,7 +992,7 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    // load the comprehension instance and append the expression.
+    // parse the expression, load the comprehension, and append.
     expression();
     emitConstInstr(OP_GET_LOCAL, var);
     getProperty(S_PUSH);
@@ -1007,42 +1014,29 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
 
   return checkpointB;
 }
-
-// Find an occurance of '|' that isn't nested within
-// braces or brackets, given some [initialBraceDepth]
-// and [initialBracketDepth].
-bool advanceToPipe(int initialBraceDepth, int initialBracketDepth) {
-  int braceDepth = initialBraceDepth;
-  int bracketDepth = initialBracketDepth;
-
-  bool nested;
+// Find a pipe that isn't nested within [left] and [right].
+// Assume that the initial nesting depth is 1, i.e., that
+// we've already consumed an instance of [left].
+bool advanceToPipe(TokenType left, TokenType right) {
+  int depth = 1;
 
   for (;;) {
-    if (check(TOKEN_LEFT_BRACE)) braceDepth++;
-    if (check(TOKEN_RIGHT_BRACE)) braceDepth--;
+    if (check(left)) depth++;
+    if (check(right)) depth--;
 
-    if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
-    if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
-
-    nested = (braceDepth > initialBraceDepth) ||
-             (bracketDepth > initialBracketDepth);
-
-    if (check(TOKEN_PIPE) && !nested) return true;
-
-    if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1)
-      return false;
-    if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == initialBracketDepth - 1)
-      return false;
+    // found one.
+    if (check(TOKEN_PIPE) && depth == 1) return true;
+    // found none.
+    if (check(right) && depth == 0) return false;
 
     advance();
   }
 }
 
-static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
-                             int initialBracketDepth) {
+static bool tryComprehension(TokenType openingToken, TokenType closingToken) {
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe(initialBraceDepth, initialBracketDepth)) {
+  if (advanceToPipe(openingToken, closingToken)) {
     advance();  // eat the pipe.
 
     // the comprehension instance is on top of the stack now;
@@ -1068,12 +1062,54 @@ static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
   return false;
 }
 
+// Here we check if we're at a comprehension, and if we are, we parse it.
+// We wrap the comprehension in a closure so that it has its own frame
+// of locals.
+static bool tryFunctionalComprehension(TokenType openingToken,
+                                       TokenType closingToken) {
+  // we need to save our location for two reasons:
+  // (a) if it *is* a comprehension, we can't parse the body
+  //  until we've parsed the conditions;
+  // (b) if it *isn't*, we need to rewind after we've looked ahead
+  //  to establish that it isn't.
+  Parser checkpointA = saveParser();
+
+  if (advanceToPipe(openingToken, closingToken)) {
+    advance();  // eat the pipe.
+
+    Compiler compiler =
+        openFunction(TYPE_ANONYMOUS, syntheticToken("#comprehension"));
+
+    // the comprehension instance is local 0; we'll need to refer to it
+    // when we hit the bottom of the condition clauses.
+    nativeCall(S_SEQUENCE, 0);
+    int var = addLocal(syntheticToken("#comprehension"));
+    markInitialized();
+
+    Parser checkpointB = comprehension(checkpointA, var, closingToken);
+
+    // return the comprehension and call the closure immediately.
+    emitByte(OP_RETURN);
+    closeFunction(compiler);
+    emitBytes(OP_CALL, 0);
+
+    // finally we pick up at the end of the expression.
+    gotoParser(checkpointB);
+
+    return true;
+  }
+
+  // otherwise rewind.
+  gotoParser(checkpointA);
+  return false;
+}
+
 static bool trySetComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACE, 1, 0);
+  return tryComprehension(TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE);
 }
 
 static bool trySeqComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACKET, 0, 1);
+  return tryFunctionalComprehension(TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET);
 }
 
 static void finishMapVal() {
@@ -1135,39 +1171,63 @@ static void braces(bool canAssign) {
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
-// A tree literal, sequence literal, or sequence comprehension.
-static void brackets(bool canAssign) {
-  int klass = nativeCall(S_SEQUENCE, 0);
+// Parse a sequence if appropriate and indicate if it is.
+static bool sequence() {
+  int elements = 0;
 
-  // empty brackets is an empty sequence.
-  if (check(TOKEN_RIGHT_BRACKET)) return advance();
-  if (trySeqComprehension()) {
-    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
-    return;
+  // empty seq.
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    nativeCall(S_SEQUENCE, elements);
+    return true;
   }
 
-  // first datum.
+  if (trySeqComprehension()) return true;
+
+  // first datum. could be a tree node or a seq element.
   whiteDelimitedExpression();
+  elements++;
 
-  // it's a sequence.
-  if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    methodCall(S_PUSH, 1);
-
-    while (match(TOKEN_COMMA)) {
-      expression();
-      methodCall(S_PUSH, 1);
-    }
-  } else {
-    // it's a tree.
-    currentChunk()->constants.values[klass] = INTERN("Tree");
-    methodCall("addChild", 1);
-
-    // and it may have branches.
-    while (!check(TOKEN_RIGHT_BRACKET)) {
-      whiteDelimitedExpression();
-      methodCall("addChild", 1);
-    }
+  // singleton.
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    nativePostfix(S_SEQUENCE, elements);
+    return true;
   }
+
+  if (match(TOKEN_COMMA)) {
+    do {
+      expression();
+      elements++;
+    } while (match(TOKEN_COMMA));
+    nativePostfix(S_SEQUENCE, elements);
+
+    return true;
+  }
+
+  return false;
+}
+
+void tree() {
+  // if we're here, the sequence check has already
+  // parsed the first element.
+  int elements = 1;
+
+  // make a node of it.
+  nativePostfix("Node", 1);
+
+  // and now the children.
+  while (!check(TOKEN_RIGHT_BRACKET)) {
+    whiteDelimitedExpression();
+    nativePostfix("Node", 1);
+    elements++;
+  }
+
+  // now the root.
+  nativePostfix("Root", elements);
+}
+
+// A sequence literal, sequence comprehension, or tree.
+static void brackets(bool canAssign) {
+  if (!sequence()) tree();
 
   consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }

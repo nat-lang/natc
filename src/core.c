@@ -47,20 +47,25 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
-ObjSequence* __sequentialInit__(ObjInstance* obj) {
+ObjSequence* __sequentialInit__(int argCount) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
+
   vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
   mapSet(&obj->fields, vmPeek(1), vmPeek(0));
   vmPop();
   vmPop();
+
+  int i = argCount;
+  while (i-- > 0) writeValueArray(&seq->values, vmPeek(i));
+  while (++i < argCount) vmPop();
+
   return seq;
 }
 
 bool __sequenceInit__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
-
-  __sequentialInit__(obj);
+  __sequentialInit__(argCount);
 
   return true;
 }
@@ -100,12 +105,7 @@ bool __sequencePop__(int argCount, Value* args) {
 }
 
 bool __tupleInit__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
-  ObjSequence* seq = __sequentialInit__(obj);
-
-  int i = argCount;
-  while (i-- > 0) writeValueArray(&seq->values, vmPeek(i));
-  while (++i < argCount) vmPop();
+  __sequentialInit__(argCount);
 
   return true;
 }
@@ -397,7 +397,7 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_INIT, 0, true, __tupleInit__, vm.classes.tuple);
 
   vm.classes.sequence = getClass(S_SEQUENCE);
-  defineNativeFnMethod(S_INIT, 0, false, __sequenceInit__, vm.classes.sequence);
+  defineNativeFnMethod(S_INIT, 0, true, __sequenceInit__, vm.classes.sequence);
   defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.classes.sequence);
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.classes.sequence);
 
