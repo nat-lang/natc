@@ -957,23 +957,18 @@ static void forInStatement() {
 Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   Iterator iter;
 
-  int exitJump = 0;
-  int predJump = 0;
-  bool isIteration = false;
-  bool isPredicate = false;
+  int iterJump = -1;
+  int predJump = -1;
+
   Parser checkpointB = checkpointA;
 
   if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
     // bound variable and iterable to draw from.
-    isIteration = true;
-
     beginScope();
     iter = iterator();
-    exitJump = iterationNext(iter);
+    iterJump = iterationNext(iter);
   } else {
     // a predicate to test against.
-    isPredicate = true;
-
     expression();
     predJump = emitJump(OP_JUMP_IF_FALSE);
     emitByte(OP_POP);
@@ -995,21 +990,23 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     // parse the expression, load the comprehension, and append.
     expression();
     emitConstInstr(OP_GET_LOCAL, var);
-    getProperty(S_PUSH);
+    getProperty(S_ADD);
     emitBytes(OP_CALL_POSTFIX, 1);
     emitByte(OP_POP);  // comprehension instance.
   }
 
-  if (isIteration) {
-    iterationEnd(iter, exitJump);
+  if (iterJump != -1) {
+    iterationEnd(iter, iterJump);
     endScope();
-  } else if (isPredicate) {
+  } else if (predJump != -1) {
     // we need to jump over this last condition.
     // pop if the condition was truthy.
     int elseJump = emitJump(OP_JUMP);
     patchJump(predJump);
     emitByte(OP_POP);
     patchJump(elseJump);
+  } else {
+    error("Comprehension requires at least one clause.");
   }
 
   return checkpointB;
@@ -1033,40 +1030,12 @@ bool advanceToPipe(TokenType left, TokenType right) {
   }
 }
 
-static bool tryComprehension(TokenType openingToken, TokenType closingToken) {
-  Parser checkpointA = saveParser();
-
-  if (advanceToPipe(openingToken, closingToken)) {
-    advance();  // eat the pipe.
-
-    // the comprehension instance is on top of the stack now;
-    // we'll need to refer to it when we hit the bottom
-    // of the condition clauses. we'll also need the local
-    // slots to be offset by 1.
-    int var = addLocal(syntheticToken("#comprehension"));
-    markInitialized();
-
-    Parser checkpointB = comprehension(checkpointA, var, closingToken);
-
-    // reclaim the local slot but leave the sequence instance
-    // on the stack.
-    current->localCount--;
-
-    // finally we pick up at the end of the expression.
-    gotoParser(checkpointB);
-
-    return true;
-  }
-
-  gotoParser(checkpointA);
-  return false;
-}
-
 // Here we check if we're at a comprehension, and if we are, we parse it.
 // We wrap the comprehension in a closure so that it has its own frame
-// of locals.
-static bool tryFunctionalComprehension(TokenType openingToken,
-                                       TokenType closingToken) {
+// of locals during construction. We then invoke the closure immediately,
+// returning the actual comprehension object.
+static bool tryComprehension(char* klass, TokenType openingToken,
+                             TokenType closingToken) {
   // we need to save our location for two reasons:
   // (a) if it *is* a comprehension, we can't parse the body
   //  until we've parsed the conditions;
@@ -1080,9 +1049,9 @@ static bool tryFunctionalComprehension(TokenType openingToken,
     Compiler compiler =
         openFunction(TYPE_ANONYMOUS, syntheticToken("#comprehension"));
 
-    // the comprehension instance is local 0; we'll need to refer to it
+    // the comprehension instance is local 0. we'll load it
     // when we hit the bottom of the condition clauses.
-    nativeCall(S_SEQUENCE, 0);
+    nativeCall(klass, 0);
     int var = addLocal(syntheticToken("#comprehension"));
     markInitialized();
 
@@ -1105,67 +1074,66 @@ static bool tryFunctionalComprehension(TokenType openingToken,
 }
 
 static bool trySetComprehension() {
-  return tryComprehension(TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE);
+  return tryComprehension(S_SET, TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE);
 }
 
 static bool trySeqComprehension() {
-  return tryFunctionalComprehension(TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET);
-}
-
-static void finishMapVal() {
-  consume(TOKEN_COLON, "Expect ':' after map key.");
-  // value.
-  expression();
-  emitByte(OP_SUBSCRIPT_SET);
-}
-
-static void finishSetVal() {
-  emitByte(OP_TRUE);
-  emitByte(OP_SUBSCRIPT_SET);
+  return tryComprehension(S_SEQUENCE, TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET);
 }
 
 // A map literal, set literal, or set comprehension.
 static void braces(bool canAssign) {
-  int klass = nativeCall(S_SET, 0);
+  int elements = 0;
 
   // empty braces is an empty set.
-  if (check(TOKEN_RIGHT_BRACE)) return advance();
+  if (check(TOKEN_RIGHT_BRACE)) {
+    advance();
+    nativeCall(S_SET, elements);
+    return;
+  }
+
   if (trySetComprehension()) {
     consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
     return;
   }
+
   // first element: either a map key or a set element.
   // we need to advance this far in order to check the
   // next token.
   expression();
+  elements++;
 
   // it's a singleton set.
   if (check(TOKEN_RIGHT_BRACE)) {
-    finishSetVal();
+    nativePostfix(S_SET, elements);
 
   } else if (check(TOKEN_COMMA)) {
     // it's a |set| > 1 .
     advance();
 
-    finishSetVal();
     do {
       expression();
-      finishSetVal();
+      elements++;
+
     } while (match(TOKEN_COMMA));
 
+    nativePostfix(S_SET, elements);
   } else if (check(TOKEN_COLON)) {
-    // otherwise it's a map: backpatch the class.
-    // TODO: now that we have a postfix operation, we should
-    // use that here instead of backpatching.
-    currentChunk()->constants.values[klass] = INTERN(S_MAP);
+    // it's a map.
 
-    // finish the first key/val pair, then any remaining elements.
-    finishMapVal();
+    advance();     // colon.
+    expression();  // value.
+    nativePostfix(S_TUPLE, 2);
 
     while (match(TOKEN_COMMA)) {
-      expression();
-      finishMapVal();
+      expression();  // key
+      consume(TOKEN_COLON, "Expect ':' after map key.");
+      expression();  // value.
+      nativePostfix(S_TUPLE, 2);
+      elements++;
     }
+
+    nativePostfix(S_MAP, elements);
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");

@@ -268,10 +268,10 @@ class TypeState {
         let left = constraint.left;
         let right = constraint.right;
 
-        this.constraints.add(
+        this.constraints.extend([
           Constraint(left.domain, right.domain),
           Constraint(left.range, right.range)
-        );
+        ]);
       } else if (constraint.left != constraint.right) {
         unsolved.push(constraint);
       }

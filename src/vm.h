@@ -89,6 +89,7 @@ void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
 bool vmInitInstance(ObjClass* klass, int argCount, int frames);
+bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
 bool vmCallValue(Value value, int argCount);

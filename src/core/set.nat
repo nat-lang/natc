@@ -1,7 +1,12 @@
 
+
 class Set extends Object {
-  init() => {
+  init(*elements) => {
     this.map = Map();
+
+    for (let i = 0; i < len(elements); i = i + 1) {
+      this.map[elements[i]] = true;
+    }
   }
 
   // The elements of the set are the keys of the underlying map.
@@ -19,13 +24,8 @@ class Set extends Object {
   __get__(key) => this.map[key];
   __in__(key) => key in this.map;
 
+  // The compiler uses this method when building set comprehensions.
   add(element) => this.__set__(element, true);
-
-  // The compiler calls this method when building a set comprehension.
-  // The name may be misleading, as the set of course does not track
-  // the order of its elements. It's simply to provide a uniform
-  // interface for comprehension construction across sequence and sets.
-  push(element) => this.add(element);
 
   __len__() => len(this.elements());
 
