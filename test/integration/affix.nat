@@ -35,6 +35,13 @@ assert(5 plus 5 == 10);
 assert(5 times 5 == 25);
 assert(5 plus 5 times 2 == 15);
 
+// default less than less than property
+// access (PREC_CALL).
+let infix @ = (x, y) => (x + y) / 2;
+class A { f() => 1; }
+
+assert(A().f() @ A().f() == 1);
+
 // simple assignment.
 
 let infix(5) f = __add__;
