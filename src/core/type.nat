@@ -89,15 +89,7 @@ class Constraint {
 }
 
 class Solution extends Map {
-  // fix me
-  // __iter__() => iter([Constraint(e[0], e[1]) | e in this.entries()]);
-
-  __iter__() => {
-    let seq = [];
-    for (x in this.entries())
-      seq.push(Constraint(x[0], x[1]));
-    return iter(seq);
-  }
+  __iter__() => iter([Constraint(e[0], e[1]) | e in this.entries()]);
 
   apply(c: Constraint) => {
     for (sub in this) {
@@ -195,9 +187,7 @@ class TypeState {
       if (len(params) == 0)
         return this.typeVars.fresh();
       if (len(params) == 1)
-        // fixme:
-        // return params[0] -> this.typeVars.fresh();
-        return TFunction(params[0], this.typeVars.fresh());
+        return params[0] -> this.typeVars.fresh();
       else
         return params -> this.typeVars.fresh();
     }
@@ -266,9 +256,6 @@ class TypeState {
 
   unify() => {
     let unsolved = [];
-
-    // fixme:
-    // [Constraint(x.left, x.right) | x in this.constraints];
     
     while (len(this.constraints) > 0) {
       let constraint = this.constraints.pop();
@@ -281,10 +268,10 @@ class TypeState {
         let left = constraint.left;
         let right = constraint.right;
 
-        this.constraints.add(
+        this.constraints.extend([
           Constraint(left.domain, right.domain),
           Constraint(left.range, right.range)
-        );
+        ]);
       } else if (constraint.left != constraint.right) {
         unsolved.push(constraint);
       }

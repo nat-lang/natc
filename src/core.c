@@ -5,14 +5,6 @@
 #include <string.h>
 #include <time.h>
 
-static bool executeMethod(char* method, int argCount) {
-  return vmExecuteMethod(method, argCount, 0);
-}
-
-static bool initInstance(ObjClass* klass, int argCount) {
-  return vmInitInstance(klass, argCount, 0);
-}
-
 static void defineNativeFn(char* name, int arity, bool variadic,
                            NativeFn function, ObjMap* dest) {
   // keep the values on the stack so they're
@@ -47,20 +39,25 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
-ObjSequence* __sequentialInit__(ObjInstance* obj) {
+ObjSequence* __sequentialInit__(int argCount) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
+
   vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
   mapSet(&obj->fields, vmPeek(1), vmPeek(0));
   vmPop();
   vmPop();
+
+  int i = argCount;
+  while (i-- > 0) writeValueArray(&seq->values, vmPeek(i));
+  while (++i < argCount) vmPop();
+
   return seq;
 }
 
 bool __sequenceInit__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
-
-  __sequentialInit__(obj);
+  __sequentialInit__(argCount);
 
   return true;
 }
@@ -100,12 +97,7 @@ bool __sequencePop__(int argCount, Value* args) {
 }
 
 bool __tupleInit__(int argCount, Value* args) {
-  ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
-  ObjSequence* seq = __sequentialInit__(obj);
-
-  int i = argCount;
-  while (i-- > 0) writeValueArray(&seq->values, vmPeek(i));
-  while (++i < argCount) vmPop();
+  __sequentialInit__(argCount);
 
   return true;
 }
@@ -131,15 +123,16 @@ bool __objKeys__(int argCount, Value* args) {
 
   // the key sequence.
   vmPush(OBJ_VAL(vm.classes.sequence));
-  if (!initInstance(vm.classes.sequence, 0)) return false;
+  if (!vmCallValue(vmPeek(0), 0)) return false;
 
   for (int i = 0; i < obj->fields.capacity; i++) {
     MapEntry* entry = &obj->fields.entries[i];
     if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
 
-    // add to sequence.
+    // add to sequence. seq's 'push' method
+    // leaves itself on the stack for us.
     vmPush(entry->key);
-    if (!executeMethod("push", 1)) return false;
+    if (!vmInvoke(intern("push"), 1)) return false;
   }
 
   Value keys = vmPop();
@@ -270,7 +263,7 @@ bool __globals__(int argCount, Value* args) {
   vmPop();  // native fn.
 
   vmPush(OBJ_VAL(vm.classes.map));
-  initInstance(vm.classes.map, 0);
+  vmInitInstance(vm.classes.map, 0, 1);
   mapAddAll(&vm.globals, &AS_INSTANCE(vmPeek(0))->fields);
 
   return true;
@@ -279,7 +272,7 @@ bool __globals__(int argCount, Value* args) {
 bool __globalTypeEnv__(int argCount, Value* args) {
   vmPop();  // native fn.
   vmPush(OBJ_VAL(newInstance(vm.classes.map)));
-  initInstance(vm.classes.map, 0);
+  vmInitInstance(vm.classes.map, 0, 1);
   mapAddAll(&vm.typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
   return true;
 }
@@ -397,13 +390,13 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_INIT, 0, true, __tupleInit__, vm.classes.tuple);
 
   vm.classes.sequence = getClass(S_SEQUENCE);
-  defineNativeFnMethod(S_INIT, 0, false, __sequenceInit__, vm.classes.sequence);
+  defineNativeFnMethod(S_INIT, 0, true, __sequenceInit__, vm.classes.sequence);
   defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.classes.sequence);
+  defineNativeFnMethod(S_ADD, 1, false, __sequencePush__, vm.classes.sequence);
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.classes.sequence);
 
   vm.classes.map = getClass(S_MAP);
   vm.classes.set = getClass(S_SET);
-  vm.classes.iterator = getClass(S_ITERATOR);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
 
   vm.classes.vTypeBool = getClass(S_CTYPE_BOOL);
