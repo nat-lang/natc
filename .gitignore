@@ -1,7 +1,7 @@
 build/**/*
 
 !build/Dockerfile
-!build/Dockerfile.valgrind
+!build/Dockerfile.linux
 !build/c.make
 !build/nat.entitlements
 
