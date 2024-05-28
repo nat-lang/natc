@@ -87,6 +87,8 @@ assert(check.failure());
 // inline type declaration (b).
 // --------------------------------------------
 
+// param constrains the function type.
+
 check = typecheck(() => {
   let k = (a: num) => a;
   k(1);
@@ -99,35 +101,68 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// homophonous local in adjacent scope.
+// multiple params constrain the function type.
 
 check = typecheck(() => {
-  let k = (a: num) => a;
-  let j = (a: string) => a;
-  k(1);
-});
-assert(check.success());
-
-check = typecheck(() => {
-  let k = (a: num) => a;
-  let j = (a: string) => a;
-  j(1);
-});
-assert(check.failure());
-
-// multiple params.
-
-check = typecheck(() => {
-  let f = (a: num, b: num) => a + b;
+  let k = (a: num, b: num) => a + b;
   k(1, 1);
 });
 assert(check.success());
 
 check = typecheck(() => {
-  let f = (a: num, b: num) => a + b;
+  let k = (a: num, b: num) => a + b;
   k(1, "a");
 });
+assert(check.failure());
+
+// param constrains the function body.
+
+let g: string -> string;
+let h: num -> num;
+
+check = typecheck((a: num) => h(a));
 assert(check.success());
+
+check = typecheck((a: num) => g(a));
+assert(check.failure());
+
+// multiple params constrain the function body.
+
+check = typecheck(
+  (a: num, b: num) => {
+    h(a);
+    h(b);
+  }
+);
+assert(check.success());
+
+check = typecheck(
+  (a: num, b: num) => {
+    h(a);
+    g(b);
+  }
+);
+assert(check.failure());
+
+// homographic local in adjacent scope.
+
+check = typecheck(() => {
+  let k = (a: num) => h(a);
+  let j = (a: string) => g(a);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num) => h(a);
+  let j = (a: string) => h(a);
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  let k = (a: num) => g(a);
+  let j = (a: string) => g(a);
+});
+assert(check.failure());
 
 // fn declarations constrained against their signatures.
 // --------------------------------------------

@@ -86,6 +86,10 @@ class Constraint {
       return this.right;
     return type;
   }
+  pp() => {
+    this.left.pp();
+    this.right.pp();
+  }
 }
 
 class Solution extends Map {
@@ -154,6 +158,8 @@ class TypeState {
     this.solution = Solution();
   }
 
+  // Look up the node in the [typeEnv]. If there's no
+  // type entry, then mint a type var.
   lookup(node: ASTVar) => {
     if (!this.typeEnv[node])
       this.typeEnv[node] = this.typeVars.fresh();
@@ -163,7 +169,9 @@ class TypeState {
 
   constrain(node) => {
     if (node is ASTClosure) {
-      let localEnv = node.signature.params.reduce(
+      // give the parameters type vars if they don't
+      // have annotations.
+      let fnEnv = node.signature.params.reduce(
         (env: Map, node: ASTLocalTypeAssignment) => {
           let var = node[0];
           let val = node[1];
@@ -171,19 +179,22 @@ class TypeState {
           let pType = val.resolve();
 
           if (pType == nil)
-            env[var.uuid] = this.typeVars.fresh();
+            env[var] = this.typeVars.fresh();
           else
-            env[var.uuid] = pType;
+            env[var] = pType;
 
           return env;
         },
         Map()
       );
 
-      let params = localEnv.values();
-
-      // this needs to happen in localEnv.
+      // since the param (types) are keyed by uuid,
+      // we can just update the global type env when
+      // checking the body of a function.
+      this.typeEnv.extend(fnEnv);
       node.children.map(this.constrain);
+
+      let params = fnEnv.values();
   
       // type of a constant function? type of return value(s)?
       if (len(params) == 0)
@@ -316,7 +327,7 @@ let typecheck = (expr) => {
   let annotations = globalTypeEnv();
 
   ast.visit((node, locals) => {
-    let rename = (node, env) => {
+    let rename = (node: ASTVar, env: Map) => {
       if (!env[node.data])
         env[node.data] = uuids.fresh();
       node.uuid = env[node.data];
@@ -324,8 +335,10 @@ let typecheck = (expr) => {
 
     if (node is ASTClosure) {
       let localEnv = Map();
-      for (param in node.signature.params)
-        rename(param, localEnv);
+      for (param in node.signature.params) {
+        let local = param[0];
+        rename(local, localEnv);
+      }
       return localEnv;
     }
   
