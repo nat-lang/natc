@@ -760,7 +760,7 @@ static bool peekSignature() {
       consumeQuietly(TOKEN_IDENTIFIER);
       if (check(TOKEN_COLON)) {
         advance();
-        expression();
+        consumeQuietly(TOKEN_IDENTIFIER);
       }
     } while (match(TOKEN_COMMA));
   }

@@ -1,6 +1,4 @@
 
-// seperate function and type declarations.
-// --------------------------------------------
 
 let f;
 let env;
@@ -101,6 +99,8 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
+// homophonous local in adjacent scope.
+
 check = typecheck(() => {
   let k = (a: num) => a;
   let j = (a: string) => a;
@@ -114,6 +114,20 @@ check = typecheck(() => {
   j(1);
 });
 assert(check.failure());
+
+// multiple params.
+
+check = typecheck(() => {
+  let f = (a: num, b: num) => a + b;
+  k(1, 1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let f = (a: num, b: num) => a + b;
+  k(1, "a");
+});
+assert(check.success());
 
 // fn declarations constrained against their signatures.
 // --------------------------------------------
