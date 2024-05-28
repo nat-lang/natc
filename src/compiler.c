@@ -362,13 +362,6 @@ static void endScope() {
   }
 }
 
-static Compiler openFunction(FunctionType type, Token name) {
-  Compiler compiler;
-  initCompiler(&compiler, type, name);
-  beginScope();
-  return compiler;
-}
-
 static void closeFunction(Compiler compiler) {
   ObjFunction* function = endCompiler();
   emitConstInstr(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
@@ -832,7 +825,9 @@ static void blockOrExpression() {
 }
 
 static void function(FunctionType type, Token name) {
-  Compiler compiler = openFunction(type, name);
+  Compiler compiler;
+  initCompiler(&compiler, type, name);
+  beginScope();
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
@@ -1046,8 +1041,9 @@ static bool tryComprehension(char* klass, TokenType openingToken,
   if (advanceToPipe(openingToken, closingToken)) {
     advance();  // eat the pipe.
 
-    Compiler compiler =
-        openFunction(TYPE_ANONYMOUS, syntheticToken("#comprehension"));
+    Compiler compiler;
+    initCompiler(&compiler, TYPE_ANONYMOUS, syntheticToken("#comprehension"));
+    beginScope();
 
     // the comprehension instance is local 0. we'll load it
     // when we hit the bottom of the condition clauses.
