@@ -192,6 +192,13 @@ assert(seq == [1,2,3]);
 seq = [a | a in [a | a in [a | a in [1,2,3]]]];
 assert(seq == [1,2,3]);
 
+// set comprehension in body.
+
+seq = [{a | a in b} | b in [[1,2], [3,4]]];
+
+assert({3,4} in seq);
+assert({1,2} in seq);
+
 // assignment to a local.
 
 (() => {

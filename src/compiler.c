@@ -213,8 +213,9 @@ static void emitByte(uint8_t byte) {
 }
 
 // Find a [token] that isn't nested within braces, brackets,
-// or parentheses. Consider the search complete when we find
-// a [closing] token at depth 0;
+// or parentheses. Assume that the initial nesting depth is 1,
+// so that the search is negative when we find a [closing] token
+// at depth 0.
 bool advanceTo(TokenType token, TokenType closing) {
   int depth = 1;
 
@@ -1024,25 +1025,6 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   return checkpointB;
 }
 
-// Find a pipe that isn't nested within [left] and [right].
-// Assume that the initial nesting depth is 1, i.e., that
-// we've already consumed an instance of [left].
-static bool advanceToPipe(TokenType left, TokenType right) {
-  int depth = 1;
-
-  for (;;) {
-    if (check(left)) depth++;
-    if (check(right)) depth--;
-
-    // found one.
-    if (check(TOKEN_PIPE) && depth == 1) return true;
-    // found none.
-    if (check(right) && depth == 0) return false;
-
-    advance();
-  }
-}
-
 // Here we check if we're at a comprehension, and if we are, we parse it.
 // We wrap the comprehension in a closure so that it has its own frame
 // of locals during construction. We then invoke the closure immediately,
@@ -1056,7 +1038,7 @@ static bool tryComprehension(char* klass, TokenType openingToken,
   //  to establish that it isn't.
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe(openingToken, closingToken)) {
+  if (advanceTo(TOKEN_PIPE, closingToken)) {
     advance();  // eat the pipe.
 
     Compiler compiler;
