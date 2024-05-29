@@ -528,7 +528,9 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_SET_PROPERTY: {
         if (!IS_INSTANCE(vmPeek(1)) && !IS_CLASS(vmPeek(1))) {
+          // printValue(vmPeek(1));
           vmRuntimeError("Only objects and classes have properties (set).");
+          return INTERPRET_RUNTIME_ERROR;
         }
 
         if (IS_INSTANCE(vmPeek(1)))
@@ -907,7 +909,7 @@ InterpretResult vmExecute(int baseFrame) {
         uint8_t slot = READ_SHORT();
         Value key = NUMBER_VAL(slot);
         mapSet(&frame->closure->typeEnv, key, vmPeek(0));
-        vmPop();  // type expression.
+        // vmPop();  // type expression.
         break;
       }
       case OP_SET_TYPE_GLOBAL: {
@@ -917,7 +919,7 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
         mapSet(&vm.typeEnv, name, vmPeek(0));
-        vmPop();  // type expression.
+        // vmPop();  // type expression.
         break;
       }
       default:

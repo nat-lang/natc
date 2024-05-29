@@ -641,6 +641,7 @@ static void namedVariable(Token name, bool canAssign) {
   } else if (canAssign && match(TOKEN_COLON)) {
     expression();
     defineType(arg);
+    // emitByte(OP_POP);
   } else if (canAssign && match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
@@ -858,6 +859,7 @@ static void function(FunctionType type, Token name) {
         emitByte(OP_NIL);
       }
       defineType(constant);
+      emitByte(OP_POP);  // the type.
 
     } while (match(TOKEN_COMMA));
   }
@@ -1289,6 +1291,7 @@ static void letDeclaration() {
     emitByte(OP_NIL);
   }
   defineType(var);
+  emitByte(OP_POP);  // the type.
 
   if (match(TOKEN_EQUAL)) {
     boundExpression(name);

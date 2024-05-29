@@ -159,7 +159,7 @@ class TypeState {
   }
 
   // Look up the node in the [typeEnv]. If there's no
-  // type entry, then mint a type var.
+  // type entry, then mint a fresh type var.
   lookup(node: ASTVar) => {
     if (!this.typeEnv[node])
       this.typeEnv[node] = this.typeVars.fresh();
@@ -194,15 +194,15 @@ class TypeState {
       this.typeEnv.extend(fnEnv);
       node.children.map(this.constrain);
 
-      let params = fnEnv.values();
+      let paramTypes = fnEnv.values();
   
       // type of a constant function? type of return value(s)?
-      if (len(params) == 0)
+      if (len(paramTypes) == 0)
         return this.typeVars.fresh();
-      if (len(params) == 1)
-        return params[0] -> this.typeVars.fresh();
+      if (len(paramTypes) == 1)
+        return paramTypes[0] -> this.typeVars.fresh();
       else
-        return params -> this.typeVars.fresh();
+        return paramTypes -> this.typeVars.fresh();
     }
 
     if (node is ASTLiteral)
@@ -321,11 +321,10 @@ let typecheck = (expr) => {
 
   let typeEnv = Map();
 
-  // give the variables uuids.
-
   let globals = Map();
   let annotations = globalTypeEnv();
 
+  // give the variables uuids.
   ast.visit((node, locals) => {
     let rename = (node: ASTVar, env: Map) => {
       if (!env[node.data])

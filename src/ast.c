@@ -40,10 +40,9 @@ bool readAST(ObjClosure* closure) {
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     printf("          ");
-    printf("\t");
     disassembleStack();
     printf("\n");
-    printf("\t (destruct) ");
+    printf("  (destruct) ");
     disassembleInstruction(
         &frame->closure->function->chunk,
         (int)(frame->ip - frame->closure->function->chunk.code));
@@ -123,14 +122,14 @@ bool readAST(ObjClosure* closure) {
       }
       case OP_SET_LOCAL: {
         uint8_t slot = READ_SHORT();
-        Value value = vmPop();
+        Value value = vmPeek(0);
 
         vmPush(root);
         vmPush(NUMBER_VAL(slot));
         vmPush(value);
 
         if (!executeMethod("opSetLocalValue", 2)) return false;
-        vmPop();  // ASTLocal obj.
+        vmPop();  // nil.
         break;
       }
       case OP_GET_UPVALUE: {
@@ -177,7 +176,6 @@ bool readAST(ObjClosure* closure) {
         break;
       }
       case OP_END: {
-        vmPop();  // the root.
         vmPop();  // the destructured expression.
         vmPush(root);
         vm.frameCount--;
@@ -185,13 +183,14 @@ bool readAST(ObjClosure* closure) {
       }
       case OP_SET_TYPE_LOCAL: {
         uint8_t slot = READ_SHORT();
-        Value value = vmPop();
+        Value value = vmPeek(0);
 
         vmPush(root);
         vmPush(NUMBER_VAL(slot));
         vmPush(value);
 
         if (!executeMethod("opSetLocalType", 2)) return false;
+
         vmPop();  // nil.
         break;
       }
