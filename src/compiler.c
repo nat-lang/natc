@@ -242,16 +242,6 @@ static int emitJump(uint8_t instruction) {
   return currentChunk()->count - 2;
 }
 
-static void emitReturn() {
-  if (current->type == TYPE_INITIALIZER) {
-    emitConstInstr(OP_GET_LOCAL, 0);
-  } else {
-    emitByte(OP_NIL);
-  }
-
-  emitByte(OP_RETURN);
-}
-
 static int getConstant(Value value) {
   Value existing;
 
@@ -330,7 +320,12 @@ static void initCompiler(Compiler* compiler, FunctionType type, Token name) {
 }
 
 static ObjFunction* endCompiler() {
-  emitReturn();
+  if (current->type == TYPE_INITIALIZER)
+    emitConstInstr(OP_GET_LOCAL, 0);
+  else
+    emitByte(OP_NIL);
+  emitByte(OP_IMPLICIT_RETURN);
+
   ObjFunction* function = current->function;
 
 #ifdef DEBUG_PRINT_CODE
@@ -641,7 +636,6 @@ static void namedVariable(Token name, bool canAssign) {
   } else if (canAssign && match(TOKEN_COLON)) {
     expression();
     defineType(arg);
-    // emitByte(OP_POP);
   } else if (canAssign && match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
@@ -1421,18 +1415,18 @@ static void returnStatement() {
   if (current->type == TYPE_SCRIPT) {
     error("Can't return from top-level code.");
   }
+  if (current->type == TYPE_INITIALIZER) {
+    error("Can't return from an initializer.");
+  }
 
   if (match(TOKEN_SEMICOLON)) {
-    emitReturn();
+    emitByte(OP_NIL);
   } else {
-    if (current->type == TYPE_INITIALIZER) {
-      error("Can't return a value from an initializer.");
-    }
-
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
-    emitByte(OP_RETURN);
   }
+
+  emitByte(OP_RETURN);
 }
 
 static void throwStatement() {

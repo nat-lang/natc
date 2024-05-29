@@ -104,6 +104,21 @@ bool readAST(ObjClosure* closure) {
         vmPop();  // nil.
         break;
       }
+      case OP_IMPLICIT_RETURN: {
+        Value value = vmPop();
+        vmPush(root);
+        vmPush(value);
+        if (!executeMethod("opImplicitReturn", 1)) return false;
+        vmPop();  // nil.
+
+        // we've reached the end of the closure
+        // we're destructuring.
+
+        vmPop();       // the destructured expression.
+        vmPush(root);  // the root of the ast.
+        vm.frameCount--;
+        return true;
+      }
       case OP_GET_GLOBAL: {
         vmPush(root);
         ObjString* name = READ_STRING();
@@ -174,12 +189,6 @@ bool readAST(ObjClosure* closure) {
 
         if (!executeMethod("opCall", 3)) return false;
         break;
-      }
-      case OP_END: {
-        vmPop();  // the destructured expression.
-        vmPush(root);
-        vm.frameCount--;
-        return true;
       }
       case OP_SET_TYPE_LOCAL: {
         uint8_t slot = READ_SHORT();

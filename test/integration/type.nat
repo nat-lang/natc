@@ -178,7 +178,7 @@ let h;
 let hType;
 let principal;
 
-// fn from num.
+// num -> a.
 
 check = typecheck(() => h(1));
 
@@ -189,7 +189,7 @@ assert(hType is TFunction);
 assert(hType.domain is TNumber);
 assert(hType.range is TVar);
 
-// fn from bool.
+// bool -> a.
 
 check = typecheck(() => h(true));
 
@@ -200,7 +200,7 @@ assert(hType is TFunction);
 assert(hType.domain is TBoolean);
 assert(hType.range is TVar);
 
-// fn from string.
+// string -> a.
 
 check = typecheck(() => h("a"));
 

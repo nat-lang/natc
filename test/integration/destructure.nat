@@ -16,7 +16,7 @@ assert(type(f[0][0]) == ASTLiteral);
 assert(f[0][0].data == 1);
 
 // implicit.
-assert(type(f[1]) == ASTReturn);
+assert(type(f[1]) == ASTImplicitReturn);
 assert(type(f[1][0]) == ASTLiteral);
 assert(f[1][0].data == nil);
 
@@ -32,7 +32,7 @@ assert(type(f[0][0]) == ASTGlobal);
 assert(f[0][0].data == "c");
 
 // implicit.
-assert(type(f[1]) == ASTReturn);
+assert(type(f[1]) == ASTImplicitReturn);
 assert(type(f[1][0]) == ASTLiteral);
 assert(f[1][0].data == nil);
 
@@ -48,7 +48,7 @@ assert(type(f[0][0]) == ASTLocal);
 assert(f[0][0].data == 1);
 
 // implicit.
-assert(type(f[1]) == ASTReturn);
+assert(type(f[1]) == ASTImplicitReturn);
 assert(type(f[1][0]) == ASTLiteral);
 assert(f[1][0].data == nil);
 

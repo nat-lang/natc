@@ -19,6 +19,7 @@ class ASTTypeAssignment extends ASTStatement {}
 class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
 class ASTLocalTypeAssignment extends ASTTypeAssignment {}
 class ASTReturn extends ASTStatement {}
+class ASTImplicitReturn extends ASTStatement {}
 class ASTExprStatement extends ASTStatement {}
 
 class ASTLiteral extends ASTExpr {
@@ -101,6 +102,11 @@ class ASTClosure extends ASTExpr {
 
   opReturn(expr) => {
     let node = ASTReturn(expr);
+    this.children.push(node);
+    this.signature.retVals.push(node);
+  }
+  opImplicitReturn(expr) => {
+    let node = ASTImplicitReturn(expr);
     this.children.push(node);
     this.signature.retVals.push(node);
   }

@@ -25,6 +25,8 @@ for (y in [1,2,3]) {
 }
 
 for (x in [[1,2], [3,4]]) {
+  assert(x == [1,2] or x == [3,4]);
+
   for (a in x) {
     assert(a == 1 or a == 2 or a == 3 or a == 4);
   }

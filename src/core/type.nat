@@ -188,9 +188,9 @@ class TypeState {
         Map()
       );
 
-      // since the param (types) are keyed by uuid,
-      // we can just update the global type env when
-      // checking the body of a function.
+      // since the params and their types are keyed by uuid,
+      // we can just update the global type env when checking
+      // the body of a function.
       this.typeEnv.extend(fnEnv);
       node.children.map(this.constrain);
 
@@ -261,7 +261,7 @@ class TypeState {
     if (node is ASTExprStatement)
       return this.constrain(node[0]);
 
-    if (node is ASTReturn) 
+    if (node is ASTReturn or node is ASTImplicitReturn) 
       return this.constrain(node[0]);
 
     throw TypeError("Unexpected syntax.");
