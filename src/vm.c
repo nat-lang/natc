@@ -675,10 +675,11 @@ InterpretResult vmExecute(int baseFrame) {
         vmCaptureUpvalues(closure, frame);
         break;
       }
-      case OP_CLOSE_UPVALUE:
+      case OP_CLOSE_UPVALUE: {
         closeUpvalues(vm.stackTop - 1);
         vmPop();
         break;
+      }
       case OP_IMPLICIT_RETURN:
       case OP_RETURN: {
         Value value = vmPop();

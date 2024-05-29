@@ -23,6 +23,13 @@ bool readAST(ObjClosure* closure) {
   printf("\n");
 #endif
 
+  // we'll populate the frame's local slots as we build
+  // the tree, and exit the frame once we're done.
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->closure = closure;
+  frame->ip = closure->function->chunk.code;
+  frame->slots = vm.stackTop;  // points at [closure].
+
   // the root of the tree.
   vmPush(OBJ_VAL(vm.classes.astClosure));
   vmPush(OBJ_VAL(closure->function->name));
@@ -31,11 +38,6 @@ bool readAST(ObjClosure* closure) {
   if (!initInstance(vm.classes.astClosure, 3)) return false;
 
   Value root = vmPeek(0);
-
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = NULL;
 
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -111,12 +113,12 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opImplicitReturn", 1)) return false;
         vmPop();  // nil.
 
-        // we've reached the end of the closure
-        // we're destructuring.
+        // we've reached the end of the closure we're
+        // destructuring. replace it with its ast.
 
-        vmPop();       // the destructured expression.
-        vmPush(root);  // the root of the ast.
         vm.frameCount--;
+        vm.stackTop = frame->slots - 1;  // point at [closure] - 1.
+        vmPush(root);                    // leave the ast on the stack.
         return true;
       }
       case OP_GET_GLOBAL: {
