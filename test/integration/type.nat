@@ -4,7 +4,7 @@ let f;
 let env;
 let check;
 
-// (single) implicit return, single argument.
+// single argument, implicit return.
 
 f : num -> num;
 f = (a) => a + 1;
@@ -18,24 +18,42 @@ assert(check.success());
 check = typecheck(() => f(true));
 assert(check.failure());
 
-// block, single argument.
+check = typecheck(() => f(f(1)));
+assert(check.success());
+
+check = typecheck(() => f(f(true)));
+assert(check.failure());
+
+// fix me.
+// check = typecheck(() => f());
+// assert(check.failure());
+
+// single argument, explicit return.
 
 check = typecheck(() => {
-  let a = 1;
-  return f(a);
+  return f(1);
 });
 assert(check.success());
 
 check = typecheck(() => {
-  let a = true;
-  return f(a);
+  return f(f(1));
+});
+assert(check.success());
+
+check = typecheck(() => {
+  return f(true);
 });
 assert(check.failure());
 
-// (single) implicit return, multiple arguments.
+check = typecheck(() => {
+  return f(f(true));
+});
+assert(check.failure());
+
+// multiple arguments, implicit return.
 
 f : (num, num) -> num;
-f = (a, b) => a + b + 1;
+f = (a, b) => a + b;
 
 env = globalTypeEnv();
 assert(env["f"] == (num, num) -> num);
@@ -43,13 +61,47 @@ assert(env["f"] == (num, num) -> num);
 check = typecheck(() => f(1,1));
 assert(check.success());
 
+check = typecheck(() => f(f(1,1),f(1,1)));
+assert(check.failure());
+
+check = typecheck(() => f(1, true));
+assert(check.failure());
+
 check = typecheck(() => f(true, true));
 assert(check.failure());
 
-// inline type declaration (a).
-// --------------------------------------------
-f : num -> num;
-f = (a) => a;
+// multiple arguments, explicit return.
+
+check = typecheck(() => {
+  return f(1,1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  return f(1,true);
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  return f(false,true);
+});
+assert(check.failure());
+
+// uninitialized variable.
+
+let g: num -> num;
+env = globalTypeEnv();
+assert(env["g"] == num -> num);
+
+check = typecheck(() => g(1));
+assert(check.success());
+
+check = typecheck(() => g(true));
+assert(check.failure());
+
+// inline type annotation.
+
+let f: num -> num = (a) => a + 1;
 
 let x: num = 1;
 check = typecheck(() => f(x));
@@ -72,20 +124,7 @@ assert(check.success());
 check = typecheck(() => h(true));
 assert(check.failure());
 
-// uninitialized.
-
-let g: num -> num;
-env = globalTypeEnv();
-assert(env["g"] == num -> num);
-
-check = typecheck(() => g(1));
-assert(check.success());
-
-check = typecheck(() => g(true));
-assert(check.failure());
-
-// inline type declaration (b).
-// --------------------------------------------
+// parameter annotation.
 
 // param constrains the function type.
 
@@ -144,7 +183,7 @@ check = typecheck(
 );
 assert(check.failure());
 
-// homographic local in adjacent scope.
+// homographic local in adjacent scope doesn't clash.
 
 check = typecheck(() => {
   let k = (a: num) => h(a);
@@ -164,7 +203,7 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// fn declarations constrained against their signatures.
+// fn declarations constrain their parameter annotations.
 // --------------------------------------------
 // check = typecheck(() => {
 //   let g: string = (a) => a;

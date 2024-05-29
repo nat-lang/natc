@@ -192,17 +192,46 @@ class TypeState {
       // we can just update the global type env when checking
       // the body of a function.
       this.typeEnv.extend(fnEnv);
-      node.children.map(this.constrain);
 
-      let paramTypes = fnEnv.values();
-  
-      // type of a constant function? type of return value(s)?
-      if (len(paramTypes) == 0)
-        return this.typeVars.fresh();
-      if (len(paramTypes) == 1)
-        return paramTypes[0] -> this.typeVars.fresh();
-      else
-        return paramTypes -> this.typeVars.fresh();
+      // track the types of the return values as we check the body.
+      let returns = node.children.reduce(
+        (returns, node) => {
+          let type = this.constrain(node);
+
+          if (node is ASTReturn)
+            returns.push(type);
+
+          return returns;
+        }, []
+      );
+
+      // now build the type of the function.
+      let tParams;
+      let tReturns;
+
+      if (len(fnEnv) == 0) {
+        tParams = this.typeVars.fresh(); // unit type?
+      } else {
+        let fnEnvValues = fnEnv.values();
+
+        if (len(fnEnvValues) == 1)
+          tParams = fnEnvValues[0];
+        else
+          tParams = fnEnvValues;
+      }
+
+      // there's always an implicit return. for now, if there are
+      // explicit returns as well, we'll just ignore the implicit
+      // one. once we have ast nodes for conditionals we can be
+      // more discriminating.
+      if (len(returns) == 1)
+        tReturns = returns[0];
+      else {
+        returns.pop();
+        tReturns = returns;
+      }
+
+      return tParams -> tReturns;
     }
 
     if (node is ASTLiteral)
@@ -261,7 +290,7 @@ class TypeState {
     if (node is ASTExprStatement)
       return this.constrain(node[0]);
 
-    if (node is ASTReturn or node is ASTImplicitReturn) 
+    if (node is ASTReturn) 
       return this.constrain(node[0]);
 
     throw TypeError("Unexpected syntax.");
@@ -341,7 +370,9 @@ let typecheck = (expr) => {
       return localEnv;
     }
   
-    if (node is ASTLocal) rename(node, locals);
+    if (node is ASTLocal)
+      rename(node, locals);
+
     if (node is ASTGlobal) {
       rename(node, globals);
 

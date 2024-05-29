@@ -54,4 +54,5 @@ class Sequence extends Sequential {
     for (x in elements)
       this.push(x);
   }
+  last() => this.values[len(this) - 1];
 }
