@@ -99,7 +99,7 @@ assert(check.success());
 check = typecheck(() => g(true));
 assert(check.failure());
 
-// inline type annotation.
+// declaration annotation.
 
 let f: num -> num = (a) => a + 1;
 
@@ -139,6 +139,20 @@ check = typecheck(() => {
   k("a");
 });
 assert(check.failure());
+
+// fn param.
+
+// check = typecheck(() => {
+//   let k = (a: num -> num) => a(1);
+//   k((x) => x);
+// });
+// assert(check.success());
+
+// check = typecheck(() => {
+//   let k = (a: num -> num) => a(1);
+//   k((x) => "a");
+// });
+// assert(check.failure());
 
 // multiple params constrain the function type.
 
@@ -183,7 +197,7 @@ check = typecheck(
 );
 assert(check.failure());
 
-// homographic local in adjacent scope doesn't clash.
+// homographic locals in adjacent scopes don't clash.
 
 check = typecheck(() => {
   let k = (a: num) => h(a);
@@ -200,6 +214,12 @@ assert(check.failure());
 check = typecheck(() => {
   let k = (a: num) => g(a);
   let j = (a: string) => g(a);
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  let k = (a: num) => g(a);
+  let j = (a: string) => h(a);
 });
 assert(check.failure());
 

@@ -322,6 +322,8 @@ bool vmCallValue(Value callee, int argCount) {
     }
   }
 
+  disassembleStack();
+  printf("\n");
   vmRuntimeError(
       "Can only call functions, classes, and objects with a 'call' method.");
   return false;

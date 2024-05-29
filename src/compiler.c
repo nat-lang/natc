@@ -188,11 +188,12 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static void consumeQuietly(TokenType type) {
-  if (parser.current.type == type)
+static bool consumeQuietly(TokenType type) {
+  if (parser.current.type == type) {
     advance();
-  else
-    parser.hadError = true;
+    return true;
+  }
+  return false;
 }
 
 static bool match(TokenType type) {
@@ -209,6 +210,29 @@ static bool prevWhite() { return isWhite(*(parser.current.start - 1)); }
 
 static void emitByte(uint8_t byte) {
   writeChunk(currentChunk(), byte, parser.previous.line);
+}
+
+// Find a [token] that isn't nested within braces, brackets,
+// or parentheses. Consider the search complete when we find
+// a [closing] token at depth 0;
+bool advanceTo(TokenType token, TokenType closing) {
+  int depth = 1;
+
+  for (;;) {
+    if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
+        check(TOKEN_LEFT_PAREN))
+      depth++;
+    if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
+        check(TOKEN_RIGHT_PAREN))
+      depth--;
+
+    // found one.
+    if (check(token) && depth == 1) return true;
+    // found none.
+    if (check(closing) && depth == 0) return false;
+
+    advance();
+  }
 }
 
 static void emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -744,33 +768,31 @@ static void defineVariable(uint16_t variable) {
 }
 
 static bool peekSignature() {
-  bool found;
-
-  Parser checkpoint = saveParser();
-
-  consumeQuietly(TOKEN_LEFT_PAREN);
+  if (!consumeQuietly(TOKEN_LEFT_PAREN)) return false;
 
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      consumeQuietly(TOKEN_IDENTIFIER);
+      if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
       if (check(TOKEN_COLON)) {
-        advance();
-        consumeQuietly(TOKEN_IDENTIFIER);
+        advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN);
+        // if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
       }
+
     } while (match(TOKEN_COMMA));
   }
-  consumeQuietly(TOKEN_RIGHT_PAREN);
-  consumeQuietly(TOKEN_FAT_ARROW);
 
-  found = !parser.hadError;
+  if (!consumeQuietly(TOKEN_RIGHT_PAREN)) return false;
+  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
 
-  gotoParser(checkpoint);
-
-  return found;
+  return true;
 }
 
 static bool tryFunction(FunctionType fnType, Token name) {
-  if (peekSignature()) {
+  Parser checkpoint = saveParser();
+  bool isFn = peekSignature();
+  gotoParser(checkpoint);
+
+  if (isFn) {
     function(fnType, name);
     return true;
   }
@@ -846,8 +868,7 @@ static void function(FunctionType type, Token name) {
       defineVariable(constant);
 
       // type annotations for parameters default to nil.
-      if (check(TOKEN_COLON)) {
-        advance();
+      if (match(TOKEN_COLON)) {
         expression();
       } else {
         emitByte(OP_NIL);
@@ -1002,10 +1023,11 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
 
   return checkpointB;
 }
+
 // Find a pipe that isn't nested within [left] and [right].
 // Assume that the initial nesting depth is 1, i.e., that
 // we've already consumed an instance of [left].
-bool advanceToPipe(TokenType left, TokenType right) {
+static bool advanceToPipe(TokenType left, TokenType right) {
   int depth = 1;
 
   for (;;) {
