@@ -62,24 +62,12 @@ bool __sequenceInit__(int argCount, Value* args) {
   return true;
 }
 
-bool sequenceValueField(ObjInstance* obj, Value* seq) {
-  if (!mapGet(&obj->fields, INTERN("values"), seq)) {
-    vmRuntimeError("Sequence instance missing its values!");
-    return false;
-  }
-  if (!IS_SEQUENCE(*seq)) {
-    vmRuntimeError("Expecting sequence.");
-    return false;
-  }
-  return true;
-}
-
 bool __sequencePush__(int argCount, Value* args) {
   Value val = vmPeek(0);
   ObjInstance* obj = AS_INSTANCE(vmPeek(1));
   Value seq;
 
-  if (!sequenceValueField(obj, &seq)) return false;
+  if (!vmSequenceValueField(obj, &seq)) return false;
   writeValueArray(&AS_SEQUENCE(seq)->values, val);
   vmPop();
   return true;
@@ -88,7 +76,7 @@ bool __sequencePush__(int argCount, Value* args) {
 bool __sequencePop__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
   Value seq;
-  if (!sequenceValueField(obj, &seq)) return false;
+  if (!vmSequenceValueField(obj, &seq)) return false;
   Value value = popValueArray(&AS_SEQUENCE(seq)->values);
 
   vmPop();

@@ -175,6 +175,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return shortInstruction("OP_SET_TYPE_LOCAL", chunk, offset);
     case OP_SET_TYPE_GLOBAL:
       return constantInstruction("OP_SET_TYPE_GLOBAL", chunk, offset);
+    case OP_SPREAD:
+      return simpleInstruction("OP_SPREAD", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

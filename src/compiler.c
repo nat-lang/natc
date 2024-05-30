@@ -523,7 +523,12 @@ static uint8_t argumentList() {
   uint8_t argCount = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      expression();
+      if (match(TOKEN_DOUBLE_DOT)) {
+        expression();
+        emitByte(OP_SPREAD);
+      } else {
+        expression();
+      }
 
       if (argCount == 255) error("Can't have more than 255 arguments.");
 
@@ -670,9 +675,9 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
-static int nativeCall(char* name, int argCount) {
+static int nativeCall(char* name) {
   int address = nativeVariable(name);
-  emitBytes(OP_CALL, argCount);
+  emitBytes(OP_CALL, 0);
   return address;
 }
 
@@ -1045,9 +1050,9 @@ static bool tryComprehension(char* klass, TokenType openingToken,
     initCompiler(&compiler, TYPE_ANONYMOUS, syntheticToken("#comprehension"));
     beginScope();
 
-    // the comprehension instance is local 0. we'll load it
-    // when we hit the bottom of the condition clauses.
-    nativeCall(klass, 0);
+    // init the comprehension instance at local 0. we'll load
+    // it when we hit the bottom of the condition clauses.
+    nativeCall(klass);
     int var = addLocal(syntheticToken("#comprehension"));
     markInitialized();
 
@@ -1084,7 +1089,7 @@ static void braces(bool canAssign) {
   // empty braces is an empty set.
   if (check(TOKEN_RIGHT_BRACE)) {
     advance();
-    nativeCall(S_SET, elements);
+    nativeCall(S_SET);
     return;
   }
 
@@ -1141,7 +1146,7 @@ static bool sequence() {
 
   // empty seq.
   if (check(TOKEN_RIGHT_BRACKET)) {
-    nativeCall(S_SEQUENCE, elements);
+    nativeCall(S_SEQUENCE);
     return true;
   }
 

@@ -16,6 +16,7 @@
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
+#define IS_SPREAD(value) isObjType(value, OBJ_SPREAD)
 
 #define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
@@ -27,6 +28,7 @@
 #define AS_STRING(value) ((ObjString *)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
+#define AS_SPREAD(value) (((ObjSpread *)AS_OBJ(value)))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 
@@ -43,6 +45,7 @@ typedef enum {
   OBJ_SEQUENCE,
   OBJ_STRING,
   OBJ_UPVALUE,
+  OBJ_SPREAD,
 } ObjType;
 
 struct Obj {
@@ -138,6 +141,11 @@ typedef struct {
   ValueArray values;
 } ObjSequence;
 
+typedef struct {
+  Obj obj;
+  Value value;
+} ObjSpread;
+
 ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
 ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
@@ -153,6 +161,7 @@ ObjString *copyString(const char *chars, int length);
 ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjString *intern(const char *chars);
 ObjUpvalue *newUpvalue(Value *slot);
+ObjSpread *newSpread(Value value);
 void printObject(Value value);
 
 static inline bool isObjType(Value value, ObjType type) {

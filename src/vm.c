@@ -1,6 +1,7 @@
 #include "vm.h"
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -210,6 +211,34 @@ static bool checkArity(int paramCount, int argCount) {
   return false;
 }
 
+// Walk the arguments and expand any [ObjSpread]s.
+static bool spread(int* argCount) {
+  Value args[255];
+  int newArgCount = 0;
+
+  for (int i = 0; i < *argCount; i++) {
+    Value arg = vmPop();
+
+    if (IS_SPREAD(arg)) {
+      Value vSeq;
+      if (!vmSequenceValueField(AS_INSTANCE(AS_SPREAD(arg)->value), &vSeq))
+        return false;
+
+      ObjSequence* seq = AS_SEQUENCE(vSeq);
+      for (int j = seq->values.count - 1; j >= 0; j--) {
+        args[newArgCount++] = seq->values.values[j];
+      }
+    } else {
+      args[newArgCount++] = arg;
+    }
+  }
+
+  *argCount = newArgCount;
+  while (newArgCount > 0) vmPush(args[--newArgCount]);
+
+  return true;
+}
+
 // Collapse [argCount] - [arity] + 1 arguments into a final
 // [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
@@ -257,6 +286,8 @@ static bool variadify(ObjClosure* closure, int* argCount) {
 }
 
 static bool call(ObjClosure* closure, int argCount) {
+  if (!spread(&argCount)) return false;
+
   if (closure->function->variadic)
     if (!variadify(closure, &argCount)) return false;
 
@@ -322,8 +353,6 @@ bool vmCallValue(Value callee, int argCount) {
     }
   }
 
-  disassembleStack();
-  printf("\n");
   vmRuntimeError(
       "Can only call functions, classes, and objects with a 'call' method.");
   return false;
@@ -402,6 +431,18 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
     return false;
   }
 
+  return true;
+}
+
+bool vmSequenceValueField(ObjInstance* obj, Value* seq) {
+  if (!mapGet(&obj->fields, INTERN("values"), seq)) {
+    vmRuntimeError("Sequence instance missing its values!");
+    return false;
+  }
+  if (!IS_SEQUENCE(*seq)) {
+    vmRuntimeError("Expecting sequence.");
+    return false;
+  }
   return true;
 }
 
@@ -921,6 +962,22 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
         mapSet(&vm.typeEnv, name, vmPeek(0));
+        break;
+      }
+      case OP_SPREAD: {
+        Value value = vmPop();
+
+        ObjClass lca;
+        if (!IS_INSTANCE(value) &&
+            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.classes.sequence,
+                                &lca) &&
+            &lca == vm.classes.sequence) {
+          vmRuntimeError("Only sequential values can spread.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjSpread* spread = newSpread(value);
+        vmPush(OBJ_VAL(spread));
         break;
       }
       default:

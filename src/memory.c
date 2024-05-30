@@ -135,6 +135,12 @@ static void blackenObject(Obj* object) {
     case OBJ_SEQUENCE: {
       ObjSequence* seq = (ObjSequence*)object;
       markArray(&seq->values);
+      break;
+    }
+    case OBJ_SPREAD: {
+      ObjSpread* spread = (ObjSpread*)object;
+      markValue(spread->value);
+      break;
     }
   }
 }
@@ -196,6 +202,10 @@ static void freeObject(Obj* object) {
       ObjSequence* seq = (ObjSequence*)object;
       freeValueArray(&seq->values);
       FREE(ObjSequence, seq);
+    }
+    case OBJ_SPREAD: {
+      // FREE(ObjSpread, object);
+      break;
     }
   }
 }

@@ -94,5 +94,6 @@ bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
 bool vmCallValue(Value value, int argCount);
 void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
+bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 
 #endif
