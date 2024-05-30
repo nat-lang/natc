@@ -193,15 +193,66 @@ assert(v.f(1,2,3) == [1,2,3]);
 assert(type(v.f(1,2,3)) == Sequence);
 
 // argument spreading.
+// --------------------------------------
+
+// singleton.
+
+let f = (x) => x + 1;
+assert(f(..[1]) == 2);
+
+// whole signature.
 
 let f = (x,y) => x + y;
-
 assert(f(..[1,1]) == 2);
-
-let x = [true, +, 1, 3];
 
 let f = (a,b,c,d) => {
   if (a) return b(c,d);
 };
-
+let x = [true, +, 1, 3];
 assert(f(..x) == 4);
+
+let x = [false, +, 1, 3];
+assert(f(..x) == nil);
+
+let x = [true, -, 1, 3];
+assert(f(..x) == (1 - 3));
+
+// initial args.
+
+let f = (x,y,z) => {
+  z.push(x);
+  z.push(y);
+  return z;
+};
+
+let a = f(..[1,2], []);
+assert(a == [1,2]);
+
+// final args.
+
+let f = (x,y,z) => {
+  x.push(y);
+  x.push(z);
+  return x;
+};
+
+let a = f([], ..[1,2]);
+assert(a == [1,2]);
+
+// & variadic.
+
+let f = (x,*y) => {
+  for (z in y) {
+    x.push(z);
+  }
+  return x;
+};
+
+let a = f([], ..[1]);
+assert(a == [1]);
+
+let a = f([], ..[1,2]);
+assert(a == [1,2]);
+
+let a = f([], ..[1,2,3]);
+assert(a == [1,2,3]);

@@ -12,6 +12,10 @@ f = (a) => a + 1;
 env = globalTypeEnv();
 assert(env["f"] == num -> num);
 
+// fix me.
+// check = typecheck(() => f());
+// assert(check.failure());
+
 check = typecheck(() => f(1));
 assert(check.success());
 
@@ -23,10 +27,6 @@ assert(check.success());
 
 check = typecheck(() => f(f(true)));
 assert(check.failure());
-
-// fix me.
-// check = typecheck(() => f());
-// assert(check.failure());
 
 // single argument, explicit return.
 
@@ -87,46 +87,33 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// uninitialized variable.
+// declaration annotations.
 
-let g: num -> num;
+let f: num -> num;
+
 env = globalTypeEnv();
-assert(env["g"] == num -> num);
+assert(env["f"] == num -> num);
 
-check = typecheck(() => g(1));
-assert(check.success());
-
-check = typecheck(() => g(true));
-assert(check.failure());
-
-// declaration annotation.
-
-let f: num -> num = (a) => a + 1;
-
-let x: num = 1;
+let x: num;
 check = typecheck(() => f(x));
 assert(check.success());
 
-let y: string = "a";
+let y: string;
 check = typecheck(() => f(y));
 assert(check.failure());
 
-let h: num -> num = (a) => {
-  return a + 1;
-};
-
-env = globalTypeEnv();
-assert(env["h"] == num -> num);
-
-check = typecheck(() => h(2));
+check = typecheck(() => f(2));
 assert(check.success());
 
-check = typecheck(() => h(true));
+check = typecheck(() => f("a"));
+assert(check.failure());
+
+check = typecheck(() => f(true));
 assert(check.failure());
 
 // parameter annotation.
 
-// param constrains the function type.
+// single base type param constrains the function type.
 
 check = typecheck(() => {
   let k = (a: num) => a;
@@ -140,21 +127,7 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// fn param.
-
-// check = typecheck(() => {
-//   let k = (a: num -> num) => a(1);
-//   k((x) => x);
-// });
-// assert(check.success());
-
-// check = typecheck(() => {
-//   let k = (a: num -> num) => a(1);
-//   k((x) => "a");
-// });
-// assert(check.failure());
-
-// multiple params constrain the function type.
+// multiple base type params constrain the function type.
 
 check = typecheck(() => {
   let k = (a: num, b: num) => a + b;
@@ -168,7 +141,50 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// param constrains the function body.
+// single arrow param constrains the function type.
+
+check = typecheck(() => {
+  let k = (a: num -> num) => a(1);
+  k((x) => x);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num -> num) => a(1);
+  k((x) => 1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num -> num) => a(1);
+  k((x) => "a");
+});
+assert(check.failure());
+
+// multiple arrow params constrain the function type.
+
+check = typecheck(() => {
+  let k = (a: num -> num, b: (num -> num) -> num) => b(a);
+
+  k((x) => x, (f) => f(1));
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num -> num, b: (num -> num) -> num) => b(a);
+
+  k((x) => x, (f) => f("a"));
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  let k = (a: num -> num, b: (num -> num) -> num) => b(a);
+
+  k((x) => x, (f) => f(true));
+});
+assert(check.failure());
+
+// single base type param constrains the function body.
 
 let g: string -> string;
 let h: num -> num;
@@ -179,7 +195,7 @@ assert(check.success());
 check = typecheck((a: num) => g(a));
 assert(check.failure());
 
-// multiple params constrain the function body.
+// multiple base type params constrain the function body.
 
 check = typecheck(
   (a: num, b: num) => {
@@ -194,6 +210,49 @@ check = typecheck(
     h(a);
     g(b);
   }
+);
+assert(check.failure());
+
+// single arrow param constrains the function body.
+
+check = typecheck((a: num -> num) => a(1));
+assert(check.success());
+
+check = typecheck((a: num -> num) => a("a"));
+assert(check.failure());
+
+check = typecheck((a: num -> num) => a(true));
+assert(check.failure());
+
+// multiple arrow params constrains the function body.
+
+check = typecheck(
+  (a: num -> num, b: (num -> num) -> num) => b(a)
+);
+assert(check.success());
+
+check = typecheck(
+  (a: num -> string, b: (num -> string) -> num) => b(a)
+);
+assert(check.success());
+
+check = typecheck(
+  (a: num -> num, b: (string -> num) -> num) => b(a)
+);
+assert(check.failure());
+
+check = typecheck(
+  (a: num -> num, b: (num -> string) -> num) => b(a)
+);
+assert(check.failure());
+
+check = typecheck(
+  (a: string -> num, b: (num -> num) -> num) => b(a)
+);
+assert(check.failure());
+
+check = typecheck(
+  (a: num -> string, b: (num -> num) -> num) => b(a)
 );
 assert(check.failure());
 
@@ -223,10 +282,12 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// fn declarations constrain their parameter annotations.
-// --------------------------------------------
+// declarations constrain parameter annotations.
+
+// let f: num -> num;
+
 // check = typecheck(() => {
-//   let g: string = (a) => a;
+//   f = (a: string) => 1;
 // });
 // assert(check.failure());
 

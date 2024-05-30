@@ -88,6 +88,7 @@ class Constraint {
   }
   pp() => {
     this.left.pp();
+    print "x";
     this.right.pp();
   }
 }
@@ -147,7 +148,7 @@ let type = (value) => {
 };
 
 class TypeState {
-  init(typeEnv: Map) => {
+  init(typeEnv: Map, debug: bool) => {
     // map from variables to types.
     this.typeEnv = typeEnv;
     // name supply.
@@ -156,6 +157,8 @@ class TypeState {
     this.constraints = [];
     // most general set of unifiers.
     this.solution = Solution();
+    // print debugging information?
+    this.debug = debug;
   }
 
   // Look up the node in the [typeEnv]. If there's no
@@ -206,29 +209,31 @@ class TypeState {
       );
 
       // now build the type of the function.
+      let paramCount = len(node.signature.params);
+
       let tParams;
       let tReturns;
 
-      if (len(fnEnv) == 0) {
+      if (paramCount == 0) {
         tParams = this.typeVars.fresh(); // unit type?
+      } else if (paramCount == 1) {
+        tParams = fnEnv.values()[0];
       } else {
-        let fnEnvValues = fnEnv.values();
-
-        if (len(fnEnvValues) == 1)
-          tParams = fnEnvValues[0];
-        else
-          tParams = fnEnvValues;
+        tParams = fnEnv.values();
       }
 
       // there's always an implicit return. for now, if there are
       // explicit returns as well, we'll just ignore the implicit
       // one. once we have ast nodes for conditionals we can be
       // more discriminating.
-      if (len(returns) == 1)
+      let tImplicitReturn = returns.pop();
+
+      if (len(returns) == 0) {
+        tReturns = tImplicitReturn;
+      } else if (len(returns) == 1) {
         tReturns = returns[0];
-      else {
-        returns.pop();
-        tReturns = returns;
+      } else {
+        tReturns = tReturns;
       }
 
       return tParams -> tReturns;
@@ -265,10 +270,10 @@ class TypeState {
       let var = node[0];
       let val = node[1];
 
-      if (var.uuid in this.typeEnv)
+      if (var in this.typeEnv)
         throw TypeError("Variable already has a type annotation.");
     
-      this.typeEnv[var.uuid] = val.resolve();
+      this.typeEnv[var] = val.resolve();
 
       return void;
     }
@@ -298,14 +303,24 @@ class TypeState {
 
   unify() => {
     let unsolved = [];
+
+    let i = 0;
     
     while (len(this.constraints) > 0) {
+      if (this.debug) {
+        print "-------- STEP " + str(i) + " -------------------";
+        this.ppConstraints();
+        print "---------------------------";
+      }
+
       let constraint = this.constraints.pop();
 
+      // apply (type variable, type) unifiers to the solution.
       if (constraint.left is TVar or constraint.right is TVar) {
         this.solution.update(constraint);
         this.constraints = this.constraints.map(this.solution.apply);
 
+      // break functions into domain/domain range/range constraints.
       } else if (constraint.left is TFunction and constraint.right is TFunction) {
         let left = constraint.left;
         let right = constraint.right;
@@ -314,9 +329,24 @@ class TypeState {
           Constraint(left.domain, right.domain),
           Constraint(left.range, right.range)
         ]);
+
+      // break sequences of equal length into pairwise sequences of constraints.
+      } else if (constraint.left is Sequence and constraint.right is Sequence) {
+        if (len(constraint.left) == len(constraint.right)) {
+
+          this.constraints.extend(
+            zip(constraint.left, constraint.right).map((x) => Constraint(..x))
+          );
+        } else {
+          unsolved.push(constraint);
+        }
+      // if they're equal (base types), eliminate them; otherwise track the
+       //insolubles.
       } else if (constraint.left != constraint.right) {
         unsolved.push(constraint);
       }
+
+      i = i + 1;
     }
 
     this.constraints = unsolved;
@@ -342,6 +372,14 @@ class TypeState {
   unified() => len(this.constraints) == 0;
   success() => this.unified();
   failure() => !this.unified();
+
+  ppConstraints() => {
+    for (c in this.constraints) {
+      print "######## constraint ########";
+      c.pp();
+      print "############################";
+    }
+  }
 }
 
 let typecheck = (expr) => {
@@ -384,7 +422,7 @@ let typecheck = (expr) => {
     return locals;
   }, Map());
 
-  let state = TypeState(typeEnv);
+  let state = TypeState(typeEnv, false);
 
   state.constrain(ast);
   state.unify();
