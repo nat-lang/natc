@@ -202,9 +202,10 @@ static void freeObject(Obj* object) {
       ObjSequence* seq = (ObjSequence*)object;
       freeValueArray(&seq->values);
       FREE(ObjSequence, seq);
+      break;
     }
     case OBJ_SPREAD: {
-      // FREE(ObjSpread, object);
+      FREE(ObjSpread, object);
       break;
     }
   }
