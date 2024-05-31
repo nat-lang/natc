@@ -207,6 +207,12 @@ bool readAST(ObjClosure* closure) {
       }
       case OP_SET_TYPE_GLOBAL:
         break;
+      case OP_UNIT: {
+        vmPush(root);
+        vmPush(UNIT_VAL);
+        if (!executeMethod("opLiteral", 1)) return false;
+        break;
+      }
       default: {
         vmRuntimeError("Unhandled destructured opcode (%i).", instruction);
         return false;
