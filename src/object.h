@@ -108,7 +108,6 @@ typedef struct {
   ObjFunction *function;
   ObjUpvalue **upvalues;
   int upvalueCount;
-  ObjMap typeEnv;
 } ObjClosure;
 
 typedef struct ObjClass {

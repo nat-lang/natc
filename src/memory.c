@@ -103,7 +103,6 @@ static void blackenObject(Obj* object) {
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
-      markMap(&closure->typeEnv);
       for (int i = 0; i < closure->upvalueCount; i++) {
         markObject((Obj*)closure->upvalues[i]);
       }
@@ -163,7 +162,6 @@ static void freeObject(Obj* object) {
     }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
-      freeMap(&closure->typeEnv);
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
       FREE(ObjClosure, object);
       break;
