@@ -986,6 +986,10 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(OBJ_VAL(spread));
         break;
       }
+      case OP_UNIT: {
+        vmPush(UNIT_VAL);
+        break;
+      }
       default:
         vmRuntimeError("Unexpected op code: %i", instruction);
         return INTERPRET_RUNTIME_ERROR;

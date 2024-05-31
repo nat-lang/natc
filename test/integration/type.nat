@@ -4,17 +4,31 @@ let f;
 let env;
 let check;
 
+// no argument, implicit return.
+
+f : () -> num;
+
+env = globalTypeEnv();
+assert(env["f"] == () -> num);
+
+check = typecheck(() => f());
+assert(check.success());
+
+check = typecheck(() => f(true));
+assert(check.failure());
+
+check = typecheck(() => f(f()));
+assert(check.failure());
+
 // single argument, implicit return.
 
 f : num -> num;
-f = (a) => a + 1;
 
 env = globalTypeEnv();
 assert(env["f"] == num -> num);
 
-// fix me.
-// check = typecheck(() => f());
-// assert(check.failure());
+check = typecheck(() => f());
+assert(check.failure());
 
 check = typecheck(() => f(1));
 assert(check.success());
@@ -28,7 +42,23 @@ assert(check.success());
 check = typecheck(() => f(f(true)));
 assert(check.failure());
 
+// no argument, explicit return.
+
+f : () -> num;
+
+check = typecheck(() => {
+  return f();
+});
+assert(check.success());
+
+check = typecheck(() => {
+  return f(true);
+});
+assert(check.failure());
+
 // single argument, explicit return.
+
+f : num -> num;
 
 check = typecheck(() => {
   return f(1);
@@ -62,7 +92,7 @@ check = typecheck(() => f(1,1));
 assert(check.success());
 
 check = typecheck(() => f(f(1,1),f(1,1)));
-assert(check.failure());
+assert(check.success());
 
 check = typecheck(() => f(1, true));
 assert(check.failure());

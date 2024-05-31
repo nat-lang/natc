@@ -8,7 +8,14 @@
 typedef struct Obj Obj;
 typedef struct ObjString ObjString;
 
-typedef enum { VAL_BOOL, VAL_NIL, VAL_NUMBER, VAL_OBJ, VAL_UNDEF } ValueType;
+typedef enum {
+  VAL_UNIT,
+  VAL_BOOL,
+  VAL_NIL,
+  VAL_NUMBER,
+  VAL_OBJ,
+  VAL_UNDEF
+} ValueType;
 
 typedef struct Value {
   ValueType vType;
@@ -31,6 +38,7 @@ typedef struct Value {
 #define AS_BOOL(value) ((value).as.boolean)
 #define AS_NUMBER(value) ((value).as.number)
 
+#define UNIT_VAL ((Value){VAL_UNIT, {}})
 #define NIL_VAL ((Value){VAL_NIL, {.number = 0}})
 #define BOOL_VAL(value) ((Value){VAL_BOOL, {.boolean = value}})
 #define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})

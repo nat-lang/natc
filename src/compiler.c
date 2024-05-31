@@ -612,6 +612,11 @@ static void literal(bool canAssign) {
 }
 
 static void parentheses(bool canAssign) {
+  if (match(TOKEN_RIGHT_PAREN)) {
+    emitByte(OP_UNIT);
+    return;
+  }
+
   expression();
 
   if (check(TOKEN_COMMA)) {

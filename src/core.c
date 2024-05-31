@@ -207,6 +207,9 @@ bool __vType__(int argCount, Value* args) {
   vmPop();  // native fn.
 
   switch (value.vType) {
+    case VAL_UNIT:
+      vmPush(value);
+      break;
     case VAL_BOOL:
       vmPush(OBJ_VAL(vm.classes.vTypeBool));
       break;
@@ -294,8 +297,21 @@ bool __str__(int argCount, Value* args) {
           (AS_BOOL(value) ? copyString("true", 4) : copyString("false", 5));
       break;
     }
+    case VAL_OBJ: {
+      switch (OBJ_TYPE(value)) {
+        case OBJ_CLASS: {
+          string = AS_CLASS(value)->name;
+          break;
+        }
+        default: {
+          vmRuntimeError("Can't turn object into a string.");
+          return false;
+        }
+      }
+      break;
+    }
     default: {
-      vmRuntimeError("Can't turn x into a string.");
+      vmRuntimeError("Can't turn value into a string.");
       return false;
     }
   }
