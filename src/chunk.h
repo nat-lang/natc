@@ -48,6 +48,7 @@ typedef enum {
   OP_SET_TYPE_LOCAL,
   OP_SET_TYPE_GLOBAL,
   OP_SPREAD,
+  OP_UNIT,
 } OpCode;
 
 typedef struct {

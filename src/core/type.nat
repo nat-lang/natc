@@ -43,6 +43,12 @@ class Type {
   pp() => {
     print this;
   }
+
+  substitute(c: Constraint) => {
+    if (this == c.left)
+      return c.right;
+    return this;
+  }
 }
 
 class TVar extends Type {
@@ -73,6 +79,14 @@ class TFunction extends Type {
     print this.domain;
     print this.range;
   }
+
+  substitute(c: Constraint) => {
+    if (this.domain == c.left)
+      this.domain = c.right;
+    if (this.range == c.left)
+      this.range = c.right;
+    return this;
+  }
 }
 class TClass extends Type {}
 
@@ -81,35 +95,37 @@ class Constraint {
     this.left = left;
     this.right = right;
   }
-  substitute(type: Type) => {
-    if (type == this.left)
-      return this.right;
-    return type;
-  }
+
   pp() => {
-    this.left.pp();
+    if (this.left == ())
+      print ();
+    else
+      this.left.pp();
     print "x";
-    this.right.pp();
+    if (this.right == ())
+      print ();
+    else
+      this.right.pp();
   }
 }
 
+class AppConstraint extends Constraint {}
+
 class Solution extends Map {
-  __iter__() => iter([Constraint(e[0], e[1]) | e in this.entries()]);
+  entries() => super.entries().map((e) => Constraint(..e));
 
   apply(c: Constraint) => {
     for (sub in this) {
-      c.left = sub.substitute(c.left);
-      c.right = sub.substitute(c.right);
+      for (key in ["left", "right"]) {
+        if (c[key] is Sequential) {
+          c[key] = c[key].map((t) => t.substitute(sub));
+        } else if (c[key] != ()) {
+          c[key] = c[key].substitute(sub);
+        }
+      }
     }
 
     return c;
-  }
-
-  update(constraint: Constraint) => {
-    if (constraint.left is TVar)
-      this[constraint.left] = constraint.right;
-    else if (constraint.right is TVar)
-      this[constraint.right] = constraint.left;
   }
 }
 
@@ -138,6 +154,7 @@ let tClass = TClass();
 let type = (value) => {
   let vmType = vType(value);
 
+  if (vmType == ()) return ();
   if (vmType == CNil) return void;
   if (vmType == CBool) return bool;
   if (vmType == CNumber) return num;
@@ -215,7 +232,7 @@ class TypeState {
       let tReturns;
 
       if (paramCount == 0) {
-        tParams = this.typeVars.fresh(); // unit type?
+        tParams = ();
       } else if (paramCount == 1) {
         tParams = fnEnv.values()[0];
       } else {
@@ -248,10 +265,12 @@ class TypeState {
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
 
-      if (len(tArgs) > 1)
-        return tArgs;
-      else
+      if (len(tArgs) == 0)
+        return ();
+      else if (len(tArgs) == 1)
         return tArgs[0];
+      else
+        return tArgs;
     }
 
     if (node is ASTApp) {
@@ -262,7 +281,7 @@ class TypeState {
       let tArgs = this.constrain(args);
 
       let tApp = this.typeVars.fresh();
-      this.constraints.push(Constraint(tFunc, tArgs -> tApp));
+      this.constraints.push(AppConstraint(tFunc, tArgs -> tApp));
       return tApp;
     }
 
@@ -316,8 +335,11 @@ class TypeState {
       let constraint = this.constraints.pop();
 
       // apply (type variable, type) unifiers to the solution.
-      if (constraint.left is TVar or constraint.right is TVar) {
-        this.solution.update(constraint);
+      if (constraint.left is TVar) {
+        this.solution[constraint.left] = constraint.right;
+        this.constraints = this.constraints.map(this.solution.apply);
+      } else if (constraint.right is TVar) {
+        this.solution[constraint.right] = constraint.left;
         this.constraints = this.constraints.map(this.solution.apply);
 
       // function constraints become domain/domain range/range constraints.
@@ -358,12 +380,10 @@ class TypeState {
     let env = Map();
 
     for (x in this.typeEnv) {
-      for (s in this.solution) {
-        let k = x[0];
-        let v = x[1];
+      let k = x[0];
+      let v = x[1];
 
-        env[k] = s.substitute(v);
-      }
+      env[k] = this.solution[v];
     }
 
     return env;
@@ -375,7 +395,7 @@ class TypeState {
 
   ppConstraints() => {
     for (c in this.constraints) {
-      print "######## constraint ########";
+      print "######## " + str(c.__class__) + " ########";
       c.pp();
       print "############################";
     }

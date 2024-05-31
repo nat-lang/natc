@@ -8,3 +8,12 @@ assert(a != b);
 // concatenation.
 
 assert(a + b == "ab");
+
+
+let x = str(1) + str(2);
+
+assert(x == "12");
+
+class A {}
+
+assert(str(A) == "A");
