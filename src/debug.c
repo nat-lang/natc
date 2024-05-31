@@ -147,6 +147,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     }
     case OP_CLOSE_UPVALUE:
       return simpleInstruction("OP_CLOSE_UPVALUE", offset);
+    case OP_IMPLICIT_RETURN:
+      return simpleInstruction("OP_IMPLICIT_RETURN", offset);
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
     case OP_CLASS:
@@ -165,8 +167,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_SUBSCRIPT_GET", offset);
     case OP_SUBSCRIPT_SET:
       return simpleInstruction("OP_SUBSCRIPT_SET", offset);
-    case OP_END:
-      return simpleInstruction("OP_END", offset);
     case OP_EXPR_STATEMENT:
       return simpleInstruction("OP_EXPR_STATEMENT", offset);
     case OP_DESTRUCTURE:
@@ -175,6 +175,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return shortInstruction("OP_SET_TYPE_LOCAL", chunk, offset);
     case OP_SET_TYPE_GLOBAL:
       return constantInstruction("OP_SET_TYPE_GLOBAL", chunk, offset);
+    case OP_SPREAD:
+      return simpleInstruction("OP_SPREAD", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

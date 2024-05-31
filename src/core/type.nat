@@ -43,6 +43,12 @@ class Type {
   pp() => {
     print this;
   }
+
+  substitute(c: Constraint) => {
+    if (this == c.left)
+      return c.right;
+    return this;
+  }
 }
 
 class TVar extends Type {
@@ -73,6 +79,14 @@ class TFunction extends Type {
     print this.domain;
     print this.range;
   }
+
+  substitute(c: Constraint) => {
+    if (this.domain == c.left)
+      this.domain = c.right;
+    if (this.range == c.left)
+      this.range = c.right;
+    return this;
+  }
 }
 class TClass extends Type {}
 
@@ -81,30 +95,37 @@ class Constraint {
     this.left = left;
     this.right = right;
   }
-  substitute(type: Type) => {
-    if (type == this.left)
-      return this.right;
-    return type;
+
+  pp() => {
+    if (this.left == ())
+      print ();
+    else
+      this.left.pp();
+    print "x";
+    if (this.right == ())
+      print ();
+    else
+      this.right.pp();
   }
 }
 
+class AppConstraint extends Constraint {}
+
 class Solution extends Map {
-  __iter__() => iter([Constraint(e[0], e[1]) | e in this.entries()]);
+  entries() => super.entries().map((e) => Constraint(..e));
 
   apply(c: Constraint) => {
     for (sub in this) {
-      c.left = sub.substitute(c.left);
-      c.right = sub.substitute(c.right);
+      for (key in ["left", "right"]) {
+        if (c[key] is Sequential) {
+          c[key] = c[key].map((t) => t.substitute(sub));
+        } else if (c[key] != ()) {
+          c[key] = c[key].substitute(sub);
+        }
+      }
     }
 
     return c;
-  }
-
-  update(constraint: Constraint) => {
-    if (constraint.left is TVar)
-      this[constraint.left] = constraint.right;
-    else if (constraint.right is TVar)
-      this[constraint.right] = constraint.left;
   }
 }
 
@@ -133,6 +154,7 @@ let tClass = TClass();
 let type = (value) => {
   let vmType = vType(value);
 
+  if (vmType == ()) return ();
   if (vmType == CNil) return void;
   if (vmType == CBool) return bool;
   if (vmType == CNumber) return num;
@@ -143,17 +165,21 @@ let type = (value) => {
 };
 
 class TypeState {
-  init(typeEnv: Map) => {
+  init(typeEnv: Map, debug: bool) => {
     // map from variables to types.
     this.typeEnv = typeEnv;
     // name supply.
     this.typeVars = TypeVarSupply();
     // constraint stack.
     this.constraints = [];
-    // mgu.
-    this.sigma = Solution();
+    // most general set of unifiers.
+    this.solution = Solution();
+    // print debugging information?
+    this.debug = debug;
   }
 
+  // Look up the node in the [typeEnv]. If there's no
+  // type entry, then mint a fresh type var.
   lookup(node: ASTVar) => {
     if (!this.typeEnv[node])
       this.typeEnv[node] = this.typeVars.fresh();
@@ -163,33 +189,71 @@ class TypeState {
 
   constrain(node) => {
     if (node is ASTClosure) {
-      let f = (env: Map, node: ASTLocalTypeAssignment) => {
-        let var = node[0];
-        let val = node[1];
+      // give the parameters type vars if they don't
+      // have annotations.
+      let fnEnv = node.signature.params.reduce(
+        (env: Map, node: ASTLocalTypeAssignment) => {
+          let var = node[0];
+          let val = node[1];
 
-        let pType = val.resolve();
+          let pType = val.resolve();
 
-        if (pType == nil)
-          env[var.uuid] = this.typeVars.fresh();
-        else
-          env[var.uuid] = pType;
+          if (pType == nil)
+            env[var] = this.typeVars.fresh();
+          else
+            env[var] = pType;
 
-        return env;
-      };
-  
-      let localEnv = node.signature.params.reduce(f, Map());
-      let params = localEnv.values();
+          return env;
+        },
+        Map()
+      );
 
-      // this needs to happen in localEnv.
-      node.children.map(this.constrain);
-  
-      // type of a constant function? type of return value(s)?
-      if (len(params) == 0)
-        return this.typeVars.fresh();
-      if (len(params) == 1)
-        return params[0] -> this.typeVars.fresh();
-      else
-        return params -> this.typeVars.fresh();
+      // since the params and their types are keyed by uuid,
+      // we can just update the global type env when checking
+      // the body of a function.
+      this.typeEnv.extend(fnEnv);
+
+      // track the types of the return values as we check the body.
+      let returns = node.children.reduce(
+        (returns, node) => {
+          let type = this.constrain(node);
+
+          if (node is ASTReturn)
+            returns.push(type);
+
+          return returns;
+        }, []
+      );
+
+      // now build the type of the function.
+      let paramCount = len(node.signature.params);
+
+      let tParams;
+      let tReturns;
+
+      if (paramCount == 0) {
+        tParams = ();
+      } else if (paramCount == 1) {
+        tParams = fnEnv.values()[0];
+      } else {
+        tParams = fnEnv.values();
+      }
+
+      // there's always an implicit return. for now, if there are
+      // explicit returns as well, we'll just ignore the implicit
+      // one. once we have ast nodes for conditionals we can be
+      // more discriminating.
+      let tImplicitReturn = returns.pop();
+
+      if (len(returns) == 0) {
+        tReturns = tImplicitReturn;
+      } else if (len(returns) == 1) {
+        tReturns = returns[0];
+      } else {
+        tReturns = tReturns;
+      }
+
+      return tParams -> tReturns;
     }
 
     if (node is ASTLiteral)
@@ -201,10 +265,12 @@ class TypeState {
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
 
-      if (len(tArgs) > 1)
-        return tArgs;
-      else
+      if (len(tArgs) == 0)
+        return ();
+      else if (len(tArgs) == 1)
         return tArgs[0];
+      else
+        return tArgs;
     }
 
     if (node is ASTApp) {
@@ -215,7 +281,7 @@ class TypeState {
       let tArgs = this.constrain(args);
 
       let tApp = this.typeVars.fresh();
-      this.constraints.push(Constraint(tFunc, tArgs -> tApp));
+      this.constraints.push(AppConstraint(tFunc, tArgs -> tApp));
       return tApp;
     }
 
@@ -223,10 +289,10 @@ class TypeState {
       let var = node[0];
       let val = node[1];
 
-      if (var.uuid in this.typeEnv)
+      if (var in this.typeEnv)
         throw TypeError("Variable already has a type annotation.");
     
-      this.typeEnv[var.uuid] = val.resolve();
+      this.typeEnv[var] = val.resolve();
 
       return void;
     }
@@ -256,14 +322,27 @@ class TypeState {
 
   unify() => {
     let unsolved = [];
+
+    let i = 0;
     
     while (len(this.constraints) > 0) {
+      if (this.debug) {
+        print "-------- STEP " + str(i) + " -------------------";
+        this.ppConstraints();
+        print "---------------------------";
+      }
+
       let constraint = this.constraints.pop();
 
-      if (constraint.left is TVar or constraint.right is TVar) {
-        this.sigma.update(constraint);
-        this.constraints = this.constraints.map(this.sigma.apply);
+      // apply (type variable, type) unifiers to the solution.
+      if (constraint.left is TVar) {
+        this.solution[constraint.left] = constraint.right;
+        this.constraints = this.constraints.map(this.solution.apply);
+      } else if (constraint.right is TVar) {
+        this.solution[constraint.right] = constraint.left;
+        this.constraints = this.constraints.map(this.solution.apply);
 
+      // function constraints become domain/domain range/range constraints.
       } else if (constraint.left is TFunction and constraint.right is TFunction) {
         let left = constraint.left;
         let right = constraint.right;
@@ -272,9 +351,24 @@ class TypeState {
           Constraint(left.domain, right.domain),
           Constraint(left.range, right.range)
         ]);
+
+      // sequences of equal length become pairwise sequences of constraints.
+      } else if (constraint.left is Sequence and constraint.right is Sequence) {
+        if (len(constraint.left) == len(constraint.right)) {
+
+          this.constraints.extend(
+            zip(constraint.left, constraint.right).map((x) => Constraint(..x))
+          );
+        } else {
+          unsolved.push(constraint);
+        }
+      // if they're equal base types, eliminate them; otherwise note that 
+      // they're not unifiable.
       } else if (constraint.left != constraint.right) {
         unsolved.push(constraint);
       }
+
+      i = i + 1;
     }
 
     this.constraints = unsolved;
@@ -286,12 +380,10 @@ class TypeState {
     let env = Map();
 
     for (x in this.typeEnv) {
-      for (s in this.sigma) {
-        let k = x[0];
-        let v = x[1];
+      let k = x[0];
+      let v = x[1];
 
-        env[k] = s.substitute(v);
-      }
+      env[k] = this.solution[v];
     }
 
     return env;
@@ -300,6 +392,14 @@ class TypeState {
   unified() => len(this.constraints) == 0;
   success() => this.unified();
   failure() => !this.unified();
+
+  ppConstraints() => {
+    for (c in this.constraints) {
+      print "######## " + str(c.__class__) + " ########";
+      c.pp();
+      print "############################";
+    }
+  }
 }
 
 let typecheck = (expr) => {
@@ -308,13 +408,12 @@ let typecheck = (expr) => {
 
   let typeEnv = Map();
 
-  // give the variables uuids.
-
   let globals = Map();
   let annotations = globalTypeEnv();
 
+  // give the variables uuids.
   ast.visit((node, locals) => {
-    let rename = (node, env) => {
+    let rename = (node: ASTVar, env: Map) => {
       if (!env[node.data])
         env[node.data] = uuids.fresh();
       node.uuid = env[node.data];
@@ -322,12 +421,16 @@ let typecheck = (expr) => {
 
     if (node is ASTClosure) {
       let localEnv = Map();
-      for (param in node.signature.params)
-        rename(param, localEnv);
+      for (param in node.signature.params) {
+        let local = param[0];
+        rename(local, localEnv);
+      }
       return localEnv;
     }
   
-    if (node is ASTLocal) rename(node, locals);
+    if (node is ASTLocal)
+      rename(node, locals);
+
     if (node is ASTGlobal) {
       rename(node, globals);
 
@@ -339,7 +442,7 @@ let typecheck = (expr) => {
     return locals;
   }, Map());
 
-  let state = TypeState(typeEnv);
+  let state = TypeState(typeEnv, false);
 
   state.constrain(ast);
   state.unify();

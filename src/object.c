@@ -63,7 +63,6 @@ ObjClosure* newClosure(ObjFunction* function) {
   closure->function = function;
   closure->upvalues = upvalues;
   closure->upvalueCount = function->upvalueCount;
-  initMap(&closure->typeEnv);
   return closure;
 }
 
@@ -174,6 +173,12 @@ ObjUpvalue* newUpvalue(Value* slot) {
   upvalue->closed = NIL_VAL;
   upvalue->next = NULL;
   return upvalue;
+}
+
+ObjSpread* newSpread(Value value) {
+  ObjSpread* spread = ALLOCATE_OBJ(ObjSpread, OBJ_SPREAD);
+  spread->value = value;
+  return spread;
 }
 
 void initMap(ObjMap* map) {
@@ -430,5 +435,11 @@ void printObject(Value value) {
     case OBJ_SEQUENCE:
       printValueArray(&AS_SEQUENCE(value)->values);
       break;
+    case OBJ_SPREAD: {
+      printf("<..");
+      printValue(AS_SPREAD(value)->value);
+      printf(">");
+      break;
+    }
   }
 }

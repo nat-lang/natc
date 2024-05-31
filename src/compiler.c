@@ -188,11 +188,12 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static void consumeQuietly(TokenType type) {
-  if (parser.current.type == type)
+static bool consumeQuietly(TokenType type) {
+  if (parser.current.type == type) {
     advance();
-  else
-    parser.hadError = true;
+    return true;
+  }
+  return false;
 }
 
 static bool match(TokenType type) {
@@ -209,6 +210,30 @@ static bool prevWhite() { return isWhite(*(parser.current.start - 1)); }
 
 static void emitByte(uint8_t byte) {
   writeChunk(currentChunk(), byte, parser.previous.line);
+}
+
+// Find a [token] that isn't nested within braces, brackets,
+// or parentheses. Assume that the initial nesting depth is 1,
+// so that the search is negative when we find a [closing] token
+// at depth 0.
+bool advanceTo(TokenType token, TokenType closing) {
+  int depth = 1;
+
+  for (;;) {
+    if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
+        check(TOKEN_LEFT_PAREN))
+      depth++;
+    if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
+        check(TOKEN_RIGHT_PAREN))
+      depth--;
+
+    // found one.
+    if (check(token) && depth == 1) return true;
+    // found none.
+    if (check(closing) && depth == 0) return false;
+
+    advance();
+  }
 }
 
 static void emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -240,16 +265,6 @@ static int emitJump(uint8_t instruction) {
   emitByte(0xff);
   emitByte(0xff);
   return currentChunk()->count - 2;
-}
-
-static void emitReturn() {
-  if (current->type == TYPE_INITIALIZER) {
-    emitConstInstr(OP_GET_LOCAL, 0);
-  } else {
-    emitByte(OP_NIL);
-  }
-
-  emitByte(OP_RETURN);
 }
 
 static int getConstant(Value value) {
@@ -330,7 +345,12 @@ static void initCompiler(Compiler* compiler, FunctionType type, Token name) {
 }
 
 static ObjFunction* endCompiler() {
-  emitReturn();
+  if (current->type == TYPE_INITIALIZER)
+    emitConstInstr(OP_GET_LOCAL, 0);
+  else
+    emitByte(OP_NIL);
+  emitByte(OP_IMPLICIT_RETURN);
+
   ObjFunction* function = current->function;
 
 #ifdef DEBUG_PRINT_CODE
@@ -503,7 +523,12 @@ static uint8_t argumentList() {
   uint8_t argCount = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      expression();
+      if (match(TOKEN_DOUBLE_DOT)) {
+        expression();
+        emitByte(OP_SPREAD);
+      } else {
+        expression();
+      }
 
       if (argCount == 255) error("Can't have more than 255 arguments.");
 
@@ -587,6 +612,11 @@ static void literal(bool canAssign) {
 }
 
 static void parentheses(bool canAssign) {
+  if (match(TOKEN_RIGHT_PAREN)) {
+    emitByte(OP_UNIT);
+    return;
+  }
+
   expression();
 
   if (check(TOKEN_COMMA)) {
@@ -650,9 +680,9 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
-static int nativeCall(char* name, int argCount) {
+static int nativeCall(char* name) {
   int address = nativeVariable(name);
-  emitBytes(OP_CALL, argCount);
+  emitBytes(OP_CALL, 0);
   return address;
 }
 
@@ -749,33 +779,28 @@ static void defineVariable(uint16_t variable) {
 }
 
 static bool peekSignature() {
-  bool found;
-
-  Parser checkpoint = saveParser();
-
-  consumeQuietly(TOKEN_LEFT_PAREN);
+  if (!consumeQuietly(TOKEN_LEFT_PAREN)) return false;
 
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      consumeQuietly(TOKEN_IDENTIFIER);
-      if (check(TOKEN_COLON)) {
-        advance();
-        expression();
-      }
+      if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
+      if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN);
+
     } while (match(TOKEN_COMMA));
   }
-  consumeQuietly(TOKEN_RIGHT_PAREN);
-  consumeQuietly(TOKEN_FAT_ARROW);
 
-  found = !parser.hadError;
+  if (!consumeQuietly(TOKEN_RIGHT_PAREN)) return false;
+  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
 
-  gotoParser(checkpoint);
-
-  return found;
+  return true;
 }
 
 static bool tryFunction(FunctionType fnType, Token name) {
-  if (peekSignature()) {
+  Parser checkpoint = saveParser();
+  bool isFn = peekSignature();
+  gotoParser(checkpoint);
+
+  if (isFn) {
     function(fnType, name);
     return true;
   }
@@ -851,13 +876,13 @@ static void function(FunctionType type, Token name) {
       defineVariable(constant);
 
       // type annotations for parameters default to nil.
-      if (check(TOKEN_COLON)) {
-        advance();
+      if (match(TOKEN_COLON)) {
         expression();
       } else {
         emitByte(OP_NIL);
       }
       defineType(constant);
+      emitByte(OP_POP);  // the type.
 
     } while (match(TOKEN_COMMA));
   }
@@ -1006,24 +1031,6 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
 
   return checkpointB;
 }
-// Find a pipe that isn't nested within [left] and [right].
-// Assume that the initial nesting depth is 1, i.e., that
-// we've already consumed an instance of [left].
-bool advanceToPipe(TokenType left, TokenType right) {
-  int depth = 1;
-
-  for (;;) {
-    if (check(left)) depth++;
-    if (check(right)) depth--;
-
-    // found one.
-    if (check(TOKEN_PIPE) && depth == 1) return true;
-    // found none.
-    if (check(right) && depth == 0) return false;
-
-    advance();
-  }
-}
 
 // Here we check if we're at a comprehension, and if we are, we parse it.
 // We wrap the comprehension in a closure so that it has its own frame
@@ -1038,16 +1045,16 @@ static bool tryComprehension(char* klass, TokenType openingToken,
   //  to establish that it isn't.
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe(openingToken, closingToken)) {
+  if (advanceTo(TOKEN_PIPE, closingToken)) {
     advance();  // eat the pipe.
 
     Compiler compiler;
     initCompiler(&compiler, TYPE_ANONYMOUS, syntheticToken("#comprehension"));
     beginScope();
 
-    // the comprehension instance is local 0. we'll load it
-    // when we hit the bottom of the condition clauses.
-    nativeCall(klass, 0);
+    // init the comprehension instance at local 0. we'll load
+    // it when we hit the bottom of the condition clauses.
+    nativeCall(klass);
     int var = addLocal(syntheticToken("#comprehension"));
     markInitialized();
 
@@ -1084,7 +1091,7 @@ static void braces(bool canAssign) {
   // empty braces is an empty set.
   if (check(TOKEN_RIGHT_BRACE)) {
     advance();
-    nativeCall(S_SET, elements);
+    nativeCall(S_SET);
     return;
   }
 
@@ -1141,7 +1148,7 @@ static bool sequence() {
 
   // empty seq.
   if (check(TOKEN_RIGHT_BRACKET)) {
-    nativeCall(S_SEQUENCE, elements);
+    nativeCall(S_SEQUENCE);
     return true;
   }
 
@@ -1289,6 +1296,7 @@ static void letDeclaration() {
     emitByte(OP_NIL);
   }
   defineType(var);
+  emitByte(OP_POP);  // the type.
 
   if (match(TOKEN_EQUAL)) {
     boundExpression(name);
@@ -1418,18 +1426,18 @@ static void returnStatement() {
   if (current->type == TYPE_SCRIPT) {
     error("Can't return from top-level code.");
   }
+  if (current->type == TYPE_INITIALIZER) {
+    error("Can't return from an initializer.");
+  }
 
   if (match(TOKEN_SEMICOLON)) {
-    emitReturn();
+    emitByte(OP_NIL);
   } else {
-    if (current->type == TYPE_INITIALIZER) {
-      error("Can't return a value from an initializer.");
-    }
-
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
-    emitByte(OP_RETURN);
   }
+
+  emitByte(OP_RETURN);
 }
 
 static void throwStatement() {

@@ -19,6 +19,7 @@ class ASTTypeAssignment extends ASTStatement {}
 class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
 class ASTLocalTypeAssignment extends ASTTypeAssignment {}
 class ASTReturn extends ASTStatement {}
+class ASTImplicitReturn extends ASTReturn {}
 class ASTExprStatement extends ASTStatement {}
 
 class ASTLiteral extends ASTExpr {
@@ -47,14 +48,24 @@ class ASTArgumentSequence extends ASTExpr {
   init(args) => {
     this.children = args;
   }
+  resolve() => this.children.map((node) => node.resolve());
 }
-class ASTApp extends ASTExprStatement {}
+
+class ASTApp extends ASTExprStatement {
+  evaluate() => {
+    let fn = this[0].resolve();
+    let args = this[1].resolve();
+
+    return fn(..args);
+  }
+
+  resolve() => this.evaluate();
+}
 
 class ASTSignature extends ASTNode {
   init(arity) => {
     this.arity = arity;
     this.params = [];
-    this.retVals = [];
   }
 
   isComplete() => len(this.params) == this.arity;
@@ -102,6 +113,10 @@ class ASTClosure extends ASTExpr {
   opReturn(expr) => {
     let node = ASTReturn(expr);
     this.children.push(node);
-    this.signature.retVals.push(node);
+  }
+
+  opImplicitReturn(expr) => {
+    let node = ASTImplicitReturn(expr);
+    this.children.push(node);
   }
 }

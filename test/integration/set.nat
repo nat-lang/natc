@@ -100,6 +100,12 @@ assert(set == {1,2,3});
 set = {a | a in {a | a in {1,1,2,2,3,3}}};
 assert(set == {1,2,3});
 
+// sequence comprehension in body.
+set = {[a | a in b] | b in [[1,2], [3,4]]};
+
+assert([3,4] in set);
+assert([1,2] in set);
+
 // api.
 
 // powerset.

@@ -40,6 +40,10 @@ bool findInValueArray(ValueArray* array, Value value) {
 
 void printValue(Value value) {
   switch (value.vType) {
+    case VAL_UNIT: {
+      printf("()");
+      break;
+    }
     case VAL_BOOL: {
       printf(AS_BOOL(value) ? "true" : "false");
       break;
@@ -71,6 +75,8 @@ void printValueArray(ValueArray* array) {
 bool valuesEqual(Value a, Value b) {
   if (a.vType != b.vType) return false;
   switch (a.vType) {
+    case VAL_UNIT:
+      return true;
     case VAL_BOOL:
       return AS_BOOL(a) == AS_BOOL(b);
     case VAL_NIL:
@@ -125,6 +131,8 @@ bool isHashable(Value value) {
 // nil, bool, num, or string.
 uint32_t hashValue(Value value) {
   switch (value.vType) {
+    case VAL_UNIT:
+      return 4;
     case VAL_BOOL:
       return AS_BOOL(value);
     case VAL_NIL:
@@ -137,5 +145,6 @@ uint32_t hashValue(Value value) {
       return 3;
   }
 
+  // unreachable.
   return 0;
 }

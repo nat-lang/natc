@@ -1,6 +1,7 @@
 #include "vm.h"
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -210,6 +211,37 @@ static bool checkArity(int paramCount, int argCount) {
   return false;
 }
 
+// Walk the frame delimited by [argCount] and expand any
+// [ObjSpread]s. (Note: maybe we could devise a way to do
+// this without shuffling the whole frame of arguments for
+// every function call.)
+static bool spread(int* argCount) {
+  Value args[255];
+  int newArgCount = 0;
+
+  for (int i = 0; i < *argCount; i++) {
+    Value arg = vmPop();
+
+    if (IS_SPREAD(arg)) {
+      Value vSeq;
+      if (!vmSequenceValueField(AS_INSTANCE(AS_SPREAD(arg)->value), &vSeq))
+        return false;
+
+      ObjSequence* seq = AS_SEQUENCE(vSeq);
+      for (int j = seq->values.count - 1; j >= 0; j--) {
+        args[newArgCount++] = seq->values.values[j];
+      }
+    } else {
+      args[newArgCount++] = arg;
+    }
+  }
+
+  *argCount = newArgCount;
+  while (newArgCount > 0) vmPush(args[--newArgCount]);
+
+  return true;
+}
+
 // Collapse [argCount] - [arity] + 1 arguments into a final
 // [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
@@ -257,6 +289,8 @@ static bool variadify(ObjClosure* closure, int* argCount) {
 }
 
 static bool call(ObjClosure* closure, int argCount) {
+  if (!spread(&argCount)) return false;
+
   if (closure->function->variadic)
     if (!variadify(closure, &argCount)) return false;
 
@@ -276,6 +310,8 @@ static bool call(ObjClosure* closure, int argCount) {
 }
 
 static bool callNative(ObjNative* native, int argCount) {
+  if (!spread(&argCount)) return false;
+
   if (!native->variadic && !checkArity(native->arity, argCount)) return false;
 
   return (native->function)(argCount, vm.stackTop - argCount);
@@ -400,6 +436,18 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
     return false;
   }
 
+  return true;
+}
+
+bool vmSequenceValueField(ObjInstance* obj, Value* seq) {
+  if (!mapGet(&obj->fields, INTERN("values"), seq)) {
+    vmRuntimeError("Sequence instance missing its values!");
+    return false;
+  }
+  if (!IS_SEQUENCE(*seq)) {
+    vmRuntimeError("Expecting sequence.");
+    return false;
+  }
   return true;
 }
 
@@ -529,6 +577,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_SET_PROPERTY: {
         if (!IS_INSTANCE(vmPeek(1)) && !IS_CLASS(vmPeek(1))) {
           vmRuntimeError("Only objects and classes have properties (set).");
+          return INTERPRET_RUNTIME_ERROR;
         }
 
         if (IS_INSTANCE(vmPeek(1)))
@@ -674,10 +723,12 @@ InterpretResult vmExecute(int baseFrame) {
         vmCaptureUpvalues(closure, frame);
         break;
       }
-      case OP_CLOSE_UPVALUE:
+      case OP_CLOSE_UPVALUE: {
         closeUpvalues(vm.stackTop - 1);
         vmPop();
         break;
+      }
+      case OP_IMPLICIT_RETURN:
       case OP_RETURN: {
         Value value = vmPop();
         closeUpvalues(frame->slots);
@@ -904,10 +955,7 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_SET_TYPE_LOCAL: {
-        uint8_t slot = READ_SHORT();
-        Value key = NUMBER_VAL(slot);
-        mapSet(&frame->closure->typeEnv, key, vmPeek(0));
-        vmPop();  // type expression.
+        READ_SHORT();
         break;
       }
       case OP_SET_TYPE_GLOBAL: {
@@ -917,7 +965,27 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
         mapSet(&vm.typeEnv, name, vmPeek(0));
-        vmPop();  // type expression.
+        break;
+      }
+      case OP_SPREAD: {
+        Value value = vmPeek(0);
+
+        ObjClass lca;
+        if (!IS_INSTANCE(value) &&
+            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.classes.sequence,
+                                &lca) &&
+            &lca == vm.classes.sequence) {
+          vmRuntimeError("Only sequential values can spread.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjSpread* spread = newSpread(value);
+        vmPop();
+        vmPush(OBJ_VAL(spread));
+        break;
+      }
+      case OP_UNIT: {
+        vmPush(UNIT_VAL);
         break;
       }
       default:
