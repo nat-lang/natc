@@ -62,24 +62,12 @@ bool __sequenceInit__(int argCount, Value* args) {
   return true;
 }
 
-bool sequenceValueField(ObjInstance* obj, Value* seq) {
-  if (!mapGet(&obj->fields, INTERN("values"), seq)) {
-    vmRuntimeError("Sequence instance missing its values!");
-    return false;
-  }
-  if (!IS_SEQUENCE(*seq)) {
-    vmRuntimeError("Expecting sequence.");
-    return false;
-  }
-  return true;
-}
-
 bool __sequencePush__(int argCount, Value* args) {
   Value val = vmPeek(0);
   ObjInstance* obj = AS_INSTANCE(vmPeek(1));
   Value seq;
 
-  if (!sequenceValueField(obj, &seq)) return false;
+  if (!vmSequenceValueField(obj, &seq)) return false;
   writeValueArray(&AS_SEQUENCE(seq)->values, val);
   vmPop();
   return true;
@@ -88,7 +76,7 @@ bool __sequencePush__(int argCount, Value* args) {
 bool __sequencePop__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
   Value seq;
-  if (!sequenceValueField(obj, &seq)) return false;
+  if (!vmSequenceValueField(obj, &seq)) return false;
   Value value = popValueArray(&AS_SEQUENCE(seq)->values);
 
   vmPop();
@@ -219,6 +207,9 @@ bool __vType__(int argCount, Value* args) {
   vmPop();  // native fn.
 
   switch (value.vType) {
+    case VAL_UNIT:
+      vmPush(value);
+      break;
     case VAL_BOOL:
       vmPush(OBJ_VAL(vm.classes.vTypeBool));
       break;
@@ -306,8 +297,21 @@ bool __str__(int argCount, Value* args) {
           (AS_BOOL(value) ? copyString("true", 4) : copyString("false", 5));
       break;
     }
+    case VAL_OBJ: {
+      switch (OBJ_TYPE(value)) {
+        case OBJ_CLASS: {
+          string = AS_CLASS(value)->name;
+          break;
+        }
+        default: {
+          vmRuntimeError("Can't turn object into a string.");
+          return false;
+        }
+      }
+      break;
+    }
     default: {
-      vmRuntimeError("Can't turn x into a string.");
+      vmRuntimeError("Can't turn value into a string.");
       return false;
     }
   }

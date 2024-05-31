@@ -45,6 +45,10 @@ class Sequential extends Object {
 
   all(predicate) => this.map(predicate).reduce(and, true);
   some(predicate) => this.map(predicate).reduce(or, false);
+
+  pp() => {
+    print this.values;
+  }
 }
 
 class Tuple extends Sequential {}

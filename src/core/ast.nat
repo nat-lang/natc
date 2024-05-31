@@ -48,8 +48,19 @@ class ASTArgumentSequence extends ASTExpr {
   init(args) => {
     this.children = args;
   }
+  resolve() => this.children.map((node) => node.resolve());
 }
-class ASTApp extends ASTExprStatement {}
+
+class ASTApp extends ASTExprStatement {
+  evaluate() => {
+    let fn = this[0].resolve();
+    let args = this[1].resolve();
+
+    return fn(..args);
+  }
+
+  resolve() => this.evaluate();
+}
 
 class ASTSignature extends ASTNode {
   init(arity) => {

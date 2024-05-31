@@ -153,3 +153,28 @@ assert(f[3][1] is ASTLiteral);
 // k(j).
 assert(f[4] is ASTExprStatement);
 assert(f[5] is ASTImplicitReturn);
+
+// resolution, aka evaluation.
+
+// obj language.
+
+f <- (g) => {
+  let k = 1 + 1;
+};
+
+assert(f[1][1] is ASTApp);
+assert(f[1][1].resolve() == 2);
+
+// type annotation.
+
+f <- () => {
+  let k = (a: num -> num) => a(1);
+};
+
+assert(f[1][1] is ASTClosure);
+
+let closure = f[1][1];
+assert(closure.signature.params[0] is ASTLocalTypeAssignment);
+
+let typeAssignment = closure.signature.params[0];
+assert(typeAssignment[1].resolve() is TFunction);

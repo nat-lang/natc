@@ -276,8 +276,13 @@ Token scanToken() {
       return makeToken(TOKEN_SEMICOLON);
     case ',':
       return makeToken(TOKEN_COMMA);
-    case '.':
-      return makeToken(TOKEN_DOT);
+    case '.': {
+      if (match('.')) {
+        return makeToken(TOKEN_DOUBLE_DOT);
+      } else {
+        return makeToken(TOKEN_DOT);
+      }
+    }
     case '|':
       return makeToken(TOKEN_PIPE);
     case '!':
