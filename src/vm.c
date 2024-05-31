@@ -955,9 +955,7 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_SET_TYPE_LOCAL: {
-        uint8_t slot = READ_SHORT();
-        Value key = NUMBER_VAL(slot);
-        mapSet(&frame->closure->typeEnv, key, vmPeek(0));
+        READ_SHORT();
         break;
       }
       case OP_SET_TYPE_GLOBAL: {
