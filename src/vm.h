@@ -22,13 +22,25 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjClass* base;
   ObjClass* object;
   ObjClass* tuple;
   ObjClass* sequence;
+  ObjClass* map;
+  ObjClass* set;
   ObjClass* iterator;
-  ObjClass* astNode;
+
   ObjClass* astClosure;
-  ObjClass* astSignature;
+
+  ObjClass* vTypeBool;
+  ObjClass* vTypeNil;
+  ObjClass* vTypeNumber;
+  ObjClass* vTypeUndef;
+  ObjClass* oTypeClass;
+  ObjClass* oTypeInstance;
+  ObjClass* oTypeString;
+  ObjClass* oTypeClosure;
+  ObjClass* oTypeSequence;
 } Classes;
 
 typedef struct {
@@ -40,6 +52,7 @@ typedef struct {
 
   ObjMap strings;
   ObjMap globals;
+  ObjMap typeEnv;
   ObjMap infixes;
 
   Obj* objects;
@@ -76,9 +89,11 @@ void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
 bool vmInitInstance(ObjClass* klass, int argCount, int frames);
+bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
 bool vmCallValue(Value value, int argCount);
 void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
+bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 
 #endif

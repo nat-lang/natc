@@ -1,5 +1,11 @@
 
 class Map extends Object {
+  init(*entries) => {
+    for (let i = 0; i < len(entries); i = i + 1) {
+      this[entries[i][0]] = entries[i][1];
+    }
+  }
+
   // Does each key in [this] map to the same value in [other]?
   subMap(other) => {
     for (key in this.keys()) {
@@ -7,6 +13,16 @@ class Map extends Object {
       if (other[key] != this[key]) return false;
     }
     return true;
+  }
+
+  // Find the first key for which [predicate] is true
+  // and return its value.
+  find(predicate) => {
+    for (key in this.keys()) {
+      if (predicate(key)) {
+        return this[key];
+      }
+    }
   }
 
   __eq__(other) => {

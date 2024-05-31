@@ -21,9 +21,9 @@ void freeChunk(Chunk* chunk) {
 }
 
 // Write a new opcode [byte] to the [chunk], keep the books,
-// and mark the end of [chunk] with OP_END.
+// and mark the end of [chunk] with OP_IMPLICIT_RETURN.
 void writeChunk(Chunk* chunk, uint8_t byte, int line) {
-  // +1 for this byte, +1 for OP_END.
+  // +1 for this byte, +1 for OP_IMPLICIT_RETURN.
   if (chunk->capacity < chunk->count + 2) {
     int oldCapacity = chunk->capacity;
     chunk->capacity = GROW_CAPACITY(oldCapacity);
@@ -33,7 +33,7 @@ void writeChunk(Chunk* chunk, uint8_t byte, int line) {
   }
 
   chunk->code[chunk->count] = byte;
-  chunk->code[chunk->count + 1] = OP_END;
+  chunk->code[chunk->count + 1] = OP_IMPLICIT_RETURN;
   chunk->lines[chunk->count] = line;
   chunk->count++;
 }

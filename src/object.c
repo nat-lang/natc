@@ -16,7 +16,7 @@
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
 
-  object->type = type;
+  object->oType = type;
   object->isMarked = false;
   object->next = vm.objects;
   object->hash = 0;
@@ -74,7 +74,6 @@ ObjFunction* newFunction() {
   function->variadic = false;
   initChunk(&function->chunk);
   initMap(&function->constants);
-  initMap(&function->signature);
   return function;
 }
 
@@ -125,7 +124,7 @@ static uint32_t hashString(const char* key, int length) {
 
 // Generate a hash code for [object].
 uint32_t hashObject(Obj* object) {
-  switch (object->type) {
+  switch (object->oType) {
     case OBJ_STRING:
       return ((ObjString*)object)->hash;
     default:
@@ -176,12 +175,10 @@ ObjUpvalue* newUpvalue(Value* slot) {
   return upvalue;
 }
 
-static void printFunction(ObjFunction* function) {
-  if (function->name == NULL) {
-    printf("<script>");
-  } else {
-    printf("<fn %s>", function->name->chars);
-  }
+ObjSpread* newSpread(Value value) {
+  ObjSpread* spread = ALLOCATE_OBJ(ObjSpread, OBJ_SPREAD);
+  spread->value = value;
+  return spread;
 }
 
 void initMap(ObjMap* map) {
@@ -384,6 +381,12 @@ bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
   return false;
 }
 
+bool objectsEqual(Obj* a, Obj* b) {
+  if (a->hash != 0 && b->hash != 0) return a->hash == b->hash;
+
+  return a == b;
+}
+
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_BOUND_FUNCTION: {
@@ -403,13 +406,15 @@ void printObject(Value value) {
       break;
     }
     case OBJ_CLASS:
-      printf("%s", AS_CLASS(value)->name->chars);
+      printf("<%s class>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
-      printFunction(AS_CLOSURE(value)->function);
+      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
+             AS_CLOSURE(value));
       break;
     case OBJ_FUNCTION:
-      printFunction(AS_FUNCTION(value));
+      printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,
+             AS_FUNCTION(value));
       break;
     case OBJ_INSTANCE:
       printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
@@ -419,7 +424,7 @@ void printObject(Value value) {
       printMap(AS_MAP(value));
       break;
     case OBJ_NATIVE:
-      printf("<fn %s>", AS_NATIVE(value)->name->chars);
+      printf("<native %s>", AS_NATIVE(value)->name->chars);
       break;
     case OBJ_STRING:
       printf("%s", AS_CSTRING(value));
@@ -430,5 +435,11 @@ void printObject(Value value) {
     case OBJ_SEQUENCE:
       printValueArray(&AS_SEQUENCE(value)->values);
       break;
+    case OBJ_SPREAD: {
+      printf("<..");
+      printValue(AS_SPREAD(value)->value);
+      printf(">");
+      break;
+    }
   }
 }

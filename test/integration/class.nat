@@ -108,6 +108,30 @@ assert(h(1) == 2);
 
 // inheritance.
 
+class B {
+  init(v) => {
+    this.v = v;
+  }
+}
+
+class C extends B {
+  init(v) => {
+    super.init(v);
+  }
+}
+
+assert(C(1).v == 1);
+
+// two place.
+
+class D extends C {
+  init(v) => {
+    super.init(v);
+  }
+}
+
+assert(D(1).v == 1);
+
 // override method.
 
 class A {
@@ -174,7 +198,25 @@ class B extends A {
 
 assert(B().method()() == "A");
 
-// class fields
+// the original instance remains bound on method reassignment.
+
+class A {
+  init(v) => {
+    this.v = v;
+  }
+  method(a) => {
+    return this.v + a;
+  }
+}
+
+let a = A(1);
+let b = A(2);
+
+b.method = a.method;
+
+assert(b.method(1) == 2);
+
+// class properties.
 
 class A {}
 

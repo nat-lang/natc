@@ -78,7 +78,7 @@ static void blackenObject(Obj* object) {
   printf("\n");
 #endif
 
-  switch (object->type) {
+  switch (object->oType) {
     case OBJ_BOUND_FUNCTION: {
       ObjBoundFunction* obj = (ObjBoundFunction*)object;
       markValue(obj->receiver);
@@ -121,7 +121,6 @@ static void blackenObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
       markArray(&function->chunk.constants);
-      markMap(&function->signature);
       break;
     }
     case OBJ_MAP: {
@@ -135,6 +134,12 @@ static void blackenObject(Obj* object) {
     case OBJ_SEQUENCE: {
       ObjSequence* seq = (ObjSequence*)object;
       markArray(&seq->values);
+      break;
+    }
+    case OBJ_SPREAD: {
+      ObjSpread* spread = (ObjSpread*)object;
+      markValue(spread->value);
+      break;
     }
   }
 }
@@ -144,7 +149,7 @@ static void freeObject(Obj* object) {
   printf("%p free type %d\n", (void*)object, object->type);
 #endif
 
-  switch (object->type) {
+  switch (object->oType) {
     case OBJ_BOUND_FUNCTION:
       FREE(ObjBoundFunction, object);
       break;
@@ -165,7 +170,6 @@ static void freeObject(Obj* object) {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
       freeMap(&function->constants);
-      freeMap(&function->signature);
       FREE(ObjFunction, object);
       break;
     }
@@ -196,6 +200,11 @@ static void freeObject(Obj* object) {
       ObjSequence* seq = (ObjSequence*)object;
       freeValueArray(&seq->values);
       FREE(ObjSequence, seq);
+      break;
+    }
+    case OBJ_SPREAD: {
+      FREE(ObjSpread, object);
+      break;
     }
   }
 }
@@ -212,6 +221,7 @@ static void markRoots() {
     markObject((Obj*)upvalue);
   }
   markMap(&vm.globals);
+  markMap(&vm.typeEnv);
   markMap(&vm.infixes);
   markCompilerRoots();
 }

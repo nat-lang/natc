@@ -66,5 +66,11 @@ test-valgrind:
 
 # Run valgrind against the integration tests in a container.
 valgrind:
-	@ docker build -t "valgrind" -f build/Dockerfile.valgrind .
-	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp valgrind sh -c "make test-valgrind"
+	@ docker build -t "linux" -f build/Dockerfile.linux .
+	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp linux sh -c "make test-valgrind"
+
+# Drop us into a linux container.
+linux:
+	@ docker build -t "linux" -f build/Dockerfile.linux .
+	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp -it linux sh
+

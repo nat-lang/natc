@@ -1,2 +1,15 @@
 
 let compose = (f, g) => (x) => f(g(x));
+
+let zip = (x, y) => {
+  if (len(x) != len(y))
+    throw Error("Can't zip sequences of different length.");
+  
+  let seq = [];
+
+  for (let i = 0; i < len(x); i = i + 1) {
+    seq.push((x[i], y[i]));
+  }
+
+  return seq;
+};

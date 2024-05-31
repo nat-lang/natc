@@ -20,6 +20,13 @@ void initToken(Token *token) {
   token->line = -1;
 }
 
+Token syntheticToken(const char *start) {
+  Token token;
+  token.start = start;
+  token.length = (int)strlen(start);
+  return token;
+}
+
 void printScanner(Scanner sc) {
   fprintf(stderr, "(scanner current): %s\n", scanner.current);
 }
@@ -209,7 +216,7 @@ static Token identifier() {
   return makeToken(identifierType());
 }
 
-Token dottedIdentifier() {
+Token slashedIdentifier() {
   while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
   return scanner.current == scanner.start ? errorToken("Unexpected character.")
                                           : makeToken(TOKEN_IDENTIFIER);
@@ -269,8 +276,13 @@ Token scanToken() {
       return makeToken(TOKEN_SEMICOLON);
     case ',':
       return makeToken(TOKEN_COMMA);
-    case '.':
-      return makeToken(TOKEN_DOT);
+    case '.': {
+      if (match('.')) {
+        return makeToken(TOKEN_DOUBLE_DOT);
+      } else {
+        return makeToken(TOKEN_DOT);
+      }
+    }
     case '|':
       return makeToken(TOKEN_PIPE);
     case '!':

@@ -5,7 +5,7 @@
 #include "common.h"
 #include "value.h"
 
-#define OBJ_TYPE(value) (AS_OBJ(value)->type)
+#define OBJ_TYPE(value) (AS_OBJ(value)->oType)
 
 #define IS_BOUND_FUNCTION(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
@@ -16,6 +16,7 @@
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
+#define IS_SPREAD(value) isObjType(value, OBJ_SPREAD)
 
 #define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
@@ -27,6 +28,7 @@
 #define AS_STRING(value) ((ObjString *)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
+#define AS_SPREAD(value) (((ObjSpread *)AS_OBJ(value)))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 
@@ -43,10 +45,11 @@ typedef enum {
   OBJ_SEQUENCE,
   OBJ_STRING,
   OBJ_UPVALUE,
+  OBJ_SPREAD,
 } ObjType;
 
 struct Obj {
-  ObjType type;
+  ObjType oType;
   bool isMarked;
   uint32_t hash;
   struct Obj *next;
@@ -74,7 +77,6 @@ typedef struct {
   // cache from values to constant indices
   // in the function's chunk.constants.
   ObjMap constants;
-  ObjMap signature;
 } ObjFunction;
 
 typedef bool (*NativeFn)(int argCount, Value *args);
@@ -138,6 +140,11 @@ typedef struct {
   ValueArray values;
 } ObjSequence;
 
+typedef struct {
+  Obj obj;
+  Value value;
+} ObjSpread;
+
 ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
 ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
@@ -153,10 +160,11 @@ ObjString *copyString(const char *chars, int length);
 ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjString *intern(const char *chars);
 ObjUpvalue *newUpvalue(Value *slot);
+ObjSpread *newSpread(Value value);
 void printObject(Value value);
 
 static inline bool isObjType(Value value, ObjType type) {
-  return IS_OBJ(value) && AS_OBJ(value)->type == type;
+  return IS_OBJ(value) && AS_OBJ(value)->oType == type;
 }
 
 void initMap(ObjMap *map);
@@ -175,5 +183,5 @@ void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
 bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
 uint32_t hashObject(Obj *object);
-
+bool objectsEqual(Obj *a, Obj *b);
 #endif

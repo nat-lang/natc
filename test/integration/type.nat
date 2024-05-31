@@ -1,0 +1,377 @@
+
+
+let f;
+let env;
+let check;
+
+// no argument, implicit return.
+
+f : () -> num;
+
+env = globalTypeEnv();
+assert(env["f"] == () -> num);
+
+check = typecheck(() => f());
+assert(check.success());
+
+check = typecheck(() => f(true));
+assert(check.failure());
+
+check = typecheck(() => f(f()));
+assert(check.failure());
+
+// single argument, implicit return.
+
+f : num -> num;
+
+env = globalTypeEnv();
+assert(env["f"] == num -> num);
+
+check = typecheck(() => f());
+assert(check.failure());
+
+check = typecheck(() => f(1));
+assert(check.success());
+
+check = typecheck(() => f(true));
+assert(check.failure());
+
+check = typecheck(() => f(f(1)));
+assert(check.success());
+
+check = typecheck(() => f(f(true)));
+assert(check.failure());
+
+// no argument, explicit return.
+
+f : () -> num;
+
+check = typecheck(() => {
+  return f();
+});
+assert(check.success());
+
+check = typecheck(() => {
+  return f(true);
+});
+assert(check.failure());
+
+// single argument, explicit return.
+
+f : num -> num;
+
+check = typecheck(() => {
+  return f(1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  return f(f(1));
+});
+assert(check.success());
+
+check = typecheck(() => {
+  return f(true);
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  return f(f(true));
+});
+assert(check.failure());
+
+// multiple arguments, implicit return.
+
+f : (num, num) -> num;
+f = (a, b) => a + b;
+
+env = globalTypeEnv();
+assert(env["f"] == (num, num) -> num);
+
+check = typecheck(() => f(1,1));
+assert(check.success());
+
+check = typecheck(() => f(f(1,1),f(1,1)));
+assert(check.success());
+
+check = typecheck(() => f(1, true));
+assert(check.failure());
+
+check = typecheck(() => f(true, true));
+assert(check.failure());
+
+// multiple arguments, explicit return.
+
+check = typecheck(() => {
+  return f(1,1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  return f(1,true);
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  return f(false,true);
+});
+assert(check.failure());
+
+// declaration annotations.
+
+let f: num -> num;
+
+env = globalTypeEnv();
+assert(env["f"] == num -> num);
+
+let x: num;
+check = typecheck(() => f(x));
+assert(check.success());
+
+let y: string;
+check = typecheck(() => f(y));
+assert(check.failure());
+
+check = typecheck(() => f(2));
+assert(check.success());
+
+check = typecheck(() => f("a"));
+assert(check.failure());
+
+check = typecheck(() => f(true));
+assert(check.failure());
+
+// parameter annotation.
+
+// single base type param constrains the function type.
+
+check = typecheck(() => {
+  let k = (a: num) => a;
+  k(1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num) => a;
+  k("a");
+});
+assert(check.failure());
+
+// multiple base type params constrain the function type.
+
+check = typecheck(() => {
+  let k = (a: num, b: num) => a + b;
+  k(1, 1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num, b: num) => a + b;
+  k(1, "a");
+});
+assert(check.failure());
+
+// single arrow param constrains the function type.
+
+check = typecheck(() => {
+  let k = (a: num -> num) => a(1);
+  k((x) => x);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num -> num) => a(1);
+  k((x) => 1);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num -> num) => a(1);
+  k((x) => "a");
+});
+assert(check.failure());
+
+// multiple arrow params constrain the function type.
+
+check = typecheck(() => {
+  let k = (a: num -> num, b: (num -> num) -> num) => b(a);
+
+  k((x) => x, (f) => f(1));
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num -> num, b: (num -> num) -> num) => b(a);
+
+  k((x) => x, (f) => f("a"));
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  let k = (a: num -> num, b: (num -> num) -> num) => b(a);
+
+  k((x) => x, (f) => f(true));
+});
+assert(check.failure());
+
+// single base type param constrains the function body.
+
+let g: string -> string;
+let h: num -> num;
+
+check = typecheck((a: num) => h(a));
+assert(check.success());
+
+check = typecheck((a: num) => g(a));
+assert(check.failure());
+
+// multiple base type params constrain the function body.
+
+check = typecheck(
+  (a: num, b: num) => {
+    h(a);
+    h(b);
+  }
+);
+assert(check.success());
+
+check = typecheck(
+  (a: num, b: num) => {
+    h(a);
+    g(b);
+  }
+);
+assert(check.failure());
+
+// single arrow param constrains the function body.
+
+check = typecheck((a: num -> num) => a(1));
+assert(check.success());
+
+check = typecheck((a: num -> num) => a("a"));
+assert(check.failure());
+
+check = typecheck((a: num -> num) => a(true));
+assert(check.failure());
+
+// multiple arrow params constrain the function body.
+
+check = typecheck(
+  (a: num -> num, b: (num -> num) -> num) => b(a)
+);
+assert(check.success());
+
+check = typecheck(
+  (a: num -> string, b: (num -> string) -> num) => b(a)
+);
+assert(check.success());
+
+check = typecheck(
+  (a: num -> num, b: (string -> num) -> num) => b(a)
+);
+assert(check.failure());
+
+check = typecheck(
+  (a: num -> num, b: (num -> string) -> num) => b(a)
+);
+assert(check.failure());
+
+check = typecheck(
+  (a: string -> num, b: (num -> num) -> num) => b(a)
+);
+assert(check.failure());
+
+check = typecheck(
+  (a: num -> string, b: (num -> num) -> num) => b(a)
+);
+assert(check.failure());
+
+// homographic locals in adjacent scopes don't clash.
+
+check = typecheck(() => {
+  let k = (a: num) => h(a);
+  let j = (a: string) => g(a);
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let k = (a: num) => h(a);
+  let j = (a: string) => h(a);
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  let k = (a: num) => g(a);
+  let j = (a: string) => g(a);
+});
+assert(check.failure());
+
+check = typecheck(() => {
+  let k = (a: num) => g(a);
+  let j = (a: string) => h(a);
+});
+assert(check.failure());
+
+// declarations constrain parameter annotations.
+
+check = typecheck(() => {
+  let f: num -> num = (a: num) => a;
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let f: num -> num = (a: string) => a;
+});
+assert(check.failure());
+
+// declarations constrain return types.
+
+check = typecheck(() => {
+  let f: () -> num = () => 1;
+});
+assert(check.success());
+
+check = typecheck(() => {
+  let f: () -> num = () => true;
+});
+assert(check.failure());
+
+// inference.
+// --------------------------------------------
+
+let h;
+let hType;
+let principal;
+
+// num -> a.
+
+check = typecheck(() => h(1));
+
+principal = check.principal();
+hType = principal.find((n) => n.data == "h");
+
+assert(hType is TFunction);
+assert(hType.domain is TNumber);
+assert(hType.range is TVar);
+
+// bool -> a.
+
+check = typecheck(() => h(true));
+
+principal = check.principal();
+hType = principal.find((n) => n.data == "h");
+
+assert(hType is TFunction);
+assert(hType.domain is TBoolean);
+assert(hType.range is TVar);
+
+// string -> a.
+
+check = typecheck(() => h("a"));
+
+principal = check.principal();
+hType = principal.find((n) => n.data == "h");
+
+assert(hType is TFunction);
+assert(hType.domain is TString);
+assert(hType.range is TVar);

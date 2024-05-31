@@ -16,18 +16,6 @@ static bool initInstance(ObjClass* klass, int argCount) {
   return vmInitInstance(klass, argCount, 1);
 }
 
-bool closureInstance(ObjMap signature) {
-  vmPush(OBJ_VAL(vm.classes.astClosure));
-  vmPush(OBJ_VAL(vm.classes.astSignature));
-  vmPush(OBJ_VAL(vm.classes.object));
-
-  if (!initInstance(vm.classes.object, 0)) return false;
-  mapAddAll(&signature, &AS_INSTANCE(vmPeek(0))->fields);
-
-  if (!initInstance(vm.classes.astSignature, 1)) return false;
-  return initInstance(vm.classes.astClosure, 1);
-}
-
 // Read the syntax tree of [closure] off the tape.
 bool readAST(ObjClosure* closure) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -35,23 +23,28 @@ bool readAST(ObjClosure* closure) {
   printf("\n");
 #endif
 
-  // the root of the tree.
-  if (!closureInstance(closure->function->signature)) return false;
-
-  Value root = vmPeek(0);
-
+  // we'll populate the frame's local slots as we build
+  // the tree, and exit the frame once we're done.
   CallFrame* frame = &vm.frames[vm.frameCount++];
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
-  frame->slots = NULL;
+  frame->slots = vm.stackTop;  // points at [closure].
+
+  // the root of the tree.
+  vmPush(OBJ_VAL(vm.classes.astClosure));
+  vmPush(OBJ_VAL(closure->function->name));
+  vmPush(OBJ_VAL(closure));
+  vmPush(NUMBER_VAL(closure->function->arity));
+  if (!initInstance(vm.classes.astClosure, 3)) return false;
+
+  Value root = vmPeek(0);
 
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     printf("          ");
-    printf("\t");
     disassembleStack();
     printf("\n");
-    printf("\t");
+    printf("  (destruct) ");
     disassembleInstruction(
         &frame->closure->function->chunk,
         (int)(frame->ip - frame->closure->function->chunk.code));
@@ -113,6 +106,21 @@ bool readAST(ObjClosure* closure) {
         vmPop();  // nil.
         break;
       }
+      case OP_IMPLICIT_RETURN: {
+        Value value = vmPop();
+        vmPush(root);
+        vmPush(value);
+        if (!executeMethod("opImplicitReturn", 1)) return false;
+        vmPop();  // nil.
+
+        // we've reached the end of the closure we're
+        // destructuring. replace it with its ast.
+
+        vm.frameCount--;
+        vm.stackTop = frame->slots - 1;  // point at [closure] - 1.
+        vmPush(root);                    // leave the ast on the stack.
+        return true;
+      }
       case OP_GET_GLOBAL: {
         vmPush(root);
         ObjString* name = READ_STRING();
@@ -131,13 +139,13 @@ bool readAST(ObjClosure* closure) {
       }
       case OP_SET_LOCAL: {
         uint8_t slot = READ_SHORT();
-        Value value = vmPop();
+        Value value = vmPeek(0);
 
         vmPush(root);
         vmPush(NUMBER_VAL(slot));
         vmPush(value);
 
-        if (!executeMethod("opSetLocal", 2)) return false;
+        if (!executeMethod("opSetLocalValue", 2)) return false;
         vmPop();  // nil.
         break;
       }
@@ -156,7 +164,6 @@ bool readAST(ObjClosure* closure) {
         vmCaptureUpvalues(closure, frame);
 
         if (!readAST(closure)) return false;
-
         break;
       }
       case OP_CALL: {
@@ -185,12 +192,26 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opCall", 3)) return false;
         break;
       }
-      case OP_END: {
-        vmPop();  // the root.
-        vmPop();  // the destructured expression.
+      case OP_SET_TYPE_LOCAL: {
+        uint8_t slot = READ_SHORT();
+        Value value = vmPeek(0);
+
         vmPush(root);
-        vm.frameCount--;
-        return true;
+        vmPush(NUMBER_VAL(slot));
+        vmPush(value);
+
+        if (!executeMethod("opSetLocalType", 2)) return false;
+
+        vmPop();  // nil.
+        break;
+      }
+      case OP_SET_TYPE_GLOBAL:
+        break;
+      case OP_UNIT: {
+        vmPush(root);
+        vmPush(UNIT_VAL);
+        if (!executeMethod("opLiteral", 1)) return false;
+        break;
       }
       default: {
         vmRuntimeError("Unhandled destructured opcode (%i).", instruction);

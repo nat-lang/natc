@@ -26,12 +26,26 @@
 #define S_POP "pop"
 #define S_HASH "hash"
 
+#define S_BASE "Base"
 #define S_OBJECT "Object"
 #define S_SEQUENCE "Sequence"
 #define S_TUPLE "Tuple"
+#define S_MAP "Map"
+#define S_SET "Set"
+#define S_TREE "Tree"
 #define S_ITERATOR "Iterator"
 #define S_AST_NODE "ASTNode"
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_SIGNATURE "ASTSignature"
+
+#define S_CTYPE_BOOL "CBool"
+#define S_CTYPE_NIL "CNil"
+#define S_CTYPE_NUMBER "CNumber"
+#define S_CTYPE_UNDEF "CUndef"
+#define S_OTYPE_CLASS "OClass"
+#define S_OTYPE_INSTANCE "OInstance"
+#define S_OTYPE_STRING "OString"
+#define S_OTYPE_CLOSURE "OClosure"
+#define S_OTYPE_SEQUENCE "OSequence"
 
 #endif

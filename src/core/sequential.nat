@@ -12,7 +12,6 @@ class Sequential extends Object {
       if (this[i] != seq[i])
         return false;
     }
-
     return true;
   }
 
@@ -36,6 +35,8 @@ class Sequential extends Object {
     return acc;
   }
 
+  filter(predicate) => [x | x in this, !predicate(x)];
+
   concat(other) => {
     let seq = [x | x in this];
     for (x in other) seq.push(x);
@@ -44,6 +45,10 @@ class Sequential extends Object {
 
   all(predicate) => this.map(predicate).reduce(and, true);
   some(predicate) => this.map(predicate).reduce(or, false);
+
+  pp() => {
+    print this.values;
+  }
 }
 
 class Tuple extends Sequential {}
@@ -53,6 +58,5 @@ class Sequence extends Sequential {
     for (x in elements)
       this.push(x);
   }
-
-  add(*elements) => this.extend(elements);
+  last() => this.values[len(this) - 1];
 }

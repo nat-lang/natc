@@ -22,15 +22,16 @@ typedef struct {
 
 typedef enum {
   PREC_NONE,
-  PREC_ASSIGNMENT,  // =
-  PREC_OR,          // or
-  PREC_AND,         // and
-  PREC_EQUALITY,    // == !=
-  PREC_COMPARISON,  // < > <= >=
-  PREC_TERM,        // + -
-  PREC_FACTOR,      // * /
-  PREC_UNARY,       // ! -
-  PREC_CALL,        // . ()
+  PREC_ASSIGNMENT,   // =
+  PREC_INLINE_TYPE,  // : _ =
+  PREC_OR,           // or
+  PREC_AND,          // and
+  PREC_EQUALITY,     // == !=
+  PREC_COMPARISON,   // < > <= >=
+  PREC_TERM,         // + -
+  PREC_FACTOR,       // * /
+  PREC_UNARY,        // ! -
+  PREC_CALL,         // . ()
   PREC_PRIMARY
 } Precedence;
 
@@ -163,9 +164,9 @@ static void advance() {
   checkError();
 }
 
-static void advanceDottedIdentifier() {
+static void advanceSlashedIdentifier() {
   shiftParser();
-  parser.next = dottedIdentifier();
+  parser.next = slashedIdentifier();
   checkError();
 }
 
@@ -187,11 +188,12 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static void consumeQuietly(TokenType type) {
-  if (parser.current.type == type)
+static bool consumeQuietly(TokenType type) {
+  if (parser.current.type == type) {
     advance();
-  else
-    parser.hadError = true;
+    return true;
+  }
+  return false;
 }
 
 static bool match(TokenType type) {
@@ -208,6 +210,30 @@ static bool prevWhite() { return isWhite(*(parser.current.start - 1)); }
 
 static void emitByte(uint8_t byte) {
   writeChunk(currentChunk(), byte, parser.previous.line);
+}
+
+// Find a [token] that isn't nested within braces, brackets,
+// or parentheses. Assume that the initial nesting depth is 1,
+// so that the search is negative when we find a [closing] token
+// at depth 0.
+bool advanceTo(TokenType token, TokenType closing) {
+  int depth = 1;
+
+  for (;;) {
+    if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
+        check(TOKEN_LEFT_PAREN))
+      depth++;
+    if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
+        check(TOKEN_RIGHT_PAREN))
+      depth--;
+
+    // found one.
+    if (check(token) && depth == 1) return true;
+    // found none.
+    if (check(closing) && depth == 0) return false;
+
+    advance();
+  }
 }
 
 static void emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -239,16 +265,6 @@ static int emitJump(uint8_t instruction) {
   emitByte(0xff);
   emitByte(0xff);
   return currentChunk()->count - 2;
-}
-
-static void emitReturn() {
-  if (current->type == TYPE_INITIALIZER) {
-    emitConstInstr(OP_GET_LOCAL, 0);
-  } else {
-    emitByte(OP_NIL);
-  }
-
-  emitByte(OP_RETURN);
 }
 
 static int getConstant(Value value) {
@@ -297,22 +313,7 @@ static void patchJump(int offset) {
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
-static ObjString* functionName(FunctionType type, char* name) {
-  switch (type) {
-    case TYPE_INITIALIZER:
-    case TYPE_METHOD:
-      return copyString(parser.previous.start, parser.previous.length);
-    case TYPE_BOUND:
-      return copyString(parser.penult.start, parser.penult.length);
-    case TYPE_ANONYMOUS:
-      return copyString("lambda", 6);
-    case TYPE_SCRIPT:
-    default:
-      return intern(name);
-  }
-}
-
-static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
+static void initCompiler(Compiler* compiler, FunctionType type, Token name) {
   compiler->enclosing = current;
   compiler->function = NULL;
   compiler->function = newFunction();
@@ -321,7 +322,7 @@ static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
   compiler->scopeDepth = 0;
 
   current = compiler;
-  current->function->name = functionName(type, name);
+  current->function->name = copyString(name.start, name.length);
 
   for (int i = 0; i < UINT8_COUNT; i++) {
     compiler->locals[i].depth = 0;
@@ -344,7 +345,12 @@ static void initCompiler(Compiler* compiler, FunctionType type, char* name) {
 }
 
 static ObjFunction* endCompiler() {
-  emitReturn();
+  if (current->type == TYPE_INITIALIZER)
+    emitConstInstr(OP_GET_LOCAL, 0);
+  else
+    emitByte(OP_NIL);
+  emitByte(OP_IMPLICIT_RETURN);
+
   ObjFunction* function = current->function;
 
 #ifdef DEBUG_PRINT_CODE
@@ -376,17 +382,25 @@ static void endScope() {
   }
 }
 
-static void function(FunctionType type);
+static void closeFunction(Compiler compiler) {
+  ObjFunction* function = endCompiler();
+  emitConstInstr(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+
+  for (int i = 0; i < function->upvalueCount; i++) {
+    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+    emitByte(compiler.upvalues[i].index);
+  }
+}
+
+static void function(FunctionType type, Token name);
 static void expression();
-static void boundExpression();
+static void boundExpression(Token name);
 static void statement();
 static void declaration();
 static void classDeclaration();
 static ParseRule* getRule(Token token);
 static void parseDelimitedPrecedence(Precedence precedence, DelimitFn fn);
 static void parsePrecedence(Precedence precedence);
-
-static Value identifier(char* name) { return INTERN(name); }
 
 static Value identifierToken(Token token) {
   return OBJ_VAL(copyString(token.start, token.length));
@@ -489,8 +503,13 @@ static uint8_t declareVariable() {
   return declareLocal(&parser.previous);
 }
 
+static void defineType(int var) {
+  emitConstInstr(
+      current->scopeDepth > 0 ? OP_SET_TYPE_LOCAL : OP_SET_TYPE_GLOBAL, var);
+}
+
 static uint16_t nativeVariable(char* name) {
-  uint16_t var = makeConstant(identifier(name));
+  uint16_t var = makeConstant(INTERN(name));
   emitConstInstr(OP_GET_GLOBAL, var);
   return var;
 }
@@ -504,7 +523,12 @@ static uint8_t argumentList() {
   uint8_t argCount = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      expression();
+      if (match(TOKEN_DOUBLE_DOT)) {
+        expression();
+        emitByte(OP_SPREAD);
+      } else {
+        expression();
+      }
 
       if (argCount == 255) error("Can't have more than 255 arguments.");
 
@@ -545,14 +569,7 @@ static void property(bool canAssign) {
   uint16_t name = identifierConstant(&parser.previous);
 
   if (canAssign && match(TOKEN_EQUAL)) {
-    // if we're here, then there's a value on the stack
-    // that's not reflected in the local count. that won't
-    // matter *unless* we're assigning a comprehension, which
-    // allocates its own locals in the *same scope* as the
-    // assignment.
-    current->localCount++;
     expression();
-    current->localCount--;
     emitConstInstr(OP_SET_PROPERTY, name);
   } else if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
@@ -595,6 +612,11 @@ static void literal(bool canAssign) {
 }
 
 static void parentheses(bool canAssign) {
+  if (match(TOKEN_RIGHT_PAREN)) {
+    emitByte(OP_UNIT);
+    return;
+  }
+
   expression();
 
   if (check(TOKEN_COMMA)) {
@@ -642,9 +664,13 @@ static void namedVariable(Token name, bool canAssign) {
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
+
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitConstInstr(setOp, arg);
+  } else if (canAssign && match(TOKEN_COLON)) {
+    expression();
+    defineType(arg);
   } else if (canAssign && match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
@@ -654,14 +680,20 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
-static int nativeCall(char* name, int argCount) {
+static int nativeCall(char* name) {
   int address = nativeVariable(name);
-  emitBytes(OP_CALL, argCount);
+  emitBytes(OP_CALL, 0);
+  return address;
+}
+
+static int nativePostfix(char* name, int argCount) {
+  int address = nativeVariable(name);
+  emitBytes(OP_CALL_POSTFIX, argCount);
   return address;
 }
 
 static void methodCall(char* name, int argCount) {
-  Value method = identifier(name);
+  Value method = INTERN(name);
   uint16_t constant = makeConstant(method);
   emitConstInstr(OP_INVOKE, constant);
   emitByte(argCount);
@@ -682,13 +714,6 @@ static void infix(bool canAssign) {
   }
 }
 
-static Token syntheticToken(const char* text) {
-  Token token;
-  token.start = text;
-  token.length = (int)strlen(text);
-  return token;
-}
-
 static void super_(bool canAssign) {
   if (currentClass == NULL) {
     error("Can't use 'super' outside of a class.");
@@ -698,16 +723,11 @@ static void super_(bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
   uint16_t name = identifierConstant(&parser.previous);
 
-  if (match(TOKEN_LEFT_PAREN)) {
-    uint8_t argCount = argumentList();
-    namedVariable(syntheticToken("this"), false);
-    namedVariable(syntheticToken("super"), false);
-    emitConstInstr(OP_SUPER_INVOKE, name);
-    emitByte(argCount);
-  } else {
-    namedVariable(syntheticToken("super"), false);
-    emitConstInstr(OP_GET_SUPER, name);
-  }
+  // load the instance first, which is necessary for
+  // binding any method detached from the superclass.
+  namedVariable(syntheticToken("this"), false);
+  namedVariable(syntheticToken("super"), false);
+  emitConstInstr(OP_GET_SUPER, name);
 }
 
 static void this_(bool canAssign) {
@@ -759,49 +779,54 @@ static void defineVariable(uint16_t variable) {
 }
 
 static bool peekSignature() {
-  bool found;
-
-  Parser checkpoint = saveParser();
-
-  consumeQuietly(TOKEN_LEFT_PAREN);
+  if (!consumeQuietly(TOKEN_LEFT_PAREN)) return false;
 
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      consumeQuietly(TOKEN_IDENTIFIER);
+      if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
+      if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN);
+
     } while (match(TOKEN_COMMA));
   }
-  consumeQuietly(TOKEN_RIGHT_PAREN);
-  consumeQuietly(TOKEN_FAT_ARROW);
 
-  found = !parser.hadError;
+  if (!consumeQuietly(TOKEN_RIGHT_PAREN)) return false;
+  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
 
-  gotoParser(checkpoint);
-
-  return found;
+  return true;
 }
 
-static bool tryFunction(FunctionType fnType) {
-  if (peekSignature()) {
-    function(fnType);
+static bool tryFunction(FunctionType fnType, Token name) {
+  Parser checkpoint = saveParser();
+  bool isFn = peekSignature();
+  gotoParser(checkpoint);
+
+  if (isFn) {
+    function(fnType, name);
     return true;
   }
   return false;
 }
 
-static void boundExpression() {
-  if (tryFunction(TYPE_BOUND)) return;
+static void boundExpression(Token name) {
+  if (tryFunction(TYPE_BOUND, name)) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
 
 static void whiteDelimitedExpression() {
-  if (tryFunction(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
 
   parseDelimitedPrecedence(PREC_ASSIGNMENT, prevWhite);
 }
 
+void inlineTypeExpression() {
+  if (tryFunction(TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
+
+  parsePrecedence(PREC_INLINE_TYPE);
+}
+
 static void expression() {
-  if (tryFunction(TYPE_ANONYMOUS)) return;
+  if (tryFunction(TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -824,10 +849,9 @@ static void blockOrExpression() {
   }
 }
 
-static void function(FunctionType type) {
+static void function(FunctionType type, Token name) {
   Compiler compiler;
-  initCompiler(&compiler, type, NULL);
-
+  initCompiler(&compiler, type, name);
   beginScope();
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
@@ -850,8 +874,16 @@ static void function(FunctionType type) {
 
       uint16_t constant = parseVariable("Expect parameter name.");
       defineVariable(constant);
-      mapSet(&current->function->signature, NUMBER_VAL(constant),
-             identifierToken(current->locals[constant].name));
+
+      // type annotations for parameters default to nil.
+      if (match(TOKEN_COLON)) {
+        expression();
+      } else {
+        emitByte(OP_NIL);
+      }
+      defineType(constant);
+      emitByte(OP_POP);  // the type.
+
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
@@ -859,25 +891,20 @@ static void function(FunctionType type) {
 
   blockOrExpression();
 
-  ObjFunction* function = endCompiler();
-  emitConstInstr(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
-
-  for (int i = 0; i < function->upvalueCount; i++) {
-    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
-    emitByte(compiler.upvalues[i].index);
-  }
+  closeFunction(compiler);
 }
 
 static void method() {
   consume(TOKEN_IDENTIFIER, "Expect method name.");
   uint16_t constant = identifierConstant(&parser.previous);
   FunctionType type = TYPE_METHOD;
+
   if (parser.previous.length == 4 &&
       memcmp(parser.previous.start, S_INIT, 4) == 0) {
     type = TYPE_INITIALIZER;
   }
 
-  function(type);
+  function(type, parser.previous);
   emitConstInstr(OP_METHOD, constant);
 
   if (!prev(TOKEN_RIGHT_BRACE)) {
@@ -950,23 +977,18 @@ static void forInStatement() {
 Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
   Iterator iter;
 
-  int exitJump = 0;
-  int predJump = 0;
-  bool isIteration = false;
-  bool isPredicate = false;
+  int iterJump = -1;
+  int predJump = -1;
+
   Parser checkpointB = checkpointA;
 
   if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
     // bound variable and iterable to draw from.
-    isIteration = true;
-
     beginScope();
     iter = iterator();
-    exitJump = iterationNext(iter);
+    iterJump = iterationNext(iter);
   } else {
     // a predicate to test against.
-    isPredicate = true;
-
     expression();
     predJump = emitJump(OP_JUMP_IF_FALSE);
     emitByte(OP_POP);
@@ -985,78 +1007,63 @@ Parser comprehension(Parser checkpointA, int var, TokenType closingToken) {
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    // load the comprehension instance and append the expression.
+    // parse the expression, load the comprehension, and append.
     expression();
     emitConstInstr(OP_GET_LOCAL, var);
-    getProperty(S_PUSH);
+    getProperty(S_ADD);
     emitBytes(OP_CALL_POSTFIX, 1);
     emitByte(OP_POP);  // comprehension instance.
   }
 
-  if (isIteration) {
-    iterationEnd(iter, exitJump);
+  if (iterJump != -1) {
+    iterationEnd(iter, iterJump);
     endScope();
-  } else if (isPredicate) {
+  } else if (predJump != -1) {
     // we need to jump over this last condition.
     // pop if the condition was truthy.
     int elseJump = emitJump(OP_JUMP);
     patchJump(predJump);
     emitByte(OP_POP);
     patchJump(elseJump);
+  } else {
+    error("Comprehension requires at least one clause.");
   }
 
   return checkpointB;
 }
 
-// Find an occurance of '|' that isn't nested within
-// braces or brackets, given some [initialBraceDepth]
-// and [initialBracketDepth].
-bool advanceToPipe(int initialBraceDepth, int initialBracketDepth) {
-  int braceDepth = initialBraceDepth;
-  int bracketDepth = initialBracketDepth;
-
-  bool nested;
-
-  for (;;) {
-    if (check(TOKEN_LEFT_BRACE)) braceDepth++;
-    if (check(TOKEN_RIGHT_BRACE)) braceDepth--;
-
-    if (check(TOKEN_LEFT_BRACKET)) bracketDepth++;
-    if (check(TOKEN_RIGHT_BRACKET)) bracketDepth--;
-
-    nested = (braceDepth > initialBraceDepth) ||
-             (bracketDepth > initialBracketDepth);
-
-    if (check(TOKEN_PIPE) && !nested) return true;
-
-    if (check(TOKEN_RIGHT_BRACE) && braceDepth == initialBraceDepth - 1)
-      return false;
-    if (check(TOKEN_RIGHT_BRACKET) && bracketDepth == initialBracketDepth - 1)
-      return false;
-
-    advance();
-  }
-}
-
-static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
-                             int initialBracketDepth) {
+// Here we check if we're at a comprehension, and if we are, we parse it.
+// We wrap the comprehension in a closure so that it has its own frame
+// of locals during construction. We then invoke the closure immediately,
+// returning the actual comprehension object.
+static bool tryComprehension(char* klass, TokenType openingToken,
+                             TokenType closingToken) {
+  // we need to save our location for two reasons:
+  // (a) if it *is* a comprehension, we can't parse the body
+  //  until we've parsed the conditions;
+  // (b) if it *isn't*, we need to rewind after we've looked ahead
+  //  to establish that it isn't.
   Parser checkpointA = saveParser();
 
-  if (advanceToPipe(initialBraceDepth, initialBracketDepth)) {
+  if (advanceTo(TOKEN_PIPE, closingToken)) {
     advance();  // eat the pipe.
 
-    // the comprehension instance is on top of the stack now;
-    // we'll need to refer to it when we hit the bottom
-    // of the condition clauses. we'll also need the local
-    // slots to be offset by 1.
+    Compiler compiler;
+    initCompiler(&compiler, TYPE_ANONYMOUS, syntheticToken("#comprehension"));
+    beginScope();
+
+    // init the comprehension instance at local 0. we'll load
+    // it when we hit the bottom of the condition clauses.
+    nativeCall(klass);
     int var = addLocal(syntheticToken("#comprehension"));
     markInitialized();
 
     Parser checkpointB = comprehension(checkpointA, var, closingToken);
 
-    // reclaim the local slot but leave the sequence instance
-    // on the stack.
-    current->localCount--;
+    // return the comprehension and call the closure immediately.
+    emitByte(OP_RETURN);
+    closeFunction(compiler);
+    emitBytes(OP_CALL, 0);
 
     // finally we pick up at the end of the expression.
     gotoParser(checkpointB);
@@ -1064,110 +1071,134 @@ static bool tryComprehension(TokenType closingToken, int initialBraceDepth,
     return true;
   }
 
+  // otherwise rewind.
   gotoParser(checkpointA);
   return false;
 }
 
 static bool trySetComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACE, 1, 0);
+  return tryComprehension(S_SET, TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE);
 }
 
 static bool trySeqComprehension() {
-  return tryComprehension(TOKEN_RIGHT_BRACKET, 0, 1);
-}
-
-static void finishMapVal() {
-  consume(TOKEN_COLON, "Expect ':' after map key.");
-  // value.
-  expression();
-  emitByte(OP_SUBSCRIPT_SET);
-}
-
-static void finishSetVal() {
-  emitByte(OP_TRUE);
-  emitByte(OP_SUBSCRIPT_SET);
+  return tryComprehension(S_SEQUENCE, TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET);
 }
 
 // A map literal, set literal, or set comprehension.
 static void braces(bool canAssign) {
-  int klass = nativeCall("Set", 0);
+  int elements = 0;
 
   // empty braces is an empty set.
-  if (check(TOKEN_RIGHT_BRACE)) return advance();
+  if (check(TOKEN_RIGHT_BRACE)) {
+    advance();
+    nativeCall(S_SET);
+    return;
+  }
+
   if (trySetComprehension()) {
     consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
     return;
   }
+
   // first element: either a map key or a set element.
   // we need to advance this far in order to check the
   // next token.
   expression();
+  elements++;
 
   // it's a singleton set.
   if (check(TOKEN_RIGHT_BRACE)) {
-    finishSetVal();
+    nativePostfix(S_SET, elements);
 
   } else if (check(TOKEN_COMMA)) {
     // it's a |set| > 1 .
     advance();
 
-    finishSetVal();
     do {
       expression();
-      finishSetVal();
+      elements++;
+
     } while (match(TOKEN_COMMA));
 
+    nativePostfix(S_SET, elements);
   } else if (check(TOKEN_COLON)) {
-    // otherwise it's a map: backpatch the class.
-    // TODO: now that we have a postfix operation, we should
-    // use that here instead of backpatching.
-    currentChunk()->constants.values[klass] = identifier("Map");
+    // it's a map.
 
-    // finish the first key/val pair, then any remaining elements.
-    finishMapVal();
+    advance();     // colon.
+    expression();  // value.
+    nativePostfix(S_TUPLE, 2);
 
     while (match(TOKEN_COMMA)) {
-      expression();
-      finishMapVal();
+      expression();  // key
+      consume(TOKEN_COLON, "Expect ':' after map key.");
+      expression();  // value.
+      nativePostfix(S_TUPLE, 2);
+      elements++;
     }
+
+    nativePostfix(S_MAP, elements);
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expect closing '}'.");
 }
 
-// A tree literal, sequence literal, or sequence comprehension.
-static void brackets(bool canAssign) {
-  int klass = nativeCall(S_SEQUENCE, 0);
+// Parse a sequence if appropriate and indicate if it is.
+static bool sequence() {
+  int elements = 0;
 
-  // empty brackets is an empty sequence.
-  if (check(TOKEN_RIGHT_BRACKET)) return advance();
-  if (trySeqComprehension()) {
-    consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
-    return;
+  // empty seq.
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    nativeCall(S_SEQUENCE);
+    return true;
   }
 
-  // first datum.
+  if (trySeqComprehension()) return true;
+
+  // first datum. could be a tree node or a seq element.
   whiteDelimitedExpression();
+  elements++;
 
-  // it's a sequence.
-  if (check(TOKEN_COMMA) || check(TOKEN_RIGHT_BRACKET)) {
-    methodCall(S_PUSH, 1);
-
-    while (match(TOKEN_COMMA)) {
-      expression();
-      methodCall(S_PUSH, 1);
-    }
-  } else {
-    // it's a tree.
-    currentChunk()->constants.values[klass] = identifier("Tree");
-    methodCall("addChild", 1);
-
-    // and it may have branches.
-    while (!check(TOKEN_RIGHT_BRACKET)) {
-      whiteDelimitedExpression();
-      methodCall("addChild", 1);
-    }
+  // singleton.
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    nativePostfix(S_SEQUENCE, elements);
+    return true;
   }
+
+  if (match(TOKEN_COMMA)) {
+    do {
+      expression();
+      elements++;
+    } while (match(TOKEN_COMMA));
+    nativePostfix(S_SEQUENCE, elements);
+
+    return true;
+  }
+
+  return false;
+}
+
+void tree() {
+  // if we're here, the sequence check has already
+  // parsed the first element.
+  int elements = 1;
+
+  // make a node of it.
+  nativePostfix("Node", 1);
+
+  // and now the children.
+  while (!check(TOKEN_RIGHT_BRACKET)) {
+    whiteDelimitedExpression();
+    nativePostfix("Node", 1);
+    elements++;
+  }
+
+  // now the root.
+  nativePostfix("Root", elements);
+}
+
+// A sequence literal, sequence comprehension, or tree.
+static void brackets(bool canAssign) {
+  if (!sequence()) tree();
 
   consume(TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }
@@ -1255,11 +1286,20 @@ static void letDeclaration() {
   }
 
   uint16_t var = parseVariable("Expect variable name.");
+  Token name = parser.previous;
   emitByte(OP_UNDEFINED);
   defineVariable(var);
 
+  if (match(TOKEN_COLON)) {
+    inlineTypeExpression();
+  } else {
+    emitByte(OP_NIL);
+  }
+  defineType(var);
+  emitByte(OP_POP);  // the type.
+
   if (match(TOKEN_EQUAL)) {
-    boundExpression();
+    boundExpression(name);
   } else if (match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
@@ -1369,7 +1409,7 @@ static void ifStatement() {
 }
 
 static void importStatement() {
-  advanceDottedIdentifier();
+  advanceSlashedIdentifier();
   consume(TOKEN_IDENTIFIER, "Expect path to import.");
   advance();
   bareString();
@@ -1386,18 +1426,18 @@ static void returnStatement() {
   if (current->type == TYPE_SCRIPT) {
     error("Can't return from top-level code.");
   }
+  if (current->type == TYPE_INITIALIZER) {
+    error("Can't return from an initializer.");
+  }
 
   if (match(TOKEN_SEMICOLON)) {
-    emitReturn();
+    emitByte(OP_NIL);
   } else {
-    if (current->type == TYPE_INITIALIZER) {
-      error("Can't return a value from an initializer.");
-    }
-
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
-    emitByte(OP_RETURN);
   }
+
+  emitByte(OP_RETURN);
 }
 
 static void throwStatement() {
@@ -1576,7 +1616,7 @@ ObjFunction* compile(const char* source, char* path) {
   initParser(sc);
 
   Compiler compiler;
-  initCompiler(&compiler, TYPE_SCRIPT, path);
+  initCompiler(&compiler, TYPE_SCRIPT, syntheticToken(path));
 
   while (!match(TOKEN_EOF)) {
     declaration();

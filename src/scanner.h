@@ -13,6 +13,7 @@ typedef enum {
   TOKEN_RIGHT_BRACKET,
   TOKEN_COMMA,
   TOKEN_DOT,
+  TOKEN_DOUBLE_DOT,
   TOKEN_COLON,
   TOKEN_SEMICOLON,
   TOKEN_PIPE,
@@ -67,11 +68,12 @@ typedef struct {
 Scanner initScanner(const char* source);
 Scanner saveScanner();
 void initToken(Token* token);
+Token syntheticToken(const char* start);
 void gotoScanner(Scanner scanner);
 void printScanner(Scanner sc);
 void skipWhitespace();
 Token scanToken();
-Token dottedIdentifier();
+Token slashedIdentifier();
 char charAt(int i);
 bool isWhite(char c);
 
