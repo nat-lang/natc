@@ -320,7 +320,7 @@ class TypeState {
         this.solution.update(constraint);
         this.constraints = this.constraints.map(this.solution.apply);
 
-      // break functions into domain/domain range/range constraints.
+      // function constraints become domain/domain range/range constraints.
       } else if (constraint.left is TFunction and constraint.right is TFunction) {
         let left = constraint.left;
         let right = constraint.right;
@@ -330,7 +330,7 @@ class TypeState {
           Constraint(left.range, right.range)
         ]);
 
-      // break sequences of equal length into pairwise sequences of constraints.
+      // sequences of equal length become pairwise sequences of constraints.
       } else if (constraint.left is Sequence and constraint.right is Sequence) {
         if (len(constraint.left) == len(constraint.right)) {
 
@@ -340,8 +340,8 @@ class TypeState {
         } else {
           unsolved.push(constraint);
         }
-      // if they're equal (base types), eliminate them; otherwise track the
-       //insolubles.
+      // if they're equal base types, eliminate them; otherwise note that 
+      // they're not unifiable.
       } else if (constraint.left != constraint.right) {
         unsolved.push(constraint);
       }

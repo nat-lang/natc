@@ -779,10 +779,7 @@ static bool peekSignature() {
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
-      if (check(TOKEN_COLON)) {
-        advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN);
-        // if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
-      }
+      if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN);
 
     } while (match(TOKEN_COMMA));
   }

@@ -211,13 +211,11 @@ static bool checkArity(int paramCount, int argCount) {
   return false;
 }
 
-// Walk a frame and expand any [ObjSpread]s. (Note: maybe
-// we could devise a way to do this without shuffling the
-// whole frame on every single function call.)
+// Walk the frame delimited by [argCount] and expand any
+// [ObjSpread]s. (Note: maybe we could devise a way to do
+// this without shuffling the whole frame of arguments for
+// every function call.)
 static bool spread(int* argCount) {
-  // printf("PRE (%i): \n", *argCount);
-  // disassembleStack();
-  // printf("\n");
   Value args[255];
   int newArgCount = 0;
 
@@ -239,12 +237,7 @@ static bool spread(int* argCount) {
   }
 
   *argCount = newArgCount;
-
   while (newArgCount > 0) vmPush(args[--newArgCount]);
-
-  // printf("POST (%i): \n", *argCount);
-  // disassembleStack();
-  // printf("\n");
 
   return true;
 }
@@ -977,7 +970,7 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_SPREAD: {
-        Value value = vmPop();
+        Value value = vmPeek(0);
 
         ObjClass lca;
         if (!IS_INSTANCE(value) &&
@@ -989,6 +982,7 @@ InterpretResult vmExecute(int baseFrame) {
         }
 
         ObjSpread* spread = newSpread(value);
+        vmPop();
         vmPush(OBJ_VAL(spread));
         break;
       }
