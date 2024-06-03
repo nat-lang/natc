@@ -1322,6 +1322,19 @@ static void letDeclaration() {
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 }
 
+static void constDeclaration() {
+  do {
+    uint16_t var = parseVariable("Expect constant name.");
+    Token name = parser.previous;
+
+    loadConstant(identifierToken(name));
+    defineVariable(var);
+
+  } while (match(TOKEN_COMMA));
+
+  consume(TOKEN_SEMICOLON, "Expect ';' after constant declaration.");
+}
+
 static void expressionStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
@@ -1490,6 +1503,8 @@ static void declaration() {
     classDeclaration();
   } else if (match(TOKEN_LET)) {
     letDeclaration();
+  } else if (match(TOKEN_CONST)) {
+    constDeclaration();
   } else {
     statement();
   }

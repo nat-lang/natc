@@ -134,8 +134,16 @@ static TokenType checkpointKeyword(int start, int length, const char *rest,
 
 static TokenType identifierType() {
   switch (scanner.start[0]) {
-    case 'c':
-      return checkpointKeyword(1, 4, "lass", TOKEN_CLASS);
+    case 'c': {
+      if (scanner.current - scanner.start > 1) {
+        switch (scanner.start[1]) {
+          case 'o':
+            return checkpointKeyword(2, 3, "nst", TOKEN_CONST);
+          case 'l':
+            return checkpointKeyword(2, 3, "ass", TOKEN_CLASS);
+        }
+      }
+    }
     case 'e':
       if (scanner.current - scanner.start > 1) {
         switch (scanner.start[1]) {
