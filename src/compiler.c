@@ -1319,6 +1319,17 @@ static void letDeclaration() {
   }
 
   emitByte(OP_POP);
+}
+
+static void singleLetDeclaration() {
+  letDeclaration();
+  consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
+}
+
+static void multiLetDeclaration() {
+  do {
+    letDeclaration();
+  } while (match(TOKEN_COMMA));
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 }
 
@@ -1370,7 +1381,7 @@ static void forConditionStatement() {
   if (match(TOKEN_SEMICOLON)) {
     // No initializer.
   } else if (match(TOKEN_LET)) {
-    letDeclaration();
+    singleLetDeclaration();
   } else {
     expressionStatement();
   }
@@ -1502,7 +1513,7 @@ static void declaration() {
   if (match(TOKEN_CLASS)) {
     classDeclaration();
   } else if (match(TOKEN_LET)) {
-    letDeclaration();
+    multiLetDeclaration();
   } else if (match(TOKEN_CONST)) {
     constDeclaration();
   } else {

@@ -36,3 +36,35 @@ a.z = (() => {
 
   assert(a.z == 5);
 })();
+
+// multi let shorthand.
+
+let x,y,z;
+
+x = 1;
+y = 2;
+z = 3;
+
+assert(x == 1);
+assert(y == 2);
+assert(z == 3);
+
+let x = 1, y = 2, z = 3;
+
+assert(x == 1);
+assert(y == 2);
+assert(z == 3);
+
+let x = () => 1, y = () => 2, z = () => 3;
+
+assert(x() == 1);
+assert(y() == 2);
+assert(z() == 3);
+
+let x: () -> num = () => 1,
+    y: () -> num = () => 2,
+    z: () -> num = () => 3;
+
+assert(x() == 1);
+assert(y() == 2);
+assert(z() == 3);
