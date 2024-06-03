@@ -143,6 +143,7 @@ static TokenType identifierType() {
             return checkpointKeyword(2, 3, "ass", TOKEN_CLASS);
         }
       }
+      break;
     }
     case 'e':
       if (scanner.current - scanner.start > 1) {
