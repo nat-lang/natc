@@ -23,6 +23,23 @@ let a = (a: z + z, b: z + z) => {};
 
 let a = () => x((a: z, b: z) => {});
 
+// unparenthesized parameters.
+
+let id = x => x;
+
+assert(id(1) == 1);
+assert(id(x => x)(1) == 1);
+assert(id(x y z => x + y + z)(1)(1)(1) == 3);
+
+let f = x => 1;
+
+assert(f(true) == 1);
+assert(f(false) == 1);
+
+let f = x y z => x + y + z;
+
+assert(f(1)(1)(1) == 3);
+
 // anonymous.
 // --------------------------------------
 

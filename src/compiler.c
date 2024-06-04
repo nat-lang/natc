@@ -393,6 +393,7 @@ static void closeFunction(Compiler compiler) {
 }
 
 static void function(FunctionType type, Token name);
+static void nakedFunction(FunctionType type, Token name);
 static void expression();
 static void boundExpression(Token name);
 static void statement();
@@ -795,6 +796,14 @@ static bool peekSignature() {
   return true;
 }
 
+// Of the form 'x y z => x + y + z;'.
+static bool peekNakedSignature() {
+  if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
+  if (check(TOKEN_IDENTIFIER)) return peekNakedSignature();
+  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
+  return true;
+}
+
 static bool tryFunction(FunctionType fnType, Token name) {
   Parser checkpoint = saveParser();
   bool isFn = peekSignature();
@@ -804,6 +813,16 @@ static bool tryFunction(FunctionType fnType, Token name) {
     function(fnType, name);
     return true;
   }
+
+  checkpoint = saveParser();
+  isFn = peekNakedSignature();
+  gotoParser(checkpoint);
+
+  if (isFn) {
+    nakedFunction(fnType, name);
+    return true;
+  }
+
   return false;
 }
 
@@ -847,6 +866,31 @@ static void blockOrExpression() {
     expression();
     emitByte(OP_RETURN);
   }
+}
+
+static void nakedFunction(FunctionType fnType, Token name) {
+  Compiler compiler;
+  initCompiler(&compiler, fnType, name);
+  beginScope();
+
+  uint16_t constant = parseVariable("Expect parameter name.");
+  defineVariable(constant);
+  current->function->arity++;
+
+  // type annotations for parameters default to nil.
+  emitByte(OP_NIL);
+  defineType(constant);
+  emitByte(OP_POP);  // the type.
+
+  if (check(TOKEN_IDENTIFIER)) {
+    nakedFunction(TYPE_ANONYMOUS, syntheticToken("lambda"));
+    emitByte(OP_RETURN);
+  } else {
+    consume(TOKEN_FAT_ARROW, "Expect '=>' after signature.");
+    blockOrExpression();
+  }
+
+  closeFunction(compiler);
 }
 
 static void function(FunctionType type, Token name) {

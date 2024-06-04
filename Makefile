@@ -1,7 +1,9 @@
 BUILD_DIR := build
 CURRENT_DIR := $(shell pwd)
 BIN := $(HOME)/bin
-HAS_LEAKS := false
+NAT_BASE_DIR := $(HOME)/natlang/natc/
+
+export NAT_BASE_DIR
 
 default: clean dev
 
@@ -32,7 +34,7 @@ debug-trace:
 debug-stress-gc:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stress-gc SOURCE_DIR=src
 
-# Compile the interpreter
+# Compile the interpreter with a verbose garbage collector.
 debug-log-gc:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
 

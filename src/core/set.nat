@@ -125,4 +125,9 @@ class Set extends Object {
 
     return powerset;
   }
+
+  map(predicate) => this.elements.map(predicate);
+  all(predicate) => this.elements.all(predicate);
+  each(predicate) => this.all(predicate);
+  some(predicate) => this.elements.some(predicate);
 }

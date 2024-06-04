@@ -385,7 +385,12 @@ InterpretResult initializeCore() {
 
   // core classes.
 
-  InterpretResult coreIntpt = interpretFile("src/core/__index__");
+  ObjString* baseDir = intern(getBaseDir());
+  ObjString* coreLoc = intern("src/core/__index__");
+  ObjString* importLoc = concatenateStrings(baseDir, coreLoc);
+
+  InterpretResult coreIntpt = interpretFile(importLoc->chars);
+
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
   vm.classes.object = getClass(S_OBJECT);
