@@ -385,11 +385,7 @@ InterpretResult initializeCore() {
 
   // core classes.
 
-  ObjString* baseDir = intern(getBaseDir());
-  ObjString* coreLoc = intern("src/core/__index__");
-  ObjString* importLoc = concatenateStrings(baseDir, coreLoc);
-
-  InterpretResult coreIntpt = interpretFile(importLoc->chars);
+  InterpretResult coreIntpt = interpretFile(NAT_CORE_LOC);
 
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 

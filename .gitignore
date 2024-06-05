@@ -1,8 +1,11 @@
 build/**/*
 
+src/config.h
+
 !build/Dockerfile
 !build/Dockerfile.linux
 !build/c.make
 !build/nat.entitlements
+!build/configure.py
 
 **/*/.DS_Store

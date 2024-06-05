@@ -14,6 +14,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
+      - name: Set base dir
+        run: |
+          echo "NAT_BASE_DIR=${{ github.workspace }}/" >> $GITHUB_ENV
       - name: Build
         run: make nat
       - name: Run integration tests

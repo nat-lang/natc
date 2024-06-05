@@ -808,8 +808,12 @@ InterpretResult vmExecute(int baseFrame) {
           vmRuntimeError("Import path must be a string.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        ObjString* baseDir = intern(getBaseDir());
+
+        ObjString* baseDir = intern(NAT_BASE_DIR);
+        vmPush(OBJ_VAL(baseDir));
         ObjString* importLoc = concatenateStrings(baseDir, AS_STRING(path));
+        vmPop();
+
         InterpretResult result = interpretFile(importLoc->chars);
         if (result != INTERPRET_OK) return result;
         // pop the return value of the module's function.

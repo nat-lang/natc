@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "config.h"
+
 #define NAT_EXT ".nat"
 
 #define UINT8_COUNT (UINT8_MAX + 1)
@@ -48,7 +50,5 @@
 #define S_OTYPE_STRING "OString"
 #define S_OTYPE_CLOSURE "OClosure"
 #define S_OTYPE_SEQUENCE "OSequence"
-
-char* getBaseDir();
 
 #endif
