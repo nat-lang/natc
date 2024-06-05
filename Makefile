@@ -1,7 +1,10 @@
 BUILD_DIR := build
 CURRENT_DIR := $(shell pwd)
 BIN := $(HOME)/bin
-HAS_LEAKS := false
+
+ifneq ($(origin NAT_BASE_DIR), environment)
+	export NAT_BASE_DIR = $(HOME)/natlang/natc/
+endif
 
 default: clean dev
 
@@ -11,29 +14,37 @@ clean:
 	@ rm -rf $(BUILD_DIR)/debug
 	@ rm -f $(BUILD_DIR)/nat $(BIN)/nat
 
-# Compile the interpreter.
+configure:
+	@ python $(BUILD_DIR)/configure.py
+
 nat:
+	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 
 # Compile and symlink to local bin.
 dev:
+	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 	@ ln -s $(BUILD_DIR)/nat $(BIN)/nat
 
 # Compile the interpreter in debug mode.
 debug:
+	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 
 # Compile the interpreter with instruction and stack tracing enabled.
 debug-trace:
+	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-trace SOURCE_DIR=src
 
 # Compile the interpreter with a manic garbage collector.
 debug-stress-gc:
+	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stress-gc SOURCE_DIR=src
 
-# Compile the interpreter
+# Compile the interpreter with a verbose garbage collector.
 debug-log-gc:
+	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
 
 integration:
@@ -53,7 +64,7 @@ tests:
 # Compile with debugging enabled, sign the binary, and create a symbol map
 # before running leaks against the integration tests.
 test-leaks:
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
+	@ $(MAKE) debug
 	@ codesign -s - --entitlements $(BUILD_DIR)/nat.entitlements -f build/nat
 	@ dsymutil build/nat
 	@ MallocStackLogging=1 leaks --atExit -- $(BUILD_DIR)/nat test/integration/__index__
@@ -73,4 +84,3 @@ valgrind:
 linux:
 	@ docker build -t "linux" -f build/Dockerfile.linux .
 	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp -it linux sh
-

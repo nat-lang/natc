@@ -385,7 +385,8 @@ InterpretResult initializeCore() {
 
   // core classes.
 
-  InterpretResult coreIntpt = interpretFile("src/core/__index__");
+  InterpretResult coreIntpt = interpretFile(NAT_CORE_LOC);
+
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
   vm.classes.object = getClass(S_OBJECT);

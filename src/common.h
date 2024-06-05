@@ -5,9 +5,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "config.h"
+
+#define NAT_EXT ".nat"
+
 #define UINT8_COUNT (UINT8_MAX + 1)
 #define UINT16_COUNT (UINT16_MAX + 1)
-#define NAT_EXT ".nat"
 
 #define S_EQ "__eq__"
 #define S_IN "__in__"

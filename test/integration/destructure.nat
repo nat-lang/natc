@@ -165,7 +165,7 @@ f <- (g) => {
 assert(f[1][1] is ASTApp);
 assert(f[1][1].resolve() == 2);
 
-// type annotation.
+// parameter annotation.
 
 f <- () => {
   let k = (a: num -> num) => a(1);

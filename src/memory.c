@@ -220,6 +220,7 @@ static void markRoots() {
        upvalue = upvalue->next) {
     markObject((Obj*)upvalue);
   }
+
   markMap(&vm.globals);
   markMap(&vm.typeEnv);
   markMap(&vm.infixes);

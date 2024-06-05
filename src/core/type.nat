@@ -291,7 +291,7 @@ class TypeState {
 
       if (var in this.typeEnv)
         throw TypeError("Variable already has a type annotation.");
-    
+
       this.typeEnv[var] = val.resolve();
 
       return void;

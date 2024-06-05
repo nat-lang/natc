@@ -54,12 +54,6 @@ class Tree extends Object {
   }
 }
 
-class Leaf extends Tree {
-  init(data) => {
-    super.init(data, []);
-  }
-}
-
 // Functions for building tree literals during compilation.
 
 // Childless tree.
