@@ -11,7 +11,7 @@ COPY build build
 
 RUN make nat && \
     cp build/nat /bin/nat && \
-    apk del make build-base && \
+    apk del make build-base python3 && \
     rm -rf src util Makefile build
 
 CMD ["./nat"]
