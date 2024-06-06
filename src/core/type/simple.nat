@@ -112,7 +112,7 @@ let infix -> = TFunction;
 let tClass = TClass();
 
 // Map vm types to object language types.
-let type = (value) => {
+let literalType = (value) => {
   let vmType = vType(value);
 
   if (vmType == ()) return ();
@@ -229,7 +229,7 @@ class TypeState {
     }
 
     if (node is ASTLiteral)
-      return type(node.data);
+      return literalType(node.data);
 
     if (node is ASTVar)
       return this.lookup(node);

@@ -22,10 +22,12 @@ class Tree extends Object {
     return seq;
   }
 
-  isLeaf() => len(this.children) == 0;
+  leaf() => len(this.children) == 0;
+  unary() => len(this.children) == 1;
+  binary() => len(this.children) == 2;
 
   leaves() => {
-    if (this.isLeaf()) return [this.data];
+    if (this.leaf()) return [this.data];
 
     return [leaf | child in this.children, leaf in child.leaves()];
   }
@@ -64,7 +66,7 @@ let Root = (*children) => Tree(nil, children);
 
 // Convert [data] to a [Tree] if it's not already.
 let Node = (value) => {
-  if (type(value) != Tree)
-    return LeafNode(value);
-  return value;
+  if (value is Tree)
+    return value;
+  return LeafNode(value);
 };
