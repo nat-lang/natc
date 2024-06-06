@@ -1,43 +1,4 @@
-class TypeError extends Error {}
 
-let isSubclass = (a, b) => {
-  if (vType(a) != OClass or vType(b) != OClass) 
-    return false;
-  
-  let klass = a;
-
-  while (klass != nil) {
-    if (klass == b) return true;
-    klass = klass.__superclass__;
-  }
-
-  return false;
-};
-
-// Is [a] an instance of [b]?
-let infix(5) is = (a, b) => {
-  let aVmType = vType(a);
-  let bVmType = vType(b);
-
-  if (aVmType != OInstance or bVmType != OClass)
-    return false;
-
-  return isSubclass(a.__class__, b);
-};
-
-class CType {}
-
-class CBool extends CType {}
-class CNil extends CType {}
-class CNumber extends CType {}
-class CObject extends CType {}
-class CUndef extends CType {}
-
-class OClass extends CObject {}
-class OInstance extends CObject {}
-class OString extends CObject {}
-class OClosure extends CObject {}
-class OSequence extends CObject {}
 
 class Type {
   pp() => {
@@ -165,9 +126,9 @@ let type = (value) => {
 };
 
 class TypeState {
-  init(typeEnv: Map, debug: bool) => {
+  init(debug: bool) => {
     // map from variables to types.
-    this.typeEnv = typeEnv;
+    this.typeEnv = Map();
     // name supply.
     this.typeVars = TypeVarSupply();
     // constraint stack.
@@ -185,6 +146,17 @@ class TypeState {
       this.typeEnv[node] = this.typeVars.fresh();
 
     return this.typeEnv[node];
+  }
+
+  rename(ast: ASTNode) => {
+    let annotations = globalTypeEnv();
+
+    ast.stampVariables(node => {
+      if (node is ASTGlobal) {
+        if (node.data in annotations)
+          this.typeEnv[node] = annotations[node.data];
+      }
+    });
   }
 
   constrain(node) => {
@@ -404,46 +376,10 @@ class TypeState {
 
 let typecheck = (expr) => {
   let ast <- expr;
-  let uuids = NameSupply();
 
-  let typeEnv = Map();
+  let state = TypeState(false);
 
-  let globals = Map();
-  let annotations = globalTypeEnv();
-
-  // give the variables uuids.
-  ast.visit((node, locals) => {
-    let rename = (node: ASTVar, env: Map) => {
-      if (!env[node.data])
-        env[node.data] = uuids.fresh();
-      node.uuid = env[node.data];
-    };
-
-    if (node is ASTClosure) {
-      let localEnv = Map();
-      for (param in node.signature.params) {
-        let local = param[0];
-        rename(local, localEnv);
-      }
-      return localEnv;
-    }
-  
-    if (node is ASTLocal)
-      rename(node, locals);
-
-    if (node is ASTGlobal) {
-      rename(node, globals);
-
-      if (node.data in annotations) {
-        typeEnv[node] = annotations[node.data];
-      }
-    }
-
-    return locals;
-  }, Map());
-
-  let state = TypeState(typeEnv, false);
-
+  state.rename(ast);
   state.constrain(ast);
   state.unify();
 

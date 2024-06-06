@@ -1,6 +1,7 @@
 import src/core/object
 import src/core/error
 import src/core/logic
+import src/core/type/vm
 import src/core/math
 import src/core/iteration
 import src/core/sequential
@@ -10,4 +11,4 @@ import src/core/tree
 import src/core/assertion
 import src/core/functional
 import src/core/ast
-import src/core/type
+import src/core/type/simple
