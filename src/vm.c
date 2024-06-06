@@ -121,20 +121,28 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
 bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
 
-  if (!IS_INSTANCE(receiver)) {
-    vmRuntimeError("Only instances have methods.");
-    return false;
+  if (IS_CLASS(receiver)) {
+    ObjClass* klass = AS_CLASS(receiver);
+    Value field;
+    if (mapGet(&klass->fields, OBJ_VAL(name), &field)) {
+      vm.stackTop[-argCount - 1] = receiver;
+      return vmCallValue(field, argCount);
+    }
   }
 
-  ObjInstance* instance = AS_INSTANCE(receiver);
+  if (IS_INSTANCE(receiver)) {
+    ObjInstance* instance = AS_INSTANCE(receiver);
+    Value field;
+    if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
+      vm.stackTop[-argCount - 1] = receiver;
+      return vmCallValue(field, argCount);
+    }
 
-  Value field;
-  if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
-    vm.stackTop[-argCount - 1] = field;
-    return vmCallValue(field, argCount);
+    return invokeFromClass(instance->klass, name, argCount);
   }
 
-  return invokeFromClass(instance->klass, name, argCount);
+  vmRuntimeError("Only instances and classes have methods.");
+  return false;
 }
 
 bool vmExecuteMethod(char* method, int argCount, int frames) {
