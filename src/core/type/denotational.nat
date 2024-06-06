@@ -1,0 +1,34 @@
+import src/core/type/interface
+import src/core/type/simple
+
+class TDomain extends Type {
+  init(set) => {
+    this.set = set;
+  }
+}
+
+
+class DenotationalTypeState extends SimpleTypeState {}
+
+class DenotationalTypeSystem extends SimpleTypeSystem {
+
+  literalType(value) => {
+
+    let valueType = vType(value);
+
+
+
+    if (valueType == ()) return ();
+    if (valueType == CNil) return void;
+    if (valueType == CBool) return bool;
+    if (valueType == CNumber) return num;
+    if (valueType == OString) return string; 
+    if (valueType == OInstance) return value.__class__;
+    if (valueType == OClass) return tClass;
+    if (valueType == OClosure) return TFunction;
+  }
+
+
+}
+
+DenotationalTypeSystem.TypeStateClass = DenotationalTypeState;

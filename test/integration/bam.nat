@@ -1,0 +1,24 @@
+class A {
+  method() => {
+    print this;
+    return true;
+  }
+}
+
+assert(A.method());
+print "---------";
+assert(A().method());
+print "---------";
+print "---------";
+let f = A.method;
+f();
+print "---------";
+let g = A().method;
+
+g();
+
+
+class B extends A {
+}
+
+B.method();

@@ -1,4 +1,4 @@
-
+import src/core/type/interface
 
 class Type {
   pp() => {
@@ -19,9 +19,6 @@ class TVar extends Type {
   hash() => hash(this.name);
   __eq__(other) => this.name == other.name;
 }
-
-class TSum extends Type {}
-class TProduct extends Tuple {}
 
 class TVoid extends Type {}
 class TBoolean extends Type {}
@@ -90,16 +87,6 @@ class Solution extends Map {
   }
 }
 
-class NameSupply {
-  init() => {
-    this.next = 0;
-  }
-  fresh() => {
-    this.next = this.next + 1;
-    return this.next;
-  }
-}
-
 class TypeVarSupply extends NameSupply {
   fresh() => TVar(super.fresh());
 }
@@ -111,22 +98,9 @@ let string = TString();
 let infix -> = TFunction;
 let tClass = TClass();
 
-// Map vm types to object language types.
-let literalType = (value) => {
-  let vmType = vType(value);
-
-  if (vmType == ()) return ();
-  if (vmType == CNil) return void;
-  if (vmType == CBool) return bool;
-  if (vmType == CNumber) return num;
-  if (vmType == OString) return string; 
-  if (vmType == OInstance) return value.__class__;
-  if (vmType == OClass) return tClass;
-  if (vmType == OClosure) return TFunction;
-};
-
-class TypeState {
-  init(debug: bool) => {
+class SimpleTypeState extends TypeState {
+  init(system: TypeSystem, debug: bool) => {
+    this.system = system;
     // map from variables to types.
     this.typeEnv = Map();
     // name supply.
@@ -148,10 +122,12 @@ class TypeState {
     return this.typeEnv[node];
   }
 
-  rename(ast: ASTNode) => {
+  // Give [ast]'s variable unique identifiers, keeping track
+  // of the variables that have global type annotations.
+  rename(node: ASTNode) => {
     let annotations = globalTypeEnv();
 
-    ast.stampVariables(node => {
+    node.stampVariables(node => {
       if (node is ASTGlobal) {
         if (node.data in annotations)
           this.typeEnv[node] = annotations[node.data];
@@ -159,7 +135,7 @@ class TypeState {
     });
   }
 
-  constrain(node) => {
+  constrain(node: ASTNode) => {
     if (node is ASTClosure) {
       // give the parameters type vars if they don't
       // have annotations.
@@ -229,7 +205,7 @@ class TypeState {
     }
 
     if (node is ASTLiteral)
-      return literalType(node.data);
+      return this.system.literalType(node.data);
 
     if (node is ASTVar)
       return this.lookup(node);
@@ -292,6 +268,7 @@ class TypeState {
     throw TypeError("Unexpected syntax.");
   } 
 
+  // Solve the state's [constraints].
   unify() => {
     let unsolved = [];
 
@@ -374,14 +351,51 @@ class TypeState {
   }
 }
 
-let typecheck = (expr) => {
-  let ast <- expr;
+class SimpleTypeSystem extends TypeSystem {
+  // Map vm types to object language types.
+  literalType(value) => {
+    let valueType = vType(value);
 
-  let state = TypeState(false);
+    if (valueType == ()) return ();
+    if (valueType == CNil) return void;
+    if (valueType == CBool) return bool;
+    if (valueType == CNumber) return num;
+    if (valueType == OString) return string; 
+    if (valueType == OInstance) return value.__class__;
+    if (valueType == OClass) return tClass;
+    if (valueType == OClosure) return TFunction;
+  }
 
-  state.rename(ast);
-  state.constrain(ast);
-  state.unify();
+  // Assemble and return the [TypeState] produced
+  // by [expr].
+  typecheck(expr) => {
+    let ast <- expr;
 
-  return state;
-};
+    let state = this.TypeStateClass(this, false);
+
+    state.rename(ast);
+    state.constrain(ast);
+    state.unify();
+
+    return state;
+  }
+
+  // Calculate the type of [expr], inferring it if necessary.
+  type(expr) => {
+    // if it's not a function, return its literal type.
+    let exprType = this.literalType(expr);
+    if (exprType != TFunction)
+      return exprType;
+
+    let ast <- expr;
+    let state = this.TypeStateClass(this, true);
+    state.rename(ast);
+    exprType = state.constrain(ast);
+    state.unify();
+    exprType.apply(state.solution);
+
+    return tExpr;
+  }
+}
+
+SimpleTypeSystem.TypeStateClass = SimpleTypeState;

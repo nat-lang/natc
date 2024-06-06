@@ -1,4 +1,4 @@
-
+let typecheck = SimpleTypeSystem.typecheck;
 
 let f;
 let env;

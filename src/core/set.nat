@@ -130,4 +130,8 @@ class Set extends Object {
   all(predicate) => this.elements.all(predicate);
   each(predicate) => this.all(predicate);
   some(predicate) => this.elements.some(predicate);
+
+  pp() => {
+    print this.elements().values;
+  }
 }
