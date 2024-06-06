@@ -5,7 +5,7 @@ let f <- (a) => 1;
 
 assert(f.name == "lambda");
 assert(f.signature is ASTSignature);
-assert(type(f.function) == TFunction);
+assert(vType(f.function) == OClosure);
 
 // explicit and implicit returns.
 assert(len(f.children) == 2);

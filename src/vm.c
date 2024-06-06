@@ -948,9 +948,11 @@ InterpretResult vmExecute(int baseFrame) {
                 if (!readAST(closure)) return INTERPRET_RUNTIME_ERROR;
                 break;
               }
-              default:
+              default: {
+                printValue(value);
                 vmRuntimeError("Undestructurable object.");
                 return INTERPRET_RUNTIME_ERROR;
+              }
             }
             break;
           }

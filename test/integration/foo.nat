@@ -1,0 +1,7 @@
+
+let f = (a: string) => 1;
+
+let inference = infer(f);
+
+print inference.domain;
+print inference.range;

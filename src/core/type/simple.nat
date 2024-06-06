@@ -1,43 +1,3 @@
-class TypeError extends Error {}
-
-let isSubclass = (a, b) => {
-  if (vType(a) != OClass or vType(b) != OClass) 
-    return false;
-  
-  let klass = a;
-
-  while (klass != nil) {
-    if (klass == b) return true;
-    klass = klass.__superclass__;
-  }
-
-  return false;
-};
-
-// Is [a] an instance of [b]?
-let infix(5) is = (a, b) => {
-  let aVmType = vType(a);
-  let bVmType = vType(b);
-
-  if (aVmType != OInstance or bVmType != OClass)
-    return false;
-
-  return isSubclass(a.__class__, b);
-};
-
-class CType {}
-
-class CBool extends CType {}
-class CNil extends CType {}
-class CNumber extends CType {}
-class CObject extends CType {}
-class CUndef extends CType {}
-
-class OClass extends CObject {}
-class OInstance extends CObject {}
-class OString extends CObject {}
-class OClosure extends CObject {}
-class OSequence extends CObject {}
 
 class Type {
   pp() => {
@@ -87,8 +47,19 @@ class TFunction extends Type {
       this.range = c.right;
     return this;
   }
+
+  apply(s: Solution) => {
+    for (c in s) {
+      this.substitute(c);
+    }
+  }
 }
 class TClass extends Type {}
+class TAbstract extends Type {
+  init(function) => {
+    this.function = function;
+  }
+}
 
 class Constraint {
   init(left, right) => {
@@ -129,16 +100,6 @@ class Solution extends Map {
   }
 }
 
-class NameSupply {
-  init() => {
-    this.next = 0;
-  }
-  fresh() => {
-    this.next = this.next + 1;
-    return this.next;
-  }
-}
-
 class TypeVarSupply extends NameSupply {
   fresh() => TVar(super.fresh());
 }
@@ -151,7 +112,7 @@ let infix -> = TFunction;
 let tClass = TClass();
 
 // Map vm types to object language types.
-let type = (value) => {
+let baseType = (value) => {
   let vmType = vType(value);
 
   if (vmType == ()) return ();
@@ -165,9 +126,11 @@ let type = (value) => {
 };
 
 class TypeState {
-  init(typeEnv: Map, debug: bool) => {
+  init(expr, debug: bool) => {
+    let ast <- expr;
+    this.ast = ast;
     // map from variables to types.
-    this.typeEnv = typeEnv;
+    this.typeEnv = Map();
     // name supply.
     this.typeVars = TypeVarSupply();
     // constraint stack.
@@ -187,137 +150,186 @@ class TypeState {
     return this.typeEnv[node];
   }
 
-  constrain(node) => {
-    if (node is ASTClosure) {
-      // give the parameters type vars if they don't
-      // have annotations.
-      let fnEnv = node.signature.params.reduce(
-        (env: Map, node: ASTLocalTypeAssignment) => {
-          let var = node[0];
-          let val = node[1];
+  rename() => {
+    let annotations = globalTypeEnv();
 
-          let pType = val.resolve();
+    this.ast.stampVariables(node => {
+      if (node is ASTGlobal) {
+        if (node.data in annotations)
+          this.typeEnv[node] = annotations[node.data];
+      }
+    });
+  }
 
-          if (pType == nil)
-            env[var] = this.typeVars.fresh();
-          else
-            env[var] = pType;
+  constrain() => {
+    let constrain = (node) => {
+      let tVars = [];
 
-          return env;
-        },
-        Map()
-      );
+      if (node is ASTClosure) {
+        // give the parameters type vars if they don't
+        // have annotations.
+        let fnEnv = node.signature.params.reduce(
+          (env: Map, node: ASTLocalTypeAssignment) => {
+            let var = node[0];
+            let val = node[1];
 
-      // since the params and their types are keyed by uuid,
-      // we can just update the global type env when checking
-      // the body of a function.
-      this.typeEnv.extend(fnEnv);
+            let pType = val.resolve();
 
-      // track the types of the return values as we check the body.
-      let returns = node.children.reduce(
-        (returns, node) => {
-          let type = this.constrain(node);
+            if (pType == nil) {
+              let tVar = this.typeVars.fresh();
+        
+              env[var] = tVar;
 
-          if (node is ASTReturn)
-            returns.push(type);
+              tVars.push(tVar);
+            } else {
+              env[var] = pType;
+            }
 
-          return returns;
-        }, []
-      );
+            return env;
+          },
+          Map()
+        );
 
-      // now build the type of the function.
-      let paramCount = len(node.signature.params);
+        // since the params and their types are keyed by uuid,
+        // we can just update the global type env when checking
+        // the body of a function.
+        this.typeEnv.extend(fnEnv);
 
-      let tParams;
-      let tReturns;
+        // track the types of the return values as we check the body.
+        let returns = node.children.reduce(
+          (returns, node) => {
+            let type = constrain(node);
 
-      if (paramCount == 0) {
-        tParams = ();
-      } else if (paramCount == 1) {
-        tParams = fnEnv.values()[0];
-      } else {
-        tParams = fnEnv.values();
+            if (node is ASTReturn)
+              returns.push(type);
+
+            return returns;
+          }, []
+        );
+
+        // now build the type of the function.
+        let paramCount = len(node.signature.params);
+
+        let tParams;
+        let tReturns;
+
+        if (paramCount == 0) {
+          tParams = ();
+        } else if (paramCount == 1) {
+          tParams = fnEnv.values()[0];
+        } else {
+          tParams = fnEnv.values();
+        }
+
+        // there's always an implicit return. for now, if there are
+        // explicit returns as well, we'll just ignore the implicit
+        // one. once we have ast nodes for conditionals we can be
+        // more discriminating.
+        let tImplicitReturn = returns.pop();
+
+        if (len(returns) == 0) {
+          tReturns = tImplicitReturn;
+        } else if (len(returns) == 1) {
+          tReturns = returns[0];
+        } else {
+          tReturns = tReturns;
+        }
+
+        // if (len(tVars) > 0) {
+        //   print tVars.values;
+
+        //   return TAbstract((*params) => {
+        //     let cs = zip(params, tVars).map((x) => Constraint(..x));
+        //     let t = tParams -> tReturns;
+        //     for (s in cs) {
+
+        //       t = t.substitute(c);
+        //     }
+        //   });
+        // }
+
+        return tParams -> tReturns;
       }
 
-      // there's always an implicit return. for now, if there are
-      // explicit returns as well, we'll just ignore the implicit
-      // one. once we have ast nodes for conditionals we can be
-      // more discriminating.
-      let tImplicitReturn = returns.pop();
+      if (node is ASTLiteral)
+        return baseType(node.data);
 
-      if (len(returns) == 0) {
-        tReturns = tImplicitReturn;
-      } else if (len(returns) == 1) {
-        tReturns = returns[0];
-      } else {
-        tReturns = tReturns;
+      if (node is ASTVar)
+        return this.lookup(node);
+      
+      if (node is ASTArgumentSequence) {
+        let tArgs = node.children.map(constrain);
+
+        if (len(tArgs) == 0)
+          return ();
+        else if (len(tArgs) == 1)
+          return tArgs[0];
+        else
+          return tArgs;
       }
 
-      return tParams -> tReturns;
-    }
+      if (node is ASTApp) {
+        let func = node[0];
+        let args = node[1];
 
-    if (node is ASTLiteral)
-      return type(node.data);
+        let tFunc = constrain(func);
+        let tArgs = constrain(args);
 
-    if (node is ASTVar)
-      return this.lookup(node);
-    
-    if (node is ASTArgumentSequence) {
-      let tArgs = node.children.map(this.constrain);
+        let tApp = this.typeVars.fresh();
 
-      if (len(tArgs) == 0)
-        return ();
-      else if (len(tArgs) == 1)
-        return tArgs[0];
-      else
-        return tArgs;
-    }
+        if (tFunc is TAbstract) {
+          // print tArgs;
+          tFunc = tFunc.function(tArgs);
+        }
 
-    if (node is ASTApp) {
-      let func = node[0];
-      let args = node[1];
+        // print tFunc;
 
-      let tFunc = this.constrain(func);
-      let tArgs = this.constrain(args);
+        this.constraints.push(AppConstraint(tFunc, tArgs -> tApp));
+        return tApp;
+      }
 
-      let tApp = this.typeVars.fresh();
-      this.constraints.push(AppConstraint(tFunc, tArgs -> tApp));
-      return tApp;
-    }
+      if (node is ASTLocalTypeAssignment) {
+        let var = node[0];
+        let val = node[1];
 
-    if (node is ASTLocalTypeAssignment) {
-      let var = node[0];
-      let val = node[1];
+        if (var in this.typeEnv)
+          throw TypeError("Variable already has a type annotation.");
 
-      if (var in this.typeEnv)
-        throw TypeError("Variable already has a type annotation.");
+        let tVal = val.resolve();
 
-      this.typeEnv[var] = val.resolve();
+        // type abstraction.
+        if (val is ASTClosure)
+          this.typeEnv[var] = TAbstract(tVal);
+        else
+          this.typeEnv[var] = tVal;
 
-      return void;
-    }
+        return void;
+      }
 
-    if (node is ASTAssignment) {
-      let var = node[0];
-      let val = node[1];
+      if (node is ASTAssignment) {
+        let var = node[0];
+        let val = node[1];
 
-      let tVar = this.lookup(var);
-      let tVal = this.constrain(val);
+        let tVar = this.lookup(var);
+        let tVal = constrain(val);
 
-      this.constraints.push(Constraint(tVar, tVal));
+        this.constraints.push(Constraint(tVar, tVal));
 
-      // this should eventually respect a possibly user
-      // defined __set__ method that returns something.
-      return void;
-    }
+        // this should eventually respect a possibly user
+        // defined __set__ method that returns something.
+        return void;
+      }
 
-    if (node is ASTExprStatement)
-      return this.constrain(node[0]);
+      if (node is ASTExprStatement)
+        return constrain(node[0]);
 
-    if (node is ASTReturn) 
-      return this.constrain(node[0]);
+      if (node is ASTReturn) 
+        return constrain(node[0]);
 
-    throw TypeError("Unexpected syntax.");
+      throw TypeError("Unexpected syntax.");
+    };
+
+    return constrain(this.ast);
   } 
 
   unify() => {
@@ -402,50 +414,27 @@ class TypeState {
   }
 }
 
-let typecheck = (expr) => {
-  let ast <- expr;
-  let uuids = NameSupply();
 
-  let typeEnv = Map();
+let typecheck = expr => {
+  let state = TypeState(expr, false);
 
-  let globals = Map();
-  let annotations = globalTypeEnv();
-
-  // give the variables uuids.
-  ast.visit((node, locals) => {
-    let rename = (node: ASTVar, env: Map) => {
-      if (!env[node.data])
-        env[node.data] = uuids.fresh();
-      node.uuid = env[node.data];
-    };
-
-    if (node is ASTClosure) {
-      let localEnv = Map();
-      for (param in node.signature.params) {
-        let local = param[0];
-        rename(local, localEnv);
-      }
-      return localEnv;
-    }
-  
-    if (node is ASTLocal)
-      rename(node, locals);
-
-    if (node is ASTGlobal) {
-      rename(node, globals);
-
-      if (node.data in annotations) {
-        typeEnv[node] = annotations[node.data];
-      }
-    }
-
-    return locals;
-  }, Map());
-
-  let state = TypeState(typeEnv, false);
-
-  state.constrain(ast);
+  state.rename();
+  state.constrain();
   state.unify();
 
   return state;
+};
+
+let type = expr => {
+  let exprBaseType = baseType(expr);
+  if (exprBaseType != TFunction)
+    return exprBaseType;
+
+  let state = TypeState(expr, false);
+  state.rename();
+  let tExpr = state.constrain();
+  state.unify();
+  tExpr.apply(state.solution);
+
+  return tExpr;
 };

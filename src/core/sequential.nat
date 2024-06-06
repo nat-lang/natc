@@ -46,6 +46,8 @@ class Sequential extends Object {
   all(predicate) => this.map(predicate).reduce(and, true);
   some(predicate) => this.map(predicate).reduce(or, false);
 
+  contains(type) => this.some(x => x is type);
+
   pp() => {
     print this.values;
   }

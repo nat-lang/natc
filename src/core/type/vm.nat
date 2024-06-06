@@ -1,0 +1,40 @@
+class TypeError extends Error {}
+
+let isSubclass = (a, b) => {
+  if (vType(a) != OClass or vType(b) != OClass) 
+    return false;
+  
+  let klass = a;
+
+  while (klass != nil) {
+    if (klass == b) return true;
+    klass = klass.__superclass__;
+  }
+
+  return false;
+};
+
+// Is [a] an instance of [b]?
+let infix(5) is = (a, b) => {
+  let aVmType = vType(a);
+  let bVmType = vType(b);
+
+  if (aVmType != OInstance or bVmType != OClass)
+    return false;
+
+  return isSubclass(a.__class__, b);
+};
+
+class CType {}
+
+class CBool extends CType {}
+class CNil extends CType {}
+class CNumber extends CType {}
+class CObject extends CType {}
+class CUndef extends CType {}
+
+class OClass extends CObject {}
+class OInstance extends CObject {}
+class OString extends CObject {}
+class OClosure extends CObject {}
+class OSequence extends CObject {}

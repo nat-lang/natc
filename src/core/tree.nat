@@ -22,19 +22,30 @@ class Tree extends Object {
     return seq;
   }
 
-  isLeaf() => len(this.children) == 0;
+  leaf() => len(this.children) == 0;
+  unary() => len(this.children) == 1;
+  binary() => len(this.children) == 2;
 
   leaves() => {
-    if (this.isLeaf()) return [this.data];
+    if (this.leaf()) return [this.data];
 
     return [leaf | child in this.children, leaf in child.leaves()];
   }
 
   map(fn) => {
-    let tree = Tree(fn(this.data), []);
+    let tree = fn(this);
 
     for (child in this.children)
       tree.children.push(child.map(fn));
+
+    return tree;
+  }
+
+  dmap(fn) => {
+    let tree = Tree(fn(this.data), []);
+
+    for (child in this.children)
+      tree.children.push(child.dmap(fn));
 
     return tree;
   }
@@ -52,6 +63,18 @@ class Tree extends Object {
     for (child in this.children)
       child.visit(fn, acc);
   }
+
+  pp() => {
+    this.visit((node, depth) => {
+      // print depth;
+      print node;
+      print node.data;
+      print node.uuid;
+      print "";
+      print "";
+      return depth + 1;
+    }, 0);
+  }
 }
 
 // Functions for building tree literals during compilation.
@@ -64,7 +87,8 @@ let Root = (*children) => Tree(nil, children);
 
 // Convert [data] to a [Tree] if it's not already.
 let Node = (value) => {
-  if (type(value) != Tree)
-    return LeafNode(value);
-  return value;
+  if (value is Tree)
+    return value;
+
+  return LeafNode(value);
 };

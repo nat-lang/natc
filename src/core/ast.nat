@@ -1,4 +1,59 @@
-class ASTNode extends Tree {}
+class NameSupply {
+  init() => {
+    this.next = 0;
+  }
+  fresh() => {
+    this.next = this.next + 1;
+    return this.next;
+  }
+}
+
+class ASTNode extends Tree {
+
+  // Give the tree's variables uuids.
+  stampVariables(cb) => {
+    let uuids = NameSupply();
+    let globals = Map();
+
+    let rename = (node: ASTVar, env: Map) => {
+      if (!env[node.data])
+        env[node.data] = uuids.fresh();
+      node.uuid = env[node.data];
+    };
+
+    class VarEnv {
+      init() => {
+        this.locals = Map();
+        this.upvalues = Map();
+      }
+    }
+
+    this.visit((node, varEnv) => {
+      if (node is ASTClosure) {
+        let closureEnv = varEnv;
+        for (param in node.signature.params) {
+          let local = param[0];
+          rename(local, closureEnv);
+        }
+        return closureEnv;
+      }
+    
+      if (node is ASTLocal)
+        rename(node, varEnv.locals);
+      
+      if (node is ASTUpvalue)
+        rename(node, varEnv.upvalues);
+
+      if (node is ASTGlobal)
+        rename(node, globals);
+
+      cb(node);
+
+      return varEnv;
+    }, VarEnv());
+  }
+
+}
 
 class ASTStatement extends ASTNode {
   init(*children) => {
@@ -78,6 +133,8 @@ class ASTClosure extends ASTExpr {
     this.signature = ASTSignature(arity);
     this.children = [];
   }
+
+  resolve() => this.function;
 
   // expressions.
 

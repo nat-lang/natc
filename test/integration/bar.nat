@@ -1,0 +1,13 @@
+
+const a,b,c;
+let e = {a,b,c};
+let t = {true, false};
+
+let Love: (e, e) -> t;
+let loves = x y => Love(x, y);
+
+let x <- loves;
+
+x.pp();
+
+typecheck(loves);
