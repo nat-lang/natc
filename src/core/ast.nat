@@ -33,7 +33,7 @@ class ASTNode extends Tree {
         let closureEnv = varEnv;
         for (param in node.signature.params) {
           let local = param[0];
-          rename(local, closureEnv);
+          rename(local, closureEnv.locals);
         }
         return closureEnv;
       }
@@ -52,7 +52,6 @@ class ASTNode extends Tree {
       return varEnv;
     }, VarEnv());
   }
-
 }
 
 class ASTStatement extends ASTNode {
