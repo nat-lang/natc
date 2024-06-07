@@ -83,10 +83,9 @@ assert(check.failure());
 // multiple arguments, implicit return.
 
 f : (num, num) -> num;
-f = (a, b) => a + b;
 
 env = globalTypeEnv();
-assert(env["f"] == (num, num) -> num);
+assert(env["f"] == TProduct(num, num) -> num);
 
 check = typecheck(() => f(1,1));
 assert(check.success());

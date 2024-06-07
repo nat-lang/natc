@@ -20,17 +20,49 @@ class TVar extends Type {
   __eq__(other) => this.name == other.name;
 }
 
+class TUnit extends Type {}
 class TVoid extends Type {}
 class TBoolean extends Type {}
 class TNumber extends Type {}
 class TString extends Type {}
+
+// The only recursive types in the system are TProduct and TFunction.
+// They transform sequential and unit values into their corresponding types,
+// as their initializers are a convenient place to control entry into the
+// system. However, it's an inelegant solution, as it we have to perform the
+// same transformation for non-recursively occuring sequentials and units
+// in a different place. We'd do better to do it all in a single pass
+// over the ast, or better yet in a callback to the destructuring function.
+
+class TProduct extends Type {
+  init(*elements) => {
+    this.elements = elements.map(x => {
+      if (x is Sequential)
+        return TProduct(..x);
+      return x;
+    });
+  }
+
+  substitute(c: Constraint) => TProduct(
+    ..this.elements.map(x => x.substitute(c))
+  );
+
+  __eq__(other) => this.elements == other.elements;
+  __len__() => len(this.elements);
+}
+
 class TFunction extends Type {
   init(domain, range) => {
     this.domain = domain;
     this.range = range;
+
+    if (this.domain == ()) this.domain = unit;
+    if (this.range == ()) this.range = unit;
+
+    if (this.domain is Sequential) this.domain = TProduct(..this.domain);
+    if (this.range is Sequential) this.range = TProduct(..this.range);
   }
 
-  // the subtype relation.
   __eq__(other) => this.domain == other.domain and this.range == other.range;
 
   pp() => {
@@ -39,10 +71,9 @@ class TFunction extends Type {
   }
 
   substitute(c: Constraint) => {
-    if (this.domain == c.left)
-      this.domain = c.right;
-    if (this.range == c.left)
-      this.range = c.right;
+    this.domain = this.domain.substitute(c);
+    this.range = this.range.substitute(c);
+
     return this;
   }
   apply(s: Solution) => {
@@ -60,15 +91,9 @@ class Constraint {
   }
 
   pp() => {
-    if (this.left == ())
-      print ();
-    else
-      this.left.pp();
+    this.left.pp();
     print "x";
-    if (this.right == ())
-      print ();
-    else
-      this.right.pp();
+    this.right.pp();
   }
 }
 
@@ -82,7 +107,7 @@ class Solution extends Map {
       for (key in ["left", "right"]) {
         if (c[key] is Sequential) {
           c[key] = c[key].map((t) => t.substitute(sub));
-        } else if (c[key] != ()) {
+        } else {
           c[key] = c[key].substitute(sub);
         }
       }
@@ -96,6 +121,7 @@ class TypeVarSupply extends NameSupply {
   fresh() => TVar(super.fresh());
 }
 
+let unit = TUnit();
 let void = TVoid();
 let bool = TBoolean();
 let num = TNumber();
@@ -138,7 +164,7 @@ class SimpleTypeState extends TypeState {
           this.typeEnv[node] = annotations[node.data];
       }
     });
-  }
+  } 
 
   constrain(node: ASTNode) => {
     if (node is ASTClosure) {
@@ -185,7 +211,7 @@ class SimpleTypeState extends TypeState {
       let tReturns;
 
       if (paramCount == 0) {
-        tParams = ();
+        tParams = unit;
       } else if (paramCount == 1) {
         tParams = fnEnv.values()[0];
       } else {
@@ -219,11 +245,11 @@ class SimpleTypeState extends TypeState {
       let tArgs = node.children.map(this.constrain);
 
       if (len(tArgs) == 0)
-        return ();
+        return unit;
       else if (len(tArgs) == 1)
         return tArgs[0];
       else
-        return tArgs;
+        return TProduct(..tArgs);
     }
 
     if (node is ASTApp) {
@@ -306,12 +332,12 @@ class SimpleTypeState extends TypeState {
           Constraint(left.range, right.range)
         ]);
 
-      // sequences of equal length become pairwise sequences of constraints.
-      } else if (constraint.left is Sequence and constraint.right is Sequence) {
+      // product types of equal length become pairwise sequences of constraints.
+      } else if (constraint.left is TProduct and constraint.right is TProduct) {
         if (len(constraint.left) == len(constraint.right)) {
 
           this.constraints.extend(
-            zip(constraint.left, constraint.right).map((x) => Constraint(..x))
+            zip(constraint.left.elements, constraint.right.elements).map((x) => Constraint(..x))
           );
         } else {
           unsolved.push(constraint);
@@ -365,7 +391,7 @@ class SimpleTypeSystem extends TypeSystem {
   literalType(value) => {
     let valueType = vType(value);
 
-    if (valueType == ()) return ();
+    if (valueType == ()) return unit;
     if (valueType == CNil) return void;
     if (valueType == CBool) return bool;
     if (valueType == CNumber) return num;
@@ -380,7 +406,7 @@ class SimpleTypeSystem extends TypeSystem {
   typecheck(expr) => {
     let node <- expr;
 
-    let state = this.TypeStateClass(this, false);
+    let state = this.TypeStateClass(this, true);
 
     state.rename(node);
     state.constrain(node);
@@ -421,7 +447,7 @@ class SimpleTypeSystem extends TypeSystem {
       print "";
     }
     print exprType;
-    print exprType.apply;
+
     exprType.apply(state.solution);
 
     return exprType;

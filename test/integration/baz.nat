@@ -1,0 +1,10 @@
+
+let f: (num, num) -> num;
+let type = SimpleTypeSystem.type(x y => f(x,y));
+
+print "";
+print "";
+print "";
+type.pp();
+
+assert(type == num -> num -> num);
