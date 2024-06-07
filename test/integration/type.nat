@@ -375,3 +375,22 @@ hType = principal.find((n) => n.data == "h");
 assert(hType is TFunction);
 assert(hType.domain is TString);
 assert(hType.range is TVar);
+
+// infer the type of a function from its body.
+
+let f: num -> num;
+let type = SimpleTypeSystem.type(x => f(x));
+
+assert(type == num -> num);
+
+let f: (num, num) -> num;
+let type = SimpleTypeSystem.type((x,y) => f(x,y));
+
+assert(type == (num, num) -> num);
+
+// with an upvalue.
+
+let f: (num, num) -> num;
+let type = SimpleTypeSystem.type(x y => f(x,y));
+
+assert(type == num -> num -> num);

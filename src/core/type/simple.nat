@@ -45,6 +45,11 @@ class TFunction extends Type {
       this.range = c.right;
     return this;
   }
+  apply(s: Solution) => {
+    for (c in s) {
+      this.substitute(c);
+    }
+  }
 }
 class TClass extends Type {}
 
@@ -329,10 +334,14 @@ class SimpleTypeState extends TypeState {
     let env = Map();
 
     for (x in this.typeEnv) {
-      let k = x[0];
-      let v = x[1];
+      let key = x[0];
+      let val = x[1];
 
-      env[k] = this.solution[v];
+      if (val is TVar) {
+        env[key] = this.solution[val];
+      } else {
+        env[key] = val;
+      }
     }
 
     return env;
@@ -369,12 +378,12 @@ class SimpleTypeSystem extends TypeSystem {
   // Assemble and return the [TypeState] produced
   // by [expr].
   typecheck(expr) => {
-    let ast <- expr;
+    let node <- expr;
 
     let state = this.TypeStateClass(this, false);
 
-    state.rename(ast);
-    state.constrain(ast);
+    state.rename(node);
+    state.constrain(node);
     state.unify();
 
     return state;
@@ -386,15 +395,36 @@ class SimpleTypeSystem extends TypeSystem {
     let exprType = this.literalType(expr);
     if (exprType != TFunction)
       return exprType;
+  
+    let node: ASTClosure <- expr;
+  
+    // now check if it has a global type annotation.
+    exprType = globalTypeEnv()[node.name];
+    if (exprType and globals()[node.name] == expr) {
+      return exprType;
+    }
 
-    let ast <- expr;
+    // otherwise infer it.
     let state = this.TypeStateClass(this, true);
-    state.rename(ast);
-    exprType = state.constrain(ast);
+    state.rename(node);
+    exprType = state.constrain(node);
+
     state.unify();
+    exprType.pp();
+    print "-->";
+    print "";
+    for (x in state.solution) {
+      print x.left;
+          print "->";
+      print x.right;
+      print "";
+      print "";
+    }
+    print exprType;
+    print exprType.apply;
     exprType.apply(state.solution);
 
-    return tExpr;
+    return exprType;
   }
 }
 
