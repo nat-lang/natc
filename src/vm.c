@@ -53,6 +53,7 @@ void initClasses(Classes* classes) {
   classes->set = NULL;
   classes->iterator = NULL;
   classes->astClosure = NULL;
+  classes->astUpvalue = NULL;
   classes->vTypeBool = NULL;
   classes->vTypeNil = NULL;
   classes->vTypeNumber = NULL;
@@ -381,7 +382,7 @@ static void bindClosure(Value receiver, Value* value) {
   }
 }
 
-static ObjUpvalue* captureUpvalue(Value* local) {
+static ObjUpvalue* captureUpvalue(Value* local, uint8_t slot) {
   ObjUpvalue* prevUpvalue = NULL;
   ObjUpvalue* upvalue = vm.openUpvalues;
   while (upvalue != NULL && upvalue->location > local) {
@@ -393,7 +394,7 @@ static ObjUpvalue* captureUpvalue(Value* local) {
     return upvalue;
   }
 
-  ObjUpvalue* createdUpvalue = newUpvalue(local);
+  ObjUpvalue* createdUpvalue = newUpvalue(local, slot);
   createdUpvalue->next = upvalue;
 
   if (prevUpvalue == NULL) {
@@ -410,14 +411,14 @@ void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame) {
     uint8_t isLocal = READ_BYTE();
     uint8_t index = READ_BYTE();
     if (isLocal) {
-      closure->upvalues[i] = captureUpvalue(frame->slots + index);
+      closure->upvalues[i] = captureUpvalue(frame->slots + index, index);
     } else {
       closure->upvalues[i] = frame->closure->upvalues[index];
     }
   }
 }
 
-static void closeUpvalues(Value* last) {
+void vmCloseUpvalues(Value* last) {
   while (vm.openUpvalues != NULL && vm.openUpvalues->location >= last) {
     ObjUpvalue* upvalue = vm.openUpvalues;
     upvalue->closed = *upvalue->location;
@@ -732,14 +733,14 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_CLOSE_UPVALUE: {
-        closeUpvalues(vm.stackTop - 1);
+        vmCloseUpvalues(vm.stackTop - 1);
         vmPop();
         break;
       }
       case OP_IMPLICIT_RETURN:
       case OP_RETURN: {
         Value value = vmPop();
-        closeUpvalues(frame->slots);
+        vmCloseUpvalues(frame->slots);
         vm.frameCount--;
 
         if (vm.frameCount == 0) {

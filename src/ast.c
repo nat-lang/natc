@@ -1,5 +1,6 @@
 #include "ast.h"
 
+#include <stdint.h>
 #include <stdio.h>
 
 #include "common.h"
@@ -30,12 +31,28 @@ bool readAST(ObjClosure* closure) {
   frame->ip = closure->function->chunk.code;
   frame->slots = vm.stackTop;  // points at [closure].
 
-  // the root of the tree.
+  // the root of the tree is an [ASTClosure] instance that has
+  // four arguments.
   vmPush(OBJ_VAL(vm.classes.astClosure));
+  // the function's name.
   vmPush(OBJ_VAL(closure->function->name));
+  // the function itself.
   vmPush(OBJ_VAL(closure));
+  // the function's arity.
   vmPush(NUMBER_VAL(closure->function->arity));
-  if (!initInstance(vm.classes.astClosure, 3)) return false;
+  // the closure's upvalues.
+  vmPush(OBJ_VAL(vm.classes.sequence));
+  for (int i = 0; i < closure->upvalueCount; i++) {
+    vmPush(OBJ_VAL(vm.classes.astUpvalue));
+    vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
+    vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
+    if (!initInstance(vm.classes.astUpvalue, 2)) return false;
+  }
+
+  if (!vmInitInstance(vm.classes.sequence, closure->upvalueCount, 0))
+    return false;
+
+  if (!initInstance(vm.classes.astClosure, 4)) return false;
 
   Value root = vmPeek(0);
 
@@ -98,6 +115,7 @@ bool readAST(ObjClosure* closure) {
       }
       case OP_RETURN: {
         Value value = vmPop();
+        vmCloseUpvalues(frame->slots);
         vmPush(root);
         vmPush(value);
 
@@ -108,6 +126,7 @@ bool readAST(ObjClosure* closure) {
       }
       case OP_IMPLICIT_RETURN: {
         Value value = vmPop();
+        vmCloseUpvalues(frame->slots);
         vmPush(root);
         vmPush(value);
         if (!executeMethod("opImplicitReturn", 1)) return false;
@@ -152,9 +171,12 @@ bool readAST(ObjClosure* closure) {
       case OP_GET_UPVALUE: {
         vmPush(root);
         uint8_t slot = READ_SHORT();
-        vmPush(NUMBER_VAL(slot));
+        ObjUpvalue* upvalue = frame->closure->upvalues[slot];
 
-        if (!executeMethod("opGetUpvalue", 1)) return false;
+        vmPush(NUMBER_VAL((uintptr_t)upvalue));
+        vmPush(NUMBER_VAL(upvalue->slot));
+
+        if (!executeMethod("opGetUpvalue", 2)) return false;
         break;
       }
       case OP_CLOSURE: {

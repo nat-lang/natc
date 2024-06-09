@@ -165,7 +165,7 @@ f <- (g) => {
 assert(f[1][1] is ASTApp);
 assert(f[1][1].resolve() == 2);
 
-// parameter annotation.
+// type language.
 
 f <- () => {
   let k = (a: num -> num) => a(1);
@@ -178,3 +178,27 @@ assert(closure.signature.params[0] is ASTLocalTypeAssignment);
 
 let typeAssignment = closure.signature.params[0];
 assert(typeAssignment[1].resolve() is TFunction);
+
+// closures.
+
+(() => {
+  let f <- (x,y,z) => () => (a,b,c) => x + z;
+
+  print f[0][0].upvalues.values;
+
+  for (c in f.children) {
+    print c;
+  }
+
+  f.stampVariables((x) => {});
+})();
+
+
+// f <- () => {
+//   let a = 1;
+//   let g = b => {
+//     a = b;
+//   };
+//   g(2);
+// };
+

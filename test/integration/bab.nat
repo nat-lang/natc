@@ -1,0 +1,6 @@
+let f = (a,b) => a + b;
+let g = x y => f(x,y);
+
+
+g(1)(2);
+

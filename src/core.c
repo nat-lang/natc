@@ -403,6 +403,7 @@ InterpretResult initializeCore() {
   vm.classes.map = getClass(S_MAP);
   vm.classes.set = getClass(S_SET);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
+  vm.classes.astUpvalue = getClass(S_AST_UPVALUE);
 
   vm.classes.vTypeBool = getClass(S_CTYPE_BOOL);
   vm.classes.vTypeNil = getClass(S_CTYPE_NIL);

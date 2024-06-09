@@ -1,0 +1,14 @@
+
+let f = () => {
+  let a = 1;
+  let g = () => {
+    let b = 2;
+
+    return () => a + b;
+  };
+
+  print g()();
+};
+
+f();
+

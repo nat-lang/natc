@@ -1,0 +1,23 @@
+
+
+
+(() => {
+  let f <- (x,z) => {
+    let y;
+    
+    let g = () => x + z;
+    let h = () => x + y;
+    let j = () => {
+      let a;
+      return () => x + y + a;
+    };
+  };
+
+  f.stampVariables((x) => {});
+})();
+
+(() => {
+  let f <- x z => () => x + z;
+
+  // f.stampVariables((x) => {});
+})();

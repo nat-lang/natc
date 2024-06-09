@@ -32,16 +32,30 @@ class ASTNode extends Tree {
         let closureEnv = VarEnv();
         for (param in node.signature.params) {
           let local = param[0];
+
           rename(local, closureEnv.locals);
         }
+
+        print "-------";
+        print node.name;
+        print varEnv.locals.keys().values;
+        print "--";
+        for (upvalue in node.upvalues) {
+          print "down: " + str(upvalue.data) + " (" + str(upvalue.localId) + ")";
+
+        }
+        print "-------";
+
         return closureEnv;
       }
 
       if (node is ASTLocal)
         rename(node, varEnv.locals);
 
-      if (node is ASTUpvalue)
-        rename(node, varEnv.upvalues);
+      if (node is ASTUpvalue) {
+        print "up: " + str(node.data) + " (" + str(node.localId) + ")";
+      }
+      // rename(node, varEnv.upvalues);
 
       if (node is ASTGlobal)
         rename(node, globals);
@@ -95,7 +109,12 @@ class ASTLocal extends ASTVar {}
 class ASTGlobal extends ASTVar {
   resolve() => globals()[this.data];
 }
-class ASTUpvalue extends ASTVar {}
+class ASTUpvalue extends ASTVar {
+  init(id, localId) => {
+    super.init(id);
+    this.localId = localId;
+  }
+}
 
 class ASTArgumentSequence extends ASTExpr {
   init(args) => {
@@ -125,11 +144,12 @@ class ASTSignature extends ASTNode {
 }
 
 class ASTClosure extends ASTExpr {
-  init(name, function, arity) => {
+  init(name, function, arity, upvalues) => {
     this.name = name;
     this.function = function;
     this.signature = ASTSignature(arity);
     this.children = [];
+    this.upvalues = upvalues;
   }
 
   // expressions.
@@ -137,7 +157,7 @@ class ASTClosure extends ASTExpr {
   opLiteral(value) => ASTLiteral(value);
   opGetLocal(slot) => ASTLocal(slot);
   opGetGlobal(name) => ASTGlobal(name);
-  opGetUpvalue(slot) => ASTUpvalue(slot);
+  opGetUpvalue(slot, localSlot) => ASTUpvalue(slot, localSlot);
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(args));
 
   // statements.
