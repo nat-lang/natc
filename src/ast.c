@@ -99,6 +99,13 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
+      case OP_NOT: {
+        Value value = vmPop();
+        vmPush(root);
+        vmPush(value);
+        if (!executeMethod("opNot", 1)) return false;
+        break;
+      }
       case OP_EXPR_STATEMENT: {
         Value value = vmPop();
         vmPush(root);
@@ -212,6 +219,39 @@ bool readAST(ObjClosure* closure) {
         vmPush(right);
 
         if (!executeMethod("opCall", 3)) return false;
+        break;
+      }
+      case OP_CALL_POSTFIX: {
+        int argCount = READ_BYTE();
+        Value postfix = vmPop();
+        Value args[argCount];
+
+        int i = argCount;
+        while (i-- > 0) args[i] = vmPop();
+
+        vmPush(root);
+
+        vmPush(postfix);
+        while (++i < argCount) vmPush(args[i]);
+
+        if (!executeMethod("opCall", argCount + 1)) return false;
+        break;
+      }
+      case OP_INVOKE: {
+        ObjString* method = READ_STRING();
+        int argCount = READ_BYTE();
+
+        Value args[argCount];
+        int i = argCount;
+        while (i-- > 0) args[i] = vmPop();
+
+        Value receiver = vmPop();
+        vmPush(root);
+        vmPush(receiver);
+        vmPush(OBJ_VAL(method));
+        while (++i < argCount) vmPush(args[i]);
+
+        if (!executeMethod("opInvoke", argCount + 2)) return false;
         break;
       }
       case OP_SET_TYPE_LOCAL: {

@@ -20,6 +20,14 @@ assert(f[1] is ASTImplicitReturn);
 assert(f[1][0] is ASTLiteral);
 assert(f[1][0].data == nil);
 
+// negation.
+
+let f <- (a) => !a;
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTNegation);
+assert(f[0][0].data is ASTLocal);
+
 // constant function to global.
 f <- (a) => c;
 
@@ -52,7 +60,7 @@ assert(f[1] is ASTImplicitReturn);
 assert(f[1][0] is ASTLiteral);
 assert(f[1][0].data == nil);
 
-// function to binary application.
+// function to infix.
 
 f <- (a) => a + 1;
 
@@ -89,6 +97,15 @@ let r = f[0];
 assert(r is ASTReturn);
 assert(r[0] is ASTApp);
 assert(r[0][0].data == "implies");
+
+// function to postfix.
+
+f <- (a) => [1,2,3];
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTApp);
+assert(f[0][0][0].data == "Sequence");
+assert(f[0][0][1].resolve() == [1,2,3]);
 
 // function to function.
 
@@ -156,7 +173,7 @@ assert(f[5] is ASTImplicitReturn);
 
 // closures.
 
-let f <- (x,z) => {
+f <- (x,z) => {
   let y;
   
   let g = () => x + z;
@@ -200,6 +217,27 @@ let j_a_up = j[2][0][0][0][1][1];
 assert(j_x_up.uuid == x.uuid);
 assert(j_y_up.uuid == y.uuid);
 assert(j_a_up.uuid == a.uuid);
+
+// invocation.
+
+class A {}
+let a = A();
+
+f <- () => a.f();
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTInvocation);
+assert(f[0][0][0].resolve() is A);
+assert(f[0][0][1] == "f");
+assert(f[0][0][2].leaf());
+
+f <- () => a.f(1,2,3);
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTInvocation);
+assert(f[0][0][0].resolve() is A);
+assert(f[0][0][1] == "f");
+assert(f[0][0][2].resolve() == [1,2,3]);
 
 // resolution, aka evaluation.
 
