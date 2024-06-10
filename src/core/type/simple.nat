@@ -18,7 +18,7 @@ class TVar extends Type {
   }
   hash() => hash(this.name);
   __eq__(other) => this.name == other.name;
-  str() => this.name;
+  str() => str(this.name);
 }
 
 class TUnit extends Type {
@@ -84,7 +84,7 @@ class TFunction extends Type {
 
   __eq__(other) => this.domain == other.domain and this.range == other.range;
 
-  str() => this.domain.str() + " -> " + this.range.str();
+  str() => "(" + this.domain.str() + " -> " + this.range.str() + ")";
 
   pp() => {
     print this.domain;
@@ -422,7 +422,7 @@ class SimpleTypeSystem extends TypeSystem {
   typecheck(expr) => {
     let node <- expr;
 
-    let state = this.TypeStateClass(this, true);
+    let state = this.TypeStateClass(this, false);
 
     state.rename(node);
     state.constrain(node);
@@ -447,22 +447,14 @@ class SimpleTypeSystem extends TypeSystem {
     }
 
     // otherwise infer it.
-    let state = this.TypeStateClass(this, true);
+    let state = this.TypeStateClass(this, false);
     state.rename(node);
     exprType = state.constrain(node);
 
     state.unify();
-    exprType.pp();
-    print "-->";
-    print "";
-    for (x in state.solution) {
-      print x.left;
-          print "->";
-      print x.right;
-      print "";
-      print "";
-    }
-    print exprType;
+
+    if (!state.unified())
+      throw Error("Can't infer type.");
 
     exprType.apply(state.solution);
 

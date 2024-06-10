@@ -1,8 +1,13 @@
+let -1 = 1 - 2;
+
 
 class Tree extends Object {
   init(data, children) => {
     this.data = data;
     this.children = children;
+
+    this.depth = -1;
+    this.breadth = -1;
   }
 
   // Subscript access is to children.
@@ -11,6 +16,23 @@ class Tree extends Object {
   __iter__() => {
     let nodes = this.depthFirst();
     return Iterator(nodes, 0, len(nodes));
+  }
+
+  index(d: num, b: num) => {
+    this.depth = d;
+    this.breadth = b;
+
+    let i = 0;
+    for (x in this.children) {
+      x.index(d + 1, i);
+      i = i + 1;
+    }
+  }
+  
+  id() => {
+    if (this.depth == -1 or this.breadth == -1)
+      throw Error("Must call 'index' before accessing 'id'.");
+    return (this.depth, this.breadth);
   }
 
   depthFirst() => {

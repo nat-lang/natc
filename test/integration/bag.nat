@@ -1,0 +1,9 @@
+let f = (num, num, num) -> bool;
+
+let check = SimpleTypeSystem.typecheck(() => {
+  f(x)(y)(z);
+});
+
+assert(check.failure());
+
+assert(type == (num -> (num -> (num -> bool))));

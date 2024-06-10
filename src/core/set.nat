@@ -46,10 +46,8 @@ class Set extends Object {
 
   // Is [this] a subset of or equal to [other]?
   subsetEq(other) => {
-    if (len(this) > len(other)) {
-      print "len not eq";
+    if (len(this) > len(other))
       return false;
-    }
 
     for (x in this) 
       if (!other(x))
@@ -134,6 +132,4 @@ class Set extends Object {
   pp() => {
     print this.elements().values;
   }
-
-  substitute(c) => this;
 }

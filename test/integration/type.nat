@@ -387,9 +387,14 @@ let type = SimpleTypeSystem.type((x,y) => f(x,y));
 
 assert(type == (num, num) -> num);
 
-// with an upvalue.
+// with constraints on upvalues.
 
-let f: (num, num) -> num;
-let type = SimpleTypeSystem.type(x => y => f(x,y));
+let f: (num, num) -> bool;
+let type = SimpleTypeSystem.type(x y => f(x,y));
 
-assert(type == num -> (num -> num));
+assert(type == num -> (num -> bool));
+
+let f: (num, num, num) -> bool;
+let type = SimpleTypeSystem.type(x y z => f(x,y,z));
+
+assert(type == (num -> (num -> (num -> bool))));
