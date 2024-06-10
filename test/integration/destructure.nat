@@ -154,6 +154,53 @@ assert(f[3][1] is ASTLiteral);
 assert(f[4] is ASTExprStatement);
 assert(f[5] is ASTImplicitReturn);
 
+// closures.
+
+let f <- (x,z) => {
+  let y;
+  
+  let g = () => x + z;
+  let h = () => x + y;
+  let j = () => {
+    let a;
+    return () => x + y + a;
+  };
+};
+
+// upvalues are identified with the locals
+// they close over.
+
+f.stampVariables(x => {});
+
+let x = f.signature.params[0][0];
+let z = f.signature.params[1][0];
+let y = f[1][0];
+
+let g = f[3][1];
+let h = f[5][1];
+let j = f[7][1];
+
+let g_x_up = g[0][0][1][0];
+let g_z_up = g[0][0][1][1];
+
+assert(g_x_up.uuid == x.uuid);
+assert(g_z_up.uuid == z.uuid);
+
+let h_x_up = h[0][0][1][0];
+let h_y_up = h[0][0][1][1];
+
+assert(h_x_up.uuid == x.uuid);
+assert(h_y_up.uuid == y.uuid);
+
+let a = j[1][0];
+let j_x_up = j[2][0][0][0][1][0][1][0];
+let j_y_up = j[2][0][0][0][1][0][1][1];
+let j_a_up = j[2][0][0][0][1][1];
+
+assert(j_x_up.uuid == x.uuid);
+assert(j_y_up.uuid == y.uuid);
+assert(j_a_up.uuid == a.uuid);
+
 // resolution, aka evaluation.
 
 // obj language.
@@ -178,27 +225,4 @@ assert(closure.signature.params[0] is ASTLocalTypeAssignment);
 
 let typeAssignment = closure.signature.params[0];
 assert(typeAssignment[1].resolve() is TFunction);
-
-// closures.
-
-(() => {
-  let f <- (x,y,z) => () => (a,b,c) => x + z;
-
-  print f[0][0].upvalues.values;
-
-  for (c in f.children) {
-    print c;
-  }
-
-  f.stampVariables((x) => {});
-})();
-
-
-// f <- () => {
-//   let a = 1;
-//   let g = b => {
-//     a = b;
-//   };
-//   g(2);
-// };
 

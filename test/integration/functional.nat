@@ -89,14 +89,24 @@ assert(h == 1);
 // composition.
 // --------------------------------------
 
-let f = (a) => a + 1;
-let g = f . f;
+let a = x => x + 1;
+let b = x => x * 2;
+let c = x => x / 3;
+
+let g = a . a;
 
 assert(g(1) == 3);
 
-let g = ((a) => a) . f;
+let g = (x => x) . a;
 
 assert(g(1) == 2);
+
+let h = a . b . c;
+let j = (a . b) . c;
+let k = a . (b . c);
+
+assert(h(1) == j(1));
+assert(j(1) == k(1));
 
 // variadicity
 // --------------------------------------

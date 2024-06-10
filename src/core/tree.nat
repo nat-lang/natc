@@ -62,8 +62,16 @@ class Tree extends Object {
   visit(fn, acc) => {
     acc = fn(this, acc);
 
+    // accumulate vertically, but not horizontally.
     for (child in this.children)
       child.visit(fn, acc);
+  }
+
+  find(predicate) => {
+    for (node in this) {
+      if (predicate(node))
+        return node;
+    }
   }
 }
 

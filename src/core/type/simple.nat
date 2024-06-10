@@ -18,13 +18,24 @@ class TVar extends Type {
   }
   hash() => hash(this.name);
   __eq__(other) => this.name == other.name;
+  str() => this.name;
 }
 
-class TUnit extends Type {}
-class TVoid extends Type {}
-class TBoolean extends Type {}
-class TNumber extends Type {}
-class TString extends Type {}
+class TUnit extends Type {
+  str() => "()";
+}
+class TVoid extends Type {
+  str() => "void";
+}
+class TBoolean extends Type {
+  str() => "bool";
+}
+class TNumber extends Type {
+  str() => "num";
+}
+class TString extends Type {
+  str() => "string";
+}
 
 // The only recursive types in the system are TProduct and TFunction.
 // They transform sequential and unit values into their corresponding types
@@ -42,6 +53,13 @@ class TProduct extends Type {
         return TProduct(..x);
       return x;
     });
+  }
+  str() => {
+    let s = "(";
+    for (x in this.elements)
+      s = s + ", " + x.str();
+    s = s + ")";
+    return s;
   }
 
   substitute(c: Constraint) => TProduct(
@@ -65,6 +83,8 @@ class TFunction extends Type {
   }
 
   __eq__(other) => this.domain == other.domain and this.range == other.range;
+
+  str() => this.domain.str() + " -> " + this.range.str();
 
   pp() => {
     print this.domain;

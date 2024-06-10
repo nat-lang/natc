@@ -392,5 +392,4 @@ assert(type == (num, num) -> num);
 let f: (num, num) -> num;
 let type = SimpleTypeSystem.type(x => y => f(x,y));
 
-print type.range.domain;
-assert(type == num -> num -> num);
+assert(type == num -> (num -> num));

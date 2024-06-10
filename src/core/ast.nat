@@ -9,7 +9,8 @@ class NameSupply {
 }
 
 class ASTNode extends Tree {
-  // Give the tree's variables uuids.
+  // Give the tree's variables uuids; make sure upvalues
+  // are identified with the locals they close over.
   stampVariables(cb) => {
     let uuids = NameSupply();
     let globals = Map();
@@ -21,30 +22,25 @@ class ASTNode extends Tree {
     };
 
     class VarEnv {
-      init() => {
+      init(upvalues) => {
         this.locals = Map();
-        this.upvalues = Map();
+        this.upvalues = upvalues;
       }
     }
 
     this.visit((node, varEnv) => {
       if (node is ASTClosure) {
-        let closureEnv = VarEnv();
+        let closureEnv = VarEnv(varEnv.upvalues);
         for (param in node.signature.params) {
           let local = param[0];
-
           rename(local, closureEnv.locals);
         }
 
-        print "-------";
-        print node.name;
-        print varEnv.locals.keys().values;
-        print "--";
         for (upvalue in node.upvalues) {
-          print "down: " + str(upvalue.data) + " (" + str(upvalue.localId) + ")";
-
+          if (!closureEnv.upvalues[upvalue.data]) {
+            closureEnv.upvalues[upvalue.data] = varEnv.locals[upvalue.localId];
+          }
         }
-        print "-------";
 
         return closureEnv;
       }
@@ -53,9 +49,10 @@ class ASTNode extends Tree {
         rename(node, varEnv.locals);
 
       if (node is ASTUpvalue) {
-        print "up: " + str(node.data) + " (" + str(node.localId) + ")";
+        if (!varEnv.upvalues[node.data])
+          throw Error("Upvalue (" + str(node.data) + ") missing uuid.");
+        node.uuid = varEnv.upvalues[node.data];
       }
-      // rename(node, varEnv.upvalues);
 
       if (node is ASTGlobal)
         rename(node, globals);
@@ -63,7 +60,7 @@ class ASTNode extends Tree {
       cb(node);
 
       return varEnv;
-    }, VarEnv());
+    }, VarEnv(Map()));
   }
 }
 
