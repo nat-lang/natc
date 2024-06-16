@@ -100,6 +100,9 @@ typedef struct ObjUpvalue {
   Obj obj;
   Value *location;
   Value closed;
+  // the address of the local that's closed over.
+  // we stash this only to reconstruct the ast.
+  uint8_t slot;
   struct ObjUpvalue *next;
 } ObjUpvalue;
 
@@ -159,7 +162,7 @@ ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
 ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjString *intern(const char *chars);
-ObjUpvalue *newUpvalue(Value *slot);
+ObjUpvalue *newUpvalue(Value *value, uint8_t slot);
 ObjSpread *newSpread(Value value);
 void printObject(Value value);
 

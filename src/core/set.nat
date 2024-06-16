@@ -46,14 +46,13 @@ class Set extends Object {
 
   // Is [this] a subset of or equal to [other]?
   subsetEq(other) => {
-    if (len(this) > len(other)) {
-      print "len not eq";
+    if (len(this) > len(other))
       return false;
-    }
 
-    for (x in this) 
+    for (x in this) {
       if (!other(x))
         return false;
+    }
   
     return true;
   }
@@ -130,4 +129,13 @@ class Set extends Object {
   all(predicate) => this.elements.all(predicate);
   each(predicate) => this.all(predicate);
   some(predicate) => this.elements.some(predicate);
+
+  pp() => {
+    print this.elements().values;
+  }
+
+  lift(value) => {
+    if (value is Set) return value;
+    return Set(value);
+  }
 }

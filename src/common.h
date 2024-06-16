@@ -37,9 +37,9 @@
 #define S_SET "Set"
 #define S_TREE "Tree"
 #define S_ITERATOR "Iterator"
-#define S_AST_NODE "ASTNode"
+
 #define S_AST_CLOSURE "ASTClosure"
-#define S_AST_SIGNATURE "ASTSignature"
+#define S_AST_UPVALUE "ASTUpvalue"
 
 #define S_CTYPE_BOOL "CBool"
 #define S_CTYPE_NIL "CNil"

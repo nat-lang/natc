@@ -1,5 +1,4 @@
 
-
 class Type {
   pp() => {
     print this;
@@ -10,31 +9,90 @@ class Type {
       return c.right;
     return this;
   }
+
+  str() => {
+    throw NotImplemented("Type classes must implement 'str' individually.");
+  }
+
+  hash() => hash(this.str());
 }
 
 class TVar extends Type {
   init(name) => {
     this.name = name;
   }
-  hash() => hash(this.name);
   __eq__(other) => this.name == other.name;
+  str() => str(this.name);
 }
 
-class TSum extends Type {}
-class TProduct extends Tuple {}
+class TUnit extends Type {
+  str() => "()";
+}
+class TVoid extends Type {
+  str() => "void";
+}
+class TBoolean extends Type {
+  str() => "bool";
+}
+class TNumber extends Type {
+  str() => "num";
+}
+class TString extends Type {
+  str() => "string";
+}
 
-class TVoid extends Type {}
-class TBoolean extends Type {}
-class TNumber extends Type {}
-class TString extends Type {}
+// The only type constructors in the system are TProduct, TFunction, and TSum.
+// They transform sequential and unit values into their corresponding types
+// (TProduct and TUnit), as their initializers are a convenient place to
+// control entry into the system. However, it's an inelegant solution, as 
+// we have to perform the same transformation for non-recursively occuring
+// sequentials and units in a different place. We'd do better to do it all
+// in a single pass over the ast, or better yet in a callback to the
+// destructuring function.
+
+class TProduct extends Type {
+  init(*elements) => {
+    this.elements = elements.map(x => {
+      if (x is Sequential)
+        return TProduct(..x);
+      if (x == ())
+        return unit;
+      return x;
+    });
+  }
+  str() => {
+    let s = "(";
+    for (x in this.elements)
+      s = s + ", " + x.str();
+    s = s + ")";
+    return s;
+  }
+
+  substitute(c: Constraint) => TProduct(
+    ..this.elements.map(x => x.substitute(c))
+  );
+
+  hash() => this.elements.hash();
+
+  __eq__(other) => this.elements == other.elements;
+  __len__() => len(this.elements);
+}
+
 class TFunction extends Type {
   init(domain, range) => {
     this.domain = domain;
     this.range = range;
+
+    if (this.domain == ()) this.domain = unit;
+    if (this.range == ()) this.range = unit;
+
+    if (this.domain is Sequential) this.domain = TProduct(..this.domain);
+    if (this.range is Sequential) this.range = TProduct(..this.range);
   }
 
-  // the subtype relation.
   __eq__(other) => this.domain == other.domain and this.range == other.range;
+
+  str() => "(" + this.domain.str() + " -> " + this.range.str() + ")";
 
   pp() => {
     print this.domain;
@@ -42,11 +100,16 @@ class TFunction extends Type {
   }
 
   substitute(c: Constraint) => {
-    if (this.domain == c.left)
-      this.domain = c.right;
-    if (this.range == c.left)
-      this.range = c.right;
+    this.domain = this.domain.substitute(c);
+    this.range = this.range.substitute(c);
+
     return this;
+  }
+
+  apply(s: Solution) => {
+    for (c in s) {
+      this.substitute(c);
+    }
   }
 }
 class TClass extends Type {}
@@ -58,15 +121,9 @@ class Constraint {
   }
 
   pp() => {
-    if (this.left == ())
-      print ();
-    else
-      this.left.pp();
+    this.left.pp();
     print "x";
-    if (this.right == ())
-      print ();
-    else
-      this.right.pp();
+    this.right.pp();
   }
 }
 
@@ -77,26 +134,11 @@ class Solution extends Map {
 
   apply(c: Constraint) => {
     for (sub in this) {
-      for (key in ["left", "right"]) {
-        if (c[key] is Sequential) {
-          c[key] = c[key].map((t) => t.substitute(sub));
-        } else if (c[key] != ()) {
-          c[key] = c[key].substitute(sub);
-        }
-      }
+      c.left = c.left.substitute(sub);
+      c.right = c.right.substitute(sub);
     }
 
     return c;
-  }
-}
-
-class NameSupply {
-  init() => {
-    this.next = 0;
-  }
-  fresh() => {
-    this.next = this.next + 1;
-    return this.next;
   }
 }
 
@@ -104,6 +146,7 @@ class TypeVarSupply extends NameSupply {
   fresh() => TVar(super.fresh());
 }
 
+let unit = TUnit();
 let void = TVoid();
 let bool = TBoolean();
 let num = TNumber();
@@ -111,22 +154,9 @@ let string = TString();
 let infix -> = TFunction;
 let tClass = TClass();
 
-// Map vm types to object language types.
-let literalType = (value) => {
-  let vmType = vType(value);
-
-  if (vmType == ()) return ();
-  if (vmType == CNil) return void;
-  if (vmType == CBool) return bool;
-  if (vmType == CNumber) return num;
-  if (vmType == OString) return string; 
-  if (vmType == OInstance) return value.__class__;
-  if (vmType == OClass) return tClass;
-  if (vmType == OClosure) return TFunction;
-};
-
 class TypeState {
-  init(debug: bool) => {
+  init(system: TypeSystem, debug: bool) => {
+    this.system = system;
     // map from variables to types.
     this.typeEnv = Map();
     // name supply.
@@ -148,18 +178,20 @@ class TypeState {
     return this.typeEnv[node];
   }
 
-  rename(ast: ASTNode) => {
+  // Give [ast]'s variable unique identifiers, keeping track
+  // of the variables that have global type annotations.
+  rename(node: ASTNode) => {
     let annotations = globalTypeEnv();
 
-    ast.stampVariables(node => {
+    node.stampVariables(node => {
       if (node is ASTGlobal) {
-        if (node.data in annotations)
-          this.typeEnv[node] = annotations[node.data];
+        if (node.id in annotations)
+          this.typeEnv[node] = annotations[node.id];
       }
     });
-  }
+  } 
 
-  constrain(node) => {
+  constrain(node: ASTNode) => {
     if (node is ASTClosure) {
       // give the parameters type vars if they don't
       // have annotations.
@@ -204,7 +236,7 @@ class TypeState {
       let tReturns;
 
       if (paramCount == 0) {
-        tParams = ();
+        tParams = unit;
       } else if (paramCount == 1) {
         tParams = fnEnv.values()[0];
       } else {
@@ -229,20 +261,24 @@ class TypeState {
     }
 
     if (node is ASTLiteral)
-      return literalType(node.data);
+      return this.system.literalType(node.value);
+    
+    if (node is ASTNegation)
+      return this.constrain(node[0]);
 
-    if (node is ASTVar)
+    if (node is ASTVar) {
       return this.lookup(node);
+    }
     
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
 
       if (len(tArgs) == 0)
-        return ();
+        return unit;
       else if (len(tArgs) == 1)
         return tArgs[0];
       else
-        return tArgs;
+        return TProduct(..tArgs);
     }
 
     if (node is ASTApp) {
@@ -253,7 +289,7 @@ class TypeState {
       let tArgs = this.constrain(args);
 
       let tApp = this.typeVars.fresh();
-      this.constraints.push(AppConstraint(tFunc, tArgs -> tApp));
+      this.constraints.push(Constraint(tFunc, tArgs -> tApp));
       return tApp;
     }
 
@@ -292,11 +328,51 @@ class TypeState {
     throw TypeError("Unexpected syntax.");
   } 
 
+  solve(constraint: Constraint) => {
+    let left = constraint.left,
+        right = constraint.right;
+
+    // apply (type variable, type) unifiers to the solution.
+    if (left is TVar) {
+      this.solution[left] = right;
+      this.constraints = this.constraints.map(this.solution.apply);
+
+      return true;
+    } else if (right is TVar) {
+      this.solution[right] = left;
+      this.constraints = this.constraints.map(this.solution.apply);
+
+      return true;
+    // function constraints become domain/domain range/range constraints.
+    } else if (left is TFunction and right is TFunction) {
+      this.constraints.extend([
+        Constraint(left.domain, right.domain),
+        Constraint(left.range, right.range)
+      ]);
+
+      return true;
+    // product types of equal length become pairwise sequences of constraints.
+    } else if (left is TProduct and right is TProduct) {
+      if (len(left) == len(right)) {
+
+        this.constraints.extend(
+          zip(left.elements, right.elements).map((x) => Constraint(..x))
+        );
+
+        return true;
+      } else {
+        return false;
+      }
+    } 
+
+    return left == right;
+  }
+
+  // Solve the state's [constraints].
   unify() => {
     let unsolved = [];
 
     let i = 0;
-    
     while (len(this.constraints) > 0) {
       if (this.debug) {
         print "-------- STEP " + str(i) + " -------------------";
@@ -305,40 +381,10 @@ class TypeState {
       }
 
       let constraint = this.constraints.pop();
+      let solution = this.solve(constraint);
 
-      // apply (type variable, type) unifiers to the solution.
-      if (constraint.left is TVar) {
-        this.solution[constraint.left] = constraint.right;
-        this.constraints = this.constraints.map(this.solution.apply);
-      } else if (constraint.right is TVar) {
-        this.solution[constraint.right] = constraint.left;
-        this.constraints = this.constraints.map(this.solution.apply);
-
-      // function constraints become domain/domain range/range constraints.
-      } else if (constraint.left is TFunction and constraint.right is TFunction) {
-        let left = constraint.left;
-        let right = constraint.right;
-
-        this.constraints.extend([
-          Constraint(left.domain, right.domain),
-          Constraint(left.range, right.range)
-        ]);
-
-      // sequences of equal length become pairwise sequences of constraints.
-      } else if (constraint.left is Sequence and constraint.right is Sequence) {
-        if (len(constraint.left) == len(constraint.right)) {
-
-          this.constraints.extend(
-            zip(constraint.left, constraint.right).map((x) => Constraint(..x))
-          );
-        } else {
-          unsolved.push(constraint);
-        }
-      // if they're equal base types, eliminate them; otherwise note that 
-      // they're not unifiable.
-      } else if (constraint.left != constraint.right) {
+      if (!solution)
         unsolved.push(constraint);
-      }
 
       i = i + 1;
     }
@@ -352,10 +398,14 @@ class TypeState {
     let env = Map();
 
     for (x in this.typeEnv) {
-      let k = x[0];
-      let v = x[1];
+      let key = x[0];
+      let val = x[1];
 
-      env[k] = this.solution[v];
+      if (val is TVar) {
+        env[key] = this.solution[val];
+      } else {
+        env[key] = val;
+      }
     }
 
     return env;
@@ -374,14 +424,71 @@ class TypeState {
   }
 }
 
-let typecheck = (expr) => {
-  let ast <- expr;
+class TypeSystem {
+  // Map vm types to object language types.
+  literalType(value) => {
+    let valueType = vType(value);
 
-  let state = TypeState(false);
+    if (valueType == ()) return unit;
+    if (valueType == CNil) return void;
+    if (valueType == CBool) return bool;
+    if (valueType == CNumber) return num;
+    if (valueType == OString) return string; 
+    if (valueType == OInstance) return value.__class__;
+    if (valueType == OClass) return tClass;
+    if (valueType == OClosure) return TFunction;
+  }
 
-  state.rename(ast);
-  state.constrain(ast);
-  state.unify();
+  inferType(node: ASTNode) => {
+    let state = this.TypeStateClass(this, false);
+    state.rename(node);
+    let type = state.constrain(node);
 
-  return state;
-};
+    state.unify();
+
+    if (!state.unified())
+      throw Error("Can't infer type.");
+
+    type.apply(state.solution);
+
+    return type;
+  }
+
+  // Assemble and return the [TypeState] produced
+  // by [expr].
+  typecheck(expr) => {
+    let node <- expr;
+
+    let state = this.TypeStateClass(this, false);
+
+    state.rename(node);
+    state.constrain(node);
+    state.unify();
+
+    return state;
+  }
+
+  // Calculate the type of [expr], inferring it if necessary.
+  type(expr) => {
+    // if it's not a function, return its literal type.
+    let exprType = this.literalType(expr);
+    if (exprType != TFunction)
+      return exprType;
+  
+    let node: ASTClosure <- expr;
+  
+    // now check if it has a global type annotation.
+    exprType = globalTypeEnv()[node.name];
+    if (exprType and globals()[node.name] == expr) {
+      return exprType;
+    }
+
+    // otherwise infer it.
+    return this.inferType(node);
+  }
+}
+
+TypeSystem.TypeStateClass = TypeState;
+
+let SimpleTypeState = TypeState;
+let SimpleTypeSystem = TypeSystem;

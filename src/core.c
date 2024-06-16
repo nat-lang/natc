@@ -202,6 +202,13 @@ bool __hash__(int argCount, Value* args) {
   return true;
 }
 
+bool __hashable__(int argCount, Value* args) {
+  Value value = vmPop();
+  vmPop();  // native fn.
+  vmPush(BOOL_VAL(isHashable(value)));
+  return true;
+}
+
 bool __vType__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
@@ -303,6 +310,10 @@ bool __str__(int argCount, Value* args) {
           string = AS_CLASS(value)->name;
           break;
         }
+        case OBJ_STRING: {
+          string = AS_STRING(value);
+          break;
+        }
         default: {
           vmRuntimeError("Can't turn object into a string.");
           return false;
@@ -362,6 +373,7 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);
+  defineNativeFnGlobal("hashable", 1, __hashable__);
   defineNativeFnGlobal("vType", 1, __vType__);
   defineNativeFnGlobal("globals", 0, __globals__);
   defineNativeFnGlobal("globalTypeEnv", 0, __globalTypeEnv__);
@@ -403,6 +415,7 @@ InterpretResult initializeCore() {
   vm.classes.map = getClass(S_MAP);
   vm.classes.set = getClass(S_SET);
   vm.classes.astClosure = getClass(S_AST_CLOSURE);
+  vm.classes.astUpvalue = getClass(S_AST_UPVALUE);
 
   vm.classes.vTypeBool = getClass(S_CTYPE_BOOL);
   vm.classes.vTypeNil = getClass(S_CTYPE_NIL);

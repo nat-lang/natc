@@ -1,0 +1,133 @@
+import src/core/type/subtype
+
+let infix || = (a, b) => TSum.lift(a).union(TSum.lift(b));
+let typecheck = SubtypeSystem.typecheck;
+let check;
+
+// arguments must be subtypes.
+
+let f: num -> void;
+let g: bool -> void;
+
+check = typecheck((x: num || bool) => f(x));
+assert(check.failure());
+
+check = typecheck((x: num || bool) => g(x));
+assert(check.failure());
+
+let f: (bool || string) -> void;
+
+check = typecheck((x: bool) => f(x));
+assert(check.success());
+
+check = typecheck((x: string) => f(x));
+assert(check.success());
+
+check = typecheck((x: bool || string) => f(x));
+assert(check.success());
+
+check = typecheck((x: num) => f(x));
+assert(check.failure());
+
+check = typecheck((x: bool || num) => f(x));
+assert(check.failure());
+
+check = typecheck((x: string || num) => f(x));
+assert(check.failure());
+
+check = typecheck((x: bool || string || num) => f(x));
+assert(check.failure());
+
+// the subtype relation for functions is contravariant in the domain
+// and covariant in the range. domain:
+
+let f: (bool -> void) -> void;
+
+check = typecheck((x: (bool || string) -> void) => f(x));
+assert(check.success());
+
+let f: ((bool || string) -> void) -> void;
+
+check = typecheck((x: bool -> void) => f(x));
+assert(check.failure());
+
+check = typecheck((x: string -> void) => f(x));
+assert(check.failure());
+
+check = typecheck((x: (bool || string) -> void) => f(x));
+assert(check.success());
+
+check = typecheck((x: (bool || string || num) -> void) => f(x));
+assert(check.success());
+
+// range:
+
+let f: (() -> bool) -> void;
+
+check = typecheck((x: () -> (bool || string)) => f(x));
+assert(check.failure());
+
+let f: (() -> (bool || string)) -> void;
+
+check = typecheck((x: () -> bool) => f(x));
+assert(check.success());
+
+check = typecheck((x: () -> string) => f(x));
+assert(check.success());
+
+check = typecheck((x: () -> (bool || string)) => f(x));
+assert(check.success());
+
+check = typecheck((x: () -> (bool || string || num)) => f(x));
+assert(check.failure());
+
+// sums of products.
+
+let f: (num, num) || (string, string) -> void;
+
+check = typecheck((x: (string,string)) => f(x));
+assert(check.success());
+
+check = typecheck((x: (num,num)) => f(x));
+assert(check.success());
+
+check = typecheck((x: (num,string)) => f(x));
+assert(check.failure());
+
+check = typecheck((x: (string,num)) => f(x));
+assert(check.failure());
+
+// reconstruction.
+
+let f: (num, string) -> void;
+
+check = typecheck((x, y) => f(x, y));
+assert(check.success());
+
+// products of sums.
+
+let f: (num || string, num || bool) -> void;
+
+check = typecheck((x: num, y: num) => f(x,y));
+assert(check.success());
+
+check = typecheck((x: num, y: bool) => f(x,y));
+assert(check.success());
+
+check = typecheck((x: string, y: num) => f(x,y));
+assert(check.success());
+
+check = typecheck((x: string, y: bool) => f(x,y));
+assert(check.success());
+
+check = typecheck((x: num || string, y: num) => f(x,y));
+assert(check.success());
+
+check = typecheck((x: num || string, y: bool) => f(x,y));
+assert(check.success());
+
+check = typecheck((x: string, y: num || bool) => f(x,y));
+assert(check.success());
+
+check = typecheck((x: num, y: num || bool) => f(x,y));
+assert(check.success());

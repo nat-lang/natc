@@ -47,7 +47,7 @@ static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 bool isIdentifierSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
-          c == '+' || c == '-' || c == '/' || c == '*');
+          c == '+' || c == '-' || c == '/' || c == '*' || c == '|');
 }
 
 bool isSymbol(char c) { return isIdentifierSymbol(c) || (c == '='); }
@@ -63,6 +63,8 @@ static char peekNext() {
   if (isAtEnd()) return '\0';
   return scanner.current[1];
 }
+
+static char prev() { return scanner.current[-1]; }
 
 static char peek() { return *scanner.current; }
 
@@ -292,8 +294,11 @@ Token scanToken() {
         return makeToken(TOKEN_DOT);
       }
     }
-    case '|':
-      return makeToken(TOKEN_PIPE);
+    case '|': {
+      if (!isWhite(prev()) && !isWhite(peekNext()))
+        return makeToken(TOKEN_PIPE);
+      break;
+    }
     case '!':
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=': {

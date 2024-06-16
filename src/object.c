@@ -167,9 +167,10 @@ ObjString* intern(const char* chars) {
   return copyString(chars, strlen(chars));
 }
 
-ObjUpvalue* newUpvalue(Value* slot) {
+ObjUpvalue* newUpvalue(Value* value, uint8_t slot) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
-  upvalue->location = slot;
+  upvalue->location = value;
+  upvalue->slot = slot;
   upvalue->closed = NIL_VAL;
   upvalue->next = NULL;
   return upvalue;
