@@ -649,6 +649,8 @@ static void bareString() {
       OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
 
+static void undefined(bool canAssign) { emitByte(OP_UNDEFINED); }
+
 static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
 
@@ -1334,6 +1336,13 @@ static void letDeclaration() {
   emitByte(OP_UNDEFINED);
   defineVariable(var);
 
+  // infixation.
+  if (infixPrecedence != -1) {
+    Value name = currentChunk()->constants.values[var];
+    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
+  }
+
+  // type.
   if (match(TOKEN_COLON)) {
     inlineTypeExpression();
   } else {
@@ -1342,24 +1351,20 @@ static void letDeclaration() {
   defineType(var);
   emitByte(OP_POP);  // the type.
 
+  // assignment.
   if (match(TOKEN_EQUAL)) {
     boundExpression(name);
   } else if (match(TOKEN_ARROW_LEFT)) {
     expression();
     emitByte(OP_DESTRUCTURE);
   } else {
-    emitByte(OP_NIL);
+    emitByte(OP_UNDEFINED);
   }
 
   if (current->scopeDepth > 0) {
     emitConstInstr(OP_SET_LOCAL, var);
   } else {
     emitConstInstr(OP_SET_GLOBAL, var);
-
-    if (infixPrecedence != -1) {
-      Value name = currentChunk()->constants.values[var];
-      mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
-    }
   }
 
   emitByte(OP_POP);
@@ -1608,6 +1613,7 @@ ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
+    [TOKEN_UNDEFINED] = {undefined, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},

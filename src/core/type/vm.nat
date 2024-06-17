@@ -1,5 +1,19 @@
 class TypeError extends Error {}
 
+class CType {}
+
+class CBool extends CType {}
+class CNil extends CType {}
+class CNumber extends CType {}
+class CObject extends CType {}
+class CUndef extends CType {}
+
+class OClass extends CObject {}
+class OInstance extends CObject {}
+class OString extends CObject {}
+class OClosure extends CObject {}
+class OSequence extends CObject {}
+
 let isSubclass = (a, b) => {
   if (vType(a) != OClass or vType(b) != OClass) 
     return false;
@@ -24,17 +38,3 @@ let infix(5) is = (a, b) => {
 
   return isSubclass(a.__class__, b);
 };
-
-class CType {}
-
-class CBool extends CType {}
-class CNil extends CType {}
-class CNumber extends CType {}
-class CObject extends CType {}
-class CUndef extends CType {}
-
-class OClass extends CObject {}
-class OInstance extends CObject {}
-class OString extends CObject {}
-class OClosure extends CObject {}
-class OSequence extends CObject {}

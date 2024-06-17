@@ -215,6 +215,8 @@ static TokenType identifierType() {
         }
       }
       break;
+    case 'u':
+      return checkpointKeyword(1, 8, "ndefined", TOKEN_UNDEFINED);
     case 'w':
       return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
   }

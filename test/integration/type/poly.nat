@@ -1,0 +1,49 @@
+import src/core/type/poly
+
+let check;
+
+// the simple type system fails here.
+
+check = SimpleTypeSystem.typecheck(() => {
+  let id = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.failure());
+
+// but the polymorphic type system succeeds.
+
+check = PolymorphicTypeSystem.typecheck(() => {
+  let id = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// explicit abstraction.
+
+check = PolymorphicTypeSystem.typecheck(() => {
+  let id: (a => a -> a) = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+let id: (a => a -> a) = x => x;
+
+check = PolymorphicTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());

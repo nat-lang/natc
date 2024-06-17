@@ -28,6 +28,7 @@ typedef enum {
   TOKEN_IDENTIFIER,
   TOKEN_STRING,
   TOKEN_NUMBER,
+  TOKEN_UNDEFINED,
   // Keywords.
   TOKEN_CLASS,
   TOKEN_CONST,
