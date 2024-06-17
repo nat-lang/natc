@@ -25,6 +25,10 @@ class Map extends Object {
     }
   }
 
+  each(fn) => {
+    for (x in this) fn(x);
+  }
+
   __eq__(other) => {
     if (len(this) != len(other)) return false;
 

@@ -1,0 +1,106 @@
+class TAbstract extends Type {
+  init(fn, arity) => {
+    this.fn = fn;
+    this.arity = arity;
+  }
+
+  instantiate(nameSupply) => {
+    let tVars = [];
+    for (let i = 0; i < this.arity; i = i + 1)
+      tVars.push(nameSupply());
+    return this.fn(..tVars);
+  }
+
+  generalize(type: Type) => {
+    let fvs = type.fvs();
+
+    return TAbstract((*args) => {
+      let s = Solution(..zip(fvs,args));
+      type.apply(s);
+      return type;
+    }, len(fvs));
+  }
+
+  fromClosure(closure: OClosure) => {
+    let node <- closure;
+    return TAbstract(closure, node.signature.arity);
+  }
+}
+
+class PolymorphicTypeState extends SimpleTypeState {
+  init(system, debug) => {
+    super.init(system, false);
+  }
+
+  constrain(node: ASTNode) => {
+    if (node is ASTAssignment) {
+      let var = node[0];
+      let val = node[1];
+
+      let tVar = this.lookup(var);
+      let tVal = this.constrain(val);
+
+      this.constraints.push(Constraint(tVar, tVal));
+
+      if (tVal is TAbstract)
+        this.typeEnv[var] = tVal;
+
+      return void;
+    }
+  
+    if (node is ASTLocalTypeAssignment) {
+      let var = node[0];
+      let val = node[1];
+
+      if (var in this.typeEnv)
+        throw TypeError("Variable already has a type annotation.");
+
+      let type = val.resolve();
+
+      if (vType(type) == OClosure)
+        type = TAbstract.fromClosure(type);
+
+      this.typeEnv[var] = type;
+
+      return void;
+    }
+  
+    let type = super.constrain(node);
+
+    if (node is ASTClosure and type.hasFvs())
+      return TAbstract.generalize(type);
+  
+    return type;
+  }
+
+  transform(node: ASTNode) => {
+    super.transform(node);
+
+    this.typeEnv.each(entry => {
+      let var = entry[0];
+      let type = entry[1];
+
+      if (vType(type) == OClosure) {
+        this.typeEnv[var] = TAbstract.fromClosure(type);
+      }
+    });
+  }
+
+  solve(constraint: Constraint) => {
+    let left = constraint.left,
+        right = constraint.right;
+
+    if (left is TAbstract)
+      left = left.instantiate(this.typeVars.fresh);
+    
+    if (right is TAbstract)
+      right = right.instantiate(this.typeVars.fresh);
+    
+    return super.solve(Constraint(left, right));
+  }
+}
+
+class PolymorphicTypeSystem extends SimpleTypeSystem {}
+
+PolymorphicTypeSystem.TypeStateClass = PolymorphicTypeState;
+

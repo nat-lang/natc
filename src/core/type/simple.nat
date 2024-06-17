@@ -42,6 +42,9 @@ class Type {
     throw NotImplemented("Type classes must implement 'str' individually.");
   }
 
+  fvs() => [];
+  hasFvs() => len(this.fvs()) > 0;
+
   hash() => hash(this.str());
 }
 
@@ -51,6 +54,7 @@ class TVar extends Type {
   }
   __eq__(other) => this.name == other.name;
   str() => str(this.name);
+  fvs() => [this];
 }
 
 class TUnit extends Type {
@@ -121,6 +125,12 @@ class TFunction extends Type {
   __eq__(other) => this.domain == other.domain and this.range == other.range;
 
   str() => "(" + this.domain.str() + " -> " + this.range.str() + ")";
+  fvs() => {
+    let fvs = [];
+    for (v in this.domain.fvs()) fvs.push(v);
+    for (v in this.range.fvs()) fvs.push(v);
+    return fvs;
+  }
 
   pp() => {
     print this.domain;
@@ -253,12 +263,13 @@ class SimpleTypeState {
     return this.typeEnv[node];
   }
 
-  // Give [ast]'s variable unique identifiers, keeping track
+  // Give [node]'s variables unique identifiers, keeping track
   // of the variables that have global type annotations.
-  rename(node: ASTNode) => {
-    let annotations = globalTypeEnv();
+  transform(node: ASTNode) => {
+    node.uniquelyIdentifyVariables();
 
-    node.stampVariables(node => {
+    let annotations = globalTypeEnv();
+    node.each(node => {
       if (node is ASTGlobal) {
         if (node.id in annotations)
           this.typeEnv[node] = annotations[node.id];
@@ -416,7 +427,7 @@ class SimpleTypeState {
       return this.constrain(node[0]);
 
     throw TypeError("Unexpected syntax.");
-  } 
+  }
 
   unify(constraint: Constraint) => {
     let left = constraint.left,
@@ -518,5 +529,3 @@ class SimpleTypeState {
 
 SimpleTypeSystem.ConstraintClass = Constraint;
 SimpleTypeSystem.TypeStateClass = SimpleTypeState;
-
-

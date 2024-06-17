@@ -15,7 +15,7 @@ class ASTNode extends Tree {
 
   // Give the tree's variables uuids; make sure upvalues
   // are identified with the locals they close over.
-  stampVariables(cb) => {
+  uniquelyIdentifyVariables() => {
     let uuids = NameSupply();
     let globals = Map();
 
@@ -59,8 +59,6 @@ class ASTNode extends Tree {
 
       if (node is ASTGlobal)
         rename(node, globals);
-
-      cb(node);
 
       return varEnv;
     }, VarEnv(Map()));
@@ -165,6 +163,8 @@ class ASTClosure extends ASTExpr {
     this.children = [];
     this.upvalues = upvalues;
   }
+
+  resolve() => this.function;
 
   // expressions.
 

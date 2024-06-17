@@ -1344,7 +1344,7 @@ static void letDeclaration(Compiler* cmp) {
   if (match(cmp, TOKEN_COLON)) {
     inlineTypeExpression(cmp);
   } else {
-    emitByte(cmp, OP_NIL);
+    emitByte(cmp, OP_UNDEFINED);
   }
   defineType(cmp, var);
   emitByte(cmp, OP_POP);  // the type.

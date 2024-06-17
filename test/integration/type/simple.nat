@@ -194,21 +194,21 @@ assert(check.failure());
 check = typecheck(() => {
   let k = (a: num -> num, b: (num -> num) -> num) => b(a);
 
-  k(x => x, (f) => f(1));
+  k(x => x, f => f(1));
 });
 assert(check.success());
 
 check = typecheck(() => {
   let k = (a: num -> num, b: (num -> num) -> num) => b(a);
 
-  k(x => x, (f) => f("a"));
+  k(x => x, f => f("a"));
 });
 assert(check.failure());
 
 check = typecheck(() => {
   let k = (a: num -> num, b: (num -> num) -> num) => b(a);
 
-  k(x => x, (f) => f(true));
+  k(x => x, f => f(true));
 });
 assert(check.failure());
 
