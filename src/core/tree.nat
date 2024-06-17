@@ -54,6 +54,10 @@ class Tree extends Object {
     return [leaf | child in this.children, leaf in child.leaves()];
   }
 
+  each(fn) => {
+    for (x in this) fn(x);
+  }
+
   // Map the data.
   dmap(fn) => {
     let tree = Tree(fn(this.data), []);

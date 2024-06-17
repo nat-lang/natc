@@ -428,7 +428,8 @@ void vmCloseUpvalues(Value* last) {
 }
 
 static bool isFalsey(Value value) {
-  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+  return IS_NIL(value) || IS_UNDEF(value) ||
+         (IS_BOOL(value) && !AS_BOOL(value));
 }
 
 static bool validateSeqIdx(ObjSequence* seq, Value idx) {

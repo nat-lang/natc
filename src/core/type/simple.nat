@@ -14,6 +14,9 @@ class Type {
     throw NotImplemented("Type classes must implement 'str' individually.");
   }
 
+  fvs() => [];
+  hasFvs() => len(this.fvs()) > 0;
+
   hash() => hash(this.str());
 }
 
@@ -23,6 +26,7 @@ class TVar extends Type {
   }
   __eq__(other) => this.name == other.name;
   str() => str(this.name);
+  fvs() => [this];
 }
 
 class TUnit extends Type {
@@ -93,6 +97,12 @@ class TFunction extends Type {
   __eq__(other) => this.domain == other.domain and this.range == other.range;
 
   str() => "(" + this.domain.str() + " -> " + this.range.str() + ")";
+  fvs() => {
+    let fvs = [];
+    for (v in this.domain.fvs()) fvs.push(v);
+    for (v in this.range.fvs()) fvs.push(v);
+    return fvs;
+  }
 
   pp() => {
     print this.domain;
@@ -121,6 +131,7 @@ class Constraint {
   }
 
   pp() => {
+    print this.left;
     this.left.pp();
     print "x";
     this.right.pp();
@@ -178,12 +189,13 @@ class TypeState {
     return this.typeEnv[node];
   }
 
-  // Give [ast]'s variable unique identifiers, keeping track
+  // Give [node]'s variables unique identifiers, keeping track
   // of the variables that have global type annotations.
-  rename(node: ASTNode) => {
-    let annotations = globalTypeEnv();
+  transform(node: ASTNode) => {
+    node.uniquelyIdentifyVariables();
 
-    node.stampVariables(node => {
+    let annotations = globalTypeEnv();
+    node.each(node => {
       if (node is ASTGlobal) {
         if (node.id in annotations)
           this.typeEnv[node] = annotations[node.id];
@@ -200,12 +212,12 @@ class TypeState {
           let var = node[0];
           let val = node[1];
 
-          let pType = val.resolve();
+          let tParam = val.resolve();
 
-          if (pType == nil)
+          if (tParam == nil)
             env[var] = this.typeVars.fresh();
           else
-            env[var] = pType;
+            env[var] = tParam;
 
           return env;
         },
@@ -328,6 +340,7 @@ class TypeState {
     throw TypeError("Unexpected syntax.");
   } 
 
+  // Unify a single [constraint].
   solve(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
@@ -441,7 +454,7 @@ class TypeSystem {
 
   inferType(node: ASTNode) => {
     let state = this.TypeStateClass(this, false);
-    state.rename(node);
+    state.transform(node);
     let type = state.constrain(node);
 
     state.unify();
@@ -461,7 +474,7 @@ class TypeSystem {
 
     let state = this.TypeStateClass(this, false);
 
-    state.rename(node);
+    state.transform(node);
     state.constrain(node);
     state.unify();
 

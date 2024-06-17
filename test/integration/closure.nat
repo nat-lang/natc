@@ -32,7 +32,7 @@ let loopConditionClosure = () => {
       a = b;
     };
 
-    if (get1 == nil) {
+    if (!get1) {
       get1 = get;
       set1 = set;
     } else {
