@@ -11,6 +11,7 @@
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
+#define IS_CASE(value) isObjType(value, OBJ_CASE)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_MAP(value) isObjType(value, OBJ_MAP)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
@@ -22,6 +23,7 @@
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
+#define AS_CASE(value) ((ObjCase *)AS_OBJ(value))
 #define AS_INSTANCE(value) ((ObjInstance *)AS_OBJ(value))
 #define AS_MAP(value) ((ObjMap *)AS_OBJ(value))
 #define AS_NATIVE(value) (((ObjNative *)AS_OBJ(value)))
@@ -39,6 +41,8 @@ typedef enum {
   OBJ_CLASS,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
+  OBJ_PATTERN,
+  OBJ_CASE,
   OBJ_INSTANCE,
   OBJ_MAP,
   OBJ_NATIVE,
@@ -46,6 +50,7 @@ typedef enum {
   OBJ_STRING,
   OBJ_UPVALUE,
   OBJ_SPREAD,
+
 } ObjType;
 
 struct Obj {
@@ -101,7 +106,7 @@ typedef struct ObjUpvalue {
   Value *location;
   Value closed;
   // the address of the local that's closed over.
-  // we stash this only to reconstruct the ast.
+  // we store this only to reconstruct the ast.
   uint8_t slot;
   struct ObjUpvalue *next;
 } ObjUpvalue;
@@ -112,6 +117,23 @@ typedef struct {
   ObjUpvalue **upvalues;
   int upvalueCount;
 } ObjClosure;
+
+typedef enum { PATTERN_VALUE, PATTERN_WILDCARD } PatternType;
+
+typedef struct {
+  Obj obj;
+  Value value;
+  PatternType type;
+} ObjPattern;
+
+typedef struct ObjCase {
+  Obj obj;
+  int arity;
+  ObjString *name;
+  ObjPattern pattern;
+  ObjClosure closure;
+  struct ObjCase *next;
+} ObjCase;
 
 typedef struct ObjClass {
   Obj obj;
@@ -153,6 +175,9 @@ ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
+ObjPattern *newPattern(Value value, PatternType type);
+ObjCase *newCase(ObjString *name, ObjPattern pattern, ObjClosure closure,
+                 ObjCase *next);
 ObjInstance *newInstance(ObjClass *klass);
 ObjMap *newMap();
 ObjNative *newNative(int arity, bool variadic, ObjString *name,

@@ -213,12 +213,9 @@ static void emitByte(uint8_t byte) {
 }
 
 // Find a [token] that isn't nested within braces, brackets,
-// or parentheses. Assume that the initial nesting depth is 1,
-// so that the search is negative when we find a [closing] token
-// at depth 0.
-bool advanceTo(TokenType token, TokenType closing) {
-  int depth = 1;
-
+// or parentheses, for some initial [depth],
+bool advanceTo(TokenType token, TokenType closing, int initialDepth) {
+  int depth = initialDepth;
   for (;;) {
     if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
         check(TOKEN_LEFT_PAREN))
@@ -228,7 +225,7 @@ bool advanceTo(TokenType token, TokenType closing) {
       depth--;
 
     // found one.
-    if (check(token) && depth == 1) return true;
+    if (check(token) && depth == initialDepth) return true;
     // found none.
     if (check(closing) && depth == 0) return false;
 
@@ -394,13 +391,14 @@ static void closeFunction(Compiler compiler) {
 
 static void function(FunctionType type, Token name);
 static void nakedFunction(FunctionType type, Token name);
+static void caseExpression(Token name);
 static void expression();
 static void boundExpression(Token name);
 static void statement();
 static void declaration();
 static void classDeclaration();
 static ParseRule* getRule(Token token);
-static void parseDelimitedPrecedence(Precedence precedence, DelimitFn fn);
+static void parseDelimitedPrecedence(Precedence precedence, DelimitFn prev);
 static void parsePrecedence(Precedence precedence);
 
 static Value identifierToken(Token token) {
@@ -785,7 +783,7 @@ static bool peekSignature() {
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
-      if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN);
+      if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN, 1);
 
     } while (match(TOKEN_COMMA));
   }
@@ -796,6 +794,13 @@ static bool peekSignature() {
   return true;
 }
 
+static bool hasSignature() {
+  Parser checkpoint = saveParser();
+  bool has = peekSignature();
+  gotoParser(checkpoint);
+  return has;
+}
+
 // Of the form 'x y z => x + y + z;'.
 static bool peekNakedSignature() {
   if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
@@ -804,22 +809,37 @@ static bool peekNakedSignature() {
   return true;
 }
 
-static bool tryFunction(FunctionType fnType, Token name) {
+static bool hasNakedSignature() {
   Parser checkpoint = saveParser();
-  bool isFn = peekSignature();
+  bool has = peekNakedSignature();
   gotoParser(checkpoint);
+  return has;
+}
 
-  if (isFn) {
+static bool tryFunction(FunctionType fnType, Token name) {
+  if (hasSignature()) {
     function(fnType, name);
     return true;
   }
 
-  checkpoint = saveParser();
-  isFn = peekNakedSignature();
-  gotoParser(checkpoint);
-
-  if (isFn) {
+  if (hasNakedSignature()) {
     nakedFunction(fnType, name);
+    return true;
+  }
+
+  return false;
+}
+
+static bool hasPattern() {
+  Parser checkpoint = saveParser();
+  bool has = advanceTo(TOKEN_FAT_ARROW, TOKEN_SEMICOLON, 0);
+  gotoParser(checkpoint);
+  return has;
+}
+
+static bool tryCase(Token name) {
+  if (hasPattern()) {
+    caseExpression(name);
     return true;
   }
 
@@ -828,6 +848,7 @@ static bool tryFunction(FunctionType fnType, Token name) {
 
 static void boundExpression(Token name) {
   if (tryFunction(TYPE_BOUND, name)) return;
+  if (tryCase(name)) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -936,6 +957,38 @@ static void function(FunctionType type, Token name) {
   blockOrExpression();
 
   closeFunction(compiler);
+}
+
+static void singleCase(Token name) {
+  PatternType type = PATTERN_VALUE;
+
+  if (hasSignature() || hasNakedSignature()) {
+    type = PATTERN_WILDCARD;
+    emitByte(OP_UNDEFINED);
+    tryFunction(TYPE_ANONYMOUS, name);
+  } else {
+    parsePrecedence(PREC_ASSIGNMENT);
+    consume(TOKEN_FAT_ARROW, "Expect '=>' after pattern.");
+
+    Compiler compiler;
+    initCompiler(&compiler, TYPE_ANONYMOUS, name);
+    beginScope();
+    blockOrExpression();
+    closeFunction(compiler);
+  }
+
+  loadConstant(identifierToken(name));
+
+  emitBytes(OP_CASE, type);
+}
+
+static void caseExpression(Token name) {
+  singleCase(name);
+
+  while (match(TOKEN_PIPE)) {
+    singleCase(name);
+    emitByte(OP_CASE_OR);
+  }
 }
 
 static void method() {
@@ -1089,7 +1142,7 @@ static bool tryComprehension(char* klass, TokenType openingToken,
   //  to establish that it isn't.
   Parser checkpointA = saveParser();
 
-  if (advanceTo(TOKEN_PIPE, closingToken)) {
+  if (advanceTo(TOKEN_PIPE, closingToken, 1)) {
     advance();  // eat the pipe.
 
     Compiler compiler;
@@ -1646,26 +1699,27 @@ static ParseRule* getRule(Token token) {
   return &rules[token.type];
 }
 
-static void parseDelimitedPrecedence(Precedence precedence, DelimitFn delimit) {
+static void parseDelimitedPrecedence(Precedence precedence,
+                                     DelimitFn delimitFn) {
   advance();
 
   ParseFn prefixRule = getRule(parser.previous)->prefix;
 
   if (prefixRule == NULL) {
-    error("Expect expression.");
+    error("Expect expression (a).");
     return;
   }
 
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   prefixRule(canAssign);
 
-  while (!(delimit != NULL && delimit()) &&
-         precedence <= getRule(parser.current)->precedence) {
+  bool delimit = (delimitFn != NULL && delimitFn());
+  while (!delimit && precedence <= getRule(parser.current)->precedence) {
     advance();
     ParseFn infixRule = getRule(parser.previous)->infix;
 
     if (infixRule == NULL) {
-      error("Expect expression.");
+      error("Expect expression (b).");
       return;
     }
 

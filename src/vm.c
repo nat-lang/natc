@@ -191,6 +191,7 @@ static bool vmExtendClass(ObjClass* subclass, ObjClass* superclass) {
 static bool vmInstantiateClass(ObjClass* klass, int argCount) {
   Value initializer;
 
+  // instances get a reference to their class.
   mapSet(&AS_INSTANCE(vmPeek(argCount))->fields, OBJ_VAL(intern(S_CLASS)),
          OBJ_VAL(klass));
 
@@ -211,6 +212,18 @@ bool vmInitInstance(ObjClass* klass, int argCount, int frames) {
   }
 
   return true;
+}
+
+static bool commonMethod(Value a, Value b, char* name, Value* method) {
+  if (IS_INSTANCE(a) && IS_INSTANCE(b)) {
+    ObjInstance* instanceA = AS_INSTANCE(a);
+    ObjInstance* instanceB = AS_INSTANCE(b);
+
+    ObjClass lca;
+    return (leastCommonAncestor(instanceA->klass, instanceB->klass, &lca) &&
+            mapGet(&lca.fields, INTERN(name), method));
+  }
+  return false;
 }
 
 static bool checkArity(int paramCount, int argCount) {
@@ -326,6 +339,70 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
+static bool unify(ObjPattern pattern, Value value) {
+  Value eqMethod;
+
+  if (commonMethod(pattern.value, value, S_EQ, &eqMethod)) {
+    vmPush(pattern.value);
+    vmPush(value);
+
+    return vmCallValue(eqMethod, 1) &&
+           vmExecute(vm.frameCount - 1) == INTERPRET_OK;
+  }
+
+  vmPush(BOOL_VAL(valuesEqual(pattern.value, value)));
+  return true;
+}
+
+// Wrap the top [count] values on the stack in a tuple.
+static bool tuplify(int count) {
+  int i = count;
+  Value args[count];
+  while (i--) args[i] = vmPop();
+
+  vmPush(OBJ_VAL(vm.classes.tuple));
+  while (++i < count) vmPush(args[i]);
+
+  return vmCallValue(OBJ_VAL(vm.classes.tuple), count);
+}
+
+static bool callCase(ObjCase* oCase, int argCount) {
+  if (argCount > 1)
+    if (!tuplify(argCount)) return false;
+
+  Value argument = vmPeek(0);
+
+  do {
+    Value closure = OBJ_VAL(&oCase->closure);
+    switch (oCase->pattern.type) {
+      case PATTERN_WILDCARD: {
+        if (argCount > 1) vm.stackTop[-1] = OBJ_VAL(newSpread(argument));
+
+        vm.stackTop[-2] = closure;
+
+        return call(AS_CLOSURE(closure), 1);
+      }
+      case PATTERN_VALUE: {
+        if (!unify(oCase->pattern, argument)) return false;
+
+        if (AS_BOOL(vmPop())) {
+          vmPop();  // the argument.
+          vm.stackTop[-1] = closure;
+          return call(AS_CLOSURE(closure), 0);
+        }
+        break;
+      }
+    }
+  } while ((oCase = oCase->next) != NULL);
+
+  // no match: replace the arguments and the case object with nil.
+  vmPop();  // arg.
+  vmPop();  // case.
+  vmPush(NIL_VAL);
+
+  return true;
+}
+
 bool vmCallValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
@@ -342,6 +419,8 @@ bool vmCallValue(Value callee, int argCount) {
             return false;
         }
       }
+      case OBJ_CASE:
+        return callCase(AS_CASE(callee), argCount);
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
@@ -363,7 +442,7 @@ bool vmCallValue(Value callee, int argCount) {
         return true;
       }
       default:
-        break;  // Non-callable object type.
+        break;  // non-callable object type.
     }
   }
 
@@ -600,27 +679,19 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_EQUAL: {
-        Value a = vmPop();
-        Value b = vmPop();
+        Value a = vmPeek(0);
+        Value b = vmPeek(1);
 
         // classes can override the equality relation.
-        if (IS_INSTANCE(a) && IS_INSTANCE(b)) {
-          ObjInstance* instanceA = AS_INSTANCE(a);
-          ObjInstance* instanceB = AS_INSTANCE(b);
-
-          Value equalFn;
-          ObjClass lca;
-          if (leastCommonAncestor(instanceA->klass, instanceB->klass, &lca) &&
-              mapGet(&lca.fields, INTERN(S_EQ), &equalFn)) {
-            vmPush(b);
-            vmPush(a);
-            if (!vmCallValue(equalFn, 1)) return INTERPRET_RUNTIME_ERROR;
-
-            frame = &vm.frames[vm.frameCount - 1];
-            break;
-          }
+        Value eqMethod;
+        if (commonMethod(a, b, S_EQ, &eqMethod)) {
+          if (!vmCallValue(eqMethod, 1)) return INTERPRET_RUNTIME_ERROR;
+          frame = &vm.frames[vm.frameCount - 1];
+          break;
         }
 
+        vmPop();
+        vmPop();
         vmPush(BOOL_VAL(valuesEqual(a, b)));
         break;
       }
@@ -752,6 +823,50 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(value);
 
         frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
+      case OP_CASE: {
+        PatternType type = READ_BYTE();
+        Value patternValue = vmPeek(2);
+        Value closure = vmPeek(1);
+        Value name = vmPeek(0);
+
+        ObjPattern* pattern = newPattern(patternValue, type);
+
+        if (!IS_CLOSURE(closure)) {
+          vmRuntimeError("Body of case statement must be a closure.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjCase* oCase =
+            newCase(AS_STRING(name), *pattern, *AS_CLOSURE(closure), NULL);
+
+        vmPop();
+        vmPop();
+        vmPop();
+
+        vmPush(OBJ_VAL(oCase));
+        break;
+      }
+      case OP_CASE_OR: {
+        Value right = vmPop();
+        Value left = vmPop();
+
+        if (!IS_CASE(left) || !IS_CASE(right)) {
+          vmRuntimeError("Operands to case disjunction must be cases.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjCase* leftCase = AS_CASE(left);
+        ObjCase* rightCase = AS_CASE(right);
+
+        while (leftCase->next != NULL) {
+          leftCase = leftCase->next;
+        };
+
+        leftCase->next = rightCase;
+
+        vmPush(left);
         break;
       }
       case OP_CLASS:

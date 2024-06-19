@@ -1,0 +1,163 @@
+
+let f = (1) => true;
+
+print f(1);
+
+let f = (1,2) => true;
+
+print f(1,2);
+
+let f = (1,2) => true | (2,1) => false;
+
+print f(1,2);
+print f(2,1);
+
+let f = (1,2) => true | (x,y) => x + y;
+
+print f(1,2);
+print f(2,1);
+
+let f = x => true;
+
+let f = 1 => true | 2 => false;
+
+let f = x => true | 1 => false;
+
+let f = 1 => true | x => false;
+
+let f = 1 => false
+  | 2 => true
+  | 3 => undefined,
+  | x => x + 1;
+
+let f = (x: num) => false
+      | (x: string) => true;
+
+let x;
+let y = case x of 
+  1 => false,
+  2 => true,
+  3 => undefined;
+
+// type patterns.
+
+let f = (x: num) => true | (x: string) => false;
+
+let f = (a: (x -> y), b: y) => a(b)
+      | (a: x, b: (x -> y)) => b(a);
+
+let f: (x,y) => ((x -> y, x) -> y) & ((x, x -> y) -> y) = (a, b) => a(b) | (a, b) => b(a)
+
+// expression patterns.
+
+let f = 1 + 1 => true | 2 + 2 => false;
+
+let h = x => true;
+let g = x => false;
+let x = 1;
+
+let f = h(x) => true | g(x) => false;
+
+assert(
+  f(true) == true
+);
+
+assert(
+  f(false) == false
+);
+
+// partial patterns.
+
+let f = (1, x) => true | (2, x) => false;
+
+assert(
+  f(1,1) == true
+);
+
+assert(
+  f(2,1) == false
+);
+
+let f = (1, x) => x | (2, x) => x;
+
+assert(
+  f(1,true) == true
+);
+
+assert(
+  f(2,false) == false
+);
+
+// anonymous.
+
+assert(
+  (1 => true | 2 => false)(1) == true
+);
+
+assert(
+  (1 => true | 2 => false)(2) == false
+);
+
+// nested.
+
+let f = (1 => 2 | 2 => 1)(1) => 2;
+
+let f = (1 => 2 | 2 => 1)(1) => 2 | (1 => 2 | 2 => 1)(2) => 3;
+
+// multiple arguments.
+
+let f = (1,2) => (1,2) | (x,y) => (y,x);
+
+let f = (x,y) => (y,x) | (1,2) => (1,2);
+
+f(1,2);
+
+let f = ((x,y)) => (y,x) | ((1,2)) => (1,2);
+
+f((1,2));
+
+// curried cases?
+
+let f = 1 2 => 3 | 2 1 => 4;
+
+assert(
+  f(2)(2) == nil
+);
+
+assert(
+  f(1)(1) == nil
+);
+
+assert(
+  f(1)(2) == 3
+);
+
+let f = 1 2 => 1 | x y => x + y;
+
+// guards?
+
+let f =
+  x | f(x) => "f(x)",
+  x | g(x) => "g(x)",
+  x => x;
+
+let f = 1 => true, 2 => false, x => x;
+
+let f = x if x < 10 => "lt",
+      | x if x > 10 => "gt",
+      | x => x;
+
+// case ammendment?
+
+let f = 1 => true;
+
+assert(f(1));
+assert(f(2) == nil);
+
+// final case.
+f |= 2 => true;
+
+assert(f(2));
+
+// initial case.
+f =| 0 => true;

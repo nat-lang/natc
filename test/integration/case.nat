@@ -1,0 +1,54 @@
+// literals.
+
+let f = (true) => false | (false) => true;
+
+assert(f(true) == false);
+assert(f(false) == true);
+
+let f = 1 => true;
+
+assert(f(1));
+assert(f(2) == nil);
+
+let f = 1 => true | 2 => false;
+
+assert(f(1));
+assert(f(2) == false);
+assert(f(3) == nil);
+
+let f = 1 => true | 2 => false | x => x;
+
+assert(f(1));
+assert(f(2) == false);
+assert(f(3) == 3);
+
+// instances.
+
+let f = [0,1] => true | [1,0] => false;
+
+assert(f([0,1]));
+assert(!f([1,0]));
+
+let f = {0,1} => true | {0,1,2} => false;
+
+assert(f({0,1}));
+assert(f({1,0}));
+assert(!f({0,1,2}));
+
+let f = {1:0} => true | {0:1} => false;
+
+assert(f({1:0}));
+assert(!f({0:1}));
+
+// multiple arguments are coerced to tuples.
+
+let f = (0,1) => 2 | (1,0) => 3;
+
+assert(f(0,1) == 2);
+assert(f(1,0) == 3);
+
+let f = (0,1) => 2 | (1,0) => 3 | (x,y) => (x + y) * 2;
+
+assert(f(0,1) == 2);
+assert(f(1,0) == 3);
+assert(f(1,1) == 4);

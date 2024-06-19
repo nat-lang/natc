@@ -141,6 +141,17 @@ static void blackenObject(Obj* object) {
       markValue(spread->value);
       break;
     }
+    case OBJ_PATTERN: {
+      ObjPattern* pattern = (ObjPattern*)object;
+      markValue(pattern->value);
+      break;
+    }
+    case OBJ_CASE: {
+      ObjCase* oCase = (ObjCase*)object;
+      markObject((Obj*)&oCase->pattern);
+      markObject((Obj*)&oCase->closure);
+      break;
+    }
   }
 }
 
@@ -204,6 +215,14 @@ static void freeObject(Obj* object) {
     }
     case OBJ_SPREAD: {
       FREE(ObjSpread, object);
+      break;
+    }
+    case OBJ_PATTERN: {
+      FREE(ObjPattern, object);
+      break;
+    }
+    case OBJ_CASE: {
+      FREE(ObjCase, object);
       break;
     }
   }

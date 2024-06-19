@@ -77,6 +77,23 @@ ObjFunction* newFunction() {
   return function;
 }
 
+ObjPattern* newPattern(Value value, PatternType type) {
+  ObjPattern* pattern = ALLOCATE_OBJ(ObjPattern, OBJ_PATTERN);
+  pattern->value = value;
+  pattern->type = type;
+  return pattern;
+}
+
+ObjCase* newCase(ObjString* name, ObjPattern pattern, ObjClosure closure,
+                 ObjCase* next) {
+  ObjCase* oCase = ALLOCATE_OBJ(ObjCase, OBJ_CASE);
+  oCase->name = name;
+  oCase->pattern = pattern;
+  oCase->closure = closure;
+  oCase->next = next;
+  return oCase;
+}
+
 ObjInstance* newInstance(ObjClass* klass) {
   ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
   instance->klass = klass;
@@ -440,6 +457,14 @@ void printObject(Value value) {
       printf("<..");
       printValue(AS_SPREAD(value)->value);
       printf(">");
+      break;
+    }
+    case OBJ_PATTERN: {
+      printf("<pattern>");
+      break;
+    }
+    case OBJ_CASE: {
+      printf("<case %s>", AS_CASE(value)->name->chars);
       break;
     }
   }
