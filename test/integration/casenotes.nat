@@ -1,43 +1,9 @@
 
-let f = (1) => true;
+// methods.
 
-print f(1);
-
-let f = (1,2) => true;
-
-print f(1,2);
-
-let f = (1,2) => true | (2,1) => false;
-
-print f(1,2);
-print f(2,1);
-
-let f = (1,2) => true | (x,y) => x + y;
-
-print f(1,2);
-print f(2,1);
-
-let f = x => true;
-
-let f = 1 => true | 2 => false;
-
-let f = x => true | 1 => false;
-
-let f = 1 => true | x => false;
-
-let f = 1 => false
-  | 2 => true
-  | 3 => undefined,
-  | x => x + 1;
-
-let f = (x: num) => false
-      | (x: string) => true;
-
-let x;
-let y = case x of 
-  1 => false,
-  2 => true,
-  3 => undefined;
+class A {
+  f = 1 => this | x => undefined;
+}
 
 // type patterns.
 

@@ -53,6 +53,12 @@ ObjClass* newClass(ObjString* name) {
   return klass;
 }
 
+ObjVariable* newVariable(ObjString* name) {
+  ObjVariable* variable = ALLOCATE_OBJ(ObjVariable, OBJ_VARIABLE);
+  variable->name = name;
+  return variable;
+}
+
 ObjClosure* newClosure(ObjFunction* function) {
   ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
   for (int i = 0; i < function->upvalueCount; i++) {
@@ -68,10 +74,14 @@ ObjClosure* newClosure(ObjFunction* function) {
 
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
-  function->arity = 0;
+  Signature signature;
+  signature.arity = 0;
+  signature.variadic = false;
+
+  function->signature = signature;
   function->upvalueCount = 0;
   function->name = NULL;
-  function->variadic = false;
+
   initChunk(&function->chunk);
   initMap(&function->constants);
   return function;
@@ -429,6 +439,9 @@ void printObject(Value value) {
     case OBJ_CLOSURE:
       printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
              AS_CLOSURE(value));
+      break;
+    case OBJ_VARIABLE:
+      printf("<var %s>", AS_VARIABLE(value)->name->chars);
       break;
     case OBJ_FUNCTION:
       printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,

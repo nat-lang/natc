@@ -35,7 +35,8 @@ typedef enum {
   OP_CLOSE_UPVALUE,
   OP_RETURN,
   OP_IMPLICIT_RETURN,
-  OP_CASE,
+  OP_PATTERN_CASE,
+  OP_FUNCTION_CASE,
   OP_CASE_OR,
   OP_CLASS,
   OP_INHERIT,
@@ -51,6 +52,7 @@ typedef enum {
   OP_SET_TYPE_GLOBAL,
   OP_SPREAD,
   OP_UNIT,
+  OP_VARIABLE,
 } OpCode;
 
 typedef struct {

@@ -18,6 +18,7 @@
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
 #define IS_SPREAD(value) isObjType(value, OBJ_SPREAD)
+#define IS_VARIABLE(value) isObjType(value, OBJ_VARIABLE)
 
 #define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
@@ -31,16 +32,17 @@
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
 #define AS_SPREAD(value) (((ObjSpread *)AS_OBJ(value)))
+#define AS_VARIABLE(value) (((ObjVariable *)AS_OBJ(value)))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 
 #define INTERN(value) ((OBJ_VAL(intern(value))))
 
 typedef enum {
-  OBJ_BOUND_FUNCTION,
   OBJ_CLASS,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
+  OBJ_BOUND_FUNCTION,
   OBJ_PATTERN,
   OBJ_CASE,
   OBJ_INSTANCE,
@@ -50,7 +52,7 @@ typedef enum {
   OBJ_STRING,
   OBJ_UPVALUE,
   OBJ_SPREAD,
-
+  OBJ_VARIABLE
 } ObjType;
 
 struct Obj {
@@ -74,9 +76,20 @@ typedef struct {
 
 typedef struct {
   Obj obj;
+  ObjString *name;
+} ObjVariable;
+
+typedef struct {
   int arity;
-  int upvalueCount;
   bool variadic;
+  Value parameters[UINT8_COUNT];
+  Value types[UINT8_COUNT];
+} Signature;
+
+typedef struct {
+  Obj obj;
+  Signature signature;
+  int upvalueCount;
   Chunk chunk;
   ObjString *name;
   // cache from values to constant indices
@@ -174,6 +187,7 @@ ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
 ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
+ObjVariable *newVariable(ObjString *name);
 ObjFunction *newFunction();
 ObjPattern *newPattern(Value value, PatternType type);
 ObjCase *newCase(ObjString *name, ObjPattern pattern, ObjClosure closure,

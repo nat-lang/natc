@@ -22,8 +22,6 @@ class Sequential extends Object {
     return false;
   }
 
-  __iter__() => Iterator(this, 0, len(this));
-
   hash() => this.map(hash).reduce(+, 0);
 
   map(fn) => [fn(value) | value in this];
@@ -48,6 +46,16 @@ class Sequential extends Object {
 
   pp() => {
     print this.values;
+  }
+
+  unifies(other) => {
+    if (len(this) != len(other)) return false;
+
+    for (let i = 0; i < len(this); i = i + 1) {
+
+    }
+
+    return true;
   }
 }
 

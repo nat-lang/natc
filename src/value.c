@@ -76,11 +76,11 @@ bool valuesEqual(Value a, Value b) {
   if (a.vType != b.vType) return false;
   switch (a.vType) {
     case VAL_UNIT:
+    case VAL_UNDEF:
+    case VAL_NIL:
       return true;
     case VAL_BOOL:
       return AS_BOOL(a) == AS_BOOL(b);
-    case VAL_NIL:
-      return true;
     case VAL_NUMBER:
       return AS_NUMBER(a) == AS_NUMBER(b);
     case VAL_OBJ:
@@ -91,9 +91,8 @@ bool valuesEqual(Value a, Value b) {
 }
 
 static inline uint32_t hashBits(uint64_t hash) {
-  // From wren's hashBits, which in turn cites
-  // v8's ComputeLongHash() which in turn cites:
-  // Thomas Wang, Integer Hash Functions.
+  // from wren's hashBits, which cites v8's ComputeLongHash(),
+  // which in turn cites: Thomas Wang, Integer Hash Functions.
   // http://www.concentric.net/~Ttwang/tech/inthash.htm
   hash = ~hash + (hash << 18);  // hash = (hash << 18) - hash - 1;
   hash = hash ^ (hash >> 31);

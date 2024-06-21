@@ -507,7 +507,7 @@ static void defineType(int var) {
       current->scopeDepth > 0 ? OP_SET_TYPE_LOCAL : OP_SET_TYPE_GLOBAL, var);
 }
 
-static uint16_t nativeVariable(char* name) {
+static uint16_t getGlobalConstant(char* name) {
   uint16_t var = makeConstant(INTERN(name));
   emitConstInstr(OP_GET_GLOBAL, var);
   return var;
@@ -586,7 +586,7 @@ static void property(bool canAssign) {
 // may as well enforce the symmetry.
 static void dot(bool canAssign) {
   if (penultWhite() && prevWhite()) {
-    nativeVariable("compose");
+    getGlobalConstant("compose");
     expression();
     emitByte(OP_CALL_INFIX);
   } else {
@@ -626,7 +626,7 @@ static void parentheses(bool canAssign) {
       argCount++;
     } while (check(TOKEN_COMMA));
 
-    nativeVariable(S_TUPLE);
+    getGlobalConstant(S_TUPLE);
     emitBytes(OP_CALL_POSTFIX, argCount);
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
@@ -646,6 +646,8 @@ static void bareString() {
   loadConstant(
       OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
+
+static void undefined(bool canAssign) { emitByte(OP_UNDEFINED); }
 
 static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
@@ -680,13 +682,13 @@ static void namedVariable(Token name, bool canAssign) {
 }
 
 static int nativeCall(char* name) {
-  int address = nativeVariable(name);
+  int address = getGlobalConstant(name);
   emitBytes(OP_CALL, 0);
   return address;
 }
 
 static int nativePostfix(char* name, int argCount) {
-  int address = nativeVariable(name);
+  int address = getGlobalConstant(name);
   emitBytes(OP_CALL_POSTFIX, argCount);
   return address;
 }
@@ -794,7 +796,7 @@ static bool peekSignature() {
   return true;
 }
 
-static bool hasSignature() {
+bool hasSignature() {
   Parser checkpoint = saveParser();
   bool has = peekSignature();
   gotoParser(checkpoint);
@@ -809,25 +811,11 @@ static bool peekNakedSignature() {
   return true;
 }
 
-static bool hasNakedSignature() {
+bool hasNakedSignature() {
   Parser checkpoint = saveParser();
   bool has = peekNakedSignature();
   gotoParser(checkpoint);
   return has;
-}
-
-static bool tryFunction(FunctionType fnType, Token name) {
-  if (hasSignature()) {
-    function(fnType, name);
-    return true;
-  }
-
-  if (hasNakedSignature()) {
-    nakedFunction(fnType, name);
-    return true;
-  }
-
-  return false;
 }
 
 static bool hasPattern() {
@@ -837,7 +825,67 @@ static bool hasPattern() {
   return has;
 }
 
-static bool tryCase(Token name) {
+typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
+
+static bool matchParamOrPattern() {
+  return match(TOKEN_IDENTIFIER) || match(TOKEN_NUMBER) || match(TOKEN_TRUE) ||
+         match(TOKEN_FALSE) || match(TOKEN_NIL) || match(TOKEN_UNDEFINED) ||
+         match(TOKEN_STRING);
+}
+
+static SignatureType peekSignatureType() {
+  if (match(TOKEN_LEFT_PAREN)) {
+    if (!check(TOKEN_RIGHT_PAREN)) {
+      do {
+        if (!matchParamOrPattern()) return SIG_NOT;
+        if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN, 1);
+
+      } while (match(TOKEN_COMMA));
+    }
+
+    if (!match(TOKEN_RIGHT_PAREN)) return SIG_NOT;
+    if (!match(TOKEN_FAT_ARROW)) return SIG_NOT;
+
+    return SIG_PAREN;
+  } else {
+    // can only be naked.
+    if (matchParamOrPattern()) return peekSignatureType();
+    if (match(TOKEN_FAT_ARROW)) return SIG_NAKED;
+  }
+
+  return SIG_NOT;
+}
+
+static bool tryFunction(FunctionType fnType, Token name) {
+  Parser checkpoint = saveParser();
+  SignatureType signatureType = peekSignatureType();
+  gotoParser(checkpoint);
+
+  switch (signatureType) {
+    case SIG_NAKED:
+      nakedFunction(fnType, name);
+      return true;
+    case SIG_PAREN:
+      function(fnType, name);
+      return true;
+    case SIG_NOT:
+      return false;
+  }
+}
+
+bool tryFunctionOrCase(FunctionType fnType, Token name) {
+  if (tryFunction(fnType, name)) {
+    if (match(TOKEN_PIPE)) {
+      loadConstant(identifierToken(name));
+      emitByte(OP_FUNCTION_CASE);
+
+      caseExpression(name);
+      emitByte(OP_CASE_OR);
+    }
+
+    return true;
+  }
+
   if (hasPattern()) {
     caseExpression(name);
     return true;
@@ -848,7 +896,6 @@ static bool tryCase(Token name) {
 
 static void boundExpression(Token name) {
   if (tryFunction(TYPE_BOUND, name)) return;
-  if (tryCase(name)) return;
 
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -889,26 +936,61 @@ static void blockOrExpression() {
   }
 }
 
+static uint8_t parameter() {
+  consume(TOKEN_IDENTIFIER, "Expect parameter name.");
+  uint8_t local = declareVariable();
+  markInitialized();
+
+  return local;
+}
+
+void hoistParam(Compiler* compiler) {
+  current = compiler->enclosing;
+
+  // param.
+  uint16_t constant = identifierConstant(&parser.previous);
+  emitConstInstr(OP_CONSTANT, constant);
+  emitByte(OP_VARIABLE);
+
+  // type.
+  if (match(TOKEN_COLON)) {
+    expression();
+  } else {
+    emitByte(OP_NIL);
+  }
+  current = compiler;
+}
+
+void hoistPattern(Compiler* compiler) {
+  current = compiler->enclosing;
+  parsePrecedence(PREC_ASSIGNMENT);
+
+  // type.
+  emitByte(OP_NIL);
+  current = compiler;
+}
+
 static void nakedFunction(FunctionType fnType, Token name) {
   Compiler compiler;
   initCompiler(&compiler, fnType, name);
   beginScope();
 
-  uint16_t constant = parseVariable("Expect parameter name.");
-  defineVariable(constant);
-  current->function->arity++;
-
-  // type annotations for parameters default to nil.
-  emitByte(OP_NIL);
-  defineType(constant);
-  emitByte(OP_POP);  // the type.
+  current->function->signature.arity = 1;
 
   if (check(TOKEN_IDENTIFIER)) {
+    parameter();
+    hoistParam(&compiler);
+
+  } else {
+    hoistPattern(&compiler);
+  }
+
+  if (check(TOKEN_FAT_ARROW)) {
+    advance();
+    blockOrExpression();
+  } else {
     nakedFunction(TYPE_ANONYMOUS, syntheticToken("lambda"));
     emitByte(OP_RETURN);
-  } else {
-    consume(TOKEN_FAT_ARROW, "Expect '=>' after signature.");
-    blockOrExpression();
   }
 
   closeFunction(compiler);
@@ -922,32 +1004,27 @@ static void function(FunctionType type, Token name) {
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      if (current->function->variadic)
+      if (current->function->signature.variadic)
         error("Can only apply * to the final parameter.");
 
-      current->function->arity++;
-      if (current->function->arity > 255) {
+      current->function->signature.arity++;
+      if (current->function->signature.arity > 255) {
         errorAtCurrent("Can't have more than 255 parameters.");
       }
 
       if (checkStr("*")) {
-        current->function->variadic = true;
+        current->function->signature.variadic = true;
         // shift the star off the parameter's token.
         parser.current.start++;
         parser.current.length--;
       }
 
-      uint16_t constant = parseVariable("Expect parameter name.");
-      defineVariable(constant);
-
-      // type annotations for parameters default to nil.
-      if (match(TOKEN_COLON)) {
-        expression();
+      if (check(TOKEN_IDENTIFIER)) {
+        parameter();
+        hoistParam(&compiler);
       } else {
-        emitByte(OP_NIL);
+        hoistPattern(&compiler);
       }
-      defineType(constant);
-      emitByte(OP_POP);  // the type.
 
     } while (match(TOKEN_COMMA));
   }
@@ -960,12 +1037,10 @@ static void function(FunctionType type, Token name) {
 }
 
 static void singleCase(Token name) {
-  PatternType type = PATTERN_VALUE;
+  if (tryFunction(TYPE_ANONYMOUS, name)) {
+    loadConstant(identifierToken(name));
+    emitByte(OP_FUNCTION_CASE);
 
-  if (hasSignature() || hasNakedSignature()) {
-    type = PATTERN_WILDCARD;
-    emitByte(OP_UNDEFINED);
-    tryFunction(TYPE_ANONYMOUS, name);
   } else {
     parsePrecedence(PREC_ASSIGNMENT);
     consume(TOKEN_FAT_ARROW, "Expect '=>' after pattern.");
@@ -975,11 +1050,10 @@ static void singleCase(Token name) {
     beginScope();
     blockOrExpression();
     closeFunction(compiler);
+
+    loadConstant(identifierToken(name));
+    emitByte(OP_PATTERN_CASE);
   }
-
-  loadConstant(identifierToken(name));
-
-  emitBytes(OP_CASE, type);
 }
 
 static void caseExpression(Token name) {
@@ -1026,7 +1100,7 @@ static Iterator iterator() {
   expression();
 
   // turn the expression into an iterator instance and store it.
-  nativeVariable(S_ITER);
+  getGlobalConstant(S_ITER);
   emitBytes(OP_CALL_POSTFIX, 1);
   iter.iter = addLocal(syntheticToken("#iter"));
   markInitialized();
@@ -1336,7 +1410,7 @@ static void classDeclaration() {
   } else {
     // all classes inherit from [Object] unless they explicitly
     // inherit from another class.
-    nativeVariable(S_OBJECT);
+    getGlobalConstant(S_OBJECT);
   }
 
   // "super" requires independent scope for adjacent
@@ -1661,6 +1735,7 @@ ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
+    [TOKEN_UNDEFINED] = {undefined, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},

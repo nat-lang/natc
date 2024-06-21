@@ -183,7 +183,7 @@ class TypeState {
   rename(node: ASTNode) => {
     let annotations = globalTypeEnv();
 
-    node.stampVariables(node => {
+    node.uniquelyIdentifyVariables(node => {
       if (node is ASTGlobal) {
         if (node.id in annotations)
           this.typeEnv[node] = annotations[node.id];
@@ -196,16 +196,16 @@ class TypeState {
       // give the parameters type vars if they don't
       // have annotations.
       let fnEnv = node.signature.params.reduce(
-        (env: Map, node: ASTLocalTypeAssignment) => {
-          let var = node[0];
-          let val = node[1];
+        (env: Map, param: ASTParameter) => {
+          // print param.type;
+          let type = param.type;
 
-          let pType = val.resolve();
+          if (type is ASTNode) type = type.resolve();
 
-          if (pType == nil)
-            env[var] = this.typeVars.fresh();
+          if (type == nil)
+            env[param] = this.typeVars.fresh();
           else
-            env[var] = pType;
+            env[param] = type;
 
           return env;
         },

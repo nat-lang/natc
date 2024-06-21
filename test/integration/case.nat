@@ -8,19 +8,27 @@ assert(f(false) == true);
 let f = 1 => true;
 
 assert(f(1));
-assert(f(2) == nil);
+assert(f(2) == undefined);
 
 let f = 1 => true | 2 => false;
 
 assert(f(1));
 assert(f(2) == false);
-assert(f(3) == nil);
+assert(f(3) == undefined);
+
+// bound cases.
 
 let f = 1 => true | 2 => false | x => x;
 
 assert(f(1));
 assert(f(2) == false);
 assert(f(3) == 3);
+
+let f = x => true | 1 => false;
+assert(f(1) == true);
+
+let f = x => true | y => false;
+assert(f(1) == true);
 
 // instances.
 
@@ -40,7 +48,7 @@ let f = {1:0} => true | {0:1} => false;
 assert(f({1:0}));
 assert(!f({0:1}));
 
-// multiple arguments are coerced to tuples.
+// multiple arguments are coerced into tuples.
 
 let f = (0,1) => 2 | (1,0) => 3;
 
@@ -52,3 +60,24 @@ let f = (0,1) => 2 | (1,0) => 3 | (x,y) => (x + y) * 2;
 assert(f(0,1) == 2);
 assert(f(1,0) == 3);
 assert(f(1,1) == 4);
+
+let f = ([1,0], [0,1]) => true | (x,y) => false;
+
+assert(f([1,0], [0,1]));
+assert(!f([1,0], [1,1]));
+
+// blocks.
+
+let f = 1 => { return true; } | 2 => { return false; }; 
+
+assert(f(1) == true);
+assert(f(2) == false);
+assert(f(3) == undefined);
+
+// patterns can mix values and binders.
+
+let f = (1, x) => x + 1 | (2, x) => x + 2;
+
+print f(1,1);
+
+print f(2,2);

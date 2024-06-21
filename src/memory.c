@@ -117,9 +117,18 @@ static void blackenObject(Obj* object) {
     case OBJ_UPVALUE:
       markValue(((ObjUpvalue*)object)->closed);
       break;
+
+    case OBJ_VARIABLE: {
+      markObject((Obj*)((ObjVariable*)object)->name);
+      break;
+    }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
+
+      for (int i = 0; i < function->signature.arity; i++) {
+        /// markValue(function->signature.parameters[i]);
+      }
       markArray(&function->chunk.constants);
       break;
     }
@@ -175,6 +184,10 @@ static void freeObject(Obj* object) {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
       FREE(ObjClosure, object);
+      break;
+    }
+    case OBJ_VARIABLE: {
+      FREE(ObjVariable, object);
       break;
     }
     case OBJ_FUNCTION: {

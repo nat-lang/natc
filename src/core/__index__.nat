@@ -10,5 +10,6 @@ import src/core/set
 import src/core/tree
 import src/core/assertion
 import src/core/functional
+import src/core/unification
 import src/core/ast
 import src/core/type/simple

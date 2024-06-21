@@ -44,25 +44,28 @@ void vmRuntimeError(const char* format, ...) {
   resetStack();
 }
 
-void initClasses(Classes* classes) {
-  classes->base = NULL;
-  classes->object = NULL;
-  classes->tuple = NULL;
-  classes->sequence = NULL;
-  classes->map = NULL;
-  classes->set = NULL;
-  classes->iterator = NULL;
-  classes->astClosure = NULL;
-  classes->astUpvalue = NULL;
-  classes->vTypeBool = NULL;
-  classes->vTypeNil = NULL;
-  classes->vTypeNumber = NULL;
-  classes->vTypeUndef = NULL;
-  classes->oTypeClass = NULL;
-  classes->oTypeInstance = NULL;
-  classes->oTypeString = NULL;
-  classes->oTypeClosure = NULL;
-  classes->oTypeSequence = NULL;
+void initCore(Core* core) {
+  core->base = NULL;
+  core->object = NULL;
+  core->tuple = NULL;
+  core->sequence = NULL;
+  core->map = NULL;
+  core->set = NULL;
+  core->iterator = NULL;
+  core->astClosure = NULL;
+  core->astUpvalue = NULL;
+  core->astSignature = NULL;
+  core->astParameter = NULL;
+  core->vTypeBool = NULL;
+  core->vTypeNil = NULL;
+  core->vTypeNumber = NULL;
+  core->vTypeUndef = NULL;
+  core->oTypeClass = NULL;
+  core->oTypeInstance = NULL;
+  core->oTypeString = NULL;
+  core->oTypeClosure = NULL;
+  core->oTypeSequence = NULL;
+  core->unify = NULL;
 }
 
 bool initVM() {
@@ -81,7 +84,7 @@ bool initVM() {
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   return initializeCore() == INTERPRET_OK;
 }
@@ -91,7 +94,7 @@ void freeVM() {
   freeMap(&vm.strings);
   freeMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   freeObjects();
 }
@@ -268,21 +271,21 @@ static bool spread(int* argCount) {
 // [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
-  vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
-  vmInstantiateClass(vm.classes.sequence, 0);
+  vmPush(OBJ_VAL(newInstance(vm.core.sequence)));
+  vmInstantiateClass(vm.core.sequence, 0);
 
   // either the function was called (a) with arity - 1 arguments
   // or (b) with arity - n arguments for n > 1. (a) is valid;
   // *args is just an empty sequence. (b) is invalid and will be
   // picked up by the arity check downstream.
-  if (*argCount < closure->function->arity) {
+  if (*argCount < closure->function->signature.arity) {
     *argCount = *argCount + 1;
     return true;
   }
 
   // walk the variadic arguments in the order they were
   // applied, peeking at and adding each to the sequence.
-  int i = *argCount - closure->function->arity;
+  int i = *argCount - closure->function->signature.arity;
   while (i >= 0) {
     Value seq = vmPop();
     Value arg = vmPeek(i);
@@ -297,7 +300,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   // now pop the sequence, all the variadic arguments,
   // and leave the sequence on the stack in their place.
   Value seq = vmPop();
-  i = *argCount - closure->function->arity;
+  i = *argCount - closure->function->signature.arity;
   while (i >= 0) {
     vmPop();
     i--;
@@ -305,7 +308,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   vmPush(seq);
 
   // what we've done is made these two equal.
-  *argCount = closure->function->arity;
+  *argCount = closure->function->signature.arity;
 
   return true;
 }
@@ -313,10 +316,10 @@ static bool variadify(ObjClosure* closure, int* argCount) {
 static bool call(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
-  if (closure->function->variadic)
+  if (closure->function->signature.variadic)
     if (!variadify(closure, &argCount)) return false;
 
-  if (!checkArity(closure->function->arity, argCount)) return false;
+  if (!checkArity(closure->function->signature.arity, argCount)) return false;
 
   if (vm.frameCount == FRAMES_MAX) {
     vmRuntimeError("Stack overflow.");
@@ -340,18 +343,14 @@ static bool callNative(ObjNative* native, int argCount) {
 }
 
 static bool unify(ObjPattern pattern, Value value) {
-  Value eqMethod;
+  Value unifyFn = OBJ_VAL(vm.core.unify);
 
-  if (commonMethod(pattern.value, value, S_EQ, &eqMethod)) {
-    vmPush(pattern.value);
-    vmPush(value);
+  vmPush(unifyFn);
+  vmPush(pattern.value);
+  vmPush(value);
 
-    return vmCallValue(eqMethod, 1) &&
-           vmExecute(vm.frameCount - 1) == INTERPRET_OK;
-  }
-
-  vmPush(BOOL_VAL(valuesEqual(pattern.value, value)));
-  return true;
+  return vmCallValue(unifyFn, 2) &&
+         vmExecute(vm.frameCount - 1) == INTERPRET_OK;
 }
 
 // Wrap the top [count] values on the stack in a tuple.
@@ -360,10 +359,10 @@ static bool tuplify(int count) {
   Value args[count];
   while (i--) args[i] = vmPop();
 
-  vmPush(OBJ_VAL(vm.classes.tuple));
+  vmPush(OBJ_VAL(vm.core.tuple));
   while (++i < count) vmPush(args[i]);
 
-  return vmCallValue(OBJ_VAL(vm.classes.tuple), count);
+  return vmCallValue(OBJ_VAL(vm.core.tuple), count);
 }
 
 static bool callCase(ObjCase* oCase, int argCount) {
@@ -395,10 +394,10 @@ static bool callCase(ObjCase* oCase, int argCount) {
     }
   } while ((oCase = oCase->next) != NULL);
 
-  // no match: replace the arguments and the case object with nil.
+  // no match: replace the arguments and the case object with undef.
   vmPop();  // arg.
   vmPop();  // case.
-  vmPush(NIL_VAL);
+  vmPush(UNDEF_VAL);
 
   return true;
 }
@@ -507,7 +506,8 @@ void vmCloseUpvalues(Value* last) {
 }
 
 static bool isFalsey(Value value) {
-  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+  return IS_NIL(value) || IS_UNDEF(value) ||
+         (IS_BOOL(value) && !AS_BOOL(value));
 }
 
 static bool validateSeqIdx(ObjSequence* seq, Value idx) {
@@ -605,12 +605,8 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_GET_GLOBAL: {
         ObjString* name = READ_STRING();
 
-        Value value;
-        if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
-          vmRuntimeError("Undefined variable '%s'.", name->chars);
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
+        Value value = UNDEF_VAL;
+        mapGet(&vm.globals, OBJ_VAL(name), &value);
         vmPush(value);
         break;
       }
@@ -796,9 +792,28 @@ InterpretResult vmExecute(int baseFrame) {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
+      case OP_VARIABLE: {
+        Value name = vmPeek(0);
+
+        if (!IS_STRING(name)) {
+          vmRuntimeError("Variable name must be a string.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjVariable* var = newVariable(AS_STRING(name));
+        vmPop();
+        vmPush(OBJ_VAL(var));
+        break;
+      }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
+        int i = function->signature.arity;
+        while (i--) {
+          function->signature.types[i] = vmPop();
+          function->signature.parameters[i] = vmPop();
+        }
+
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
         break;
@@ -825,13 +840,12 @@ InterpretResult vmExecute(int baseFrame) {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
-      case OP_CASE: {
-        PatternType type = READ_BYTE();
+      case OP_PATTERN_CASE: {
         Value patternValue = vmPeek(2);
         Value closure = vmPeek(1);
         Value name = vmPeek(0);
 
-        ObjPattern* pattern = newPattern(patternValue, type);
+        ObjPattern* pattern = newPattern(patternValue, PATTERN_VALUE);
 
         if (!IS_CLOSURE(closure)) {
           vmRuntimeError("Body of case statement must be a closure.");
@@ -842,6 +856,26 @@ InterpretResult vmExecute(int baseFrame) {
             newCase(AS_STRING(name), *pattern, *AS_CLOSURE(closure), NULL);
 
         vmPop();
+        vmPop();
+        vmPop();
+
+        vmPush(OBJ_VAL(oCase));
+        break;
+      }
+      case OP_FUNCTION_CASE: {
+        Value closure = vmPeek(1);
+        Value name = vmPeek(0);
+
+        ObjPattern* pattern = newPattern(UNDEF_VAL, PATTERN_WILDCARD);
+
+        if (!IS_CLOSURE(closure)) {
+          vmRuntimeError("Body of case statement must be a closure.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjCase* oCase =
+            newCase(AS_STRING(name), *pattern, *AS_CLOSURE(closure), NULL);
+
         vmPop();
         vmPop();
 
@@ -866,6 +900,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         leftCase->next = rightCase;
 
+        // leave the first case on the stack.
         vmPush(left);
         break;
       }
@@ -1102,9 +1137,9 @@ InterpretResult vmExecute(int baseFrame) {
 
         ObjClass lca;
         if (!IS_INSTANCE(value) &&
-            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.classes.sequence,
+            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.core.sequence,
                                 &lca) &&
-            &lca == vm.classes.sequence) {
+            &lca == vm.core.sequence) {
           vmRuntimeError("Only sequential values can spread.");
           return INTERPRET_RUNTIME_ERROR;
         }

@@ -33,26 +33,37 @@ bool readAST(ObjClosure* closure) {
 
   // the root of the tree is an [ASTClosure] instance that has
   // four arguments.
-  vmPush(OBJ_VAL(vm.classes.astClosure));
+  vmPush(OBJ_VAL(vm.core.astClosure));
   // the function's name.
   vmPush(OBJ_VAL(closure->function->name));
   // the function itself.
   vmPush(OBJ_VAL(closure));
-  // the function's arity.
-  vmPush(NUMBER_VAL(closure->function->arity));
+  // the function's signature.
+  vmPush(OBJ_VAL(vm.core.astSignature));
+  vmPush(NUMBER_VAL(closure->function->signature.arity));
+  for (int i = 0; i < closure->function->signature.arity; i++) {
+    vmPush(OBJ_VAL(vm.core.astParameter));
+    // offset the reserved stack slot.
+    vmPush(NUMBER_VAL(i + 1));
+    vmPush(closure->function->signature.parameters[i]);
+    vmPush(closure->function->signature.types[i]);
+    if (!initInstance(vm.core.astParameter, 3)) return false;
+  }
+  if (!initInstance(vm.core.astSignature,
+                    closure->function->signature.arity + 1))
+    return false;
   // the closure's upvalues.
-  vmPush(OBJ_VAL(vm.classes.sequence));
+  vmPush(OBJ_VAL(vm.core.sequence));
   for (int i = 0; i < closure->upvalueCount; i++) {
-    vmPush(OBJ_VAL(vm.classes.astUpvalue));
+    vmPush(OBJ_VAL(vm.core.astUpvalue));
     vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
-    if (!initInstance(vm.classes.astUpvalue, 2)) return false;
+    if (!initInstance(vm.core.astUpvalue, 2)) return false;
   }
 
-  if (!vmInitInstance(vm.classes.sequence, closure->upvalueCount, 0))
-    return false;
+  if (!vmInitInstance(vm.core.sequence, closure->upvalueCount, 0)) return false;
 
-  if (!initInstance(vm.classes.astClosure, 4)) return false;
+  if (!initInstance(vm.core.astClosure, 4)) return false;
 
   Value root = vmPeek(0);
 
@@ -186,9 +197,30 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opGetUpvalue", 2)) return false;
         break;
       }
+      case OP_VARIABLE: {
+        Value value = vmPeek(0);
+
+        Value name;
+        if (!IS_INSTANCE(value) ||
+            !mapGet(&AS_INSTANCE(value)->fields, INTERN("value"), &name) ||
+            !IS_STRING(name)) {
+          vmRuntimeError(
+              "Parameter literal must have a 'value' field that's a string.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        ObjVariable* var = newVariable(AS_STRING(name));
+        vmPop();
+        vmPush(OBJ_VAL(var));
+        break;
+      }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
+        int i = function->signature.arity;
+        while (i--) {
+          function->signature.types[i] = vmPop();
+          function->signature.parameters[i] = vmPop();
+        }
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
 
