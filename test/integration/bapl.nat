@@ -1,0 +1,18 @@
+
+
+let f = x => 1;
+
+let g = (x, y) => 1;
+
+let k = (x, 1) => 1;
+
+let j = 1 => 1;
+
+let h = (1) => 2;
+
+
+let f = 2 => false | 1 => true;
+
+
+print f(1);
+print f(2);

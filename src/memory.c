@@ -23,7 +23,7 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 #endif
 
     if (vm.bytesAllocated > vm.nextGC) {
-      collectGarbage();
+      // collectGarbage();
     }
   }
 
@@ -127,9 +127,21 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)function->name);
 
       for (int i = 0; i < function->signature.arity; i++) {
-        /// markValue(function->signature.parameters[i]);
+        markValue(function->signature.parameters[i]);
+        markValue(function->signature.types[i]);
       }
       markArray(&function->chunk.constants);
+      break;
+    }
+    case OBJ_OVERLOAD: {
+      ObjOverload* overload = (ObjOverload*)object;
+
+      for (int i = 0; i < overload->cases; i++) {
+        printf("marking...\n");
+        printValue(OBJ_VAL(&overload->functions[i]));
+        printf("\n");
+        markObject((Obj*)overload->functions + i);
+      }
       break;
     }
     case OBJ_MAP: {
@@ -148,17 +160,6 @@ static void blackenObject(Obj* object) {
     case OBJ_SPREAD: {
       ObjSpread* spread = (ObjSpread*)object;
       markValue(spread->value);
-      break;
-    }
-    case OBJ_PATTERN: {
-      ObjPattern* pattern = (ObjPattern*)object;
-      markValue(pattern->value);
-      break;
-    }
-    case OBJ_CASE: {
-      ObjCase* oCase = (ObjCase*)object;
-      markObject((Obj*)&oCase->pattern);
-      markObject((Obj*)&oCase->closure);
       break;
     }
   }
@@ -197,6 +198,10 @@ static void freeObject(Obj* object) {
       FREE(ObjFunction, object);
       break;
     }
+    case OBJ_OVERLOAD: {
+      FREE(ObjOverload, object);
+      break;
+    }
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
       freeMap(&instance->fields);
@@ -228,14 +233,6 @@ static void freeObject(Obj* object) {
     }
     case OBJ_SPREAD: {
       FREE(ObjSpread, object);
-      break;
-    }
-    case OBJ_PATTERN: {
-      FREE(ObjPattern, object);
-      break;
-    }
-    case OBJ_CASE: {
-      FREE(ObjCase, object);
       break;
     }
   }

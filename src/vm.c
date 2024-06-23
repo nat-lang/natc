@@ -342,19 +342,8 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
-static bool unify(ObjPattern pattern, Value value) {
-  Value unifyFn = OBJ_VAL(vm.core.unify);
-
-  vmPush(unifyFn);
-  vmPush(pattern.value);
-  vmPush(value);
-
-  return vmCallValue(unifyFn, 2) &&
-         vmExecute(vm.frameCount - 1) == INTERPRET_OK;
-}
-
 // Wrap the top [count] values on the stack in a tuple.
-static bool tuplify(int count) {
+bool tuplify(int count) {
   int i = count;
   Value args[count];
   while (i--) args[i] = vmPop();
@@ -365,34 +354,45 @@ static bool tuplify(int count) {
   return vmCallValue(OBJ_VAL(vm.core.tuple), count);
 }
 
-static bool callCase(ObjCase* oCase, int argCount) {
-  if (argCount > 1)
-    if (!tuplify(argCount)) return false;
+bool unify(Signature pattern, Value value) {
+  Value unifyFn = OBJ_VAL(vm.core.unify);
+
+  vmPush(unifyFn);
+
+  if (pattern.arity > 1) {
+    vmPush(OBJ_VAL(vm.core.tuple));
+    for (int i = 0; i < pattern.arity; i++) {
+      vmPush(pattern.parameters[i]);
+    }
+    if (!vmCallValue(OBJ_VAL(vm.core.tuple), pattern.arity)) return false;
+
+  } else {
+    vmPush(pattern.parameters[0]);
+  }
+
+  vmPush(value);
+
+  return vmCallValue(unifyFn, 2) &&
+         vmExecute(vm.frameCount - 1) == INTERPRET_OK;
+}
+
+static bool callOverload(ObjOverload* overload, int argCount) {
+  // if (argCount > 1)
+  //   if (!tuplify(argCount)) return false;
 
   Value argument = vmPeek(0);
 
-  do {
-    Value closure = OBJ_VAL(&oCase->closure);
-    switch (oCase->pattern.type) {
-      case PATTERN_WILDCARD: {
-        if (argCount > 1) vm.stackTop[-1] = OBJ_VAL(newSpread(argument));
+  for (int i = 0; i < overload->cases; i++) {
+    // ObjClosure* closure = &overload->functions[i];
+    if (!unify(overload->functions[i].function->signature, argument))
+      return false;
 
-        vm.stackTop[-2] = closure;
+    if (AS_BOOL(vmPop())) {
+      vm.stackTop[-argCount - 1] = OBJ_VAL(&overload->functions[i]);
 
-        return call(AS_CLOSURE(closure), 1);
-      }
-      case PATTERN_VALUE: {
-        if (!unify(oCase->pattern, argument)) return false;
-
-        if (AS_BOOL(vmPop())) {
-          vmPop();  // the argument.
-          vm.stackTop[-1] = closure;
-          return call(AS_CLOSURE(closure), 0);
-        }
-        break;
-      }
+      return call(&overload->functions[i], argCount);
     }
-  } while ((oCase = oCase->next) != NULL);
+  }
 
   // no match: replace the arguments and the case object with undef.
   vmPop();  // arg.
@@ -418,8 +418,6 @@ bool vmCallValue(Value callee, int argCount) {
             return false;
         }
       }
-      case OBJ_CASE:
-        return callCase(AS_CASE(callee), argCount);
       case OBJ_CLASS: {
         ObjClass* klass = AS_CLASS(callee);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
@@ -427,6 +425,8 @@ bool vmCallValue(Value callee, int argCount) {
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
+      case OBJ_OVERLOAD:
+        return callOverload(AS_OVERLOAD(callee), argCount);
       case OBJ_NATIVE:
         return callNative(AS_NATIVE(callee), argCount);
       case OBJ_INSTANCE: {
@@ -840,68 +840,28 @@ InterpretResult vmExecute(int baseFrame) {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
-      case OP_PATTERN_CASE: {
-        Value patternValue = vmPeek(2);
-        Value closure = vmPeek(1);
-        Value name = vmPeek(0);
+      case OP_OVERLOAD: {
+        int cases = READ_BYTE();
+        ObjOverload* overload = newOverload(cases);
 
-        ObjPattern* pattern = newPattern(patternValue, PATTERN_VALUE);
-
-        if (!IS_CLOSURE(closure)) {
-          vmRuntimeError("Body of case statement must be a closure.");
+        if (!IS_CLOSURE(vmPeek(cases - 1))) {
+          vmRuntimeError("Overload operand must be function.");
           return INTERPRET_RUNTIME_ERROR;
         }
+        overload->functions = AS_CLOSURE(vmPeek(cases - 1));
 
-        ObjCase* oCase =
-            newCase(AS_STRING(name), *pattern, *AS_CLOSURE(closure), NULL);
+        for (int i = 1; i < cases; i++) {
+          if (!IS_CLOSURE(vmPeek(i))) {
+            vmRuntimeError("Overload operand must be function.");
+            return INTERPRET_RUNTIME_ERROR;
+          }
 
-        vmPop();
-        vmPop();
-        vmPop();
-
-        vmPush(OBJ_VAL(oCase));
-        break;
-      }
-      case OP_FUNCTION_CASE: {
-        Value closure = vmPeek(1);
-        Value name = vmPeek(0);
-
-        ObjPattern* pattern = newPattern(UNDEF_VAL, PATTERN_WILDCARD);
-
-        if (!IS_CLOSURE(closure)) {
-          vmRuntimeError("Body of case statement must be a closure.");
-          return INTERPRET_RUNTIME_ERROR;
+          overload->functions[i] = *AS_CLOSURE(vmPeek(i));
         }
 
-        ObjCase* oCase =
-            newCase(AS_STRING(name), *pattern, *AS_CLOSURE(closure), NULL);
+        while (cases--) vmPop();
+        vmPush(OBJ_VAL(overload));
 
-        vmPop();
-        vmPop();
-
-        vmPush(OBJ_VAL(oCase));
-        break;
-      }
-      case OP_CASE_OR: {
-        Value right = vmPop();
-        Value left = vmPop();
-
-        if (!IS_CASE(left) || !IS_CASE(right)) {
-          vmRuntimeError("Operands to case disjunction must be cases.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
-        ObjCase* leftCase = AS_CASE(left);
-        ObjCase* rightCase = AS_CASE(right);
-
-        while (leftCase->next != NULL) {
-          leftCase = leftCase->next;
-        };
-
-        leftCase->next = rightCase;
-
-        // leave the first case on the stack.
-        vmPush(left);
         break;
       }
       case OP_CLASS:

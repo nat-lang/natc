@@ -1,13 +1,8 @@
 
 let unify = (a, b) => {
 
-  if (a == undefined or b == undefined)
-    return true;
-
-
-  print a.values;
-  print b.values;
+  if (a is Sequential and b is Sequential)
+    return zip(a,b).map(unify);
 
   return a == b;
-
 };

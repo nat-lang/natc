@@ -153,12 +153,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_IMPLICIT_RETURN", offset);
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
-    case OP_PATTERN_CASE:
-      return simpleInstruction("OP_PATTERN_CASE", offset);
-    case OP_FUNCTION_CASE:
-      return simpleInstruction("OP_FUNCTION_CASE", offset);
-    case OP_CASE_OR:
-      return simpleInstruction("OP_CASE_OR", offset);
+    case OP_OVERLOAD:
+      return byteInstruction("OP_OVERLOAD", chunk, offset);
     case OP_CLASS:
       return constantInstruction("OP_CLASS", chunk, offset);
     case OP_INHERIT:

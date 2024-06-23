@@ -87,21 +87,14 @@ ObjFunction* newFunction() {
   return function;
 }
 
-ObjPattern* newPattern(Value value, PatternType type) {
-  ObjPattern* pattern = ALLOCATE_OBJ(ObjPattern, OBJ_PATTERN);
-  pattern->value = value;
-  pattern->type = type;
-  return pattern;
-}
+ObjOverload* newOverload(int cases) {
+  ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
 
-ObjCase* newCase(ObjString* name, ObjPattern pattern, ObjClosure closure,
-                 ObjCase* next) {
-  ObjCase* oCase = ALLOCATE_OBJ(ObjCase, OBJ_CASE);
-  oCase->name = name;
-  oCase->pattern = pattern;
-  oCase->closure = closure;
-  oCase->next = next;
-  return oCase;
+  overload->cases = cases;
+  overload->functions = NULL;
+  // overload->functions = functions;
+
+  return overload;
 }
 
 ObjInstance* newInstance(ObjClass* klass) {
@@ -447,6 +440,10 @@ void printObject(Value value) {
       printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
+    case OBJ_OVERLOAD: {
+      printf("<overload at %p>", AS_OVERLOAD(value));
+      break;
+    }
     case OBJ_INSTANCE:
       printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
              AS_INSTANCE(value));
@@ -470,14 +467,6 @@ void printObject(Value value) {
       printf("<..");
       printValue(AS_SPREAD(value)->value);
       printf(">");
-      break;
-    }
-    case OBJ_PATTERN: {
-      printf("<pattern>");
-      break;
-    }
-    case OBJ_CASE: {
-      printf("<case %s>", AS_CASE(value)->name->chars);
       break;
     }
   }

@@ -188,14 +188,6 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static bool consumeQuietly(TokenType type) {
-  if (parser.current.type == type) {
-    advance();
-    return true;
-  }
-  return false;
-}
-
 static bool match(TokenType type) {
   if (!check(type)) return false;
   advance();
@@ -391,7 +383,6 @@ static void closeFunction(Compiler compiler) {
 
 static void function(FunctionType type, Token name);
 static void nakedFunction(FunctionType type, Token name);
-static void caseExpression(Token name);
 static void expression();
 static void boundExpression(Token name);
 static void statement();
@@ -779,52 +770,6 @@ static void defineVariable(uint16_t variable) {
   emitConstInstr(OP_DEFINE_GLOBAL, variable);
 }
 
-static bool peekSignature() {
-  if (!consumeQuietly(TOKEN_LEFT_PAREN)) return false;
-
-  if (!check(TOKEN_RIGHT_PAREN)) {
-    do {
-      if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
-      if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN, 1);
-
-    } while (match(TOKEN_COMMA));
-  }
-
-  if (!consumeQuietly(TOKEN_RIGHT_PAREN)) return false;
-  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
-
-  return true;
-}
-
-bool hasSignature() {
-  Parser checkpoint = saveParser();
-  bool has = peekSignature();
-  gotoParser(checkpoint);
-  return has;
-}
-
-// Of the form 'x y z => x + y + z;'.
-static bool peekNakedSignature() {
-  if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
-  if (check(TOKEN_IDENTIFIER)) return peekNakedSignature();
-  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
-  return true;
-}
-
-bool hasNakedSignature() {
-  Parser checkpoint = saveParser();
-  bool has = peekNakedSignature();
-  gotoParser(checkpoint);
-  return has;
-}
-
-static bool hasPattern() {
-  Parser checkpoint = saveParser();
-  bool has = advanceTo(TOKEN_FAT_ARROW, TOKEN_SEMICOLON, 0);
-  gotoParser(checkpoint);
-  return has;
-}
-
 typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
 
 static bool matchParamOrPattern() {
@@ -856,7 +801,7 @@ static SignatureType peekSignatureType() {
   return SIG_NOT;
 }
 
-static bool tryFunction(FunctionType fnType, Token name) {
+static bool trySingleFunction(FunctionType fnType, Token name) {
   Parser checkpoint = saveParser();
   SignatureType signatureType = peekSignatureType();
   gotoParser(checkpoint);
@@ -871,23 +816,23 @@ static bool tryFunction(FunctionType fnType, Token name) {
     case SIG_NOT:
       return false;
   }
+  return false;
 }
 
-bool tryFunctionOrCase(FunctionType fnType, Token name) {
-  if (tryFunction(fnType, name)) {
-    if (match(TOKEN_PIPE)) {
-      loadConstant(identifierToken(name));
-      emitByte(OP_FUNCTION_CASE);
+void overload(FunctionType fnType, Token name) {
+  int cases = 1;
 
-      caseExpression(name);
-      emitByte(OP_CASE_OR);
-    }
+  do {
+    trySingleFunction(fnType, name);
+    cases++;
+  } while (match(TOKEN_PIPE));
 
-    return true;
-  }
+  emitBytes(OP_OVERLOAD, cases);
+}
 
-  if (hasPattern()) {
-    caseExpression(name);
+static bool tryFunction(FunctionType fnType, Token name) {
+  if (trySingleFunction(fnType, name)) {
+    if (match(TOKEN_PIPE)) overload(fnType, name);
     return true;
   }
 
@@ -1034,35 +979,6 @@ static void function(FunctionType type, Token name) {
   blockOrExpression();
 
   closeFunction(compiler);
-}
-
-static void singleCase(Token name) {
-  if (tryFunction(TYPE_ANONYMOUS, name)) {
-    loadConstant(identifierToken(name));
-    emitByte(OP_FUNCTION_CASE);
-
-  } else {
-    parsePrecedence(PREC_ASSIGNMENT);
-    consume(TOKEN_FAT_ARROW, "Expect '=>' after pattern.");
-
-    Compiler compiler;
-    initCompiler(&compiler, TYPE_ANONYMOUS, name);
-    beginScope();
-    blockOrExpression();
-    closeFunction(compiler);
-
-    loadConstant(identifierToken(name));
-    emitByte(OP_PATTERN_CASE);
-  }
-}
-
-static void caseExpression(Token name) {
-  singleCase(name);
-
-  while (match(TOKEN_PIPE)) {
-    singleCase(name);
-    emitByte(OP_CASE_OR);
-  }
 }
 
 static void method() {
