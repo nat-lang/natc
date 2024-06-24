@@ -188,14 +188,6 @@ static void consume(TokenType type, const char* message) {
     errorAtCurrent(message);
 }
 
-static bool consumeQuietly(TokenType type) {
-  if (parser.current.type == type) {
-    advance();
-    return true;
-  }
-  return false;
-}
-
 static bool match(TokenType type) {
   if (!check(type)) return false;
   advance();
@@ -213,11 +205,9 @@ static void emitByte(uint8_t byte) {
 }
 
 // Find a [token] that isn't nested within braces, brackets,
-// or parentheses. Assume that the initial nesting depth is 1,
-// so that the search is negative when we find a [closing] token
-// at depth 0.
-bool advanceTo(TokenType token, TokenType closing) {
-  int depth = 1;
+// or parentheses, for some initial [depth],
+bool advanceTo(TokenType token, TokenType closing, int initialDepth) {
+  int depth = initialDepth;
 
   for (;;) {
     if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
@@ -228,7 +218,7 @@ bool advanceTo(TokenType token, TokenType closing) {
       depth--;
 
     // found one.
-    if (check(token) && depth == 1) return true;
+    if (check(token) && depth == initialDepth) return true;
     // found none.
     if (check(closing) && depth == 0) return false;
 
@@ -509,7 +499,7 @@ static void defineType(int var) {
       current->scopeDepth > 0 ? OP_SET_TYPE_LOCAL : OP_SET_TYPE_GLOBAL, var);
 }
 
-static uint16_t nativeVariable(char* name) {
+static uint16_t getGlobalConstant(char* name) {
   uint16_t var = makeConstant(INTERN(name));
   emitConstInstr(OP_GET_GLOBAL, var);
   return var;
@@ -588,7 +578,7 @@ static void property(bool canAssign) {
 // may as well enforce the symmetry.
 static void dot(bool canAssign) {
   if (penultWhite() && prevWhite()) {
-    nativeVariable("compose");
+    getGlobalConstant("compose");
     expression();
     emitByte(OP_CALL_INFIX);
   } else {
@@ -628,7 +618,7 @@ static void parentheses(bool canAssign) {
       argCount++;
     } while (check(TOKEN_COMMA));
 
-    nativeVariable(S_TUPLE);
+    getGlobalConstant(S_TUPLE);
     emitBytes(OP_CALL_POSTFIX, argCount);
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
@@ -682,13 +672,13 @@ static void namedVariable(Token name, bool canAssign) {
 }
 
 static int nativeCall(char* name) {
-  int address = nativeVariable(name);
+  int address = getGlobalConstant(name);
   emitBytes(OP_CALL, 0);
   return address;
 }
 
 static int nativePostfix(char* name, int argCount) {
-  int address = nativeVariable(name);
+  int address = getGlobalConstant(name);
   emitBytes(OP_CALL_POSTFIX, argCount);
   return address;
 }
@@ -779,51 +769,51 @@ static void defineVariable(uint16_t variable) {
   emitConstInstr(OP_DEFINE_GLOBAL, variable);
 }
 
-static bool peekSignature() {
-  if (!consumeQuietly(TOKEN_LEFT_PAREN)) return false;
+typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
 
-  if (!check(TOKEN_RIGHT_PAREN)) {
-    do {
-      if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
-      if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN);
+static SignatureType peekSignatureType() {
+  if (match(TOKEN_LEFT_PAREN)) {
+    if (!check(TOKEN_RIGHT_PAREN)) {
+      do {
+        if (!match(TOKEN_IDENTIFIER)) return SIG_NOT;
+        if (check(TOKEN_COLON)) advanceTo(TOKEN_COMMA, TOKEN_RIGHT_PAREN, 1);
 
-    } while (match(TOKEN_COMMA));
+      } while (match(TOKEN_COMMA));
+    }
+
+    if (!match(TOKEN_RIGHT_PAREN)) return SIG_NOT;
+    if (!match(TOKEN_FAT_ARROW)) return SIG_NOT;
+
+    return SIG_PAREN;
+  } else {
+    // can only be naked.
+    if (match(TOKEN_IDENTIFIER)) return peekSignatureType();
+    if (match(TOKEN_FAT_ARROW)) return SIG_NAKED;
   }
 
-  if (!consumeQuietly(TOKEN_RIGHT_PAREN)) return false;
-  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
-
-  return true;
+  return SIG_NOT;
 }
 
-// Of the form 'x y z => x + y + z;'.
-static bool peekNakedSignature() {
-  if (!consumeQuietly(TOKEN_IDENTIFIER)) return false;
-  if (check(TOKEN_IDENTIFIER)) return peekNakedSignature();
-  if (!consumeQuietly(TOKEN_FAT_ARROW)) return false;
-  return true;
+static bool trySingleFunction(FunctionType fnType, Token name) {
+  Parser checkpoint = saveParser();
+  SignatureType signatureType = peekSignatureType();
+  gotoParser(checkpoint);
+
+  switch (signatureType) {
+    case SIG_NAKED:
+      nakedFunction(fnType, name);
+      return true;
+    case SIG_PAREN:
+      function(fnType, name);
+      return true;
+    case SIG_NOT:
+      return false;
+  }
+  return false;
 }
 
 static bool tryFunction(FunctionType fnType, Token name) {
-  Parser checkpoint = saveParser();
-  bool isFn = peekSignature();
-  gotoParser(checkpoint);
-
-  if (isFn) {
-    function(fnType, name);
-    return true;
-  }
-
-  checkpoint = saveParser();
-  isFn = peekNakedSignature();
-  gotoParser(checkpoint);
-
-  if (isFn) {
-    nakedFunction(fnType, name);
-    return true;
-  }
-
-  return false;
+  return trySingleFunction(fnType, name);
 }
 
 static void boundExpression(Token name) {
@@ -973,7 +963,7 @@ static Iterator iterator() {
   expression();
 
   // turn the expression into an iterator instance and store it.
-  nativeVariable(S_ITER);
+  getGlobalConstant(S_ITER);
   emitBytes(OP_CALL_POSTFIX, 1);
   iter.iter = addLocal(syntheticToken("#iter"));
   markInitialized();
@@ -1089,7 +1079,7 @@ static bool tryComprehension(char* klass, TokenType openingToken,
   //  to establish that it isn't.
   Parser checkpointA = saveParser();
 
-  if (advanceTo(TOKEN_PIPE, closingToken)) {
+  if (advanceTo(TOKEN_PIPE, closingToken, 1)) {
     advance();  // eat the pipe.
 
     Compiler compiler;
@@ -1283,7 +1273,7 @@ static void classDeclaration() {
   } else {
     // all classes inherit from [Object] unless they explicitly
     // inherit from another class.
-    nativeVariable(S_OBJECT);
+    getGlobalConstant(S_OBJECT);
   }
 
   // "super" requires independent scope for adjacent
