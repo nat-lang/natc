@@ -1,7 +1,7 @@
 // signature parsing.
 // --------------------------------------
 
-let z;
+const z;
 
 let a = () => {};
 
@@ -13,13 +13,13 @@ let a = (a: z) => {};
 
 let a = (a: z, b: z) => {};
 
-let a = (a: z + z) => {};
+let a = (a: z -> z) => {};
 
-let a = (a: z + z, b: z) => {};
+let a = (a: z -> z, b: z) => {};
 
-let a = (a: z, b: z + z) => {};
+let a = (a: z, b: z -> z) => {};
 
-let a = (a: z + z, b: z + z) => {};
+let a = (a: z -> z, b: z -> z) => {};
 
 let a = () => x((a: z, b: z) => {});
 

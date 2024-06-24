@@ -858,26 +858,46 @@ static void blockOrExpression() {
   }
 }
 
+static uint8_t parameter() {
+  consume(TOKEN_IDENTIFIER, "Expect parameter name.");
+  uint8_t local = declareVariable();
+  markInitialized();
+
+  return local;
+}
+
+void hoistParam(Compiler* compiler) {
+  current = compiler->enclosing;
+
+  // param.
+  uint16_t constant = identifierConstant(&parser.previous);
+  emitConstInstr(OP_CONSTANT, constant);
+  // emitByte(OP_VARIABLE);
+
+  // type.
+  if (match(TOKEN_COLON)) {
+    expression();
+  } else {
+    emitByte(OP_NIL);
+  }
+  current = compiler;
+}
+
 static void nakedFunction(FunctionType fnType, Token name) {
   Compiler compiler;
   initCompiler(&compiler, fnType, name);
   beginScope();
 
-  uint16_t constant = parseVariable("Expect parameter name.");
-  defineVariable(constant);
-  current->function->signature.arity++;
+  current->function->signature.arity = 1;
+  parameter();
+  hoistParam(&compiler);
 
-  // type annotations for parameters default to nil.
-  emitByte(OP_NIL);
-  defineType(constant);
-  emitByte(OP_POP);  // the type.
-
-  if (check(TOKEN_IDENTIFIER)) {
+  if (check(TOKEN_FAT_ARROW)) {
+    advance();
+    blockOrExpression();
+  } else {
     nakedFunction(TYPE_ANONYMOUS, syntheticToken("lambda"));
     emitByte(OP_RETURN);
-  } else {
-    consume(TOKEN_FAT_ARROW, "Expect '=>' after signature.");
-    blockOrExpression();
   }
 
   closeFunction(compiler);
@@ -906,17 +926,8 @@ static void function(FunctionType type, Token name) {
         parser.current.length--;
       }
 
-      uint16_t constant = parseVariable("Expect parameter name.");
-      defineVariable(constant);
-
-      // type annotations for parameters default to nil.
-      if (match(TOKEN_COLON)) {
-        expression();
-      } else {
-        emitByte(OP_NIL);
-      }
-      defineType(constant);
-      emitByte(OP_POP);  // the type.
+      parameter();
+      hoistParam(&compiler);
 
     } while (match(TOKEN_COMMA));
   }

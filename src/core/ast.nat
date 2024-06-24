@@ -36,8 +36,7 @@ class ASTNode extends Tree {
       if (node is ASTClosure) {
         let closureEnv = VarEnv(varEnv.upvalues);
         for (param in node.signature.params) {
-          let local = param[0];
-          rename(local, closureEnv.locals);
+          rename(param, closureEnv.locals);
         }
 
         for (upvalue in node.upvalues) {
@@ -114,6 +113,14 @@ class ASTUpvalue extends ASTVar {
   }
 }
 
+class ASTParameter extends ASTLocal {
+  init(id, name, type) => {
+    super.init(id);
+    this.name = name;
+    this.type = type;
+  }
+}
+
 class ASTArgumentSequence extends ASTExpr {
   resolve() => this.children.map((node) => node.resolve());
 }
@@ -142,19 +149,19 @@ class ASTInvocation extends ASTApp {
 }
 
 class ASTSignature extends ASTNode {
-  init(arity) => {
+  init(arity, *params) => {
     this.arity = arity;
-    this.params = [];
+    this.params = params;
   }
 
   isComplete() => len(this.params) == this.arity;
 }
 
 class ASTClosure extends ASTExpr {
-  init(name, function, arity, upvalues) => {
+  init(name, function, signature, upvalues) => {
     this.name = name;
     this.function = function;
-    this.signature = ASTSignature(arity);
+    this.signature = signature;
     this.children = [];
     this.upvalues = upvalues;
   }
@@ -186,10 +193,7 @@ class ASTClosure extends ASTExpr {
     let local = ASTLocal(slot);
     let node = ASTLocalTypeAssignment(local, value);
 
-    if (this.signature.isComplete())
-      this.children.push(node);
-    else
-      this.signature.params.push(node);
+    this.children.push(node);
   }
 
   opReturn(expr) => {

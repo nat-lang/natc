@@ -1,4 +1,32 @@
 
+class Constraint {
+  init(left, right) => {
+    this.left = left;
+    this.right = right;
+  }
+
+  pp() => {
+    this.left.pp();
+    print "x";
+    this.right.pp();
+  }
+}
+
+class AppConstraint extends Constraint {}
+
+class Solution extends Map {
+  entries() => super.entries().map((e) => Constraint(..e));
+
+  apply(c: Constraint) => {
+    for (sub in this) {
+      c.left = c.left.substitute(sub);
+      c.right = c.right.substitute(sub);
+    }
+
+    return c;
+  }
+}
+
 class Type {
   pp() => {
     print this;
@@ -114,38 +142,6 @@ class TFunction extends Type {
 }
 class TClass extends Type {}
 
-class Constraint {
-  init(left, right) => {
-    this.left = left;
-    this.right = right;
-  }
-
-  pp() => {
-    this.left.pp();
-    print "x";
-    this.right.pp();
-  }
-}
-
-class AppConstraint extends Constraint {}
-
-class Solution extends Map {
-  entries() => super.entries().map((e) => Constraint(..e));
-
-  apply(c: Constraint) => {
-    for (sub in this) {
-      c.left = c.left.substitute(sub);
-      c.right = c.right.substitute(sub);
-    }
-
-    return c;
-  }
-}
-
-class TypeVarSupply extends NameSupply {
-  fresh() => TVar(super.fresh());
-}
-
 let unit = TUnit();
 let void = TVoid();
 let bool = TBoolean();
@@ -153,6 +149,75 @@ let num = TNumber();
 let string = TString();
 let infix -> = TFunction;
 let tClass = TClass();
+
+class TypeVarSupply extends NameSupply {
+  fresh() => TVar(super.fresh());
+}
+
+class TypeSystem {
+  // Map vm types to object language types.
+  literalType(value) => {
+    let valueType = vType(value);
+
+    if (valueType == ()) return unit;
+    if (valueType == CNil) return void;
+    if (valueType == CBool) return bool;
+    if (valueType == CNumber) return num;
+    if (valueType == OString) return string; 
+    if (valueType == OInstance) return value.__class__;
+    if (valueType == OClass) return tClass;
+    if (valueType == OClosure) return TFunction;
+  }
+
+  inferType(node: ASTNode) => {
+    let state = this.TypeStateClass(this, false);
+    state.rename(node);
+    let type = state.constrain(node);
+
+    state.unify();
+
+    if (!state.unified())
+      throw Error("Can't infer type.");
+
+    type.apply(state.solution);
+
+    return type;
+  }
+
+  // Assemble and return the [TypeState] produced
+  // by [expr].
+  typecheck(expr) => {
+    let node <- expr;
+
+    let state = this.TypeStateClass(this, false);
+
+    state.rename(node);
+    state.constrain(node);
+    state.unify();
+
+    return state;
+  }
+
+  // Calculate the type of [expr], inferring it if necessary.
+  type(expr) => {
+    // if it's not a function, return its literal type.
+    let exprType = this.literalType(expr);
+    if (exprType != TFunction)
+      return exprType;
+  
+    let node: ASTClosure <- expr;
+  
+    // now check if it has a global type annotation.
+    exprType = globalTypeEnv()[node.name];
+    if (exprType and globals()[node.name] == expr) {
+      return exprType;
+    }
+
+    // otherwise infer it.
+    return this.inferType(node);
+  }
+}
+
 
 class TypeState {
   init(system: TypeSystem, debug: bool) => {
@@ -196,16 +261,15 @@ class TypeState {
       // give the parameters type vars if they don't
       // have annotations.
       let fnEnv = node.signature.params.reduce(
-        (env: Map, node: ASTLocalTypeAssignment) => {
-          let var = node[0];
-          let val = node[1];
+        (env: Map, param: ASTParameter) => {
+          let type = param.type;
 
-          let pType = val.resolve();
+          if (type is ASTNode) type = type.resolve();
 
-          if (pType == nil)
-            env[var] = this.typeVars.fresh();
+          if (type == nil)
+            env[param] = this.typeVars.fresh();
           else
-            env[var] = pType;
+            env[param] = type;
 
           return env;
         },
@@ -421,70 +485,6 @@ class TypeState {
       c.pp();
       print "############################";
     }
-  }
-}
-
-class TypeSystem {
-  // Map vm types to object language types.
-  literalType(value) => {
-    let valueType = vType(value);
-
-    if (valueType == ()) return unit;
-    if (valueType == CNil) return void;
-    if (valueType == CBool) return bool;
-    if (valueType == CNumber) return num;
-    if (valueType == OString) return string; 
-    if (valueType == OInstance) return value.__class__;
-    if (valueType == OClass) return tClass;
-    if (valueType == OClosure) return TFunction;
-  }
-
-  inferType(node: ASTNode) => {
-    let state = this.TypeStateClass(this, false);
-    state.rename(node);
-    let type = state.constrain(node);
-
-    state.unify();
-
-    if (!state.unified())
-      throw Error("Can't infer type.");
-
-    type.apply(state.solution);
-
-    return type;
-  }
-
-  // Assemble and return the [TypeState] produced
-  // by [expr].
-  typecheck(expr) => {
-    let node <- expr;
-
-    let state = this.TypeStateClass(this, false);
-
-    state.rename(node);
-    state.constrain(node);
-    state.unify();
-
-    return state;
-  }
-
-  // Calculate the type of [expr], inferring it if necessary.
-  type(expr) => {
-    // if it's not a function, return its literal type.
-    let exprType = this.literalType(expr);
-    if (exprType != TFunction)
-      return exprType;
-  
-    let node: ASTClosure <- expr;
-  
-    // now check if it has a global type annotation.
-    exprType = globalTypeEnv()[node.name];
-    if (exprType and globals()[node.name] == expr) {
-      return exprType;
-    }
-
-    // otherwise infer it.
-    return this.inferType(node);
   }
 }
 

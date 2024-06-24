@@ -32,6 +32,8 @@ typedef struct {
 
   ObjClass* astClosure;
   ObjClass* astUpvalue;
+  ObjClass* astSignature;
+  ObjClass* astParameter;
 
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;

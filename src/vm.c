@@ -54,6 +54,8 @@ void initCore(Core* core) {
   core->iterator = NULL;
   core->astClosure = NULL;
   core->astUpvalue = NULL;
+  core->astSignature = NULL;
+  core->astParameter = NULL;
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
   core->vTypeNumber = NULL;
@@ -728,6 +730,11 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
+        int i = function->signature.arity;
+        while (i--) {
+          function->signature.types[i] = vmPop();
+          function->signature.parameters[i] = vmPop();
+        }
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
         break;

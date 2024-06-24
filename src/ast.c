@@ -38,8 +38,20 @@ bool readAST(ObjClosure* closure) {
   vmPush(OBJ_VAL(closure->function->name));
   // the function itself.
   vmPush(OBJ_VAL(closure));
-  // the function's arity.
+  // the function's signature.
+  vmPush(OBJ_VAL(vm.core.astSignature));
   vmPush(NUMBER_VAL(closure->function->signature.arity));
+  for (int i = 0; i < closure->function->signature.arity; i++) {
+    vmPush(OBJ_VAL(vm.core.astParameter));
+    // offset the reserved stack slot.
+    vmPush(NUMBER_VAL(i + 1));
+    vmPush(closure->function->signature.parameters[i]);
+    vmPush(closure->function->signature.types[i]);
+    if (!initInstance(vm.core.astParameter, 3)) return false;
+  }
+  if (!initInstance(vm.core.astSignature,
+                    closure->function->signature.arity + 1))
+    return false;
   // the closure's upvalues.
   vmPush(OBJ_VAL(vm.core.sequence));
   for (int i = 0; i < closure->upvalueCount; i++) {
@@ -188,6 +200,11 @@ bool readAST(ObjClosure* closure) {
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure* closure = newClosure(function);
+        int i = function->signature.arity;
+        while (i--) {
+          function->signature.types[i] = vmPop();
+          function->signature.parameters[i] = vmPop();
+        }
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
 

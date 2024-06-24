@@ -415,7 +415,8 @@ InterpretResult initializeCore() {
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
-
+      (vm.core.astSignature = getGlobalClass(S_AST_SIGNATURE)) == NULL ||
+      (vm.core.astParameter = getGlobalClass(S_AST_PARAMETER)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
