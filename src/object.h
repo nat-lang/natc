@@ -141,7 +141,7 @@ typedef struct {
 typedef struct {
   Obj obj;
   int cases;
-  ObjClosure *functions;
+  ObjClosure *functions[UINT8_MAX];
 } ObjOverload;
 
 typedef struct ObjClass {

@@ -372,6 +372,9 @@ bool unify(Signature pattern, Value value) {
 
   vmPush(value);
 
+  // disassembleStack();
+  // printf("\n");
+
   return vmCallValue(unifyFn, 2) &&
          vmExecute(vm.frameCount - 1) == INTERPRET_OK;
 }
@@ -384,13 +387,21 @@ static bool callOverload(ObjOverload* overload, int argCount) {
 
   for (int i = 0; i < overload->cases; i++) {
     // ObjClosure* closure = &overload->functions[i];
-    if (!unify(overload->functions[i].function->signature, argument))
+    // printf("\n--------------checking %i--------------\n", i);
+    // printf("\nfn: ");
+    // printValue(OBJ_VAL(&overload->functions[i]));
+    // printf("\n");
+
+    if (!unify(overload->functions[i]->function->signature, argument))
       return false;
+
+    // printf("\n%s", AS_BOOL(vmPeek(0)) ? "true" : "false");
+    // printf("\n---------------------------------------\n");
 
     if (AS_BOOL(vmPop())) {
       vm.stackTop[-argCount - 1] = OBJ_VAL(&overload->functions[i]);
 
-      return call(&overload->functions[i], argCount);
+      return call(overload->functions[i], argCount);
     }
   }
 
@@ -844,23 +855,34 @@ InterpretResult vmExecute(int baseFrame) {
         int cases = READ_BYTE();
         ObjOverload* overload = newOverload(cases);
 
-        if (!IS_CLOSURE(vmPeek(cases - 1))) {
-          vmRuntimeError("Overload operand must be function.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
-        overload->functions = AS_CLOSURE(vmPeek(cases - 1));
+        // disassembleStack();
+        // printf("\n");
 
-        for (int i = 1; i < cases; i++) {
+        // printf("overload %p with\n", overload);
+
+        for (int i = cases; i > 0; i--) {
           if (!IS_CLOSURE(vmPeek(i))) {
             vmRuntimeError("Overload operand must be function.");
             return INTERPRET_RUNTIME_ERROR;
           }
+          // printf("\t");
+          // printValue(vmPeek(i - 1));
+          // printf("\n");
 
-          overload->functions[i] = *AS_CLOSURE(vmPeek(i));
+          overload->functions[cases - i] = AS_CLOSURE(vmPeek(i - 1));
         }
+
+        // printf("\n");
 
         while (cases--) vmPop();
         vmPush(OBJ_VAL(overload));
+        // disassembleStack();
+        // printf("\n");
+        for (int i = 0; i < cases; i++) {
+          // printf("\t");
+          // printValue(OBJ_VAL(overload->functions[i]));
+          // printf("\n");
+        }
 
         break;
       }

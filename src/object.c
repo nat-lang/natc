@@ -91,7 +91,7 @@ ObjOverload* newOverload(int cases) {
   ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
 
   overload->cases = cases;
-  overload->functions = NULL;
+  for (int i = 0; i < cases; i++) overload->functions[i] = NULL;
   // overload->functions = functions;
 
   return overload;
