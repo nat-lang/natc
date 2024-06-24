@@ -68,10 +68,13 @@ ObjClosure* newClosure(ObjFunction* function) {
 
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
-  function->arity = 0;
+  Signature signature;
+  signature.arity = 0;
+  signature.variadic = false;
+  function->signature = signature;
   function->upvalueCount = 0;
   function->name = NULL;
-  function->variadic = false;
+
   initChunk(&function->chunk);
   initMap(&function->constants);
   return function;

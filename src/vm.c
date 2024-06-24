@@ -262,14 +262,14 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   // or (b) with arity - n arguments for n > 1. (a) is valid;
   // *args is just an empty sequence. (b) is invalid and will be
   // picked up by the arity check downstream.
-  if (*argCount < closure->function->arity) {
+  if (*argCount < closure->function->signature.arity) {
     *argCount = *argCount + 1;
     return true;
   }
 
   // walk the variadic arguments in the order they were
   // applied, peeking at and adding each to the sequence.
-  int i = *argCount - closure->function->arity;
+  int i = *argCount - closure->function->signature.arity;
   while (i >= 0) {
     Value seq = vmPop();
     Value arg = vmPeek(i);
@@ -284,7 +284,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   // now pop the sequence, all the variadic arguments,
   // and leave the sequence on the stack in their place.
   Value seq = vmPop();
-  i = *argCount - closure->function->arity;
+  i = *argCount - closure->function->signature.arity;
   while (i >= 0) {
     vmPop();
     i--;
@@ -292,7 +292,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   vmPush(seq);
 
   // what we've done is made these two equal.
-  *argCount = closure->function->arity;
+  *argCount = closure->function->signature.arity;
 
   return true;
 }
@@ -300,10 +300,10 @@ static bool variadify(ObjClosure* closure, int* argCount) {
 static bool call(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
-  if (closure->function->variadic)
+  if (closure->function->signature.variadic)
     if (!variadify(closure, &argCount)) return false;
 
-  if (!checkArity(closure->function->arity, argCount)) return false;
+  if (!checkArity(closure->function->signature.arity, argCount)) return false;
 
   if (vm.frameCount == FRAMES_MAX) {
     vmRuntimeError("Stack overflow.");

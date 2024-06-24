@@ -68,10 +68,16 @@ typedef struct {
 } ObjMap;
 
 typedef struct {
-  Obj obj;
   int arity;
-  int upvalueCount;
   bool variadic;
+  Value parameters[UINT8_COUNT];
+  Value types[UINT8_COUNT];
+} Signature;
+
+typedef struct {
+  Obj obj;
+  Signature signature;
+  int upvalueCount;
   Chunk chunk;
   ObjString *name;
   // cache from values to constant indices

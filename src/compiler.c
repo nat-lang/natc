@@ -865,7 +865,7 @@ static void nakedFunction(FunctionType fnType, Token name) {
 
   uint16_t constant = parseVariable("Expect parameter name.");
   defineVariable(constant);
-  current->function->arity++;
+  current->function->signature.arity++;
 
   // type annotations for parameters default to nil.
   emitByte(OP_NIL);
@@ -891,16 +891,16 @@ static void function(FunctionType type, Token name) {
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      if (current->function->variadic)
+      if (current->function->signature.variadic)
         error("Can only apply * to the final parameter.");
 
-      current->function->arity++;
-      if (current->function->arity > 255) {
+      current->function->signature.arity++;
+      if (current->function->signature.arity > 255) {
         errorAtCurrent("Can't have more than 255 parameters.");
       }
 
       if (checkStr("*")) {
-        current->function->variadic = true;
+        current->function->signature.variadic = true;
         // shift the star off the parameter's token.
         parser.current.start++;
         parser.current.length--;

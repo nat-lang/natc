@@ -39,7 +39,7 @@ bool readAST(ObjClosure* closure) {
   // the function itself.
   vmPush(OBJ_VAL(closure));
   // the function's arity.
-  vmPush(NUMBER_VAL(closure->function->arity));
+  vmPush(NUMBER_VAL(closure->function->signature.arity));
   // the closure's upvalues.
   vmPush(OBJ_VAL(vm.core.sequence));
   for (int i = 0; i < closure->upvalueCount; i++) {
