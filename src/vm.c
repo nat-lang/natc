@@ -44,25 +44,25 @@ void vmRuntimeError(const char* format, ...) {
   resetStack();
 }
 
-void initClasses(Classes* classes) {
-  classes->base = NULL;
-  classes->object = NULL;
-  classes->tuple = NULL;
-  classes->sequence = NULL;
-  classes->map = NULL;
-  classes->set = NULL;
-  classes->iterator = NULL;
-  classes->astClosure = NULL;
-  classes->astUpvalue = NULL;
-  classes->vTypeBool = NULL;
-  classes->vTypeNil = NULL;
-  classes->vTypeNumber = NULL;
-  classes->vTypeUndef = NULL;
-  classes->oTypeClass = NULL;
-  classes->oTypeInstance = NULL;
-  classes->oTypeString = NULL;
-  classes->oTypeClosure = NULL;
-  classes->oTypeSequence = NULL;
+void initCore(Core* core) {
+  core->base = NULL;
+  core->object = NULL;
+  core->tuple = NULL;
+  core->sequence = NULL;
+  core->map = NULL;
+  core->set = NULL;
+  core->iterator = NULL;
+  core->astClosure = NULL;
+  core->astUpvalue = NULL;
+  core->vTypeBool = NULL;
+  core->vTypeNil = NULL;
+  core->vTypeNumber = NULL;
+  core->vTypeUndef = NULL;
+  core->oTypeClass = NULL;
+  core->oTypeInstance = NULL;
+  core->oTypeString = NULL;
+  core->oTypeClosure = NULL;
+  core->oTypeSequence = NULL;
 }
 
 bool initVM() {
@@ -81,7 +81,7 @@ bool initVM() {
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   return initializeCore() == INTERPRET_OK;
 }
@@ -91,7 +91,7 @@ void freeVM() {
   freeMap(&vm.strings);
   freeMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   freeObjects();
 }
@@ -255,8 +255,8 @@ static bool spread(int* argCount) {
 // [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
-  vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
-  vmInstantiateClass(vm.classes.sequence, 0);
+  vmPush(OBJ_VAL(newInstance(vm.core.sequence)));
+  vmInstantiateClass(vm.core.sequence, 0);
 
   // either the function was called (a) with arity - 1 arguments
   // or (b) with arity - n arguments for n > 1. (a) is valid;
@@ -987,9 +987,9 @@ InterpretResult vmExecute(int baseFrame) {
 
         ObjClass lca;
         if (!IS_INSTANCE(value) &&
-            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.classes.sequence,
+            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.core.sequence,
                                 &lca) &&
-            &lca == vm.classes.sequence) {
+            &lca == vm.core.sequence) {
           vmRuntimeError("Only sequential values can spread.");
           return INTERPRET_RUNTIME_ERROR;
         }

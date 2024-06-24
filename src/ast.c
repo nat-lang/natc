@@ -33,7 +33,7 @@ bool readAST(ObjClosure* closure) {
 
   // the root of the tree is an [ASTClosure] instance that has
   // four arguments.
-  vmPush(OBJ_VAL(vm.classes.astClosure));
+  vmPush(OBJ_VAL(vm.core.astClosure));
   // the function's name.
   vmPush(OBJ_VAL(closure->function->name));
   // the function itself.
@@ -41,18 +41,17 @@ bool readAST(ObjClosure* closure) {
   // the function's arity.
   vmPush(NUMBER_VAL(closure->function->arity));
   // the closure's upvalues.
-  vmPush(OBJ_VAL(vm.classes.sequence));
+  vmPush(OBJ_VAL(vm.core.sequence));
   for (int i = 0; i < closure->upvalueCount; i++) {
-    vmPush(OBJ_VAL(vm.classes.astUpvalue));
+    vmPush(OBJ_VAL(vm.core.astUpvalue));
     vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
-    if (!initInstance(vm.classes.astUpvalue, 2)) return false;
+    if (!initInstance(vm.core.astUpvalue, 2)) return false;
   }
 
-  if (!vmInitInstance(vm.classes.sequence, closure->upvalueCount, 0))
-    return false;
+  if (!vmInitInstance(vm.core.sequence, closure->upvalueCount, 0)) return false;
 
-  if (!initInstance(vm.classes.astClosure, 4)) return false;
+  if (!initInstance(vm.core.astClosure, 4)) return false;
 
   Value root = vmPeek(0);
 

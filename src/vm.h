@@ -42,7 +42,7 @@ typedef struct {
   ObjClass* oTypeString;
   ObjClass* oTypeClosure;
   ObjClass* oTypeSequence;
-} Classes;
+} Core;
 
 typedef struct {
   Value stack[STACK_MAX];
@@ -60,7 +60,7 @@ typedef struct {
   ObjUpvalue* openUpvalues;
 
   // core defs.
-  Classes classes;
+  Core core;
 
   // memory.
   int grayCount;
