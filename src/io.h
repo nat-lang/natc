@@ -3,7 +3,6 @@
 
 #include "vm.h"
 
-void compileFile(const char* path);
 InterpretResult interpretFile(const char* path);
 
 #endif

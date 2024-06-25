@@ -78,6 +78,8 @@ bool initVM() {
   vm.grayCapacity = 0;
   vm.grayStack = NULL;
 
+  vm.compiler = NULL;
+
   initMap(&vm.globals);
   initMap(&vm.typeEnv);
   initMap(&vm.strings);
@@ -91,7 +93,6 @@ bool initVM() {
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
-  freeMap(&vm.infixes);
 
   initCore(&vm.core);
 
@@ -264,14 +265,14 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   // or (b) with arity - n arguments for n > 1. (a) is valid;
   // *args is just an empty sequence. (b) is invalid and will be
   // picked up by the arity check downstream.
-  if (*argCount < closure->function->signature.arity) {
+  if (*argCount < closure->function->arity) {
     *argCount = *argCount + 1;
     return true;
   }
 
   // walk the variadic arguments in the order they were
   // applied, peeking at and adding each to the sequence.
-  int i = *argCount - closure->function->signature.arity;
+  int i = *argCount - closure->function->arity;
   while (i >= 0) {
     Value seq = vmPop();
     Value arg = vmPeek(i);
@@ -286,7 +287,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   // now pop the sequence, all the variadic arguments,
   // and leave the sequence on the stack in their place.
   Value seq = vmPop();
-  i = *argCount - closure->function->signature.arity;
+  i = *argCount - closure->function->arity;
   while (i >= 0) {
     vmPop();
     i--;
@@ -294,7 +295,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   vmPush(seq);
 
   // what we've done is made these two equal.
-  *argCount = closure->function->signature.arity;
+  *argCount = closure->function->arity;
 
   return true;
 }
@@ -302,10 +303,10 @@ static bool variadify(ObjClosure* closure, int* argCount) {
 static bool call(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
-  if (closure->function->signature.variadic)
+  if (closure->function->variadic)
     if (!variadify(closure, &argCount)) return false;
 
-  if (!checkArity(closure->function->signature.arity, argCount)) return false;
+  if (!checkArity(closure->function->arity, argCount)) return false;
 
   if (vm.frameCount == FRAMES_MAX) {
     vmRuntimeError("Stack overflow.");
@@ -470,6 +471,20 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
                 mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
   return true;
+}
+
+void vmInitPattern(ObjFunction* function) {
+  ObjPattern* pattern = newPattern(function->arity);
+
+  int i = pattern->count;
+  int j = i;
+  while (i > 0) {
+    pattern->elements[j - i].value = vmPeek(i * 2 - 1);
+    pattern->elements[j - i].type = vmPeek(i * 2 - 2);
+    i--;
+  }
+
+  function->pattern = pattern;
 }
 
 // Loop until we're back to [baseFrame] frames. Typically this
@@ -729,12 +744,22 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = newClosure(function);
-        int i = function->signature.arity;
-        while (i--) {
-          function->signature.types[i] = vmPop();
-          function->signature.parameters[i] = vmPop();
+
+        ObjPattern* pattern = newPattern(function->arity);
+
+        int i = pattern->count;
+        int j = i;
+        while (i > 0) {
+          pattern->elements[j - i].value = vmPeek(i * 2 - 1);
+          pattern->elements[j - i].type = vmPeek(i * 2 - 2);
+          i--;
         }
+
+        function->pattern = pattern;
+        ObjClosure* closure = newClosure(function);
+
+        for (int i = 0; i < function->arity * 2; i++) vmPop();
+
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
         break;
@@ -831,6 +856,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPop();
 
         InterpretResult result = interpretFile(importLoc->chars);
+
         if (result != INTERPRET_OK) return result;
         // pop the return value of the module's function.
         // if/when import statements become selective, this'll
@@ -1018,7 +1044,8 @@ InterpretResult vmExecute(int baseFrame) {
 }
 
 InterpretResult vmInterpret(char* path, const char* source) {
-  ObjFunction* function = compile(source, path);
+  ObjFunction* function = compile(vm.compiler, source, path);
+
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(function));

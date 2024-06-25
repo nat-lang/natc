@@ -11,6 +11,7 @@
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
+#define IS_PATTERN(value) isObjType(value, OBJ_PATTERN)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_MAP(value) isObjType(value, OBJ_MAP)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
@@ -46,6 +47,7 @@ typedef enum {
   OBJ_STRING,
   OBJ_UPVALUE,
   OBJ_SPREAD,
+  OBJ_PATTERN,
 } ObjType;
 
 struct Obj {
@@ -68,16 +70,22 @@ typedef struct {
 } ObjMap;
 
 typedef struct {
-  int arity;
-  bool variadic;
-  Value parameters[UINT8_COUNT];
-  Value types[UINT8_COUNT];
-} Signature;
+  Value value;
+  Value type;
+} PatternElement;
 
 typedef struct {
   Obj obj;
-  Signature signature;
+  int count;
+  PatternElement *elements;
+} ObjPattern;
+
+typedef struct {
+  Obj obj;
+  int arity;
+  bool variadic;
   int upvalueCount;
+  ObjPattern *pattern;
   Chunk chunk;
   ObjString *name;
   // cache from values to constant indices
@@ -160,7 +168,6 @@ ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjInstance *newInstance(ObjClass *klass);
-ObjMap *newMap();
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();
@@ -170,6 +177,7 @@ ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjString *intern(const char *chars);
 ObjUpvalue *newUpvalue(Value *value, uint8_t slot);
 ObjSpread *newSpread(Value value);
+ObjPattern *newPattern(int count);
 void printObject(Value value);
 
 static inline bool isObjType(Value value, ObjType type) {

@@ -40,17 +40,16 @@ bool readAST(ObjClosure* closure) {
   vmPush(OBJ_VAL(closure));
   // the function's signature.
   vmPush(OBJ_VAL(vm.core.astSignature));
-  vmPush(NUMBER_VAL(closure->function->signature.arity));
-  for (int i = 0; i < closure->function->signature.arity; i++) {
+  vmPush(NUMBER_VAL(closure->function->arity));
+  for (int i = 0; i < closure->function->arity; i++) {
     vmPush(OBJ_VAL(vm.core.astParameter));
     // offset the reserved stack slot.
     vmPush(NUMBER_VAL(i + 1));
-    vmPush(closure->function->signature.parameters[i]);
-    vmPush(closure->function->signature.types[i]);
+    vmPush(closure->function->pattern->elements[i].value);
+    vmPush(closure->function->pattern->elements[i].type);
     if (!initInstance(vm.core.astParameter, 3)) return false;
   }
-  if (!initInstance(vm.core.astSignature,
-                    closure->function->signature.arity + 1))
+  if (!initInstance(vm.core.astSignature, closure->function->arity + 1))
     return false;
   // the closure's upvalues.
   vmPush(OBJ_VAL(vm.core.sequence));
@@ -199,12 +198,22 @@ bool readAST(ObjClosure* closure) {
       }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = newClosure(function);
-        int i = function->signature.arity;
-        while (i--) {
-          function->signature.types[i] = vmPop();
-          function->signature.parameters[i] = vmPop();
+
+        ObjPattern* pattern = newPattern(function->arity);
+
+        int i = pattern->count;
+        int j = i;
+        while (i > 0) {
+          pattern->elements[j - i].value = vmPeek(i * 2 - 1);
+          pattern->elements[j - i].type = vmPeek(i * 2 - 2);
+          i--;
         }
+
+        function->pattern = pattern;
+        ObjClosure* closure = newClosure(function);
+
+        while (i++ < j * 2) vmPop();
+
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
 

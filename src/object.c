@@ -66,13 +66,26 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
+ObjPattern* newPattern(int count) {
+  PatternElement* elements = ALLOCATE(PatternElement, count);
+  for (int i = 0; i < count; i++) {
+    elements[i].value = UNDEF_VAL;
+    elements[i].type = UNDEF_VAL;
+  }
+
+  ObjPattern* pattern = ALLOCATE_OBJ(ObjPattern, OBJ_PATTERN);
+  pattern->count = count;
+  pattern->elements = elements;
+  return pattern;
+}
+
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
-  Signature signature;
-  signature.arity = 0;
-  signature.variadic = false;
-  function->signature = signature;
+
+  function->arity = 0;
+  function->variadic = false;
   function->upvalueCount = 0;
+  function->pattern = NULL;
   function->name = NULL;
 
   initChunk(&function->chunk);
@@ -444,6 +457,9 @@ void printObject(Value value) {
       printValue(AS_SPREAD(value)->value);
       printf(">");
       break;
+    }
+    case OBJ_PATTERN: {
+      printf("<pattern>");
     }
   }
 }

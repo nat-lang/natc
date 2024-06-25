@@ -2,6 +2,7 @@
 #define nat_vm_h
 
 #include "chunk.h"
+#include "compiler.h"
 #include "object.h"
 #include "value.h"
 
@@ -71,6 +72,8 @@ typedef struct {
 
   size_t bytesAllocated;
   size_t nextGC;
+
+  Compiler* compiler;
 } VM;
 
 typedef enum {
@@ -86,6 +89,7 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
+InterpretResult vmInterpretImport(char* path, const char* source);
 InterpretResult vmInterpret(char* path, const char* source);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
