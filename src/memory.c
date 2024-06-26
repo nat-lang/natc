@@ -103,17 +103,14 @@ static void blackenObject(Obj* object) {
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
-      for (int i = 0; i < closure->upvalueCount; i++) {
+      for (int i = 0; i < closure->upvalueCount; i++)
         markObject((Obj*)closure->upvalues[i]);
-      }
       break;
     }
     case OBJ_OVERLOAD: {
       ObjOverload* overload = (ObjOverload*)object;
-
       for (int i = 0; i < overload->cases; i++)
-        markObject((Obj*)overload->functions + i);
-
+        markObject((Obj*)overload->functions[i]);
       break;
     }
     case OBJ_INSTANCE: {
@@ -196,6 +193,8 @@ static void freeObject(Obj* object) {
       break;
     }
     case OBJ_OVERLOAD: {
+      ObjOverload* overload = (ObjOverload*)object;
+      FREE_ARRAY(ObjOverload*, overload->functions, overload->cases);
       FREE(ObjOverload, object);
       break;
     }

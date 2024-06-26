@@ -55,9 +55,7 @@ ObjClass* newClass(ObjString* name) {
 
 ObjClosure* newClosure(ObjFunction* function) {
   ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
-  for (int i = 0; i < function->upvalueCount; i++) {
-    upvalues[i] = NULL;
-  }
+  for (int i = 0; i < function->upvalueCount; i++) upvalues[i] = NULL;
 
   ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
   closure->function = function;
@@ -67,10 +65,12 @@ ObjClosure* newClosure(ObjFunction* function) {
 }
 
 ObjOverload* newOverload(int cases) {
-  ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
+  ObjClosure** functions = ALLOCATE(ObjClosure*, cases);
+  for (int i = 0; i < cases; i++) functions[i] = NULL;
 
+  ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
+  overload->functions = functions;
   overload->cases = cases;
-  for (int i = 0; i < cases; i++) overload->functions[i] = NULL;
 
   return overload;
 }

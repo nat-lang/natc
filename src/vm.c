@@ -370,6 +370,8 @@ static bool callOverload(ObjOverload* overload, int argCount) {
   Value scrutinee = vmPeek(0);
 
   for (int i = 0; i < overload->cases; i++) {
+    disassembleStack();
+    printf("\n");
     if (!unify(*overload->functions[i]->function->pattern, scrutinee))
       return false;
 
