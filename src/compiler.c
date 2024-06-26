@@ -336,9 +336,10 @@ static void endScope(Compiler* cmp) {
 }
 
 static void closeFunction(Compiler* cmp, Compiler* enclosing) {
+  emitBytes(enclosing, OP_PATTERN, cmp->function->arity);
+
   ObjFunction* function = endCompiler(cmp);
 
-  emitBytes(enclosing, OP_PATTERN, function->arity);
   emitConstInstr(enclosing, OP_CLOSURE,
                  makeConstant(enclosing, OBJ_VAL(function)));
 
