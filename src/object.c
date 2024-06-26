@@ -66,6 +66,21 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
+ObjOverload* newOverload(int cases) {
+  ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
+
+  overload->cases = cases;
+  for (int i = 0; i < cases; i++) overload->functions[i] = NULL;
+
+  return overload;
+}
+
+ObjVariable* newVariable(ObjString* name) {
+  ObjVariable* variable = ALLOCATE_OBJ(ObjVariable, OBJ_VARIABLE);
+  variable->name = name;
+  return variable;
+}
+
 ObjPattern* newPattern(int count) {
   PatternElement* elements = ALLOCATE(PatternElement, count);
   for (int i = 0; i < count; i++) {
@@ -433,6 +448,15 @@ void printObject(Value value) {
       printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
+    case OBJ_OVERLOAD:
+      printf("<overload at %p>", AS_OVERLOAD(value));
+      break;
+    case OBJ_VARIABLE:
+      printf("<var %s>", AS_VARIABLE(value)->name->chars);
+      break;
+    case OBJ_PATTERN:
+      printf("<pattern>");
+      break;
     case OBJ_INSTANCE:
       printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
              AS_INSTANCE(value));
@@ -457,9 +481,6 @@ void printObject(Value value) {
       printValue(AS_SPREAD(value)->value);
       printf(">");
       break;
-    }
-    case OBJ_PATTERN: {
-      printf("<pattern>");
     }
   }
 }

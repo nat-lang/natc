@@ -108,6 +108,14 @@ static void blackenObject(Obj* object) {
       }
       break;
     }
+    case OBJ_OVERLOAD: {
+      ObjOverload* overload = (ObjOverload*)object;
+
+      for (int i = 0; i < overload->cases; i++)
+        markObject((Obj*)overload->functions + i);
+
+      break;
+    }
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
       markObject((Obj*)instance->klass);
@@ -122,6 +130,10 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)function->name);
       markArray(&function->chunk.constants);
       markObject((Obj*)function->pattern);
+      break;
+    }
+    case OBJ_VARIABLE: {
+      markObject((Obj*)((ObjVariable*)object)->name);
       break;
     }
     case OBJ_PATTERN: {
@@ -183,6 +195,20 @@ static void freeObject(Obj* object) {
       FREE(ObjFunction, object);
       break;
     }
+    case OBJ_OVERLOAD: {
+      FREE(ObjOverload, object);
+      break;
+    }
+    case OBJ_VARIABLE: {
+      FREE(ObjVariable, object);
+      break;
+    }
+    case OBJ_PATTERN: {
+      ObjPattern* pattern = (ObjPattern*)object;
+      FREE_ARRAY(PatternElement, pattern->elements, pattern->count);
+      FREE(ObjPattern, object);
+      break;
+    }
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
       freeMap(&instance->fields);
@@ -214,12 +240,6 @@ static void freeObject(Obj* object) {
     }
     case OBJ_SPREAD: {
       FREE(ObjSpread, object);
-      break;
-    }
-    case OBJ_PATTERN: {
-      ObjPattern* pattern = (ObjPattern*)object;
-      FREE_ARRAY(PatternElement, pattern->elements, pattern->count);
-      FREE(ObjPattern, object);
       break;
     }
   }

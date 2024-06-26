@@ -39,6 +39,22 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
+ObjClosure* getGlobalClosure(char* name) {
+  Value obj;
+
+  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
+    vmRuntimeError("Couldn't find function '%s'.", name);
+    return NULL;
+  }
+
+  if (!IS_CLOSURE(obj)) {
+    vmRuntimeError("Not a closure: '%s'.", name);
+    return NULL;
+  }
+
+  return AS_CLOSURE(obj);
+}
+
 ObjClass* getGlobalClass(char* name) {
   Value obj;
 
@@ -228,6 +244,9 @@ bool __vType__(int argCount, Value* args) {
       break;
     case VAL_OBJ:
       switch (AS_OBJ(value)->oType) {
+        case OBJ_VARIABLE:
+          vmPush(OBJ_VAL(vm.core.oTypeVariable));
+          break;
         case OBJ_CLASS:
           vmPush(OBJ_VAL(vm.core.oTypeClass));
           break;
@@ -421,11 +440,14 @@ InterpretResult initializeCore() {
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
       (vm.core.vTypeUndef = getGlobalClass(S_CTYPE_UNDEF)) == NULL ||
+      (vm.core.oTypeVariable = getGlobalClass(S_OTYPE_VARIABLE)) == NULL ||
       (vm.core.oTypeClass = getGlobalClass(S_OTYPE_CLASS)) == NULL ||
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
       (vm.core.oTypeString = getGlobalClass(S_OTYPE_STRING)) == NULL ||
       (vm.core.oTypeClosure = getGlobalClass(S_OTYPE_CLOSURE)) == NULL ||
-      (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL)
+      (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
+
+      (vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   return INTERPRET_OK;

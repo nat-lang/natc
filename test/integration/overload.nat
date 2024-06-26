@@ -1,0 +1,67 @@
+
+// naked literals.
+
+let f = 1 => true;
+
+assert(f(1));
+// assert(f(2) == undefined);
+
+let f = 1 => true | 2 => false;
+
+assert(f(1));
+assert(f(2) == false);
+assert(f(3) == undefined);
+
+// parenthesized literals.
+
+let f = (true) => false | (false) => true;
+
+assert(f(true) == false);
+assert(f(false) == true);
+
+// bound cases.
+
+let f = 1 => true | 2 => false | x => x;
+
+assert(f(1));
+assert(f(2) == false);
+assert(f(3) == 3);
+
+let f = x => true | 1 => false;
+assert(f(1) == true);
+
+let f = x => true | y => false;
+assert(f(1) == true);
+
+// multiple arguments.
+
+let f = (0,1) => 2 | (1,0) => 3;
+
+assert(f(0,1) == 2);
+assert(f(1,0) == 3);
+
+let f = (0,1) => 2 | (1,0) => 3 | (x,y) => (x + y) * 2;
+
+assert(f(0,1) == 2);
+assert(f(1,0) == 3);
+assert(f(1,1) == 4);
+
+// blocks.
+
+let f = 1 => { return true; } | 2 => { return false; }; 
+
+assert(f(1) == true);
+assert(f(2) == false);
+assert(f(3) == undefined);
+
+// patterns can mix values and binders.
+
+let f = (2,x) => x | (x,2) => x;
+
+assert(f(2,1) == 1);
+assert(f(2,2) == 2);
+assert(f(2,3) == 3);
+
+assert(f(1,2) == 1);
+assert(f(2,2) == 2);
+assert(f(3,2) == 3);

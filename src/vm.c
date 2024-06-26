@@ -65,6 +65,7 @@ void initCore(Core* core) {
   core->oTypeString = NULL;
   core->oTypeClosure = NULL;
   core->oTypeSequence = NULL;
+  core->unify = NULL;
 }
 
 bool initVM() {
@@ -329,6 +330,63 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
+// Wrap the top [count] values in tuple and put it
+// on the stack, leaving the values below it.
+bool tuplify(int count) {
+  int i = count;
+  Value args[count];
+  while (i--) args[count - i - 1] = vmPeek(i);
+
+  vmPush(OBJ_VAL(vm.core.tuple));
+  while (++i < count) vmPush(args[i]);
+
+  return vmCallValue(OBJ_VAL(vm.core.tuple), count);
+}
+
+bool unify(ObjPattern pattern, Value value) {
+  Value unifyFn = OBJ_VAL(vm.core.unify);
+
+  vmPush(unifyFn);
+  if (pattern.count > 1) {
+    vmPush(OBJ_VAL(vm.core.tuple));
+    for (int i = 0; i < pattern.count; i++) {
+      vmPush(pattern.elements[i].value);
+    }
+    if (!vmCallValue(OBJ_VAL(vm.core.tuple), pattern.count)) return false;
+
+  } else {
+    vmPush(pattern.elements[0].value);
+  }
+  vmPush(value);
+
+  return vmCallValue(unifyFn, 2) &&
+         vmExecute(vm.frameCount - 1) == INTERPRET_OK;
+}
+
+static bool callOverload(ObjOverload* overload, int argCount) {
+  if (argCount > 1)
+    if (!tuplify(argCount)) return false;
+
+  Value scrutinee = vmPeek(0);
+
+  for (int i = 0; i < overload->cases; i++) {
+    if (!unify(*overload->functions[i]->function->pattern, scrutinee))
+      return false;
+
+    if (AS_BOOL(vmPop())) {
+      if (argCount > 1) vmPop();  // the tuplified scrutinee.
+      return call(overload->functions[i], argCount);
+    }
+  }
+
+  // no match: replace the arguments and the case object with undef.
+  vmPop();  // arg.
+  vmPop();  // case.
+  vmPush(UNDEF_VAL);
+
+  return true;
+}
+
 bool vmCallValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
@@ -352,6 +410,8 @@ bool vmCallValue(Value callee, int argCount) {
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
+      case OBJ_OVERLOAD:
+        return callOverload(AS_OVERLOAD(callee), argCount);
       case OBJ_NATIVE:
         return callNative(AS_NATIVE(callee), argCount);
       case OBJ_INSTANCE: {
@@ -431,7 +491,8 @@ void vmCloseUpvalues(Value* last) {
 }
 
 static bool isFalsey(Value value) {
-  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+  return IS_NIL(value) || IS_UNDEF(value) ||
+         (IS_BOOL(value) && !AS_BOOL(value));
 }
 
 static bool validateSeqIdx(ObjSequence* seq, Value idx) {
@@ -744,7 +805,6 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-
         ObjPattern* pattern = newPattern(function->arity);
 
         int i = pattern->count;
@@ -762,6 +822,30 @@ InterpretResult vmExecute(int baseFrame) {
 
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
+        break;
+      }
+      case OP_OVERLOAD: {
+        int cases = READ_BYTE();
+        ObjOverload* overload = newOverload(cases);
+
+        for (int i = cases; i > 0; i--) {
+          if (!IS_CLOSURE(vmPeek(i))) {
+            vmRuntimeError("Overload operand must be function.");
+            return INTERPRET_RUNTIME_ERROR;
+          }
+
+          overload->functions[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+        }
+
+        while (cases--) vmPop();
+        vmPush(OBJ_VAL(overload));
+
+        break;
+      }
+      case OP_VARIABLE: {
+        ObjString* name = READ_STRING();
+        ObjVariable* var = newVariable(name);
+        vmPush(OBJ_VAL(var));
         break;
       }
       case OP_CLOSE_UPVALUE: {

@@ -196,6 +196,12 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opGetUpvalue", 2)) return false;
         break;
       }
+      case OP_VARIABLE: {
+        ObjString* name = READ_STRING();
+        ObjVariable* var = newVariable(name);
+        vmPush(OBJ_VAL(var));
+        break;
+      }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
 

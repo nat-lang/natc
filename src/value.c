@@ -75,12 +75,12 @@ void printValueArray(ValueArray* array) {
 bool valuesEqual(Value a, Value b) {
   if (a.vType != b.vType) return false;
   switch (a.vType) {
+    case VAL_UNDEF:
     case VAL_UNIT:
+    case VAL_NIL:
       return true;
     case VAL_BOOL:
       return AS_BOOL(a) == AS_BOOL(b);
-    case VAL_NIL:
-      return true;
     case VAL_NUMBER:
       return AS_NUMBER(a) == AS_NUMBER(b);
     case VAL_OBJ:

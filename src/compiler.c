@@ -606,6 +606,10 @@ static void bareString(Compiler* cmp) {
       cmp, OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
 
+static void undefined(Compiler* cmp, bool canAssign) {
+  emitByte(cmp, OP_UNDEFINED);
+}
+
 static void namedVariable(Compiler* cmp, Token name, bool canAssign) {
   uint8_t getOp, setOp;
 
@@ -786,10 +790,25 @@ static bool trySingleFunction(Compiler* cmp, FunctionType fnType, Token name) {
   return false;
 }
 
-static bool tryFunction(Compiler* cmp, FunctionType fnType, Token name) {
-  return trySingleFunction(cmp, fnType, name);
+void overload(Compiler* cmp, FunctionType fnType, Token name) {
+  int cases = 1;
+
+  do {
+    trySingleFunction(cmp, fnType, name);
+    cases++;
+  } while (match(cmp, TOKEN_PIPE));
+
+  emitBytes(cmp, OP_OVERLOAD, cases);
 }
 
+static bool tryFunction(Compiler* cmp, FunctionType fnType, Token name) {
+  if (trySingleFunction(cmp, fnType, name)) {
+    if (match(cmp, TOKEN_PIPE)) overload(cmp, fnType, name);
+    return true;
+  }
+
+  return false;
+}
 static void boundExpression(Compiler* cmp, Token name) {
   if (tryFunction(cmp, TYPE_BOUND, name)) return;
 
@@ -843,7 +862,7 @@ static uint8_t parameter(Compiler* cmp) {
 void hoistParam(Compiler* cmp) {
   // param.
   uint16_t constant = identifierConstant(cmp->enclosing, &parser.previous);
-  emitConstInstr(cmp->enclosing, OP_CONSTANT, constant);
+  emitConstInstr(cmp->enclosing, OP_VARIABLE, constant);
 
   // type.
   if (match(cmp->enclosing, TOKEN_COLON)) {
@@ -872,6 +891,7 @@ static void nakedFunction(Compiler* enclosing, FunctionType fnType,
 
   } else {
     hoistPattern(&cmp);
+    addLocal(&cmp, syntheticToken("#pattern"));
   }
 
   if (check(TOKEN_FAT_ARROW)) {
@@ -914,6 +934,7 @@ static void function(Compiler* enclosing, FunctionType type, Token name) {
 
       } else {
         hoistPattern(&cmp);
+        addLocal(&cmp, syntheticToken("#pattern"));
       }
 
     } while (match(&cmp, TOKEN_COMMA));
@@ -1600,6 +1621,7 @@ ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
+    [TOKEN_UNDEFINED] = {undefined, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},

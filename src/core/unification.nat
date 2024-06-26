@@ -1,0 +1,15 @@
+
+let var = x => vType(x) == OVariable;
+
+let unify = (a,b) => {
+  if (var(a) or var(b))
+    return true;
+
+  if (a is Sequential and b is Sequential) {
+    if (len(a) != len(b))
+      return false;
+    return zip(a,b).all(x => unify(..x));
+  }
+
+  return a == b;
+};

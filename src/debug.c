@@ -145,12 +145,16 @@ int disassembleInstruction(Chunk* chunk, int offset) {
 
       return offset;
     }
+    case OP_VARIABLE:
+      return constantInstruction("OP_VARIABLE", chunk, offset);
     case OP_CLOSE_UPVALUE:
       return simpleInstruction("OP_CLOSE_UPVALUE", offset);
     case OP_IMPLICIT_RETURN:
       return simpleInstruction("OP_IMPLICIT_RETURN", offset);
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
+    case OP_OVERLOAD:
+      return byteInstruction("OP_OVERLOAD", chunk, offset);
     case OP_CLASS:
       return constantInstruction("OP_CLASS", chunk, offset);
     case OP_INHERIT:

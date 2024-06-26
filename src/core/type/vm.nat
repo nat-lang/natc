@@ -33,6 +33,7 @@ class CNumber extends CType {}
 class CObject extends CType {}
 class CUndef extends CType {}
 
+class OVariable extends CObject {}
 class OClass extends CObject {}
 class OInstance extends CObject {}
 class OString extends CObject {}

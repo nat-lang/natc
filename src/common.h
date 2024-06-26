@@ -47,10 +47,13 @@
 #define S_CTYPE_NIL "CNil"
 #define S_CTYPE_NUMBER "CNumber"
 #define S_CTYPE_UNDEF "CUndef"
+#define S_OTYPE_VARIABLE "OVariable"
 #define S_OTYPE_CLASS "OClass"
 #define S_OTYPE_INSTANCE "OInstance"
 #define S_OTYPE_STRING "OString"
 #define S_OTYPE_CLOSURE "OClosure"
 #define S_OTYPE_SEQUENCE "OSequence"
+
+#define S_UNIFY "unify"
 
 #endif

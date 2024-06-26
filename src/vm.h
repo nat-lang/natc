@@ -40,11 +40,14 @@ typedef struct {
   ObjClass* vTypeNil;
   ObjClass* vTypeNumber;
   ObjClass* vTypeUndef;
+  ObjClass* oTypeVariable;
   ObjClass* oTypeClass;
   ObjClass* oTypeInstance;
   ObjClass* oTypeString;
   ObjClass* oTypeClosure;
   ObjClass* oTypeSequence;
+
+  ObjClosure* unify;
 } Core;
 
 typedef struct {
