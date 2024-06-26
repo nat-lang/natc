@@ -89,6 +89,8 @@ typedef struct {
 typedef struct {
   Obj obj;
   int count;
+  // does the pattern have values?
+  bool isLiteral;
   PatternElement *elements;
 } ObjPattern;
 

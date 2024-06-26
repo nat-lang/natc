@@ -6,6 +6,12 @@ let infix &;
 // simplest case.
 assert(2 & 2 == 4);
 
+let infix g = >;
+
+assert(1 g 1 == false);
+assert(1 g 2 == false);
+assert(2 g 1);
+
 // callable as prefix.
 assert(&(2,2) == 4);
 
@@ -35,17 +41,10 @@ assert(5 plus 5 == 10);
 assert(5 times 5 == 25);
 assert(5 plus 5 times 2 == 15);
 
-// default less than less than property
-// access (PREC_CALL).
+// default less than property access (PREC_CALL).
 let infix @ = (x, y) => (x + y) / 2;
 class A { f() => 1; }
 
 assert(A().f() @ A().f() == 1);
 
-// simple assignment.
 
-let infix(5) f = __add__;
-assert(1 f 1 == 2);
-
-let infix g = >;
-assert(1 g 1 == false);

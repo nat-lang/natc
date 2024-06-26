@@ -363,21 +363,18 @@ bool unify(ObjPattern pattern, Value value) {
          vmExecute(vm.frameCount - 1) == INTERPRET_OK;
 }
 
-static bool callOverload(ObjOverload* overload, int argCount) {
+static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
   if (argCount > 1)
     if (!tuplify(argCount)) return false;
 
   Value scrutinee = vmPeek(0);
 
-  for (int i = 0; i < overload->cases; i++) {
-    disassembleStack();
-    printf("\n");
-    if (!unify(*overload->functions[i]->function->pattern, scrutinee))
-      return false;
+  for (int i = 0; i < caseCount; i++) {
+    if (!unify(*cases[i]->function->pattern, scrutinee)) return false;
 
     if (AS_BOOL(vmPop())) {
       if (argCount > 1) vmPop();  // the tuplified scrutinee.
-      return call(overload->functions[i], argCount);
+      return call(cases[i], argCount);
     }
   }
 
@@ -410,10 +407,18 @@ bool vmCallValue(Value callee, int argCount) {
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
         return vmInstantiateClass(klass, argCount);
       }
-      case OBJ_CLOSURE:
+      case OBJ_CLOSURE: {
+        ObjClosure* closure = AS_CLOSURE(callee);
+        ObjPattern* pattern = closure->function->pattern;
+
+        if (pattern != NULL && pattern->isLiteral)
+          return callCases(&closure, 1, argCount);
         return call(AS_CLOSURE(callee), argCount);
-      case OBJ_OVERLOAD:
-        return callOverload(AS_OVERLOAD(callee), argCount);
+      }
+      case OBJ_OVERLOAD: {
+        ObjOverload* overload = AS_OVERLOAD(callee);
+        return callCases(overload->functions, overload->cases, argCount);
+      }
       case OBJ_NATIVE:
         return callNative(AS_NATIVE(callee), argCount);
       case OBJ_INSTANCE: {
@@ -490,6 +495,25 @@ void vmCloseUpvalues(Value* last) {
     upvalue->location = &upvalue->closed;
     vm.openUpvalues = upvalue->next;
   }
+}
+
+void vmPattern(int count) {
+  ObjPattern* pattern = newPattern(count);
+
+  int i = count;
+  while (i > 0) {
+    Value value = vmPeek(i * 2 - 1);
+    Value type = vmPeek(i * 2 - 2);
+    pattern->elements[count - i].value = value;
+    pattern->elements[count - i].type = type;
+
+    if (!IS_VARIABLE(value)) pattern->isLiteral = true;
+    i--;
+  }
+
+  for (int i = 0; i < count * 2; i++) vmPop();
+
+  vmPush(OBJ_VAL(pattern));
 }
 
 static bool isFalsey(Value value) {
@@ -807,20 +831,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjPattern* pattern = newPattern(function->arity);
-
-        int i = pattern->count;
-        int j = i;
-        while (i > 0) {
-          pattern->elements[j - i].value = vmPeek(i * 2 - 1);
-          pattern->elements[j - i].type = vmPeek(i * 2 - 2);
-          i--;
-        }
-
-        function->pattern = pattern;
         ObjClosure* closure = newClosure(function);
+        Value pattern = vmPop();
 
-        for (int i = 0; i < function->arity * 2; i++) vmPop();
+        function->pattern = AS_PATTERN(pattern);
 
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);
@@ -848,6 +862,11 @@ InterpretResult vmExecute(int baseFrame) {
         ObjString* name = READ_STRING();
         ObjVariable* var = newVariable(name);
         vmPush(OBJ_VAL(var));
+        break;
+      }
+      case OP_PATTERN: {
+        int count = READ_BYTE();
+        vmPattern(count);
         break;
       }
       case OP_CLOSE_UPVALUE: {

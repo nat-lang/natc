@@ -147,6 +147,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     }
     case OP_VARIABLE:
       return constantInstruction("OP_VARIABLE", chunk, offset);
+    case OP_PATTERN:
+      return byteInstruction("OP_PATTERN", chunk, offset);
     case OP_CLOSE_UPVALUE:
       return simpleInstruction("OP_CLOSE_UPVALUE", offset);
     case OP_IMPLICIT_RETURN:

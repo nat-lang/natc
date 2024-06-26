@@ -202,23 +202,17 @@ bool readAST(ObjClosure* closure) {
         vmPush(OBJ_VAL(var));
         break;
       }
+      case OP_PATTERN: {
+        int count = READ_BYTE();
+        vmPattern(count);
+        break;
+      }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-
-        ObjPattern* pattern = newPattern(function->arity);
-
-        int i = pattern->count;
-        int j = i;
-        while (i > 0) {
-          pattern->elements[j - i].value = vmPeek(i * 2 - 1);
-          pattern->elements[j - i].type = vmPeek(i * 2 - 2);
-          i--;
-        }
-
-        function->pattern = pattern;
         ObjClosure* closure = newClosure(function);
+        Value pattern = vmPop();
 
-        while (i++ < j * 2) vmPop();
+        function->pattern = AS_PATTERN(pattern);
 
         vmPush(OBJ_VAL(closure));
         vmCaptureUpvalues(closure, frame);

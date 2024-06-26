@@ -338,6 +338,7 @@ static void endScope(Compiler* cmp) {
 static void closeFunction(Compiler* cmp, Compiler* enclosing) {
   ObjFunction* function = endCompiler(cmp);
 
+  emitBytes(enclosing, OP_PATTERN, function->arity);
   emitConstInstr(enclosing, OP_CLOSURE,
                  makeConstant(enclosing, OBJ_VAL(function)));
 
@@ -745,7 +746,8 @@ typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
 bool matchParamOrPattern(Compiler* cmp) {
   return match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_NUMBER) ||
          match(cmp, TOKEN_TRUE) || match(cmp, TOKEN_FALSE) ||
-         match(cmp, TOKEN_NIL) || match(cmp, TOKEN_STRING);
+         match(cmp, TOKEN_NIL) || match(cmp, TOKEN_UNDEFINED) ||
+         match(cmp, TOKEN_STRING);
 }
 
 static SignatureType peekSignatureType(Compiler* cmp) {
@@ -851,14 +853,6 @@ static void blockOrExpression(Compiler* cmp) {
   }
 }
 
-static uint8_t parameter(Compiler* cmp) {
-  consume(cmp, TOKEN_IDENTIFIER, "Expect parameter name.");
-  uint8_t local = declareVariable(cmp);
-  markInitialized(cmp);
-
-  return local;
-}
-
 void hoistParam(Compiler* cmp) {
   // param.
   uint16_t constant = identifierConstant(cmp->enclosing, &parser.previous);
@@ -878,6 +872,19 @@ void hoistPattern(Compiler* cmp) {
   emitByte(cmp->enclosing, OP_NIL);
 }
 
+void parameter(Compiler* cmp) {
+  if (check(TOKEN_IDENTIFIER)) {
+    consume(cmp, TOKEN_IDENTIFIER, "Expect parameter name.");
+    declareVariable(cmp);
+    markInitialized(cmp);
+    hoistParam(cmp);
+
+  } else {
+    hoistPattern(cmp);
+    addLocal(cmp, syntheticToken("#pattern"));
+  }
+}
+
 static void nakedFunction(Compiler* enclosing, FunctionType fnType,
                           Token name) {
   Compiler cmp;
@@ -885,14 +892,7 @@ static void nakedFunction(Compiler* enclosing, FunctionType fnType,
   beginScope(&cmp);
 
   cmp.function->arity = 1;
-  if (check(TOKEN_IDENTIFIER)) {
-    parameter(&cmp);
-    hoistParam(&cmp);
-
-  } else {
-    hoistPattern(&cmp);
-    addLocal(&cmp, syntheticToken("#pattern"));
-  }
+  parameter(&cmp);
 
   if (check(TOKEN_FAT_ARROW)) {
     advance(&cmp);
@@ -928,17 +928,10 @@ static void function(Compiler* enclosing, FunctionType type, Token name) {
         parser.current.length--;
       }
 
-      if (check(TOKEN_IDENTIFIER)) {
-        parameter(&cmp);
-        hoistParam(&cmp);
-
-      } else {
-        hoistPattern(&cmp);
-        addLocal(&cmp, syntheticToken("#pattern"));
-      }
-
+      parameter(&cmp);
     } while (match(&cmp, TOKEN_COMMA));
   }
+
   consume(&cmp, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
 

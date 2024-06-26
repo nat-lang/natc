@@ -4,13 +4,24 @@
 let f = 1 => true;
 
 assert(f(1));
-// assert(f(2) == undefined);
+assert(f(2) == undefined);
 
 let f = 1 => true | 2 => false;
 
 assert(f(1));
 assert(f(2) == false);
 assert(f(3) == undefined);
+
+let f = nil => true;
+
+assert(f(nil));
+assert(f(2) == undefined);
+
+let f = nil => true | undefined => true | false => false;
+
+assert(f(nil));
+assert(f(undefined));
+assert(f(false) == false);
 
 // parenthesized literals.
 
@@ -54,7 +65,7 @@ assert(f(1) == true);
 assert(f(2) == false);
 assert(f(3) == undefined);
 
-// patterns can mix values and binders.
+// literals & bound variables.
 
 let f = (2,x) => x | (x,2) => x;
 

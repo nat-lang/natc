@@ -90,6 +90,7 @@ ObjPattern* newPattern(int count) {
 
   ObjPattern* pattern = ALLOCATE_OBJ(ObjPattern, OBJ_PATTERN);
   pattern->count = count;
+  pattern->isLiteral = false;
   pattern->elements = elements;
   return pattern;
 }

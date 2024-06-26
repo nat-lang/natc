@@ -105,6 +105,7 @@ bool vmHashValue(Value value, uint32_t* hash);
 bool vmCallValue(Value value, int argCount);
 void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
 void vmCloseUpvalues(Value* last);
+void vmPattern(int count);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 
 #endif
