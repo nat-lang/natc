@@ -1,15 +1,23 @@
 
 let var = x => vType(x) == OVariable;
 
-let unify = (a,b) => {
-  if (var(a) or var(b))
-    return true;
+let unifyPair = (a, b) => {
+  let vA = a[0], vB = b[0],
+      tA = a[1], tB = b[1];
 
-  if (a is Sequential and b is Sequential) {
-    if (len(a) != len(b))
-      return false;
-    return zip(a,b).all(x => unify(..x));
+  if (tA == undefined) {
+    if (var(vA))
+      return true;
+    return vA == vB;
   }
 
-  return a == b;
+  return tA == tB;
+};
+
+let unify = (pattern, scrutinee) => {
+  if (len(pattern) != len(scrutinee)) return false;
+
+  let typedScrutinee = [(x, SimpleTypeSystem.type(x)) | x in scrutinee];
+
+  return zip(pattern, typedScrutinee).all(pair => unifyPair(..pair));
 };

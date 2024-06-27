@@ -266,7 +266,7 @@ class TypeState {
 
           if (type is ASTNode) type = type.resolve();
 
-          if (type == nil)
+          if (type == undefined)
             env[param] = this.typeVars.fresh();
           else
             env[param] = type;

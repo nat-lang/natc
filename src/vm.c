@@ -331,11 +331,15 @@ static bool callNative(ObjNative* native, int argCount) {
 }
 
 // Wrap the top [count] values in tuple and put it
-// on the stack, leaving the values below it.
-bool tuplify(int count) {
+// on the stack, optionally leaving the values below it.
+bool tuplify(int count, bool replace) {
   int i = count;
   Value args[count];
-  while (i--) args[count - i - 1] = vmPeek(i);
+
+  if (replace)
+    while (i--) args[i] = vmPop();
+  else
+    while (i--) args[count - i - 1] = vmPeek(i);
 
   vmPush(OBJ_VAL(vm.core.tuple));
   while (++i < count) vmPush(args[i]);
@@ -343,20 +347,24 @@ bool tuplify(int count) {
   return vmCallValue(OBJ_VAL(vm.core.tuple), count);
 }
 
-bool unify(ObjPattern pattern, Value value) {
+bool pushPatternElement(PatternElement element) {
+  vmPush(element.value);
+  vmPush(element.type);
+  if (!tuplify(2, true) && vmExecute(vm.frameCount - 1) == INTERPRET_OK)
+    return false;
+  return true;
+}
+
+bool unify(ObjPattern* pattern, Value value) {
   Value unifyFn = OBJ_VAL(vm.core.unify);
 
   vmPush(unifyFn);
-  if (pattern.count > 1) {
-    vmPush(OBJ_VAL(vm.core.tuple));
-    for (int i = 0; i < pattern.count; i++) {
-      vmPush(pattern.elements[i].value);
-    }
-    if (!vmCallValue(OBJ_VAL(vm.core.tuple), pattern.count)) return false;
 
-  } else {
-    vmPush(pattern.elements[0].value);
-  }
+  for (int i = 0; i < pattern->count; i++)
+    pushPatternElement(pattern->elements[i]);
+
+  if (pattern->count > 0) tuplify(pattern->count, true);
+
   vmPush(value);
 
   return vmCallValue(unifyFn, 2) &&
@@ -364,23 +372,23 @@ bool unify(ObjPattern pattern, Value value) {
 }
 
 static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
-  if (argCount > 1)
-    if (!tuplify(argCount)) return false;
+  if (!tuplify(argCount, false)) return false;
 
   Value scrutinee = vmPeek(0);
 
   for (int i = 0; i < caseCount; i++) {
-    if (!unify(*cases[i]->function->pattern, scrutinee)) return false;
+    if (!unify(cases[i]->function->pattern, scrutinee)) return false;
 
     if (AS_BOOL(vmPop())) {
-      if (argCount > 1) vmPop();  // the tuplified scrutinee.
+      vmPop();  // the tuplified scrutinee.
       return call(cases[i], argCount);
     }
   }
 
   // no match: replace the arguments and the case object with undef.
-  vmPop();  // arg.
-  vmPop();  // case.
+  vmPop();                     // tuplified scrutinee.
+  while (argCount--) vmPop();  // args.
+  vmPop();                     // case.
   vmPush(UNDEF_VAL);
 
   return true;
@@ -845,8 +853,8 @@ InterpretResult vmExecute(int baseFrame) {
         ObjOverload* overload = newOverload(cases);
 
         for (int i = cases; i > 0; i--) {
-          if (!IS_CLOSURE(vmPeek(i))) {
-            vmRuntimeError("Overload operand must be function.");
+          if (!IS_CLOSURE(vmPeek(i - 1))) {
+            vmRuntimeError("Overload operand must be a function.");
             return INTERPRET_RUNTIME_ERROR;
           }
 

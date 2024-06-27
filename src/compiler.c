@@ -863,14 +863,14 @@ void hoistParam(Compiler* cmp) {
   if (match(cmp->enclosing, TOKEN_COLON)) {
     expression(cmp->enclosing);
   } else {
-    emitByte(cmp->enclosing, OP_NIL);
+    emitByte(cmp->enclosing, OP_UNDEFINED);
   }
 }
 
 void hoistPattern(Compiler* cmp) {
   parsePrecedence(cmp->enclosing, PREC_ASSIGNMENT);
   // type.
-  emitByte(cmp->enclosing, OP_NIL);
+  emitByte(cmp->enclosing, OP_UNDEFINED);
 }
 
 void parameter(Compiler* cmp) {
