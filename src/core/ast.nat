@@ -206,3 +206,11 @@ class ASTClosure extends ASTExpr {
     this.children.push(node);
   }
 }
+
+class ASTOverload extends ASTExpr {
+  init(overload, cases, closures) => {
+    this.overload = overload;
+    this.cases = cases;
+    this.children = closures;
+  }
+}

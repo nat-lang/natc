@@ -65,11 +65,11 @@ ObjClosure* newClosure(ObjFunction* function) {
 }
 
 ObjOverload* newOverload(int cases) {
-  ObjClosure** functions = ALLOCATE(ObjClosure*, cases);
-  for (int i = 0; i < cases; i++) functions[i] = NULL;
+  ObjClosure** closures = ALLOCATE(ObjClosure*, cases);
+  for (int i = 0; i < cases; i++) closures[i] = NULL;
 
   ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
-  overload->functions = functions;
+  overload->closures = closures;
   overload->cases = cases;
 
   return overload;

@@ -42,6 +42,7 @@
 #define S_AST_UPVALUE "ASTUpvalue"
 #define S_AST_SIGNATURE "ASTSignature"
 #define S_AST_PARAMETER "ASTParameter"
+#define S_AST_OVERLOAD "ASTOverload"
 
 #define S_CTYPE_BOOL "CBool"
 #define S_CTYPE_NIL "CNil"
@@ -52,6 +53,7 @@
 #define S_OTYPE_INSTANCE "OInstance"
 #define S_OTYPE_STRING "OString"
 #define S_OTYPE_CLOSURE "OClosure"
+#define S_OTYPE_OVERLOAD "OOverload"
 #define S_OTYPE_SEQUENCE "OSequence"
 
 #define S_UNIFY "unify"

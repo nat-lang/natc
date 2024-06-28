@@ -140,6 +140,13 @@ class TFunction extends Type {
     }
   }
 }
+
+class TOverload extends Type {
+  init(functions) => {
+    this.functions = functions;
+  }
+}
+
 class TClass extends Type {}
 
 let unit = TUnit();

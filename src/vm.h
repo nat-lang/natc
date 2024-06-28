@@ -35,6 +35,7 @@ typedef struct {
   ObjClass* astUpvalue;
   ObjClass* astSignature;
   ObjClass* astParameter;
+  ObjClass* astOverload;
 
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;
@@ -45,6 +46,7 @@ typedef struct {
   ObjClass* oTypeInstance;
   ObjClass* oTypeString;
   ObjClass* oTypeClosure;
+  ObjClass* oTypeOverload;
   ObjClass* oTypeSequence;
 
   ObjClosure* unify;
@@ -106,8 +108,10 @@ CallFrame* vmCallFrame(ObjClosure* closure, int offset);
 bool vmCallValue(Value value, int argCount);
 void vmCloseUpvalues(Value* last);
 bool vmClosure(CallFrame* frame);
+bool vmOverload(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmPattern(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
+bool vmTuplify(int count, bool replace);
 
 #endif

@@ -259,6 +259,9 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_CLOSURE:
           vmPush(OBJ_VAL(vm.core.oTypeClosure));
           break;
+        case OBJ_OVERLOAD:
+          vmPush(OBJ_VAL(vm.core.oTypeOverload));
+          break;
         default: {
           printValue(value);
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
@@ -436,6 +439,7 @@ InterpretResult initializeCore() {
       (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
       (vm.core.astSignature = getGlobalClass(S_AST_SIGNATURE)) == NULL ||
       (vm.core.astParameter = getGlobalClass(S_AST_PARAMETER)) == NULL ||
+      (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
@@ -445,6 +449,7 @@ InterpretResult initializeCore() {
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
       (vm.core.oTypeString = getGlobalClass(S_OTYPE_STRING)) == NULL ||
       (vm.core.oTypeClosure = getGlobalClass(S_OTYPE_CLOSURE)) == NULL ||
+      (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
       (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 
       (vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL)

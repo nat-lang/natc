@@ -56,6 +56,7 @@ void initCore(Core* core) {
   core->astUpvalue = NULL;
   core->astSignature = NULL;
   core->astParameter = NULL;
+  core->astOverload = NULL;
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
   core->vTypeNumber = NULL;
@@ -64,6 +65,7 @@ void initCore(Core* core) {
   core->oTypeInstance = NULL;
   core->oTypeString = NULL;
   core->oTypeClosure = NULL;
+  core->oTypeOverload = NULL;
   core->oTypeSequence = NULL;
   core->unify = NULL;
 }
@@ -337,7 +339,7 @@ static bool callNative(ObjNative* native, int argCount) {
 
 // Wrap the top [count] values in tuple and put it
 // on the stack, optionally leaving the values below it.
-bool tuplify(int count, bool replace) {
+bool vmTuplify(int count, bool replace) {
   int i = count;
   Value args[count];
 
@@ -355,7 +357,7 @@ bool tuplify(int count, bool replace) {
 bool pushPatternElement(PatternElement element) {
   vmPush(element.value);
   vmPush(element.type);
-  if (!tuplify(2, true) && vmExecute(vm.frameCount - 1) == INTERPRET_OK)
+  if (!vmTuplify(2, true) && vmExecute(vm.frameCount - 1) == INTERPRET_OK)
     return false;
   return true;
 }
@@ -368,7 +370,7 @@ bool unify(ObjPattern* pattern, Value value) {
   for (int i = 0; i < pattern->count; i++)
     pushPatternElement(pattern->elements[i]);
 
-  if (pattern->count > 0) tuplify(pattern->count, true);
+  if (pattern->count > 0) vmTuplify(pattern->count, true);
 
   vmPush(value);
 
@@ -377,7 +379,7 @@ bool unify(ObjPattern* pattern, Value value) {
 }
 
 static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
-  if (!tuplify(argCount, false)) return false;
+  if (!vmTuplify(argCount, false)) return false;
 
   Value scrutinee = vmPeek(0);
 
@@ -430,7 +432,7 @@ bool vmCallValue(Value callee, int argCount) {
       }
       case OBJ_OVERLOAD: {
         ObjOverload* overload = AS_OVERLOAD(callee);
-        return callCases(overload->functions, overload->cases, argCount);
+        return callCases(overload->closures, overload->cases, argCount);
       }
       case OBJ_NATIVE:
         return callNative(AS_NATIVE(callee), argCount);
@@ -536,7 +538,8 @@ void vmPattern(CallFrame* frame) {
   vmPush(OBJ_VAL(pattern));
 }
 
-bool vmOverload(int cases) {
+bool vmOverload(CallFrame* frame) {
+  int cases = READ_BYTE();
   ObjOverload* overload = newOverload(cases);
 
   for (int i = cases; i > 0; i--) {
@@ -545,7 +548,7 @@ bool vmOverload(int cases) {
       return false;
     }
 
-    overload->functions[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+    overload->closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
   }
 
   while (cases--) vmPop();
@@ -887,21 +890,7 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_OVERLOAD: {
-        int cases = READ_BYTE();
-        ObjOverload* overload = newOverload(cases);
-
-        for (int i = cases; i > 0; i--) {
-          if (!IS_CLOSURE(vmPeek(i - 1))) {
-            vmRuntimeError("Overload operand must be a function.");
-            return INTERPRET_RUNTIME_ERROR;
-          }
-
-          overload->functions[cases - i] = AS_CLOSURE(vmPeek(i - 1));
-        }
-
-        while (cases--) vmPop();
-        vmPush(OBJ_VAL(overload));
-
+        if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_VARIABLE: {
@@ -1128,26 +1117,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DESTRUCTURE: {
         Value value = vmPeek(0);
-
-        switch (value.vType) {
-          case VAL_OBJ: {
-            switch (OBJ_TYPE(value)) {
-              case OBJ_CLOSURE: {
-                ObjClosure* closure = AS_CLOSURE(value);
-
-                if (!readAST(closure)) return INTERPRET_RUNTIME_ERROR;
-                break;
-              }
-              default:
-                vmRuntimeError("Undestructurable object.");
-                return INTERPRET_RUNTIME_ERROR;
-            }
-            break;
-          }
-          default:
-            vmRuntimeError("Undestructurable value.");
-            return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!astDestructure(value)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_SET_TYPE_LOCAL: {

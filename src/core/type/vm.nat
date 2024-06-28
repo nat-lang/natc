@@ -38,4 +38,5 @@ class OClass extends CObject {}
 class OInstance extends CObject {}
 class OString extends CObject {}
 class OClosure extends CObject {}
+class OOverload extends CObject {}
 class OSequence extends CObject {}

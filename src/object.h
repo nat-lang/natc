@@ -144,7 +144,7 @@ typedef struct {
 typedef struct {
   Obj obj;
   int cases;
-  ObjClosure **functions;
+  ObjClosure **closures;
 } ObjOverload;
 
 typedef struct ObjClass {

@@ -218,6 +218,15 @@ assert(j_x_up.uuid == x.uuid);
 assert(j_y_up.uuid == y.uuid);
 assert(j_a_up.uuid == a.uuid);
 
+// overloaded functions.
+
+f <- 1 => true | 2 => false;
+
+assert(vType(f.overload) == OOverload);
+assert(f.cases == 2);
+assert(f[0] is ASTClosure);
+assert(f[1] is ASTClosure);
+
 // invocation.
 
 class A {}
