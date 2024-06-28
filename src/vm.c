@@ -301,6 +301,14 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   return true;
 }
 
+CallFrame* vmCallFrame(ObjClosure* closure, int offset) {
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->closure = closure;
+  frame->ip = closure->function->chunk.code;
+  frame->slots = vm.stackTop - offset;
+  return frame;
+}
+
 static bool call(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
@@ -314,10 +322,7 @@ static bool call(ObjClosure* closure, int argCount) {
     return false;
   }
 
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = vm.stackTop - argCount - 1;
+  vmCallFrame(closure, argCount + 1);
 
   return true;
 }
@@ -505,7 +510,14 @@ void vmCloseUpvalues(Value* last) {
   }
 }
 
-void vmPattern(int count) {
+void vmVariable(CallFrame* frame) {
+  ObjString* name = READ_STRING();
+  ObjVariable* var = newVariable(name);
+  vmPush(OBJ_VAL(var));
+}
+
+void vmPattern(CallFrame* frame) {
+  int count = READ_BYTE();
   ObjPattern* pattern = newPattern(count);
 
   int i = count;
@@ -522,6 +534,39 @@ void vmPattern(int count) {
   for (int i = 0; i < count * 2; i++) vmPop();
 
   vmPush(OBJ_VAL(pattern));
+}
+
+bool vmOverload(int cases) {
+  ObjOverload* overload = newOverload(cases);
+
+  for (int i = cases; i > 0; i--) {
+    if (!IS_CLOSURE(vmPeek(i - 1))) {
+      vmRuntimeError("Overload operand must be a function.");
+      return false;
+    }
+
+    overload->functions[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+  }
+
+  while (cases--) vmPop();
+  vmPush(OBJ_VAL(overload));
+  return true;
+}
+
+bool vmClosure(CallFrame* frame) {
+  ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+  ObjClosure* closure = newClosure(function);
+  Value pattern = vmPop();
+
+  if (!IS_PATTERN(pattern)) {
+    vmRuntimeError("Function signature must be a pattern object.");
+    return false;
+  }
+  function->pattern = AS_PATTERN(pattern);
+
+  vmPush(OBJ_VAL(closure));
+  vmCaptureUpvalues(closure, frame);
+  return true;
 }
 
 static bool isFalsey(Value value) {
@@ -838,14 +883,7 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_CLOSURE: {
-        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = newClosure(function);
-        Value pattern = vmPop();
-
-        function->pattern = AS_PATTERN(pattern);
-
-        vmPush(OBJ_VAL(closure));
-        vmCaptureUpvalues(closure, frame);
+        if (!vmClosure(frame)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_OVERLOAD: {
@@ -867,14 +905,11 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_VARIABLE: {
-        ObjString* name = READ_STRING();
-        ObjVariable* var = newVariable(name);
-        vmPush(OBJ_VAL(var));
+        vmVariable(frame);
         break;
       }
       case OP_PATTERN: {
-        int count = READ_BYTE();
-        vmPattern(count);
+        vmPattern(frame);
         break;
       }
       case OP_CLOSE_UPVALUE: {

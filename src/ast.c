@@ -26,10 +26,7 @@ bool readAST(ObjClosure* closure) {
 
   // we'll populate the frame's local slots as we build
   // the tree, and exit the frame once we're done.
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = vm.stackTop;  // points at [closure].
+  CallFrame* frame = vmCallFrame(closure, 0);
 
   // the root of the tree is an [ASTClosure] instance that has
   // four arguments.
@@ -197,27 +194,18 @@ bool readAST(ObjClosure* closure) {
         break;
       }
       case OP_VARIABLE: {
-        ObjString* name = READ_STRING();
-        ObjVariable* var = newVariable(name);
-        vmPush(OBJ_VAL(var));
+        vmVariable(frame);
         break;
       }
       case OP_PATTERN: {
-        int count = READ_BYTE();
-        vmPattern(count);
+        vmPattern(frame);
         break;
       }
+      case OP_OVERLOAD: {
+      }
       case OP_CLOSURE: {
-        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = newClosure(function);
-        Value pattern = vmPop();
-
-        function->pattern = AS_PATTERN(pattern);
-
-        vmPush(OBJ_VAL(closure));
-        vmCaptureUpvalues(closure, frame);
-
-        if (!readAST(closure)) return false;
+        if (!vmClosure(frame)) return false;
+        if (!readAST(AS_CLOSURE(vmPeek(0)))) return false;
         break;
       }
       case OP_CALL: {
@@ -279,6 +267,7 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opInvoke", argCount + 2)) return false;
         break;
       }
+
       case OP_SET_TYPE_LOCAL: {
         uint8_t slot = READ_SHORT();
         Value value = vmPeek(0);
