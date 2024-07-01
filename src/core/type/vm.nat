@@ -1,29 +1,8 @@
+
+// This module bridges the object language and the
+// vm's type system.
+
 class TypeError extends Error {}
-
-let isSubclass = (a, b) => {
-  if (vType(a) != OClass or vType(b) != OClass) 
-    return false;
-  
-  let klass = a;
-
-  while (klass != nil) {
-    if (klass == b) return true;
-    klass = klass.__superclass__;
-  }
-
-  return false;
-};
-
-// Is [a] an instance of [b]?
-let infix(5) is = (a, b) => {
-  let aVmType = vType(a);
-  let bVmType = vType(b);
-
-  if (aVmType != OInstance or bVmType != OClass)
-    return false;
-
-  return isSubclass(a.__class__, b);
-};
 
 class CType {}
 
@@ -40,3 +19,30 @@ class OString extends CObject {}
 class OClosure extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
+
+let isSubclass = (a, b) => {
+  if (vType(a) != OClass or vType(b) != OClass) 
+    return false;
+  
+  let klass = a;
+
+  while (klass != nil) {
+    if (klass == b) return true;
+    klass = klass.__superclass__;
+  }
+
+  return false;
+};
+
+let isClass = a => vType(a) == OClass;
+
+// Is [a] an instance of [b]?
+let infix(5) is = (a, b) => {
+  let aType = vType(a);
+  let bType = vType(b);
+
+  if (aType != OInstance or bType != OClass)
+    return false;
+
+  return isSubclass(a.__class__, b);
+};

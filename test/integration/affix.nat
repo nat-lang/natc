@@ -46,5 +46,3 @@ let infix @ = (x, y) => (x + y) / 2;
 class A { f() => 1; }
 
 assert(A().f() @ A().f() == 1);
-
-

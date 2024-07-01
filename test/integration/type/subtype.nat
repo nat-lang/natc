@@ -1,5 +1,3 @@
-import src/core/type/subtype
-
 let infix || = (a, b) => TSum.lift(a).union(TSum.lift(b));
 let typecheck = SubtypeSystem.typecheck;
 let check;
@@ -15,7 +13,7 @@ assert(check.failure());
 check = typecheck((x: num || bool) => g(x));
 assert(check.failure());
 
-let f: (bool || string) -> void;
+let f: (bool || string) -> void = x => {};
 
 check = typecheck((x: bool) => f(x));
 assert(check.success());
@@ -39,14 +37,16 @@ check = typecheck((x: bool || string || num) => f(x));
 assert(check.failure());
 
 // the subtype relation for functions is contravariant in the domain
-// and covariant in the range. domain:
+// and covariant in the range.
 
-let f: (bool -> void) -> void;
+// domain:
+
+let f: (bool -> void) -> void = f => {};
 
 check = typecheck((x: (bool || string) -> void) => f(x));
 assert(check.success());
 
-let f: ((bool || string) -> void) -> void;
+let f: ((bool || string) -> void) -> void = f => {};
 
 check = typecheck((x: bool -> void) => f(x));
 assert(check.failure());
@@ -62,12 +62,12 @@ assert(check.success());
 
 // range:
 
-let f: (() -> bool) -> void;
+let f: (() -> bool) -> void = g => {};
 
 check = typecheck((x: () -> (bool || string)) => f(x));
 assert(check.failure());
 
-let f: (() -> (bool || string)) -> void;
+let f: (() -> (bool || string)) -> void = g => {};
 
 check = typecheck((x: () -> bool) => f(x));
 assert(check.success());
@@ -83,7 +83,7 @@ assert(check.failure());
 
 // sums of products.
 
-let f: (num, num) || (string, string) -> void;
+let f: (num, num) || (string, string) -> void = x => {};
 
 check = typecheck((x: (string,string)) => f(x));
 assert(check.success());
@@ -99,14 +99,15 @@ assert(check.failure());
 
 // reconstruction.
 
-let f: (num, string) -> void;
+let f: (num || string) -> void = x => {};
 
-check = typecheck((x, y) => f(x, y));
-assert(check.success());
+let type = SubtypeSystem.type(x => f(x));
+
+assert(type == (num || string) -> void);
 
 // products of sums.
 
-let f: (num || string, num || bool) -> void;
+let f: (num || string, num || bool) -> void = (x,y) => {};
 
 check = typecheck((x: num, y: num) => f(x,y));
 assert(check.success());
@@ -131,3 +132,39 @@ assert(check.success());
 
 check = typecheck((x: num, y: num || bool) => f(x,y));
 assert(check.success());
+
+// classes.
+
+class A {}
+class B extends A {}
+class C extends B {}
+
+let f: A -> A = x => x;
+
+// subclasses are subtypes.
+
+check = typecheck((x: B) => f(x));
+assert(check.success());
+
+// the relation is reflexive.
+
+check = typecheck((x: A) => f(x));
+assert(check.success());
+
+// and transitive.
+
+check = typecheck((x: C) => f(x));
+assert(check.success());
+
+let f: C -> C = x => x;
+
+check = typecheck((x: C) => f(x));
+assert(check.success());
+
+// asymmetric.
+
+check = typecheck((x: B) => f(x));
+assert(check.failure());
+
+check = typecheck((x: A) => f(x));
+assert(check.failure());

@@ -1,23 +1,27 @@
 
 let var = x => vType(x) == OVariable;
 
+// [a] is a pattern element, [b] a scrutinee.
 let unifyPair = (a, b) => {
   let vA = a[0], vB = b[0],
       tA = a[1], tB = b[1];
 
+  // if the pattern has no type annotation
+  // then we just unify the param and the
+  // scrutinee.
   if (tA == undefined) {
     if (var(vA))
       return true;
     return vA == vB;
   }
 
-  return tA == tB;
+  return TypeSystem.unify(tB,tA);
 };
 
 let unify = (pattern, scrutinee) => {
   if (len(pattern) != len(scrutinee)) return false;
 
-  let typedScrutinee = [(x, SimpleTypeSystem.type(x)) | x in scrutinee];
+  let typedScrutinee = [(x, TypeSystem.type(x)) | x in scrutinee];
 
   return zip(pattern, typedScrutinee).all(pair => unifyPair(..pair));
 };

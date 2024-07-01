@@ -117,6 +117,16 @@ let a = A(), b = B();
 assert(f(a) == true);
 assert(f(b) == false);
 
+// matches subtypes.
+
+class C extends B {}
+
+let f = (x: B) => true | (x: C) => false;
+
+let c = C();
+
+assert(f(c) == true);
+
 // literals & type patterns.
 
 let f = (1, x: num) => true | (1, x: string) => false | (2, x: string) => true;

@@ -161,19 +161,19 @@ class TypeVarSupply extends NameSupply {
   fresh() => TVar(super.fresh());
 }
 
-class TypeSystem {
+class SimpleTypeSystem {
   // Map vm types to object language types.
   literalType(value) => {
-    let valueType = vType(value);
+    let type = vType(value);
 
-    if (valueType == ()) return unit;
-    if (valueType == CNil) return void;
-    if (valueType == CBool) return bool;
-    if (valueType == CNumber) return num;
-    if (valueType == OString) return string; 
-    if (valueType == OInstance) return value.__class__;
-    if (valueType == OClass) return tClass;
-    if (valueType == OClosure) return TFunction;
+    if (type == ()) return unit;
+    if (type == CNil) return void;
+    if (type == CBool) return bool;
+    if (type == CNumber) return num;
+    if (type == OString) return string; 
+    if (type == OInstance) return value.__class__;
+    if (type == OClass) return tClass;
+    if (type == OClosure) return TFunction;
   }
 
   inferType(node: ASTNode) => {
@@ -181,9 +181,9 @@ class TypeSystem {
     state.rename(node);
     let type = state.constrain(node);
 
-    state.unify();
+    state.solve();
 
-    if (!state.unified())
+    if (!state.solved())
       throw Error("Can't infer type.");
 
     type.apply(state.solution);
@@ -200,7 +200,7 @@ class TypeSystem {
 
     state.rename(node);
     state.constrain(node);
-    state.unify();
+    state.solve();
 
     return state;
   }
@@ -216,18 +216,21 @@ class TypeSystem {
   
     // now check if it has a global type annotation.
     exprType = globalTypeEnv()[node.name];
-    if (exprType and globals()[node.name] == expr) {
+    if (exprType and globals()[node.name] == expr)
       return exprType;
-    }
 
     // otherwise infer it.
     return this.inferType(node);
   }
+
+  unify(a,b) => this.TypeStateClass(this, false).unify(
+    this.ConstraintClass(a,b)
+  );
 }
 
 
-class TypeState {
-  init(system: TypeSystem, debug: bool) => {
+class SimpleTypeState {
+  init(system: SimpleTypeSystem, debug: bool) => {
     this.system = system;
     // map from variables to types.
     this.typeEnv = Map();
@@ -245,7 +248,7 @@ class TypeState {
   // type entry, then mint a fresh type var.
   lookup(node: ASTVar) => {
     if (!this.typeEnv[node])
-      this.typeEnv[node] = this.typeVars.fresh();
+        this.typeEnv[node] = this.typeVars.fresh();
 
     return this.typeEnv[node];
   }
@@ -337,9 +340,25 @@ class TypeState {
     if (node is ASTNegation)
       return this.constrain(node[0]);
 
-    if (node is ASTVar) {
-      return this.lookup(node);
+    if (node is ASTGlobal) {
+      let value = node.resolve();
+      let literalType = this.system.literalType(value);
+      let annotationType = this.lookup(node);
+
+      // todo: destructure and reconstruct the type of
+      // functions that are defined outside the scope of
+      // the check.
+      if (literalType == TFunction)
+        literalType = this.typeVars.fresh() -> this.typeVars.fresh();
+
+      // annotation and literal type should unify.
+      this.constraints.push(Constraint(annotationType, literalType));
+
+      return annotationType;
     }
+
+    if (node is ASTVar)
+      return this.lookup(node);
     
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
@@ -399,7 +418,7 @@ class TypeState {
     throw TypeError("Unexpected syntax.");
   } 
 
-  solve(constraint: Constraint) => {
+  unify(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
 
@@ -440,7 +459,7 @@ class TypeState {
   }
 
   // Solve the state's [constraints].
-  unify() => {
+  solve() => {
     let unsolved = [];
 
     let i = 0;
@@ -452,15 +471,17 @@ class TypeState {
       }
 
       let constraint = this.constraints.pop();
-      let solution = this.solve(constraint);
+      let unifiable = this.unify(constraint);
 
-      if (!solution)
+      if (!unifiable)
         unsolved.push(constraint);
 
       i = i + 1;
     }
 
     this.constraints = unsolved;
+
+    return this.solved();
   }
 
   // Compute the most general type for each variable in
@@ -482,9 +503,9 @@ class TypeState {
     return env;
   }
 
-  unified() => len(this.constraints) == 0;
-  success() => this.unified();
-  failure() => !this.unified();
+  solved() => len(this.constraints) == 0;
+  success() => this.solved();
+  failure() => !this.solved();
 
   ppConstraints() => {
     for (c in this.constraints) {
@@ -495,7 +516,7 @@ class TypeState {
   }
 }
 
-TypeSystem.TypeStateClass = TypeState;
+SimpleTypeSystem.ConstraintClass = Constraint;
+SimpleTypeSystem.TypeStateClass = SimpleTypeState;
 
-let SimpleTypeState = TypeState;
-let SimpleTypeSystem = TypeSystem;
+

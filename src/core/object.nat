@@ -19,4 +19,6 @@ class Object extends Base {
     for (x in other)
       this[x[0]] = x[1];
   }
+
+  substitute(c) => this;
 }

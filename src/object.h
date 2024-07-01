@@ -222,6 +222,5 @@ ObjString *mapFindString(ObjMap *map, const char *chars, int length,
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
 bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
-uint32_t hashObject(Obj *object);
 bool objectsEqual(Obj *a, Obj *b);
 #endif

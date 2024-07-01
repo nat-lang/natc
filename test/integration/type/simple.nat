@@ -1,12 +1,11 @@
 let typecheck = SimpleTypeSystem.typecheck;
 
-let f;
 let env;
 let check;
 
 // no argument, implicit return.
 
-f : () -> num;
+let f: () -> num = () => 1;
 
 env = globalTypeEnv();
 assert(env["f"] == () -> num);
@@ -22,7 +21,7 @@ assert(check.failure());
 
 // single argument, implicit return.
 
-f : num -> num;
+let f: num -> num = x => x;
 
 env = globalTypeEnv();
 assert(env["f"] == num -> num);
@@ -44,7 +43,7 @@ assert(check.failure());
 
 // no argument, explicit return.
 
-f : () -> num;
+let f: () -> num = () => 1;
 
 check = typecheck(() => {
   return f();
@@ -58,7 +57,7 @@ assert(check.failure());
 
 // single argument, explicit return.
 
-f : num -> num;
+let f: num -> num = x => x;
 
 check = typecheck(() => {
   return f(1);
@@ -82,7 +81,7 @@ assert(check.failure());
 
 // multiple arguments, implicit return.
 
-f : (num, num) -> num;
+let f: (num, num) -> num = (x,y) => 1;
 
 env = globalTypeEnv();
 assert(env["f"] == TProduct(num, num) -> num);
@@ -118,16 +117,16 @@ assert(check.failure());
 
 // declaration annotations.
 
-let f: num -> num;
+let f: num -> num = x => 1;
 
 env = globalTypeEnv();
 assert(env["f"] == num -> num);
 
-let x: num;
+let x: num = 1;
 check = typecheck(() => f(x));
 assert(check.success());
 
-let y: string;
+let y: string = "string";
 check = typecheck(() => f(y));
 assert(check.failure());
 
@@ -215,8 +214,8 @@ assert(check.failure());
 
 // single base type param constrains the function body.
 
-let g: string -> string;
-let h: num -> num;
+let g: string -> string = x => x;
+let h: num -> num = x => x;
 
 check = typecheck((a: num) => h(a));
 assert(check.success());
@@ -335,14 +334,13 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// inference.
+// reconstruction.
 // --------------------------------------------
 
-let h;
 let hType;
 let principal;
 
-// num -> a.
+let h: num -> num = x => 1;
 
 check = typecheck(() => h(1));
 
@@ -351,9 +349,9 @@ hType = principal.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TNumber);
-assert(hType.range is TVar);
+assert(hType.range is TNumber);
 
-// bool -> a.
+let h: bool -> num = x => 1;
 
 check = typecheck(() => h(true));
 
@@ -362,9 +360,9 @@ hType = principal.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TBoolean);
-assert(hType.range is TVar);
+assert(hType.range is TNumber);
 
-// string -> a.
+let h: string -> num = x => 1;
 
 check = typecheck(() => h("a"));
 
@@ -373,28 +371,28 @@ hType = principal.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TString);
-assert(hType.range is TVar);
+assert(hType.range is TNumber);
 
 // infer the type of a function from its body.
 
-let f: num -> num;
+let f: num -> num = x => 1;
 let type = SimpleTypeSystem.type(x => f(x));
 
 assert(type == num -> num);
 
-let f: (num, num) -> num;
+let f: (num, num) -> num = (x,y) => 1;
 let type = SimpleTypeSystem.type((x,y) => f(x,y));
 
 assert(type == (num, num) -> num);
 
 // with constraints on upvalues.
 
-let f: (num, num) -> bool;
+let f: (num, num) -> bool = (x,y) => true;
 let type = SimpleTypeSystem.type(x y => f(x,y));
 
 assert(type == num -> (num -> bool));
 
-let f: (num, num, num) -> bool;
+let f: (num, num, num) -> bool = (x,y,z) => true;
 let type = SimpleTypeSystem.type(x y z => f(x,y,z));
 
 assert(type == (num -> (num -> (num -> bool))));

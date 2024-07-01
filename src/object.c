@@ -154,16 +154,6 @@ static uint32_t hashString(const char* key, int length) {
   return hash;
 }
 
-// Generate a hash code for [object].
-uint32_t hashObject(Obj* object) {
-  switch (object->oType) {
-    case OBJ_STRING:
-      return ((ObjString*)object)->hash;
-    default:
-      return object->hash;
-  }
-}
-
 ObjString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
   ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
@@ -235,14 +225,14 @@ static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
 
     if (IS_UNDEF(entry->key)) {
       if (IS_NIL(entry->value)) {
-        // Empty entry.
+        // empty entry.
         return tombstone != NULL ? tombstone : entry;
       } else {
-        // We found a tombstone.
+        // we found a tombstone.
         if (tombstone == NULL) tombstone = entry;
       }
     } else if (valuesEqual(entry->key, key)) {
-      // We found the key.
+      // we found the key.
       return entry;
     }
 
@@ -439,7 +429,7 @@ void printObject(Value value) {
       break;
     }
     case OBJ_CLASS:
-      printf("<%s class>", AS_CLASS(value)->name->chars);
+      printf("<class %s>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
       printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,

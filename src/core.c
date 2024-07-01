@@ -256,6 +256,7 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_STRING:
           vmPush(OBJ_VAL(vm.core.oTypeString));
           break;
+        case OBJ_NATIVE:
         case OBJ_CLOSURE:
           vmPush(OBJ_VAL(vm.core.oTypeClosure));
           break;

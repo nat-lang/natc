@@ -123,8 +123,9 @@ static inline uint32_t hashNumber(double num) {
 }
 
 bool isHashable(Value value) {
-  return (value.vType == VAL_BOOL || value.vType == VAL_NIL ||
-          value.vType == VAL_NUMBER || IS_STRING(value));
+  return (IS_BOOL(value) || IS_NIL(value) || IS_UNDEF(value) ||
+          IS_UNIT(value) || IS_NUMBER(value) || IS_STRING(value)) ||
+         IS_CLASS(value);
 }
 
 // Generates a hash code for [value], which must be one of
@@ -133,16 +134,25 @@ uint32_t hashValue(Value value) {
   switch (value.vType) {
     case VAL_UNIT:
       return 4;
-    case VAL_BOOL:
-      return AS_BOOL(value);
-    case VAL_NIL:
-      return 2;
-    case VAL_NUMBER:
-      return hashNumber(AS_NUMBER(value));
-    case VAL_OBJ:
-      return hashObject(AS_OBJ(value));
     case VAL_UNDEF:
       return 3;
+    case VAL_NIL:
+      return 2;
+    case VAL_BOOL:
+      return AS_BOOL(value);
+    case VAL_NUMBER:
+      return hashNumber(AS_NUMBER(value));
+    case VAL_OBJ: {
+      Obj* object = AS_OBJ(value);
+      switch (object->oType) {
+        case OBJ_STRING:
+          return ((ObjString*)object)->hash;
+        case OBJ_CLASS:
+          return hashNumber((uintptr_t)object);
+        default:
+          return object->hash;
+      }
+    }
   }
 
   // unreachable.

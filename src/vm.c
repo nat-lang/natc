@@ -176,8 +176,8 @@ bool vmHashValue(Value value, uint32_t* hash) {
   vmPush(value);
   if (!vmExecuteMethod(S_HASH, 0, 1)) return false;
 
-  if (!IS_NUMBER(vmPeek(0))) {
-    vmRuntimeError("'%s' function must return a number.", S_HASH);
+  if (!IS_NUMBER(vmPeek(0)) || AS_NUMBER(vmPeek(0)) < 0) {
+    vmRuntimeError("'%s' function must return a natural number.", S_HASH);
     return false;
   }
 
