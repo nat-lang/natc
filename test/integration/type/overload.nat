@@ -1,0 +1,15 @@
+
+
+let f;
+let env;
+let check;
+
+let typecheck = SimpleTypeSystem.typecheck;
+
+
+let f = 
+
+
+check = typecheck(
+  1 => true | _ => false
+);

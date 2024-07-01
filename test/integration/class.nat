@@ -201,20 +201,17 @@ assert(B().method()() == "A");
 // the original instance remains bound on method reassignment.
 
 class A {
-  init(v) => {
-    this.v = v;
-  }
-  method(a) => {
-    return this.v + a;
-  }
+  f() => this;
 }
 
-let a = A(1);
-let b = A(2);
+class B {}
 
-b.method = a.method;
+let a = A();
+let b = B();
 
-assert(b.method(1) == 2);
+b.f = a.f;
+
+assert(b.f() == a);
 
 // class properties.
 
@@ -243,3 +240,21 @@ assert(a.p1());
 
 A.p2 = () => false;
 assert(!a.p2());
+
+// class methods.
+
+class A {
+  f() => true;
+  g() => this;
+}
+
+// doesn't require instantiation to be called.
+assert(A.f());
+
+// binds 'this' to the class.
+assert(A.g() == A);
+
+class B extends A {}
+
+assert(B.f());
+assert(B.g() == B);

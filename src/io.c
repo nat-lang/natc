@@ -44,13 +44,6 @@ char* readFile(const char* path) {
   return buffer;
 }
 
-// Load and compile module at [path] without executing.
-void compileFile(const char* path) {
-  char* source = readFile(path);
-  compile(source, (char*)path);
-  free(source);
-}
-
 // Load, compile, and execute module at [path].
 InterpretResult interpretFile(const char* path) {
   char* qualifiedPath = qualifyPath(path);

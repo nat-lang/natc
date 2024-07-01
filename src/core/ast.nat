@@ -1,17 +1,74 @@
-class ASTNode extends Tree {}
+class NameSupply {
+  init() => {
+    this.next = 0;
+  }
+  fresh() => {
+    this.next = this.next + 1;
+    return this.next;
+  }
+}
 
-class ASTStatement extends ASTNode {
+class ASTNode extends Tree {
   init(*children) => {
     this.children = children;
   }
-}
 
-class ASTExpr extends ASTNode {
-  init(data) => {
-    this.data = data;
-    this.children = [];
+  // Give the tree's variables uuids; make sure upvalues
+  // are identified with the locals they close over.
+  stampVariables(cb) => {
+    let uuids = NameSupply();
+    let globals = Map();
+
+    let rename = (node: ASTVar, env: Map) => {
+      if (!env[node.id])
+        env[node.id] = uuids.fresh();
+      node.uuid = env[node.id];
+    };
+
+    class VarEnv {
+      init(upvalues) => {
+        this.locals = Map();
+        this.upvalues = upvalues;
+      }
+    }
+
+    this.visit((node, varEnv) => {
+      if (node is ASTClosure) {
+        let closureEnv = VarEnv(varEnv.upvalues);
+        for (param in node.signature.params) {
+          rename(param, closureEnv.locals);
+        }
+
+        for (upvalue in node.upvalues) {
+          if (!closureEnv.upvalues[upvalue.id]) {
+            closureEnv.upvalues[upvalue.id] = varEnv.locals[upvalue.localId];
+          }
+        }
+
+        return closureEnv;
+      }
+
+      if (node is ASTLocal)
+        rename(node, varEnv.locals);
+
+      if (node is ASTUpvalue) {
+        if (!varEnv.upvalues[node.id])
+          throw Error("Upvalue (" + str(node.id) + ") missing uuid.");
+        node.uuid = varEnv.upvalues[node.id];
+      }
+
+      if (node is ASTGlobal)
+        rename(node, globals);
+
+      cb(node);
+
+      return varEnv;
+    }, VarEnv(Map()));
   }
 }
+
+class ASTStatement extends ASTNode {}
+class ASTExpr extends ASTNode {}
 
 class ASTAssignment extends ASTStatement {}
 class ASTLocalValueAssignment extends ASTAssignment {}
@@ -23,12 +80,19 @@ class ASTImplicitReturn extends ASTReturn {}
 class ASTExprStatement extends ASTStatement {}
 
 class ASTLiteral extends ASTExpr {
-  resolve() => this.data;
+  init(value) => {
+    this.value = value;
+    super.init();
+  }
+  resolve() => this.value;
 }
+class ASTNegation extends ASTExpr {}
+
 class ASTVar extends ASTExpr {
   init(id) => {
-    super.init(id);
+    this.id = id;
     this.uuid = nil;
+    super.init();
   }
 
   hash() => {
@@ -40,14 +104,24 @@ class ASTVar extends ASTExpr {
 
 class ASTLocal extends ASTVar {}
 class ASTGlobal extends ASTVar {
-  resolve() => globals()[this.data];
+  resolve() => globals()[this.id];
 }
-class ASTUpvalue extends ASTVar {}
+class ASTUpvalue extends ASTVar {
+  init(id, localId) => {
+    super.init(id);
+    this.localId = localId;
+  }
+}
+
+class ASTParameter extends ASTLocal {
+  init(id, name, type) => {
+    super.init(id);
+    this.name = name;
+    this.type = type;
+  }
+}
 
 class ASTArgumentSequence extends ASTExpr {
-  init(args) => {
-    this.children = args;
-  }
   resolve() => this.children.map((node) => node.resolve());
 }
 
@@ -62,30 +136,45 @@ class ASTApp extends ASTExprStatement {
   resolve() => this.evaluate();
 }
 
+class ASTInvocation extends ASTApp {
+  evaluate() => {
+    let obj = this[0].resolve();
+    let key = this[1].resolve();
+    let args = this[2].resolve();
+
+    return obj[key](..args);
+  }
+
+  resolve() => this.evaluate();
+}
+
 class ASTSignature extends ASTNode {
-  init(arity) => {
+  init(arity, *params) => {
     this.arity = arity;
-    this.params = [];
+    this.params = params;
   }
 
   isComplete() => len(this.params) == this.arity;
 }
 
 class ASTClosure extends ASTExpr {
-  init(name, function, arity) => {
+  init(name, function, signature, upvalues) => {
     this.name = name;
     this.function = function;
-    this.signature = ASTSignature(arity);
+    this.signature = signature;
     this.children = [];
+    this.upvalues = upvalues;
   }
 
   // expressions.
 
   opLiteral(value) => ASTLiteral(value);
+  opNot(value) => ASTNegation(value);
   opGetLocal(slot) => ASTLocal(slot);
   opGetGlobal(name) => ASTGlobal(name);
-  opGetUpvalue(slot) => ASTUpvalue(slot);
-  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(args));
+  opGetUpvalue(slot, localSlot) => ASTUpvalue(slot, localSlot);
+  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
+  opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
 
   // statements.
 
@@ -104,10 +193,7 @@ class ASTClosure extends ASTExpr {
     let local = ASTLocal(slot);
     let node = ASTLocalTypeAssignment(local, value);
 
-    if (this.signature.isComplete())
-      this.children.push(node);
-    else
-      this.signature.params.push(node);
+    this.children.push(node);
   }
 
   opReturn(expr) => {
@@ -118,5 +204,13 @@ class ASTClosure extends ASTExpr {
   opImplicitReturn(expr) => {
     let node = ASTImplicitReturn(expr);
     this.children.push(node);
+  }
+}
+
+class ASTOverload extends ASTExpr {
+  init(overload, cases, closures) => {
+    this.overload = overload;
+    this.cases = cases;
+    this.children = closures;
   }
 }

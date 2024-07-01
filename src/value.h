@@ -26,6 +26,7 @@ typedef struct Value {
   } as;
 } Value;
 
+#define IS_UNIT(value) ((value).vType == VAL_UNIT)
 #define IS_BOOL(value) ((value).vType == VAL_BOOL)
 #define IS_NIL(value) ((value).vType == VAL_NIL)
 #define IS_NUMBER(value) ((value).vType == VAL_NUMBER)
@@ -61,5 +62,4 @@ void printValue(Value value);
 void printValueArray(ValueArray* array);
 uint32_t hashValue(Value value);
 bool isHashable(Value value);
-
 #endif

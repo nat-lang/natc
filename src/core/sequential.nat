@@ -22,8 +22,6 @@ class Sequential extends Object {
     return false;
   }
 
-  __iter__() => Iterator(this, 0, len(this));
-
   hash() => this.map(hash).reduce(+, 0);
 
   map(fn) => [fn(value) | value in this];

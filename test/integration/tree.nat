@@ -59,7 +59,7 @@ let leaves = tree.leaves();
 assert(leaves == [1,2,3,4,5,6,7]);
 
 // fill the interior nodes.
-tree = tree.map((data) => {
+tree = tree.dmap((data) => {
   if (!data) return 0;
   return data; 
 });

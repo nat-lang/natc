@@ -1,8 +1,13 @@
+let -1 = 1 - 2;
+
 
 class Tree extends Object {
   init(data, children) => {
     this.data = data;
     this.children = children;
+
+    this.depth = -1;
+    this.breadth = -1;
   }
 
   // Subscript access is to children.
@@ -11,6 +16,23 @@ class Tree extends Object {
   __iter__() => {
     let nodes = this.depthFirst();
     return Iterator(nodes, 0, len(nodes));
+  }
+
+  index(depth, breadth) => {
+    this.depth = depth;
+    this.breadth = breadth;
+
+    let i = 0;
+    for (x in this.children) {
+      x.index(d + 1, i);
+      i = i + 1;
+    }
+  }
+  
+  id() => {
+    if (this.depth == -1 or this.breadth == -1)
+      throw Error("Must call 'index' before accessing 'id'.");
+    return (this.depth, this.breadth);
   }
 
   depthFirst() => {
@@ -22,16 +44,29 @@ class Tree extends Object {
     return seq;
   }
 
-  isLeaf() => len(this.children) == 0;
+  leaf() => len(this.children) == 0;
+  unary() => len(this.children) == 1;
+  binary() => len(this.children) == 2;
 
   leaves() => {
-    if (this.isLeaf()) return [this.data];
+    if (this.leaf()) return [this.data];
 
     return [leaf | child in this.children, leaf in child.leaves()];
   }
 
-  map(fn) => {
+  // Map the data.
+  dmap(fn) => {
     let tree = Tree(fn(this.data), []);
+
+    for (child in this.children)
+      tree.children.push(child.dmap(fn));
+
+    return tree;
+  }
+
+  // Map the nodes.
+  map(fn) => {
+    let tree = fn(this);
 
     for (child in this.children)
       tree.children.push(child.map(fn));
@@ -49,8 +84,16 @@ class Tree extends Object {
   visit(fn, acc) => {
     acc = fn(this, acc);
 
+    // accumulate vertically, but not horizontally.
     for (child in this.children)
       child.visit(fn, acc);
+  }
+
+  find(predicate) => {
+    for (node in this) {
+      if (predicate(node))
+        return node;
+    }
   }
 }
 
@@ -64,7 +107,7 @@ let Root = (*children) => Tree(nil, children);
 
 // Convert [data] to a [Tree] if it's not already.
 let Node = (value) => {
-  if (type(value) != Tree)
-    return LeafNode(value);
-  return value;
+  if (value is Tree)
+    return value;
+  return LeafNode(value);
 };

@@ -3,3 +3,5 @@ class Error {
     this.message = message;
   }
 }
+
+class NotImplemented extends Error {}
