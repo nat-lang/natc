@@ -44,25 +44,30 @@ void vmRuntimeError(const char* format, ...) {
   resetStack();
 }
 
-void initClasses(Classes* classes) {
-  classes->base = NULL;
-  classes->object = NULL;
-  classes->tuple = NULL;
-  classes->sequence = NULL;
-  classes->map = NULL;
-  classes->set = NULL;
-  classes->iterator = NULL;
-  classes->astClosure = NULL;
-  classes->astUpvalue = NULL;
-  classes->vTypeBool = NULL;
-  classes->vTypeNil = NULL;
-  classes->vTypeNumber = NULL;
-  classes->vTypeUndef = NULL;
-  classes->oTypeClass = NULL;
-  classes->oTypeInstance = NULL;
-  classes->oTypeString = NULL;
-  classes->oTypeClosure = NULL;
-  classes->oTypeSequence = NULL;
+void initCore(Core* core) {
+  core->base = NULL;
+  core->object = NULL;
+  core->tuple = NULL;
+  core->sequence = NULL;
+  core->map = NULL;
+  core->set = NULL;
+  core->iterator = NULL;
+  core->astClosure = NULL;
+  core->astUpvalue = NULL;
+  core->astSignature = NULL;
+  core->astParameter = NULL;
+  core->astOverload = NULL;
+  core->vTypeBool = NULL;
+  core->vTypeNil = NULL;
+  core->vTypeNumber = NULL;
+  core->vTypeUndef = NULL;
+  core->oTypeClass = NULL;
+  core->oTypeInstance = NULL;
+  core->oTypeString = NULL;
+  core->oTypeClosure = NULL;
+  core->oTypeOverload = NULL;
+  core->oTypeSequence = NULL;
+  core->unify = NULL;
 }
 
 bool initVM() {
@@ -76,12 +81,14 @@ bool initVM() {
   vm.grayCapacity = 0;
   vm.grayStack = NULL;
 
+  vm.compiler = NULL;
+
   initMap(&vm.globals);
   initMap(&vm.typeEnv);
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   return initializeCore() == INTERPRET_OK;
 }
@@ -89,9 +96,8 @@ bool initVM() {
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
-  freeMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   freeObjects();
 }
@@ -170,8 +176,8 @@ bool vmHashValue(Value value, uint32_t* hash) {
   vmPush(value);
   if (!vmExecuteMethod(S_HASH, 0, 1)) return false;
 
-  if (!IS_NUMBER(vmPeek(0))) {
-    vmRuntimeError("'%s' function must return a number.", S_HASH);
+  if (!IS_NUMBER(vmPeek(0)) || AS_NUMBER(vmPeek(0)) < 0) {
+    vmRuntimeError("'%s' function must return a natural number.", S_HASH);
     return false;
   }
 
@@ -255,8 +261,8 @@ static bool spread(int* argCount) {
 // [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
-  vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
-  vmInstantiateClass(vm.classes.sequence, 0);
+  vmPush(OBJ_VAL(newInstance(vm.core.sequence)));
+  vmInstantiateClass(vm.core.sequence, 0);
 
   // either the function was called (a) with arity - 1 arguments
   // or (b) with arity - n arguments for n > 1. (a) is valid;
@@ -297,6 +303,14 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   return true;
 }
 
+CallFrame* vmCallFrame(ObjClosure* closure, int offset) {
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->closure = closure;
+  frame->ip = closure->function->chunk.code;
+  frame->slots = vm.stackTop - offset;
+  return frame;
+}
+
 static bool call(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
@@ -310,10 +324,7 @@ static bool call(ObjClosure* closure, int argCount) {
     return false;
   }
 
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = vm.stackTop - argCount - 1;
+  vmCallFrame(closure, argCount + 1);
 
   return true;
 }
@@ -324,6 +335,70 @@ static bool callNative(ObjNative* native, int argCount) {
   if (!native->variadic && !checkArity(native->arity, argCount)) return false;
 
   return (native->function)(argCount, vm.stackTop - argCount);
+}
+
+// Wrap the top [count] values in tuple and put it
+// on the stack, optionally leaving the values below it.
+bool vmTuplify(int count, bool replace) {
+  int i = count;
+  Value args[count];
+
+  if (replace)
+    while (i--) args[i] = vmPop();
+  else
+    while (i--) args[count - i - 1] = vmPeek(i);
+
+  vmPush(OBJ_VAL(vm.core.tuple));
+  while (++i < count) vmPush(args[i]);
+
+  return vmCallValue(OBJ_VAL(vm.core.tuple), count);
+}
+
+bool pushPatternElement(PatternElement element) {
+  vmPush(element.value);
+  vmPush(element.type);
+  if (!vmTuplify(2, true) && vmExecute(vm.frameCount - 1) == INTERPRET_OK)
+    return false;
+  return true;
+}
+
+bool unify(ObjPattern* pattern, Value value) {
+  Value unifyFn = OBJ_VAL(vm.core.unify);
+
+  vmPush(unifyFn);
+
+  for (int i = 0; i < pattern->count; i++)
+    pushPatternElement(pattern->elements[i]);
+
+  if (pattern->count > 0) vmTuplify(pattern->count, true);
+
+  vmPush(value);
+
+  return vmCallValue(unifyFn, 2) &&
+         vmExecute(vm.frameCount - 1) == INTERPRET_OK;
+}
+
+static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
+  if (!vmTuplify(argCount, false)) return false;
+
+  Value scrutinee = vmPeek(0);
+
+  for (int i = 0; i < caseCount; i++) {
+    if (!unify(cases[i]->function->pattern, scrutinee)) return false;
+
+    if (AS_BOOL(vmPop())) {
+      vmPop();  // the tuplified scrutinee.
+      return call(cases[i], argCount);
+    }
+  }
+
+  // no match: replace the arguments and the case object with undef.
+  vmPop();                     // tuplified scrutinee.
+  while (argCount--) vmPop();  // args.
+  vmPop();                     // case.
+  vmPush(UNDEF_VAL);
+
+  return true;
 }
 
 bool vmCallValue(Value callee, int argCount) {
@@ -347,8 +422,18 @@ bool vmCallValue(Value callee, int argCount) {
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
         return vmInstantiateClass(klass, argCount);
       }
-      case OBJ_CLOSURE:
+      case OBJ_CLOSURE: {
+        ObjClosure* closure = AS_CLOSURE(callee);
+        ObjPattern* pattern = closure->function->pattern;
+
+        if (pattern != NULL && pattern->isLiteral)
+          return callCases(&closure, 1, argCount);
         return call(AS_CLOSURE(callee), argCount);
+      }
+      case OBJ_OVERLOAD: {
+        ObjOverload* overload = AS_OVERLOAD(callee);
+        return callCases(overload->closures, overload->cases, argCount);
+      }
       case OBJ_NATIVE:
         return callNative(AS_NATIVE(callee), argCount);
       case OBJ_INSTANCE: {
@@ -427,8 +512,69 @@ void vmCloseUpvalues(Value* last) {
   }
 }
 
+void vmVariable(CallFrame* frame) {
+  ObjString* name = READ_STRING();
+  ObjVariable* var = newVariable(name);
+  vmPush(OBJ_VAL(var));
+}
+
+void vmPattern(CallFrame* frame) {
+  int count = READ_BYTE();
+  ObjPattern* pattern = newPattern(count);
+
+  int i = count;
+  while (i > 0) {
+    Value value = vmPeek(i * 2 - 1);
+    Value type = vmPeek(i * 2 - 2);
+    pattern->elements[count - i].value = value;
+    pattern->elements[count - i].type = type;
+
+    if (!IS_VARIABLE(value)) pattern->isLiteral = true;
+    i--;
+  }
+
+  for (int i = 0; i < count * 2; i++) vmPop();
+
+  vmPush(OBJ_VAL(pattern));
+}
+
+bool vmOverload(CallFrame* frame) {
+  int cases = READ_BYTE();
+  ObjOverload* overload = newOverload(cases);
+
+  for (int i = cases; i > 0; i--) {
+    if (!IS_CLOSURE(vmPeek(i - 1))) {
+      vmRuntimeError("Overload operand must be a function.");
+      return false;
+    }
+
+    overload->closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+  }
+
+  while (cases--) vmPop();
+  vmPush(OBJ_VAL(overload));
+  return true;
+}
+
+bool vmClosure(CallFrame* frame) {
+  ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+  ObjClosure* closure = newClosure(function);
+  Value pattern = vmPop();
+
+  if (!IS_PATTERN(pattern)) {
+    vmRuntimeError("Function signature must be a pattern object.");
+    return false;
+  }
+  function->pattern = AS_PATTERN(pattern);
+
+  vmPush(OBJ_VAL(closure));
+  vmCaptureUpvalues(closure, frame);
+  return true;
+}
+
 static bool isFalsey(Value value) {
-  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+  return IS_NIL(value) || IS_UNDEF(value) ||
+         (IS_BOOL(value) && !AS_BOOL(value));
 }
 
 static bool validateSeqIdx(ObjSequence* seq, Value idx) {
@@ -468,6 +614,20 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
                 mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
   return true;
+}
+
+void vmInitPattern(ObjFunction* function) {
+  ObjPattern* pattern = newPattern(function->arity);
+
+  int i = pattern->count;
+  int j = i;
+  while (i > 0) {
+    pattern->elements[j - i].value = vmPeek(i * 2 - 1);
+    pattern->elements[j - i].type = vmPeek(i * 2 - 2);
+    i--;
+  }
+
+  function->pattern = pattern;
 }
 
 // Loop until we're back to [baseFrame] frames. Typically this
@@ -726,10 +886,19 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_CLOSURE: {
-        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = newClosure(function);
-        vmPush(OBJ_VAL(closure));
-        vmCaptureUpvalues(closure, frame);
+        if (!vmClosure(frame)) return INTERPRET_RUNTIME_ERROR;
+        break;
+      }
+      case OP_OVERLOAD: {
+        if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
+        break;
+      }
+      case OP_VARIABLE: {
+        vmVariable(frame);
+        break;
+      }
+      case OP_PATTERN: {
+        vmPattern(frame);
         break;
       }
       case OP_CLOSE_UPVALUE: {
@@ -824,6 +993,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPop();
 
         InterpretResult result = interpretFile(importLoc->chars);
+
         if (result != INTERPRET_OK) return result;
         // pop the return value of the module's function.
         // if/when import statements become selective, this'll
@@ -947,26 +1117,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DESTRUCTURE: {
         Value value = vmPeek(0);
-
-        switch (value.vType) {
-          case VAL_OBJ: {
-            switch (OBJ_TYPE(value)) {
-              case OBJ_CLOSURE: {
-                ObjClosure* closure = AS_CLOSURE(value);
-
-                if (!readAST(closure)) return INTERPRET_RUNTIME_ERROR;
-                break;
-              }
-              default:
-                vmRuntimeError("Undestructurable object.");
-                return INTERPRET_RUNTIME_ERROR;
-            }
-            break;
-          }
-          default:
-            vmRuntimeError("Undestructurable value.");
-            return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!astDestructure(value)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_SET_TYPE_LOCAL: {
@@ -987,9 +1138,9 @@ InterpretResult vmExecute(int baseFrame) {
 
         ObjClass lca;
         if (!IS_INSTANCE(value) &&
-            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.classes.sequence,
+            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.core.sequence,
                                 &lca) &&
-            &lca == vm.classes.sequence) {
+            &lca == vm.core.sequence) {
           vmRuntimeError("Only sequential values can spread.");
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -1011,7 +1162,8 @@ InterpretResult vmExecute(int baseFrame) {
 }
 
 InterpretResult vmInterpret(char* path, const char* source) {
-  ObjFunction* function = compile(source, path);
+  ObjFunction* function = compile(vm.compiler, source, path);
+
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(function));

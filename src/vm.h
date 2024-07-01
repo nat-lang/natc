@@ -2,6 +2,7 @@
 #define nat_vm_h
 
 #include "chunk.h"
+#include "compiler.h"
 #include "object.h"
 #include "value.h"
 
@@ -32,17 +33,24 @@ typedef struct {
 
   ObjClass* astClosure;
   ObjClass* astUpvalue;
+  ObjClass* astSignature;
+  ObjClass* astParameter;
+  ObjClass* astOverload;
 
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;
   ObjClass* vTypeNumber;
   ObjClass* vTypeUndef;
+  ObjClass* oTypeVariable;
   ObjClass* oTypeClass;
   ObjClass* oTypeInstance;
   ObjClass* oTypeString;
   ObjClass* oTypeClosure;
+  ObjClass* oTypeOverload;
   ObjClass* oTypeSequence;
-} Classes;
+
+  ObjClosure* unify;
+} Core;
 
 typedef struct {
   Value stack[STACK_MAX];
@@ -60,7 +68,7 @@ typedef struct {
   ObjUpvalue* openUpvalues;
 
   // core defs.
-  Classes classes;
+  Core core;
 
   // memory.
   int grayCount;
@@ -69,6 +77,8 @@ typedef struct {
 
   size_t bytesAllocated;
   size_t nextGC;
+
+  Compiler* compiler;
 } VM;
 
 typedef enum {
@@ -84,6 +94,7 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
+InterpretResult vmInterpretImport(char* path, const char* source);
 InterpretResult vmInterpret(char* path, const char* source);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
@@ -93,9 +104,14 @@ bool vmInitInstance(ObjClass* klass, int argCount, int frames);
 bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
+CallFrame* vmCallFrame(ObjClosure* closure, int offset);
 bool vmCallValue(Value value, int argCount);
-void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
 void vmCloseUpvalues(Value* last);
+bool vmClosure(CallFrame* frame);
+bool vmOverload(CallFrame* frame);
+void vmVariable(CallFrame* frame);
+void vmPattern(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
+bool vmTuplify(int count, bool replace);
 
 #endif

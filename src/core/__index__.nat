@@ -12,3 +12,6 @@ import src/core/assertion
 import src/core/functional
 import src/core/ast
 import src/core/type/simple
+import src/core/type/subtype
+import src/core/type/system
+import src/core/unification

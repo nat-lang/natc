@@ -189,8 +189,8 @@ f <- (x,z) => {
 
 f.stampVariables(x => {});
 
-let x = f.signature.params[0][0];
-let z = f.signature.params[1][0];
+let x = f.signature.params[0];
+let z = f.signature.params[1];
 let y = f[1][0];
 
 let g = f[3][1];
@@ -217,6 +217,15 @@ let j_a_up = j[2][0][0][0][1][1];
 assert(j_x_up.uuid == x.uuid);
 assert(j_y_up.uuid == y.uuid);
 assert(j_a_up.uuid == a.uuid);
+
+// overloaded functions.
+
+f <- 1 => true | 2 => false;
+
+assert(vType(f.overload) == OOverload);
+assert(f.cases == 2);
+assert(f[0] is ASTClosure);
+assert(f[1] is ASTClosure);
 
 // invocation.
 
@@ -259,8 +268,7 @@ f <- () => {
 assert(f[1][1] is ASTClosure);
 
 let closure = f[1][1];
-assert(closure.signature.params[0] is ASTLocalTypeAssignment);
+let param = closure.signature.params[0];
 
-let typeAssignment = closure.signature.params[0];
-assert(typeAssignment[1].resolve() is TFunction);
-
+assert(param is ASTParameter);
+assert(param.type.resolve() is TFunction);

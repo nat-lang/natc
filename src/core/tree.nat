@@ -18,9 +18,9 @@ class Tree extends Object {
     return Iterator(nodes, 0, len(nodes));
   }
 
-  index(d: num, b: num) => {
-    this.depth = d;
-    this.breadth = b;
+  index(depth, breadth) => {
+    this.depth = depth;
+    this.breadth = breadth;
 
     let i = 0;
     for (x in this.children) {

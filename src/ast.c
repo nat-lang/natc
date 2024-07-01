@@ -9,6 +9,9 @@
 #include "value.h"
 #include "vm.h"
 
+bool astClosure(ObjClosure* closure);
+bool astOverload(ObjOverload* overload);
+
 static bool executeMethod(char* method, int argCount) {
   return vmExecuteMethod(method, argCount, 1);
 }
@@ -18,43 +21,14 @@ static bool initInstance(ObjClass* klass, int argCount) {
 }
 
 // Read the syntax tree of [closure] off the tape.
-bool readAST(ObjClosure* closure) {
+bool astFrame(Value root) {
+  CallFrame* frame = &vm.frames[vm.frameCount - 1];
+
 #ifdef DEBUG_TRACE_EXECUTION
-  disassembleChunk(&closure->function->chunk, closure->function->name->chars);
+  disassembleChunk(&frame->closure->function->chunk,
+                   frame->closure->function->name->chars);
   printf("\n");
 #endif
-
-  // we'll populate the frame's local slots as we build
-  // the tree, and exit the frame once we're done.
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = vm.stackTop;  // points at [closure].
-
-  // the root of the tree is an [ASTClosure] instance that has
-  // four arguments.
-  vmPush(OBJ_VAL(vm.classes.astClosure));
-  // the function's name.
-  vmPush(OBJ_VAL(closure->function->name));
-  // the function itself.
-  vmPush(OBJ_VAL(closure));
-  // the function's arity.
-  vmPush(NUMBER_VAL(closure->function->arity));
-  // the closure's upvalues.
-  vmPush(OBJ_VAL(vm.classes.sequence));
-  for (int i = 0; i < closure->upvalueCount; i++) {
-    vmPush(OBJ_VAL(vm.classes.astUpvalue));
-    vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
-    vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
-    if (!initInstance(vm.classes.astUpvalue, 2)) return false;
-  }
-
-  if (!vmInitInstance(vm.classes.sequence, closure->upvalueCount, 0))
-    return false;
-
-  if (!initInstance(vm.classes.astClosure, 4)) return false;
-
-  Value root = vmPeek(0);
 
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -186,13 +160,22 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opGetUpvalue", 2)) return false;
         break;
       }
+      case OP_VARIABLE: {
+        vmVariable(frame);
+        break;
+      }
+      case OP_PATTERN: {
+        vmPattern(frame);
+        break;
+      }
+      case OP_OVERLOAD: {
+        if (!vmOverload(frame)) return false;
+        if (!astOverload(AS_OVERLOAD(vmPeek(0)))) return false;
+        break;
+      }
       case OP_CLOSURE: {
-        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = newClosure(function);
-        vmPush(OBJ_VAL(closure));
-        vmCaptureUpvalues(closure, frame);
-
-        if (!readAST(closure)) return false;
+        if (!vmClosure(frame)) return false;
+        if (!astClosure(AS_CLOSURE(vmPeek(0)))) return false;
         break;
       }
       case OP_CALL: {
@@ -254,6 +237,7 @@ bool readAST(ObjClosure* closure) {
         if (!executeMethod("opInvoke", argCount + 2)) return false;
         break;
       }
+
       case OP_SET_TYPE_LOCAL: {
         uint8_t slot = READ_SHORT();
         Value value = vmPeek(0);
@@ -284,4 +268,81 @@ bool readAST(ObjClosure* closure) {
 
   vmRuntimeError("This should be unreachable.");
   return false;
+}
+
+bool astClosure(ObjClosure* closure) {
+  // we'll populate the frame's local slots as we build
+  // the tree, and exit the frame once we're done.
+  vmCallFrame(closure, 0);
+
+  // the root of the tree is an [ASTClosure] instance that has
+  // four arguments.
+  vmPush(OBJ_VAL(vm.core.astClosure));
+  // the function's name.
+  vmPush(OBJ_VAL(closure->function->name));
+  // the function itself.
+  vmPush(OBJ_VAL(closure));
+  // the function's signature.
+  vmPush(OBJ_VAL(vm.core.astSignature));
+  vmPush(NUMBER_VAL(closure->function->arity));
+  for (int i = 0; i < closure->function->arity; i++) {
+    vmPush(OBJ_VAL(vm.core.astParameter));
+    // offset the reserved stack slot.
+    vmPush(NUMBER_VAL(i + 1));
+    vmPush(closure->function->pattern->elements[i].value);
+    vmPush(closure->function->pattern->elements[i].type);
+    if (!initInstance(vm.core.astParameter, 3)) return false;
+  }
+  if (!initInstance(vm.core.astSignature, closure->function->arity + 1))
+    return false;
+  // the closure's upvalues.
+  for (int i = 0; i < closure->upvalueCount; i++) {
+    vmPush(OBJ_VAL(vm.core.astUpvalue));
+    vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
+    vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
+    if (!initInstance(vm.core.astUpvalue, 2)) return false;
+  }
+
+  if (!vmTuplify(closure->upvalueCount, true)) return false;
+  if (!initInstance(vm.core.astClosure, 4)) return false;
+
+  return astFrame(vmPeek(0));
+}
+
+bool astOverload(ObjOverload* overload) {
+  vmPush(OBJ_VAL(vm.core.astOverload));
+  vmPush(OBJ_VAL(overload));
+  vmPush(NUMBER_VAL(overload->cases));
+
+  for (int i = 0; i < overload->cases; i++) {
+    vmPush(OBJ_VAL(overload->closures[i]));
+    if (!astClosure(overload->closures[i])) return false;
+  }
+
+  if (!vmTuplify(overload->cases, true)) return false;
+
+  return initInstance(vm.core.astOverload, 3);
+}
+
+bool astDestructure(Value value) {
+  switch (value.vType) {
+    case VAL_OBJ: {
+      switch (OBJ_TYPE(value)) {
+        case OBJ_CLOSURE:
+          return astClosure(AS_CLOSURE(value));
+        case OBJ_OVERLOAD:
+          return astOverload(AS_OVERLOAD(value));
+        default:
+          vmRuntimeError("Undestructurable object.");
+          return false;
+      }
+      break;
+    }
+    default:
+      vmRuntimeError("Undestructurable value.");
+      return false;
+  }
+
+  vmRuntimeError("This should be unreachable.");
+  return false;  // unreachable.
 }
