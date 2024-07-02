@@ -39,18 +39,19 @@ Scanner saveScanner() {
 void gotoScanner(Scanner checkpoint) { scanner = checkpoint; }
 
 static bool isAlpha(char c) {
-  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
+
+static bool isTypeAlpha(char c) { return (c >= 'u' && c <= 'z'); }
 
 static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
-bool isIdentifierSymbol(char c) {
+static bool isSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
-          c == '+' || c == '-' || c == '/' || c == '*' || c == '|');
+          c == '+' || c == '-' || c == '/' || c == '*' || c == '|' ||
+          c == '=' || c == '_');
 }
-
-bool isSymbol(char c) { return isIdentifierSymbol(c) || (c == '='); }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }
 
@@ -112,7 +113,7 @@ void skipWhitespace() {
         break;
       case '/':
         if (peekNext() == '/') {
-          // A comment goes until the end of the line.
+          // a comment goes until the end of the line.
           while (peek() != '\n' && !isAtEnd()) advance();
         } else {
           return;
@@ -229,6 +230,14 @@ static Token identifier() {
   return makeToken(identifierType());
 }
 
+Token typeVariable() {
+  while (isTypeAlpha(peek()) || isDigit(peek()) || peek() == '\'') advance();
+
+  if (isAlpha(peek()) || isSymbol(peek())) return identifier();
+
+  return makeToken(TOKEN_TYPE_VARIABLE);
+}
+
 Token slashedIdentifier() {
   while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
   return scanner.current == scanner.start ? errorToken("Unexpected character.")
@@ -238,9 +247,9 @@ Token slashedIdentifier() {
 static Token number() {
   while (isDigit(peek())) advance();
 
-  // Look for a fractional part.
+  // look for a fractional part.
   if (peek() == '.' && isDigit(peekNext())) {
-    // Consume the ".".
+    // consume the '.'.
     advance();
 
     while (isDigit(peek())) advance();
@@ -318,7 +327,8 @@ Token scanToken() {
       return string();
   }
 
-  if (isAlpha(c) || isIdentifierSymbol(c)) return identifier();
+  if (isTypeAlpha(c)) return typeVariable();
+  if (isAlpha(c) || isSymbol(c)) return identifier();
   if (isDigit(c)) return number();
 
   return errorToken("Unexpected character.");

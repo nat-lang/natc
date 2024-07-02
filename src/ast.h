@@ -3,6 +3,6 @@
 
 #include "object.h"
 
-bool astDestructure(Value value);
+bool ast(Value value);
 
 #endif

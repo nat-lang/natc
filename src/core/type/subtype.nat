@@ -1,14 +1,7 @@
 
 class TSum extends Type {
   init(type) => {
-    if (type is Sequential) type = TProduct(..type);
-
-    if (type == ()) type = unit;
-
-    if (type is Set)
-      this.disjuncts = type;
-    else
-      this.disjuncts = Set(type);
+    this.disjuncts = (Set.lift . typify)(type);
   }
 
   union(other) => TSum(this.disjuncts.union(other.disjuncts));
@@ -46,7 +39,7 @@ class SubtypeState extends SimpleTypeState {
 
       let tFunc = this.constrain(func);
       let tArgs = this.constrain(args);
-      let tApp = this.typeVars.fresh();
+      let tApp = typeVar();
 
       this.constraints.push(SubtypeConstraint(tFunc, tArgs -> tApp));
       

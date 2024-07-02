@@ -278,10 +278,13 @@ bool astClosure(ObjClosure* closure) {
   // the root of the tree is an [ASTClosure] instance that has
   // four arguments.
   vmPush(OBJ_VAL(vm.core.astClosure));
+
   // the function's name.
   vmPush(OBJ_VAL(closure->function->name));
+
   // the function itself.
   vmPush(OBJ_VAL(closure));
+
   // the function's signature.
   vmPush(OBJ_VAL(vm.core.astSignature));
   vmPush(NUMBER_VAL(closure->function->arity));
@@ -295,6 +298,7 @@ bool astClosure(ObjClosure* closure) {
   }
   if (!initInstance(vm.core.astSignature, closure->function->arity + 1))
     return false;
+
   // the closure's upvalues.
   for (int i = 0; i < closure->upvalueCount; i++) {
     vmPush(OBJ_VAL(vm.core.astUpvalue));
@@ -302,8 +306,8 @@ bool astClosure(ObjClosure* closure) {
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
     if (!initInstance(vm.core.astUpvalue, 2)) return false;
   }
-
   if (!vmTuplify(closure->upvalueCount, true)) return false;
+
   if (!initInstance(vm.core.astClosure, 4)) return false;
 
   return astFrame(vmPeek(0));
@@ -324,7 +328,7 @@ bool astOverload(ObjOverload* overload) {
   return initInstance(vm.core.astOverload, 3);
 }
 
-bool astDestructure(Value value) {
+bool ast(Value value) {
   switch (value.vType) {
     case VAL_OBJ: {
       switch (OBJ_TYPE(value)) {

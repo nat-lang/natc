@@ -11,11 +11,11 @@ class TAbstract extends Type {
     return this.fn(..tVars);
   }
 
-  generalize(type: Type) => {
+  generalize(type: TFunction) => {
     let fvs = type.fvs();
 
     return TAbstract((*args) => {
-      let s = Solution(..zip(fvs,args));
+      let s = Solution(..zip(fvs, args));
       type.apply(s);
       return type;
     }, len(fvs));
@@ -27,11 +27,7 @@ class TAbstract extends Type {
   }
 }
 
-class PolymorphicTypeState extends SimpleTypeState {
-  init(system, debug) => {
-    super.init(system, false);
-  }
-
+class PolyTypeState extends SimpleTypeState {
   constrain(node: ASTNode) => {
     if (node is ASTAssignment) {
       let var = node[0];
@@ -67,8 +63,9 @@ class PolymorphicTypeState extends SimpleTypeState {
   
     let type = super.constrain(node);
 
-    if (node is ASTClosure and type.hasFvs())
+    if (node is ASTClosure and type.hasFvs()) {
       return TAbstract.generalize(type);
+    }
   
     return type;
   }
@@ -86,21 +83,21 @@ class PolymorphicTypeState extends SimpleTypeState {
     });
   }
 
-  solve(constraint: Constraint) => {
+  unify(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
 
     if (left is TAbstract)
-      left = left.instantiate(this.typeVars.fresh);
+      left = left.instantiate(typeVar);
     
     if (right is TAbstract)
-      right = right.instantiate(this.typeVars.fresh);
+      right = right.instantiate(typeVar);
     
-    return super.solve(Constraint(left, right));
+    return super.unify(Constraint(left, right));
   }
 }
 
-class PolymorphicTypeSystem extends SimpleTypeSystem {}
+class PolyTypeSystem extends SimpleTypeSystem {}
 
-PolymorphicTypeSystem.TypeStateClass = PolymorphicTypeState;
+PolyTypeSystem.TypeStateClass = PolyTypeState;
 

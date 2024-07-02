@@ -24,16 +24,16 @@ typedef struct {
 
 typedef enum {
   PREC_NONE,
-  PREC_ASSIGNMENT,   // =
-  PREC_INLINE_TYPE,  // : _ =
-  PREC_OR,           // or
-  PREC_AND,          // and
-  PREC_EQUALITY,     // == !=
-  PREC_COMPARISON,   // < > <= >=
-  PREC_TERM,         // + -
-  PREC_FACTOR,       // * /
-  PREC_UNARY,        // ! -
-  PREC_CALL,         // . ()
+  PREC_ASSIGNMENT,       // =
+  PREC_TYPE_ASSIGNMENT,  // : _ =
+  PREC_OR,               // or
+  PREC_AND,              // and
+  PREC_EQUALITY,         // == !=
+  PREC_COMPARISON,       // < > <= >=
+  PREC_TERM,             // + -
+  PREC_FACTOR,           // * /
+  PREC_UNARY,            // ! -
+  PREC_CALL,             // . ()
   PREC_PRIMARY
 } Precedence;
 
@@ -142,6 +142,14 @@ static bool checkStr(char* str) {
 
 static void consume(Compiler* cmp, TokenType type, const char* message) {
   if (parser.current.type == type)
+    advance(cmp);
+  else
+    errorAtCurrent(cmp, message);
+}
+
+static void consumeIdentifier(Compiler* cmp, const char* message) {
+  if (parser.current.type == TOKEN_IDENTIFIER ||
+      parser.current.type == TOKEN_TYPE_VARIABLE)
     advance(cmp);
   else
     errorAtCurrent(cmp, message);
@@ -266,12 +274,12 @@ static void patchJump(Compiler* cmp, int offset) {
   chunk->code[offset + 1] = jump & 0xff;
 }
 
-void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType type,
+void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType functionType,
                   Token name) {
   cmp->enclosing = enclosing;
   cmp->function = NULL;
   cmp->function = newFunction();
-  cmp->type = type;
+  cmp->functionType = functionType;
   cmp->localCount = 0;
   cmp->scopeDepth = 0;
 
@@ -289,7 +297,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType type,
   local->depth = 0;
   local->isCaptured = false;
   local->name.type = TOKEN_IDENTIFIER;
-  if (type == TYPE_METHOD || type == TYPE_INITIALIZER) {
+  if (functionType == TYPE_METHOD || functionType == TYPE_INITIALIZER) {
     local->name.start = "this";
     local->name.length = 4;
   } else {
@@ -299,7 +307,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType type,
 }
 
 static ObjFunction* endCompiler(Compiler* cmp) {
-  if (cmp->type == TYPE_INITIALIZER)
+  if (cmp->functionType == TYPE_INITIALIZER)
     emitConstInstr(cmp, OP_GET_LOCAL, 0);
   else
     emitByte(cmp, OP_NIL);
@@ -351,8 +359,10 @@ static void closeFunction(Compiler* cmp, Compiler* enclosing) {
 
 static void function(Compiler* enclosing, FunctionType type, Token name);
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name);
+static void hoistVariableParam(Compiler* cmp);
 static void expression(Compiler* cmp);
 static void boundExpression(Compiler* cmp, Token name);
+static void typeExpression(Compiler* cmp);
 static void statement(Compiler* cmp);
 static void declaration(Compiler* cmp);
 static void classDeclaration(Compiler* cmp);
@@ -442,6 +452,12 @@ static uint8_t addLocal(Compiler* cmp, Token name) {
   return cmp->localCount - 1;
 }
 
+static void markInitialized(Compiler* cmp) {
+  if (cmp->scopeDepth == 0) return;
+
+  cmp->locals[cmp->localCount - 1].depth = cmp->scopeDepth;
+}
+
 static uint8_t declareLocal(Compiler* cmp, Token* name) {
   for (int i = cmp->localCount - 1; i >= 0; i--) {
     Local* local = &cmp->locals[i];
@@ -525,7 +541,7 @@ static void call(Compiler* cmp, bool canAssign) {
 }
 
 static void property(Compiler* cmp, bool canAssign) {
-  consume(cmp, TOKEN_IDENTIFIER, "Expect property name after '.'.");
+  consumeIdentifier(cmp, "Expect property name after '.'.");
   uint16_t name = identifierConstant(cmp, &parser.previous);
 
   if (canAssign && match(cmp, TOKEN_EQUAL)) {
@@ -664,6 +680,18 @@ static void methodCall(Compiler* cmp, char* name, int argCount) {
 }
 
 static void variable(Compiler* cmp, bool canAssign) {
+  if (cmp->functionType == TYPE_IMPLICIT &&
+      parser.previous.type == TOKEN_TYPE_VARIABLE) {
+    int i = resolveLocal(cmp, &parser.previous);
+
+    if (i == -1) {
+      cmp->function->arity++;
+      declareVariable(cmp);
+      markInitialized(cmp);
+      hoistVariableParam(cmp);
+    }
+  }
+
   namedVariable(cmp, parser.previous, canAssign);
 }
 
@@ -684,7 +712,7 @@ static void super_(Compiler* cmp, bool canAssign) {
   }
 
   consume(cmp, TOKEN_DOT, "Expect '.' after 'super'.");
-  consume(cmp, TOKEN_IDENTIFIER, "Expect superclass method name.");
+  consumeIdentifier(cmp, "Expect superclass method name.");
   uint16_t name = identifierConstant(cmp, &parser.previous);
 
   // load the instance first, which is necessary for
@@ -719,18 +747,12 @@ static void unary(Compiler* cmp, bool canAssign) {
 }
 
 static uint16_t parseVariable(Compiler* cmp, const char* errorMessage) {
-  consume(cmp, TOKEN_IDENTIFIER, errorMessage);
+  consumeIdentifier(cmp, errorMessage);
   uint8_t local = declareVariable(cmp);
 
   if (cmp->scopeDepth > 0) return local;
 
   return identifierConstant(cmp, &parser.previous);
-}
-
-static void markInitialized(Compiler* cmp) {
-  if (cmp->scopeDepth == 0) return;
-
-  cmp->locals[cmp->localCount - 1].depth = cmp->scopeDepth;
 }
 
 static void defineVariable(Compiler* cmp, uint16_t variable) {
@@ -745,10 +767,10 @@ static void defineVariable(Compiler* cmp, uint16_t variable) {
 typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
 
 bool matchParamOrPattern(Compiler* cmp) {
-  return match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_NUMBER) ||
-         match(cmp, TOKEN_TRUE) || match(cmp, TOKEN_FALSE) ||
-         match(cmp, TOKEN_NIL) || match(cmp, TOKEN_UNDEFINED) ||
-         match(cmp, TOKEN_STRING);
+  return match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_TYPE_VARIABLE) ||
+         match(cmp, TOKEN_NUMBER) || match(cmp, TOKEN_TRUE) ||
+         match(cmp, TOKEN_FALSE) || match(cmp, TOKEN_NIL) ||
+         match(cmp, TOKEN_UNDEFINED) || match(cmp, TOKEN_STRING);
 }
 
 static SignatureType peekSignatureType(Compiler* cmp) {
@@ -812,6 +834,7 @@ static bool tryFunction(Compiler* cmp, FunctionType fnType, Token name) {
 
   return false;
 }
+
 static void boundExpression(Compiler* cmp, Token name) {
   if (tryFunction(cmp, TYPE_BOUND, name)) return;
 
@@ -822,12 +845,6 @@ static void whiteDelimitedExpression(Compiler* cmp) {
   if (tryFunction(cmp, TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
 
   parseDelimitedPrecedence(cmp, PREC_ASSIGNMENT, prevWhite);
-}
-
-void inlineTypeExpression(Compiler* cmp) {
-  if (tryFunction(cmp, TYPE_ANONYMOUS, syntheticToken("lambda"))) return;
-
-  parsePrecedence(cmp, PREC_INLINE_TYPE);
 }
 
 static void expression(Compiler* cmp) {
@@ -854,7 +871,35 @@ static void blockOrExpression(Compiler* cmp) {
   }
 }
 
-void hoistParam(Compiler* cmp) {
+static bool tryImplicitFunction(Compiler* enclosing) {
+  Parser checkpoint = saveParser();
+
+  Compiler cmp;
+  initCompiler(&cmp, enclosing, TYPE_IMPLICIT, syntheticToken("implicit"));
+  beginScope(&cmp);
+
+  parsePrecedence(&cmp, PREC_TYPE_ASSIGNMENT);
+
+  if (cmp.function->arity > 0) {
+    emitByte(&cmp, OP_RETURN);
+    closeFunction(&cmp, enclosing);
+    return true;
+  }
+
+  // discard the function if it has no parameters; it'll be gc'd.
+  gotoParser(checkpoint);
+  return false;
+}
+
+static void typeExpression(Compiler* cmp) {
+  if (tryFunction(cmp, TYPE_ANONYMOUS, syntheticToken("lambda")) ||
+      tryImplicitFunction(cmp))
+    return;
+
+  parsePrecedence(cmp, PREC_TYPE_ASSIGNMENT);
+}
+
+static void hoistVariableParam(Compiler* cmp) {
   // param.
   uint16_t constant = identifierConstant(cmp->enclosing, &parser.previous);
   emitConstInstr(cmp->enclosing, OP_VARIABLE, constant);
@@ -867,29 +912,28 @@ void hoistParam(Compiler* cmp) {
   }
 }
 
-void hoistPattern(Compiler* cmp) {
+static void hoistLiteralParam(Compiler* cmp) {
   parsePrecedence(cmp->enclosing, PREC_ASSIGNMENT);
   // type.
   emitByte(cmp->enclosing, OP_UNDEFINED);
 }
 
-void parameter(Compiler* cmp) {
-  if (check(TOKEN_IDENTIFIER)) {
-    consume(cmp, TOKEN_IDENTIFIER, "Expect parameter name.");
+static void parameter(Compiler* cmp) {
+  if (check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) {
+    advance(cmp);
     declareVariable(cmp);
     markInitialized(cmp);
-    hoistParam(cmp);
+    hoistVariableParam(cmp);
 
   } else {
-    hoistPattern(cmp);
+    hoistLiteralParam(cmp);
     addLocal(cmp, syntheticToken("#pattern"));
   }
 }
 
-static void nakedFunction(Compiler* enclosing, FunctionType fnType,
-                          Token name) {
+static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
   Compiler cmp;
-  initCompiler(&cmp, enclosing, fnType, name);
+  initCompiler(&cmp, enclosing, type, name);
   beginScope(&cmp);
 
   cmp.function->arity = 1;
@@ -942,7 +986,7 @@ static void function(Compiler* enclosing, FunctionType type, Token name) {
 }
 
 static void method(Compiler* cmp) {
-  consume(cmp, TOKEN_IDENTIFIER, "Expect method name.");
+  consumeIdentifier(cmp, "Expect method name.");
   uint16_t constant = identifierConstant(cmp, &parser.previous);
   FunctionType type = TYPE_METHOD;
 
@@ -1031,7 +1075,8 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
 
   Parser checkpointB = checkpointA;
 
-  if (check(TOKEN_IDENTIFIER) && peek(TOKEN_IN)) {
+  if ((check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) &&
+      peek(TOKEN_IN)) {
     // bound variable and iterable to draw from.
     beginScope(cmp);
     iter = iterator(cmp);
@@ -1268,7 +1313,7 @@ static void subscript(Compiler* cmp, bool canAssign) {
 }
 
 static void classDeclaration(Compiler* cmp) {
-  consume(cmp, TOKEN_IDENTIFIER, "Expect class name.");
+  consumeIdentifier(cmp, "Expect class name.");
   Token className = parser.previous;
   uint16_t nameConstant = identifierConstant(cmp, &parser.previous);
   declareVariable(cmp);
@@ -1281,7 +1326,7 @@ static void classDeclaration(Compiler* cmp) {
   currentClass = &classCompiler;
 
   if (match(cmp, TOKEN_EXTENDS)) {
-    consume(cmp, TOKEN_IDENTIFIER, "Expect superclass name.");
+    consumeIdentifier(cmp, "Expect superclass name.");
     variable(cmp, false);
 
     if (identifiersEqual(&className, &parser.previous)) {
@@ -1342,7 +1387,7 @@ static void letDeclaration(Compiler* cmp) {
   defineVariable(cmp, var);
 
   if (match(cmp, TOKEN_COLON)) {
-    inlineTypeExpression(cmp);
+    typeExpression(cmp);
   } else {
     emitByte(cmp, OP_UNDEFINED);
   }
@@ -1456,7 +1501,7 @@ static void forStatement(Compiler* cmp) {
   beginScope(cmp);
   consume(cmp, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
-  if (check(TOKEN_IDENTIFIER)) {
+  if (check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) {
     forInStatement(cmp);
   } else {
     forConditionStatement(cmp);
@@ -1485,7 +1530,7 @@ static void ifStatement(Compiler* cmp) {
 
 static void importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
-  consume(cmp, TOKEN_IDENTIFIER, "Expect path to import.");
+  consumeIdentifier(cmp, "Expect path to import.");
   advance(cmp);
   bareString(cmp);
   emitByte(cmp, OP_IMPORT);
@@ -1498,10 +1543,10 @@ static void printStatement(Compiler* cmp) {
 }
 
 static void returnStatement(Compiler* cmp) {
-  if (cmp->type == TYPE_SCRIPT) {
+  if (cmp->functionType == TYPE_SCRIPT) {
     error(cmp, "Can't return from top-level code.");
   }
-  if (cmp->type == TYPE_INITIALIZER) {
+  if (cmp->functionType == TYPE_INITIALIZER) {
     error(cmp, "Can't return from an initializer.");
   }
 
@@ -1613,6 +1658,7 @@ ParseRule rules[] = {
     [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
     [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
     [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
+    [TOKEN_TYPE_VARIABLE] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_UNDEFINED] = {undefined, NULL, PREC_NONE},
@@ -1636,8 +1682,8 @@ ParseRule rules[] = {
 
 static ParseRule* getRule(Token token) { return &rules[token.type]; }
 
-// Simply look up the rule for the [token]'s type, unless the
-// [token] is an identifier, in which case check the parser's
+// Look up the rule for the [token]'s type, unless the
+// [token] is an identifier, in which case check the vm's
 // infix table for a user-defined infixation precedence.
 static ParseRule* getInfixableRule(Compiler* cmp, Token token) {
   if (token.type == TOKEN_IDENTIFIER) {

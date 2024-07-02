@@ -1117,7 +1117,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DESTRUCTURE: {
         Value value = vmPeek(0);
-        if (!astDestructure(value)) return INTERPRET_RUNTIME_ERROR;
+        if (!ast(value)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_SET_TYPE_LOCAL: {

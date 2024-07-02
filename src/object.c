@@ -432,11 +432,11 @@ void printObject(Value value) {
       printf("<class %s>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
-      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
+      printf("<fn %s at %p>", AS_CLOSURE(value)->function->name->chars,
              AS_CLOSURE(value));
       break;
     case OBJ_FUNCTION:
-      printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,
+      printf("<raw fn %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
     case OBJ_OVERLOAD:

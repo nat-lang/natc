@@ -16,19 +16,9 @@ assert(check.failure());
 
 // but the polymorphic type system succeeds.
 
-check = PolymorphicTypeSystem.typecheck(() => {
-  let id = x => x;
-
-  id(1);
-  id(true);
-  id("string");
-});
-
-assert(check.success());
-
 // explicit abstraction.
 
-check = PolymorphicTypeSystem.typecheck(() => {
+check = PolyTypeSystem.typecheck(() => {
   let id: (a => a -> a) = x => x;
 
   id(1);
@@ -40,7 +30,65 @@ assert(check.success());
 
 let id: (a => a -> a) = x => x;
 
-check = PolymorphicTypeSystem.typecheck(() => {
+check = PolyTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// implicit abstraction.
+
+// one parameter.
+
+let f: w -> w = x => x;
+let t = globalTypeEnv()["f"];
+
+assert(vType(t) == OClosure);
+
+assert(t(num) is TFunction);
+assert(t(num).domain == num);
+assert(t(num).range == num);
+
+// two parameters.
+
+let f: x -> y = x => x;
+let t = globalTypeEnv()["f"];
+
+assert(vType(t) == OClosure);
+
+assert(t(num, string) is TFunction);
+assert(t(num, string).domain == num);
+assert(t(num, string).range == string);
+
+// checking.
+
+check = PolyTypeSystem.typecheck(() => {
+  let id: w -> w = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+let id: w -> w = x => x;
+
+check = PolyTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// reconstruction.
+
+check = PolyTypeSystem.typecheck(() => {
+  let id = x => x;
+
   id(1);
   id(true);
   id("string");

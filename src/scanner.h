@@ -27,6 +27,7 @@ typedef enum {
   // Literals.
   TOKEN_UNDEFINED,
   TOKEN_IDENTIFIER,
+  TOKEN_TYPE_VARIABLE,
   TOKEN_STRING,
   TOKEN_NUMBER,
   // Keywords.

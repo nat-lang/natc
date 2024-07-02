@@ -389,6 +389,7 @@ bool __add__(int argCount, Value* args) {
   }
   return true;
 }
+
 InterpretResult initializeCore() {
   // native functions.
 

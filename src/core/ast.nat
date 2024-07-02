@@ -13,8 +13,8 @@ class ASTNode extends Tree {
     this.children = children;
   }
 
-  // Give the tree's variables uuids; make sure upvalues
-  // are identified with the locals they close over.
+  // Give the tree's variables uuids. Identify upvalues
+  // with the locals they close over.
   uniquelyIdentifyVariables() => {
     let uuids = NameSupply();
     let globals = Map();
@@ -151,8 +151,6 @@ class ASTSignature extends ASTNode {
     this.arity = arity;
     this.params = params;
   }
-
-  isComplete() => len(this.params) == this.arity;
 }
 
 class ASTClosure extends ASTExpr {

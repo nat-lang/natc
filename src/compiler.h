@@ -20,6 +20,7 @@ typedef struct {
 
 typedef enum {
   TYPE_ANONYMOUS,
+  TYPE_IMPLICIT,
   TYPE_BOUND,
   TYPE_METHOD,
   TYPE_SCRIPT,
@@ -42,7 +43,7 @@ typedef struct ClassCompiler {
 typedef struct Compiler {
   struct Compiler* enclosing;
   ObjFunction* function;
-  FunctionType type;
+  FunctionType functionType;
 
   Local locals[UINT8_COUNT];
   int localCount;
@@ -50,7 +51,7 @@ typedef struct Compiler {
   int scopeDepth;
 } Compiler;
 
-void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType type,
+void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType functionType,
                   Token name);
 ObjFunction* compile(Compiler* root, const char* source, char* path);
 void markCompilerRoots();
