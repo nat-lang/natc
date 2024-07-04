@@ -43,6 +43,7 @@
 #define S_AST_SIGNATURE "ASTSignature"
 #define S_AST_PARAMETER "ASTParameter"
 #define S_AST_OVERLOAD "ASTOverload"
+#define S_AST_VARIABLE "ASTVariable"
 
 #define S_CTYPE_BOOL "CBool"
 #define S_CTYPE_NIL "CNil"

@@ -164,6 +164,10 @@ bool astFrame(Value root) {
         vmVariable(frame);
         break;
       }
+      case OP_SIGNATURE: {
+        vmSignature(frame);
+        break;
+      }
       case OP_PATTERN: {
         vmPattern(frame);
         break;
@@ -257,6 +261,14 @@ bool astFrame(Value root) {
         vmPush(root);
         vmPush(UNIT_VAL);
         if (!executeMethod("opLiteral", 1)) return false;
+        break;
+      }
+      case OP_SEQUENCE: {
+        vmSequence(frame);
+        Value seq = vmPop();
+        vmPush(root);
+        vmPush(seq);
+        if (!executeMethod("opSequence", 1)) return false;
         break;
       }
       default: {

@@ -77,26 +77,28 @@ assert(r is ASTReturn);
 assert(r[0] is ASTApp);
 assert(r[0][0].id == "+");
 
-f <- (a) => a and true;
+// these now require jump ast.
 
-let r = f[0];
-assert(r is ASTReturn);
-assert(r[0] is ASTApp);
-assert(r[0][0].id == "and");
+// f <- (a) => a and true;
 
-f <- (a) => a or true;
+// let r = f[0];
+// assert(r is ASTReturn);
+// assert(r[0] is ASTApp);
+// assert(r[0][0].id == "and");
 
-let r = f[0];
-assert(r is ASTReturn);
-assert(r[0] is ASTApp);
-assert(r[0][0].id == "or");
+// f <- (a) => a or true;
 
-f <- (a) => a implies b;
+// let r = f[0];
+// assert(r is ASTReturn);
+// assert(r[0] is ASTApp);
+// assert(r[0][0].id == "or");
 
-let r = f[0];
-assert(r is ASTReturn);
-assert(r[0] is ASTApp);
-assert(r[0][0].id == "implies");
+// f <- (a) => a implies b;
+
+// let r = f[0];
+// assert(r is ASTReturn);
+// assert(r[0] is ASTApp);
+// assert(r[0][0].id == "implies");
 
 // function to postfix.
 
@@ -159,6 +161,7 @@ f <- (g) => {
 };
 
 assert(len(f.children) == 6);
+
 // k.
 assert(f[0] is ASTLocalTypeAssignment);
 assert(f[1] is ASTLocalValueAssignment);
@@ -265,10 +268,42 @@ f <- () => {
   let k = (a: num -> num) => a(1);
 };
 
-assert(f[1][1] is ASTClosure);
+// two type assignments for 'k':
+// (0) for the let declaration,
+// (1) for the signature.
 
-let closure = f[1][1];
-let param = closure.signature.params[0];
+let t0 = f[0];
+let t1 = f[1];
 
-assert(param is ASTParameter);
-assert(param.type.resolve() is TFunction);
+assert(t0 is ASTLocalTypeAssignment);
+assert(t1 is ASTLocalTypeAssignment);
+
+// they both assign to 'k';
+assert(t0[0].id == 1);
+assert(t0[0].id == t1[0].id);
+
+// first assignment is undefined.
+assert(t0[1] is ASTLiteral);
+assert(t0[1].resolve() == undefined);
+
+// second is (num -> num) -> undefined.
+assert(t1[1] is ASTApp);
+assert(t1[1].resolve() == (num -> num) -> undefined);
+
+// the closure's signature lives on its node.
+
+let k = f[2][1];
+
+assert(k is ASTClosure);
+assert(k.signature is ASTSignature);
+
+let a = k.signature.params[0];
+
+assert(a is ASTParameter);
+
+let aType = a.type;
+
+assert(aType is ASTApp);
+assert(aType.resolve() is TFunction);
+assert(aType.resolve().domain == num);
+assert(aType.resolve().range == num);

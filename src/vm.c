@@ -57,6 +57,7 @@ void initCore(Core* core) {
   core->astSignature = NULL;
   core->astParameter = NULL;
   core->astOverload = NULL;
+  core->astVariable = NULL;
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
   core->vTypeNumber = NULL;
@@ -337,7 +338,7 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
-// Wrap the top [count] values in tuple and put it
+// Wrap the top [count] values in a tuple and put it
 // on the stack, optionally leaving the values below it.
 bool vmTuplify(int count, bool replace) {
   int i = count;
@@ -512,6 +513,20 @@ void vmCloseUpvalues(Value* last) {
   }
 }
 
+void vmSequence(CallFrame* frame) {
+  int count = READ_BYTE();
+
+  ObjSequence* seq = newSequence();
+  vmPush(OBJ_VAL(seq));
+
+  for (int i = 0; i < count; i++)
+    writeValueArray(&seq->values, vmPeek(count - i));
+
+  vmPop();  // seq.
+  while (count--) vmPop();
+  vmPush(OBJ_VAL(seq));
+}
+
 void vmVariable(CallFrame* frame) {
   ObjString* name = READ_STRING();
   ObjVariable* var = newVariable(name);
@@ -538,6 +553,17 @@ void vmPattern(CallFrame* frame) {
   vmPush(OBJ_VAL(pattern));
 }
 
+void vmSignature(CallFrame* frame) {
+  vmPattern(frame);
+
+  ObjPattern* pattern = AS_PATTERN(vmPeek(0));
+
+  for (int i = 0; i < pattern->count; i++) vmPush(pattern->elements[i].type);
+
+  // disassembleStack();
+  // printf("\n");
+}
+
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
   ObjOverload* overload = newOverload(cases);
@@ -559,6 +585,9 @@ bool vmOverload(CallFrame* frame) {
 bool vmClosure(CallFrame* frame) {
   ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
   ObjClosure* closure = newClosure(function);
+
+  // disassembleStack();
+  // printf("\n");
   Value pattern = vmPop();
 
   if (!IS_PATTERN(pattern)) {
@@ -738,6 +767,13 @@ InterpretResult vmExecute(int baseFrame) {
           break;
         }
 
+        if (IS_VARIABLE(vmPeek(0)) &&
+            strcmp(AS_STRING(name)->chars, "name") == 0) {
+          vmPop();
+          vmPush(OBJ_VAL(AS_VARIABLE(vmPeek(0))->name));
+          break;
+        }
+
         vmRuntimeError("Only objects and classes have properties (get).");
         return INTERPRET_RUNTIME_ERROR;
 
@@ -899,6 +935,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_PATTERN: {
         vmPattern(frame);
+        break;
+      }
+      case OP_SIGNATURE: {
+        vmSignature(frame);
         break;
       }
       case OP_CLOSE_UPVALUE: {
@@ -1137,10 +1177,10 @@ InterpretResult vmExecute(int baseFrame) {
         Value value = vmPeek(0);
 
         ObjClass lca;
-        if (!IS_INSTANCE(value) &&
-            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.core.sequence,
-                                &lca) &&
-            &lca == vm.core.sequence) {
+        if (!IS_INSTANCE(value) ||
+            (leastCommonAncestor(AS_INSTANCE(value)->klass, vm.core.sequence,
+                                 &lca) &&
+             &lca == vm.core.sequence)) {
           vmRuntimeError("Only sequential values can spread.");
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -1152,6 +1192,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_UNIT: {
         vmPush(UNIT_VAL);
+        break;
+      }
+      case OP_SEQUENCE: {
+        vmSequence(frame);
         break;
       }
       default:

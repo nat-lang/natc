@@ -34,8 +34,8 @@ typedef enum {
   OP_CLOSURE,
   OP_OVERLOAD,
   OP_VARIABLE,
-  OP_TYPE_VARIABLE,
   OP_PATTERN,
+  OP_SIGNATURE,
   OP_CLOSE_UPVALUE,
   OP_RETURN,
   OP_IMPLICIT_RETURN,
@@ -53,6 +53,7 @@ typedef enum {
   OP_SET_TYPE_GLOBAL,
   OP_SPREAD,
   OP_UNIT,
+  OP_SEQUENCE,
 } OpCode;
 
 typedef struct {

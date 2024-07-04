@@ -38,7 +38,7 @@ check = PolyTypeSystem.typecheck(() => {
 
 assert(check.success());
 
-// implicit abstraction.
+// implicit abstraction in let annotation.
 
 // one parameter.
 
@@ -50,19 +50,6 @@ assert(vType(t) == OClosure);
 assert(t(num) is TFunction);
 assert(t(num).domain == num);
 assert(t(num).range == num);
-
-// two parameters.
-
-let f: x -> y = x => x;
-let t = globalTypeEnv()["f"];
-
-assert(vType(t) == OClosure);
-
-assert(t(num, string) is TFunction);
-assert(t(num, string).domain == num);
-assert(t(num, string).range == string);
-
-// checking.
 
 check = PolyTypeSystem.typecheck(() => {
   let id: w -> w = x => x;
@@ -83,6 +70,21 @@ check = PolyTypeSystem.typecheck(() => {
 });
 
 assert(check.success());
+
+// two parameters.
+
+let f: x -> y = x => x;
+let t = globalTypeEnv()["f"];
+
+assert(vType(t) == OClosure);
+
+assert(t(num, string) is TFunction);
+assert(t(num, string).domain == num);
+assert(t(num, string).range == string);
+
+// implicit abstraction in parameter annotation.
+
+// parameter 
 
 // reconstruction.
 

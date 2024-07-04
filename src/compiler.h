@@ -51,6 +51,21 @@ typedef struct Compiler {
   int scopeDepth;
 } Compiler;
 
+typedef enum {
+  PREC_NONE,
+  PREC_ASSIGNMENT,       // =
+  PREC_TYPE_ASSIGNMENT,  // : _ =
+  PREC_OR,               // or
+  PREC_AND,              // and
+  PREC_EQUALITY,         // == !=
+  PREC_COMPARISON,       // < > <= >=
+  PREC_TERM,             // + -
+  PREC_FACTOR,           // * /
+  PREC_UNARY,            // ! -
+  PREC_CALL,             // . ()
+  PREC_PRIMARY
+} Precedence;
+
 void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType functionType,
                   Token name);
 ObjFunction* compile(Compiler* root, const char* source, char* path);

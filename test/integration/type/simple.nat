@@ -84,7 +84,7 @@ assert(check.failure());
 let f: (num, num) -> num = (x,y) => 1;
 
 env = globalTypeEnv();
-assert(env["f"] == TProduct(num, num) -> num);
+assert(env["f"] == (num, num) -> num);
 
 check = typecheck(() => f(1,1));
 assert(check.success());
@@ -161,6 +161,7 @@ check = typecheck(() => {
   let k = (a: num, b: num) => a + b;
   k(1, 1);
 });
+
 assert(check.success());
 
 check = typecheck(() => {
@@ -383,7 +384,7 @@ assert(type == num -> num);
 let f: (num, num) -> num = (x,y) => 1;
 let type = SimpleTypeSystem.type((x,y) => f(x,y));
 
-assert(type == (num, num) -> num);
+assert(type == TProduct([num, num]) -> num);
 
 // with constraints on upvalues.
 

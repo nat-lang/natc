@@ -1,9 +1,0 @@
-let infix(5) > = __gt__;
-let infix(5) < = __lt__;
-let infix(5) >= = __gte__;
-let infix(5) <= = __lte__;
-let infix(6) + = __add__;
-// fix me; i have to handle negation as well.
-let infix(6) - = __sub__;
-let infix(7) / = __div__;
-let infix(7) * = __mul__;

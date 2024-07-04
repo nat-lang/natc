@@ -149,6 +149,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_VARIABLE", chunk, offset);
     case OP_PATTERN:
       return byteInstruction("OP_PATTERN", chunk, offset);
+    case OP_SIGNATURE:
+      return byteInstruction("OP_SIGNATURE", chunk, offset);
     case OP_CLOSE_UPVALUE:
       return simpleInstruction("OP_CLOSE_UPVALUE", offset);
     case OP_IMPLICIT_RETURN:
@@ -183,6 +185,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_SET_TYPE_GLOBAL", chunk, offset);
     case OP_SPREAD:
       return simpleInstruction("OP_SPREAD", offset);
+    case OP_SEQUENCE:
+      return byteInstruction("OP_SEQUENCE", chunk, offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

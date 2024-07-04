@@ -1,11 +1,2 @@
-let infix(3) and = (x, y) => {
-  if (!x) return false;
-  return y;
-};
-
-let infix(2) or = (x, y) => {
-  if (x) return true;
-  return y;
-};
 
 let infix(5) implies = (x, y) => !x or y;

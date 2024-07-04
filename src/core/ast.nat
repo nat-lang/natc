@@ -8,36 +8,37 @@ class NameSupply {
   }
 }
 
+class VarEnv {
+  init(upvalues) => {
+    this.locals = Map();
+    this.upvalues = upvalues;
+    this.typeVars = Map();
+  }
+}
+
 class ASTNode extends Tree {
   init(*children) => {
     this.children = children;
   }
 
   // Give the tree's variables uuids. Identify upvalues
-  // with the locals they close over.
+  // with the locals they close over. 
   uniquelyIdentifyVariables() => {
     let uuids = NameSupply();
     let globals = Map();
 
-    let rename = (node: ASTVar, env: Map) => {
+    let rename = (node: ASTVariable, env: Map) => {
       if (!env[node.id])
         env[node.id] = uuids.fresh();
       node.uuid = env[node.id];
     };
 
-    class VarEnv {
-      init(upvalues) => {
-        this.locals = Map();
-        this.upvalues = upvalues;
-      }
-    }
-
     this.visit((node, varEnv) => {
       if (node is ASTClosure) {
         let closureEnv = VarEnv(varEnv.upvalues);
-        for (param in node.signature.params) {
+    
+        for (param in node.signature.params)
           rename(param, closureEnv.locals);
-        }
 
         for (upvalue in node.upvalues) {
           if (!closureEnv.upvalues[upvalue.id]) {
@@ -86,7 +87,11 @@ class ASTLiteral extends ASTExpr {
 }
 class ASTNegation extends ASTExpr {}
 
-class ASTVar extends ASTExpr {
+class ASTSequence extends ASTExpr {
+  resolve() => this.children.map(x => x.resolve());
+}
+
+class ASTVariable extends ASTExpr {
   init(id) => {
     this.id = id;
     this.uuid = nil;
@@ -94,17 +99,17 @@ class ASTVar extends ASTExpr {
   }
 
   hash() => {
-    if (!this.uuid) throw Error("Can't hash 'ASTVar' without uuid.");
+    if (!this.uuid) throw Error("Can't hash 'ASTVariable' without uuid.");
 
     return hash(this.uuid);
   }
 }
-
-class ASTLocal extends ASTVar {}
-class ASTGlobal extends ASTVar {
+class ASTTypeVariable extends ASTVariable {}
+class ASTLocal extends ASTVariable {}
+class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
 }
-class ASTUpvalue extends ASTVar {
+class ASTUpvalue extends ASTVariable {
   init(id, localId) => {
     super.init(id);
     this.localId = localId;
@@ -168,11 +173,13 @@ class ASTClosure extends ASTExpr {
 
   opLiteral(value) => ASTLiteral(value);
   opNot(value) => ASTNegation(value);
+  opSequence(seq) => ASTSequence(..Sequential.fromRaw(seq));
   opGetLocal(slot) => ASTLocal(slot);
   opGetGlobal(name) => ASTGlobal(name);
   opGetUpvalue(slot, localSlot) => ASTUpvalue(slot, localSlot);
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
   opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
+  opTypeVariable(var) => ASTTypeVariable(var.name);
 
   // statements.
 

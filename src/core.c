@@ -5,6 +5,9 @@
 #include <string.h>
 #include <time.h>
 
+#include "compiler.h"
+#include "io.h"
+
 static void defineNativeFn(char* name, int arity, bool variadic,
                            NativeFn function, ObjMap* dest) {
   // keep the values on the stack so they're
@@ -17,6 +20,16 @@ static void defineNativeFn(char* name, int arity, bool variadic,
   mapSet(dest, vmPeek(1), vmPeek(0));
   vmPop();
   vmPop();
+}
+
+static void defineNativeInfixGlobal(char* name, int arity, NativeFn function,
+                                    Precedence prec) {
+  defineNativeFn(name, arity, false, function, &vm.globals);
+
+  Value fn;
+  Value fnName = INTERN(name);
+  mapGet(&vm.globals, fnName, &fn);
+  mapSet(&vm.infixes, fnName, NUMBER_VAL(prec));
 }
 
 static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
@@ -263,6 +276,9 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_OVERLOAD:
           vmPush(OBJ_VAL(vm.core.oTypeOverload));
           break;
+        case OBJ_SEQUENCE:
+          vmPush(OBJ_VAL(vm.core.oTypeSequence));
+          break;
         default: {
           printValue(value);
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
@@ -403,14 +419,14 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
 
-  defineNativeFnGlobal("__gt__", 2, __gt__);
-  defineNativeFnGlobal("__lt__", 2, __lt__);
-  defineNativeFnGlobal("__gte__", 2, __gte__);
-  defineNativeFnGlobal("__lte__", 2, __lte__);
-  defineNativeFnGlobal("__add__", 2, __add__);
-  defineNativeFnGlobal("__sub__", 2, __sub__);
-  defineNativeFnGlobal("__div__", 2, __div__);
-  defineNativeFnGlobal("__mul__", 2, __mul__);
+  defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
+  defineNativeInfixGlobal(">=", 2, __gte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<=", 2, __lte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("+", 2, __add__, PREC_TERM);
+  defineNativeInfixGlobal("-", 2, __sub__, PREC_TERM);
+  defineNativeInfixGlobal("/", 2, __div__, PREC_FACTOR);
+  defineNativeInfixGlobal("*", 2, __mul__, PREC_FACTOR);
 
   // native classes.
 
@@ -442,6 +458,7 @@ InterpretResult initializeCore() {
       (vm.core.astSignature = getGlobalClass(S_AST_SIGNATURE)) == NULL ||
       (vm.core.astParameter = getGlobalClass(S_AST_PARAMETER)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
+      (vm.core.astVariable = getGlobalClass(S_AST_VARIABLE)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||

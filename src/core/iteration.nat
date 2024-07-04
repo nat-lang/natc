@@ -18,7 +18,7 @@ class Iterator {
   __len__() => this.end - this.idx;
 }
 
-let iter = (object) => {
+let iter = object => {
   if (object is Sequential)
     return Iterator(object, 0, len(object));
 

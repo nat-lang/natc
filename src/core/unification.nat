@@ -1,6 +1,4 @@
 
-let var = x => vType(x) == OVariable;
-
 // [a] is a pattern element, [b] a scrutinee.
 let unifyPair = (a, b) => {
   let vA = a[0], vB = b[0],
@@ -10,7 +8,7 @@ let unifyPair = (a, b) => {
   // then we just unify the param and the
   // scrutinee.
   if (tA == undefined) {
-    if (var(vA))
+    if (isVar(vA))
       return true;
     return vA == vB;
   }

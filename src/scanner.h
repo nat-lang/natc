@@ -31,6 +31,7 @@ typedef enum {
   TOKEN_STRING,
   TOKEN_NUMBER,
   // Keywords.
+  TOKEN_AND,
   TOKEN_CLASS,
   TOKEN_CONST,
   TOKEN_ELSE,
@@ -42,6 +43,7 @@ typedef enum {
   TOKEN_INFIX,
   TOKEN_LET,
   TOKEN_NIL,
+  TOKEN_OR,
   TOKEN_PRINT,
   TOKEN_RETURN,
   TOKEN_SUPER,
@@ -50,7 +52,6 @@ typedef enum {
   TOKEN_TRUE,
   TOKEN_WHILE,
   TOKEN_IMPORT,
-
   TOKEN_ERROR,
   TOKEN_EOF,
 } TokenType;

@@ -1,4 +1,9 @@
 
+let pp = v => {
+  if (v.has("pp")) v.pp();
+  else print v;
+};
+
 class Constraint {
   init(left, right) => {
     this.left = left;
@@ -6,9 +11,9 @@ class Constraint {
   }
 
   pp() => {
-    this.left.pp();
+    pp(this.left);
     print "x";
-    this.right.pp();
+    pp(this.right);
   }
 }
 
@@ -25,27 +30,9 @@ class Solution extends Map {
 
     return c;
   }
-}
-
-class Type {
   pp() => {
-    print this;
+    for (sub in this) { sub.pp(); print ""; }
   }
-
-  substitute(c: Constraint) => {
-    if (this == c.left)
-      return c.right;
-    return this;
-  }
-
-  str() => {
-    throw NotImplemented("Type classes must implement 'str' individually.");
-  }
-
-  fvs() => [];
-  hasFvs() => len(this.fvs()) > 0;
-
-  hash() => hash(this.str());
 }
 
 class TVar extends Type {
@@ -82,70 +69,36 @@ class TString extends Type {
 
 // Transform sequential and unit values into their
 // corresponding types, TProduct and TUnit.
-let typify = type => {
-  if (type is Sequential)
-    return TProduct(..type);
-  if (type == ())
+let typify = value => {
+  if (value == ())
     return unit;
-  return type;
+  if (value == undefined)
+    return typeVar();
+  if (value is Sequential)
+    return TProduct(value.map(typify));
+  if (vType(value) == OSequence)
+    return typify(Sequence.fromRaw(value));
+  if (value is TFunction)
+    return typify(value.domain) -> typify(value.range);
+
+  return value;
 };
 
 class TProduct extends Type {
-  init(*elements) => {
-    this.elements = elements.map(typify);
-  }
-  str() => {
-    let s = "(";
-    for (x in this.elements)
-      s = s + ", " + x.str();
-    s = s + ")";
-    return s;
+  init(elements) => {
+    this.elements = elements;
   }
 
-  substitute(c: Constraint) => TProduct(
-    ..this.elements.map(x => x.substitute(c))
-  );
+  pp() => { print this.elements.values; }
+
+  substitute(c: Constraint) => {
+    return TProduct(this.elements.map(x => x.substitute(c)));
+  }
 
   hash() => this.elements.hash();
 
   __eq__(other) => this.elements == other.elements;
   __len__() => len(this.elements);
-}
-
-class TFunction extends Type {
-  init(domain, range) => {
-    this.domain = typify(domain);
-    this.range = typify(range);
-  }
-
-  __eq__(other) => this.domain == other.domain and this.range == other.range;
-
-  str() => "(" + this.domain.str() + " -> " + this.range.str() + ")";
-
-  fvs() => {
-    let fvs = [];
-    for (v in this.domain.fvs()) fvs.push(v);
-    for (v in this.range.fvs()) fvs.push(v);
-    return fvs;
-  }
-
-  pp() => {
-    print this.domain;
-    print this.range;
-  }
-
-  substitute(c: Constraint) => {
-    this.domain = this.domain.substitute(c);
-    this.range = this.range.substitute(c);
-
-    return this;
-  }
-
-  apply(s: Solution) => {
-    for (c in s) {
-      this.substitute(c);
-    }
-  }
 }
 
 class TOverload extends Type {
@@ -161,7 +114,6 @@ let void = TVoid();
 let bool = TBoolean();
 let num = TNumber();
 let string = TString();
-let infix -> = TFunction;
 let tClass = TClass();
 
 class SimpleTypeSystem {
@@ -189,7 +141,7 @@ class SimpleTypeSystem {
     if (!state.solved())
       throw Error("Can't infer type.");
 
-    type.apply(state.solution);
+    type = type.apply(state.solution);
 
     return type;
   }
@@ -247,7 +199,7 @@ class SimpleTypeState {
 
   // Look up the node in the [typeEnv]. If there's no
   // type entry, then mint a fresh type var.
-  lookup(node: ASTVar) => {
+  lookup(node: ASTVariable) => {
     if (!this.typeEnv[node])
         this.typeEnv[node] = typeVar();
 
@@ -263,7 +215,7 @@ class SimpleTypeState {
     node.each(node => {
       if (node is ASTGlobal) {
         if (node.id in annotations)
-          this.typeEnv[node] = annotations[node.id];
+          this.typeEnv[node] = typify(annotations[node.id]);
       }
     });
   } 
@@ -276,12 +228,12 @@ class SimpleTypeState {
         (env: Map, param: ASTParameter) => {
           let type = param.type;
 
-          if (type is ASTNode) type = type.resolve();
+          // it's not an ASTNode when we're unifying
+          // for pattern matching.
+          if (type is ASTNode)
+            type = type.resolve();
 
-          if (type == undefined)
-            env[param] = typeVar();
-          else
-            env[param] = type;
+          env[param] = typify(type);
 
           return env;
         },
@@ -314,7 +266,7 @@ class SimpleTypeState {
       } else if (node.signature.arity == 1) {
         tParams = fnEnv.values()[0];
       } else {
-        tParams = fnEnv.values();
+        tParams = TProduct(fnEnv.values());
       }
 
       // there's always an implicit return. for now, if there are
@@ -357,7 +309,7 @@ class SimpleTypeState {
       return annotationType;
     }
 
-    if (node is ASTVar)
+    if (node is ASTVariable)
       return this.lookup(node);
     
     if (node is ASTArgumentSequence) {
@@ -368,7 +320,7 @@ class SimpleTypeState {
       else if (len(tArgs) == 1)
         return tArgs[0];
       else
-        return TProduct(..tArgs);
+        return TProduct(tArgs);
     }
 
     if (node is ASTApp) {
@@ -387,10 +339,10 @@ class SimpleTypeState {
       let var = node[0];
       let val = node[1];
 
-      if (var in this.typeEnv)
-        throw TypeError("Variable already has a type annotation.");
+      let tVar = this.lookup(var);
+      let tVal = typify(val.resolve());
 
-      this.typeEnv[var] = val.resolve();
+      this.constraints.push(Constraint(tVar, tVal));
 
       return void;
     }
@@ -449,7 +401,7 @@ class SimpleTypeState {
           zip(left.elements, right.elements).map((x) => Constraint(..x))
         );
 
-        return true;
+        return this.solve();
       } else {
         return false;
       }

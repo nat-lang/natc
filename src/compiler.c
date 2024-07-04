@@ -22,21 +22,6 @@ typedef struct {
   bool panicMode;
 } Parser;
 
-typedef enum {
-  PREC_NONE,
-  PREC_ASSIGNMENT,       // =
-  PREC_TYPE_ASSIGNMENT,  // : _ =
-  PREC_OR,               // or
-  PREC_AND,              // and
-  PREC_EQUALITY,         // == !=
-  PREC_COMPARISON,       // < > <= >=
-  PREC_TERM,             // + -
-  PREC_FACTOR,           // * /
-  PREC_UNARY,            // ! -
-  PREC_CALL,             // . ()
-  PREC_PRIMARY
-} Precedence;
-
 typedef void (*ParseFn)(Compiler* cmp, bool canAssign);
 typedef bool (*DelimitFn)();
 
@@ -344,8 +329,6 @@ static void endScope(Compiler* cmp) {
 }
 
 static void closeFunction(Compiler* cmp, Compiler* enclosing) {
-  emitBytes(enclosing, OP_PATTERN, cmp->function->arity);
-
   ObjFunction* function = endCompiler(cmp);
 
   emitConstInstr(enclosing, OP_CLOSURE,
@@ -359,7 +342,7 @@ static void closeFunction(Compiler* cmp, Compiler* enclosing) {
 
 static void function(Compiler* enclosing, FunctionType type, Token name);
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name);
-static void hoistVariableParam(Compiler* cmp);
+static bool hoistVariableParam(Compiler* cmp);
 static void expression(Compiler* cmp);
 static void boundExpression(Compiler* cmp, Token name);
 static void typeExpression(Compiler* cmp);
@@ -609,6 +592,26 @@ static void parentheses(Compiler* cmp, bool canAssign) {
   consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
+static void and_(Compiler* cmp, bool canAssign) {
+  int endJump = emitJump(cmp, OP_JUMP_IF_FALSE);
+
+  emitByte(cmp, OP_POP);
+  parsePrecedence(cmp, PREC_AND);
+
+  patchJump(cmp, endJump);
+}
+
+static void or_(Compiler* cmp, bool canAssign) {
+  int elseJump = emitJump(cmp, OP_JUMP_IF_FALSE);
+  int endJump = emitJump(cmp, OP_JUMP);
+
+  patchJump(cmp, elseJump);
+  emitByte(cmp, OP_POP);
+
+  parsePrecedence(cmp, PREC_OR);
+  patchJump(cmp, endJump);
+}
+
 static void number(Compiler* cmp, bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
   loadConstant(cmp, NUMBER_VAL(value));
@@ -680,8 +683,8 @@ static void methodCall(Compiler* cmp, char* name, int argCount) {
 }
 
 static void variable(Compiler* cmp, bool canAssign) {
-  if (cmp->functionType == TYPE_IMPLICIT &&
-      parser.previous.type == TOKEN_TYPE_VARIABLE) {
+  if (parser.previous.type == TOKEN_TYPE_VARIABLE &&
+      cmp->functionType == TYPE_IMPLICIT) {
     int i = resolveLocal(cmp, &parser.previous);
 
     if (i == -1) {
@@ -816,14 +819,14 @@ static bool trySingleFunction(Compiler* cmp, FunctionType fnType, Token name) {
 }
 
 void overload(Compiler* cmp, FunctionType fnType, Token name) {
-  int cases = 1;
+  int count = 1;
 
   do {
     trySingleFunction(cmp, fnType, name);
-    cases++;
+    count++;
   } while (match(cmp, TOKEN_PIPE));
 
-  emitBytes(cmp, OP_OVERLOAD, cases);
+  emitBytes(cmp, OP_OVERLOAD, count);
 }
 
 static bool tryFunction(Compiler* cmp, FunctionType fnType, Token name) {
@@ -836,7 +839,9 @@ static bool tryFunction(Compiler* cmp, FunctionType fnType, Token name) {
 }
 
 static void boundExpression(Compiler* cmp, Token name) {
-  if (tryFunction(cmp, TYPE_BOUND, name)) return;
+  if (tryFunction(cmp, TYPE_BOUND, name)) {
+    return;
+  }
 
   parsePrecedence(cmp, PREC_ASSIGNMENT);
 }
@@ -882,6 +887,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 
   if (cmp.function->arity > 0) {
     emitByte(&cmp, OP_RETURN);
+    emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
     closeFunction(&cmp, enclosing);
     return true;
   }
@@ -892,6 +898,8 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 }
 
 static void typeExpression(Compiler* cmp) {
+  // the order here means that if there is explicit
+  // quantification, all type variables must be explicit.
   if (tryFunction(cmp, TYPE_ANONYMOUS, syntheticToken("lambda")) ||
       tryImplicitFunction(cmp))
     return;
@@ -899,7 +907,9 @@ static void typeExpression(Compiler* cmp) {
   parsePrecedence(cmp, PREC_TYPE_ASSIGNMENT);
 }
 
-static void hoistVariableParam(Compiler* cmp) {
+// Emit a variable and optional type in the enclosing scope.
+// Report the presence of a type.
+static bool hoistVariableParam(Compiler* cmp) {
   // param.
   uint16_t constant = identifierConstant(cmp->enclosing, &parser.previous);
   emitConstInstr(cmp->enclosing, OP_VARIABLE, constant);
@@ -907,9 +917,11 @@ static void hoistVariableParam(Compiler* cmp) {
   // type.
   if (match(cmp->enclosing, TOKEN_COLON)) {
     expression(cmp->enclosing);
-  } else {
-    emitByte(cmp->enclosing, OP_UNDEFINED);
+    return true;
   }
+
+  emitByte(cmp->enclosing, OP_UNDEFINED);
+  return false;
 }
 
 static void hoistLiteralParam(Compiler* cmp) {
@@ -918,42 +930,25 @@ static void hoistLiteralParam(Compiler* cmp) {
   emitByte(cmp->enclosing, OP_UNDEFINED);
 }
 
-static void parameter(Compiler* cmp) {
+static bool parameter(Compiler* cmp) {
   if (check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) {
     advance(cmp);
     declareVariable(cmp);
     markInitialized(cmp);
-    hoistVariableParam(cmp);
 
-  } else {
-    hoistLiteralParam(cmp);
-    addLocal(cmp, syntheticToken("#pattern"));
+    return hoistVariableParam(cmp);
   }
-}
-
-static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
-  Compiler cmp;
-  initCompiler(&cmp, enclosing, type, name);
-  beginScope(&cmp);
-
-  cmp.function->arity = 1;
-  parameter(&cmp);
-
-  if (check(TOKEN_FAT_ARROW)) {
-    advance(&cmp);
-    blockOrExpression(&cmp);
-  } else {
-    nakedFunction(&cmp, TYPE_ANONYMOUS, syntheticToken("lambda"));
-    emitByte(&cmp, OP_RETURN);
-  }
-
-  closeFunction(&cmp, enclosing);
+  hoistLiteralParam(cmp);
+  addLocal(cmp, syntheticToken("#pattern"));
+  return false;
 }
 
 static void function(Compiler* enclosing, FunctionType type, Token name) {
   Compiler cmp;
   initCompiler(&cmp, enclosing, type, name);
   beginScope(&cmp);
+
+  int paramAnnotations = 0;
 
   consume(&cmp, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
@@ -973,14 +968,51 @@ static void function(Compiler* enclosing, FunctionType type, Token name) {
         parser.current.length--;
       }
 
-      parameter(&cmp);
+      if (parameter(&cmp)) paramAnnotations++;
     } while (match(&cmp, TOKEN_COMMA));
   }
 
   consume(&cmp, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+  if (type == TYPE_BOUND && paramAnnotations > 0) {
+    emitBytes(enclosing, OP_SIGNATURE, cmp.function->arity);
+    if (cmp.function->arity > 1)
+      emitBytes(enclosing, OP_SEQUENCE, cmp.function->arity);
+    emitByte(enclosing, OP_UNDEFINED);
+    nativePostfix(enclosing, "->", 2);
+
+    int var = enclosing->scopeDepth == 0 ? identifierConstant(enclosing, &name)
+                                         : resolveLocal(enclosing, &name);
+    defineType(enclosing, var);
+    emitByte(enclosing, OP_POP);
+  } else {
+    emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
+  }
+
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
 
   blockOrExpression(&cmp);
+
+  closeFunction(&cmp, enclosing);
+}
+
+static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
+  Compiler cmp;
+  initCompiler(&cmp, enclosing, type, name);
+  beginScope(&cmp);
+
+  cmp.function->arity = 1;
+  parameter(&cmp);
+
+  if (check(TOKEN_FAT_ARROW)) {
+    advance(&cmp);
+    blockOrExpression(&cmp);
+  } else {
+    nakedFunction(&cmp, TYPE_ANONYMOUS, syntheticToken("lambda"));
+    emitByte(&cmp, OP_RETURN);
+  }
+
+  emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
 
   closeFunction(&cmp, enclosing);
 }
@@ -1157,7 +1189,9 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
 
     // return the comprehension and call the closure immediately.
     emitByte(&cmp, OP_RETURN);
+    emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
     closeFunction(&cmp, enclosing);
+
     emitBytes(enclosing, OP_CALL, 0);
 
     // pick up at the end of the expression.
@@ -1281,14 +1315,14 @@ void tree(Compiler* cmp) {
   // make a node of it.
   nativePostfix(cmp, "Node", 1);
 
-  // and now the children.
+  // parse the children.
   while (!check(TOKEN_RIGHT_BRACKET)) {
     whiteDelimitedExpression(cmp);
     nativePostfix(cmp, "Node", 1);
     elements++;
   }
 
-  // now the root.
+  // parse the root.
   nativePostfix(cmp, "Root", elements);
 }
 
@@ -1661,6 +1695,8 @@ ParseRule rules[] = {
     [TOKEN_TYPE_VARIABLE] = {variable, infix, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
+    [TOKEN_AND] = {NULL, and_, PREC_AND},
+    [TOKEN_OR] = {NULL, or_, PREC_OR},
     [TOKEN_UNDEFINED] = {undefined, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},

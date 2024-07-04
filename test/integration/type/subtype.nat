@@ -151,7 +151,7 @@ assert(check.success());
 check = typecheck((x: A) => f(x));
 assert(check.success());
 
-// and transitive.
+// transitive.
 
 check = typecheck((x: C) => f(x));
 assert(check.success());
