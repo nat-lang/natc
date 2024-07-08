@@ -23,7 +23,7 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 #endif
 
     if (vm.bytesAllocated > vm.nextGC) {
-      collectGarbage();
+      // collectGarbage();
     }
   }
 
@@ -122,11 +122,27 @@ static void blackenObject(Obj* object) {
     case OBJ_UPVALUE:
       markValue(((ObjUpvalue*)object)->closed);
       break;
+    case OBJ_SIGNATURE: {
+      ObjSignature* signature = (ObjSignature*)object;
+      switch (signature->type) {
+        case SIG_PATTERN:
+          markObject((Obj*)&signature->as.pattern->domain);
+          markObject((Obj*)&signature->as.pattern->range);
+          break;
+        case SIG_CLOSURE:
+          markObject((Obj*)signature->as.closure);
+          break;
+        case SIG_UNDEF:
+          break;
+      }
+      break;
+    }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
+      markMap(&function->fields);
       markArray(&function->chunk.constants);
-      markObject((Obj*)function->pattern);
+      markObject((Obj*)(function->signature));
       break;
     }
     case OBJ_VARIABLE: {
@@ -185,9 +201,14 @@ static void freeObject(Obj* object) {
       FREE(ObjClosure, object);
       break;
     }
+    case OBJ_SIGNATURE: {
+      FREE(ObjSignature, object);
+      break;
+    }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
+      freeMap(&function->fields);
       freeMap(&function->constants);
       FREE(ObjFunction, object);
       break;

@@ -158,6 +158,13 @@ class ASTSignature extends ASTNode {
   }
 }
 
+class ASTAbstractSignature extends ASTNode {
+  init(arity, fn) => {
+    this.arity = arity;
+    this.fn = fn;
+  }
+}
+
 class ASTClosure extends ASTExpr {
   init(name, function, signature, upvalues) => {
     this.name = name;

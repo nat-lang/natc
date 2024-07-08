@@ -298,18 +298,26 @@ bool astClosure(ObjClosure* closure) {
   vmPush(OBJ_VAL(closure));
 
   // the function's signature.
-  vmPush(OBJ_VAL(vm.core.astSignature));
-  vmPush(NUMBER_VAL(closure->function->arity));
-  for (int i = 0; i < closure->function->arity; i++) {
-    vmPush(OBJ_VAL(vm.core.astParameter));
-    // offset the reserved stack slot.
-    vmPush(NUMBER_VAL(i + 1));
-    vmPush(closure->function->pattern->elements[i].value);
-    vmPush(closure->function->pattern->elements[i].type);
-    if (!initInstance(vm.core.astParameter, 3)) return false;
+  if (closure->function->signature->type == SIG_PATTERN) {
+    vmPush(OBJ_VAL(vm.core.astSignature));
+    vmPush(NUMBER_VAL(closure->function->arity));
+    for (int i = 0; i < closure->function->arity; i++) {
+      vmPush(OBJ_VAL(vm.core.astParameter));
+      // the slot: offset the reserved stack slot.
+      vmPush(NUMBER_VAL(i + 1));
+      ObjPattern domain = closure->function->signature->as.pattern->domain;
+      vmPush(domain.elements[i].value);
+      vmPush(domain.elements[i].type);
+      if (!initInstance(vm.core.astParameter, 3)) return false;
+    }
+    if (!initInstance(vm.core.astSignature, closure->function->arity + 1))
+      return false;
+  } else {
+    printf("what kind of sig?\n");
+    disassembleStack();
+    printf("\n");
+    vmPush(UNDEF_VAL);
   }
-  if (!initInstance(vm.core.astSignature, closure->function->arity + 1))
-    return false;
 
   // the closure's upvalues.
   for (int i = 0; i < closure->upvalueCount; i++) {

@@ -1,0 +1,14 @@
+let f: (num, num) -> num = (x,y) => 1;
+
+let type = SimpleTypeSystem.type((x,y) => f(x,y));
+
+assert(
+  SimpleTypeSystem.typecheck((x,y) => f(x,y)).success()
+);
+
+print type.domain;
+print type.range;
+
+assert(type == TProduct([num, num]) -> num);
+
+

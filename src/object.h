@@ -10,6 +10,7 @@
 #define IS_BOUND_FUNCTION(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
+#define IS_SIGNATURE(value) isObjType(value, OBJ_SIGNATURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 #define IS_OVERLOAD(value) isObjType(value, OBJ_OVERLOAD)
 #define IS_VARIABLE(value) isObjType(value, OBJ_VARIABLE)
@@ -24,6 +25,7 @@
 #define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
+#define AS_SIGNATURE(value) ((ObjSignature *)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
 #define AS_OVERLOAD(value) ((ObjOverload *)AS_OBJ(value))
 #define AS_VARIABLE(value) (((ObjVariable *)AS_OBJ(value)))
@@ -40,10 +42,13 @@
 
 #define INTERN(value) ((OBJ_VAL(intern(value))))
 
+struct ObjClosure;
+
 typedef enum {
   OBJ_BOUND_FUNCTION,
   OBJ_CLASS,
   OBJ_CLOSURE,
+  OBJ_SIGNATURE,
   OBJ_FUNCTION,
   OBJ_OVERLOAD,
   OBJ_INSTANCE,
@@ -79,6 +84,7 @@ typedef struct {
 typedef struct {
   Obj obj;
   ObjString *name;
+  int id;
 } ObjVariable;
 
 typedef struct {
@@ -94,12 +100,31 @@ typedef struct {
   PatternElement *elements;
 } ObjPattern;
 
+typedef enum { SIG_PATTERN, SIG_CLOSURE, SIG_UNDEF } ObjSignatureType;
+
+typedef struct {
+  ObjPattern domain;
+  ObjPattern range;
+} FunctionPattern;
+
+typedef struct ObjSignature {
+  Obj obj;
+  ObjSignatureType type;
+  union {
+    struct ObjClosure *closure;
+    FunctionPattern *pattern;
+  } as;
+} ObjSignature;
+
 typedef struct {
   Obj obj;
   int arity;
   bool variadic;
   int upvalueCount;
-  ObjPattern *pattern;
+  ObjSignature *signature;
+
+  ObjMap fields;
+
   Chunk chunk;
   ObjString *name;
   // cache from values to constant indices
@@ -147,6 +172,15 @@ typedef struct {
   ObjClosure **closures;
 } ObjOverload;
 
+/*
+typedef struct ObjCase {
+  Obj obj;
+  ObjPattern pattern;
+  ObjClosure closure;
+  struct ObjCase *next;
+} ObjCase;
+*/
+
 typedef struct ObjClass {
   Obj obj;
   ObjString *name;
@@ -186,10 +220,12 @@ ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
 ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
+ObjSignature *newSignature();
 ObjFunction *newFunction();
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
 ObjPattern *newPattern(int count);
+FunctionPattern *newFunctionPattern(ObjPattern *domain, ObjPattern *range);
 ObjInstance *newInstance(ObjClass *klass);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);

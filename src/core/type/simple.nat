@@ -35,15 +35,6 @@ class Solution extends Map {
   }
 }
 
-class TVar extends Type {
-  init(id) => {
-    this.id = id;
-  }
-  __eq__(other) => this.id == other.id;
-  str() => str(this.id);
-  fvs() => [this];
-}
-
 class TypeVarSupply extends NameSupply {
   fresh() => TVar(super.fresh());
 }

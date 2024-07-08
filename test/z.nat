@@ -1,0 +1,37 @@
+
+
+
+let g = (x: num) => x;
+
+print g.signature.domain[0].type;
+
+let f = (x: w -> z, y: w) => x(y);
+
+// print f.signature;
+
+// the signature: is a function to a pattern.
+// 
+// s = (w,z) => (x: w -> z, y: w)
+//
+// the type:      is a function to a type.
+// 
+// t = (w,z) => (w -> z, w)
+//
+
+// let h <- f;
+// let x = h.signature;
+
+// x(1,2);
+
+print f.signature;
+
+print f(x => x, 1);
+
+// assert(h(x => x, 1));
+// assert(vType(h) == OClosure);
+
+// (w, z) => (w -> z, w) -> undef
+
+// let h = (x: num -> num, y: w) => x(y);
+
+// let h = (x: num -> num, y: num) => x(y);

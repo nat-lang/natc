@@ -1,0 +1,47 @@
+import src/core/type/poly
+
+PolyTypeSystem.typecheck(() => {
+  let h = (x: w -> z, y: w) => y(x);
+});
+
+assert(check.failure());
+
+// (w, z) => (w -> z, w) -> z
+
+PolyTypeSystem.typecheck(() => {
+  let h = (x: w -> z, y: w) => x(y);
+});
+
+assert(check.success());
+
+//
+
+PolyTypeSystem.typecheck(
+  (x: w -> z, y: w) => y(x)
+);
+
+assert(check.failure());
+
+// (w, z) => (w -> z, w) -> z
+
+PolyTypeSystem.typecheck(
+  (x: w -> z, y: w) => x(y)
+);
+
+assert(check.success());
+
+
+// 
+
+let f = (x: w -> z, y: w) => y(x);
+
+PolyTypeSystem.typecheck(f);
+
+assert(check.failure());
+
+let f = (x: w -> z, y: w) => x(y);
+
+PolyTypeSystem.typecheck(f);
+
+assert(check.success());
+

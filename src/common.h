@@ -45,6 +45,11 @@
 #define S_AST_OVERLOAD "ASTOverload"
 #define S_AST_VARIABLE "ASTVariable"
 
+#define S_PATTERN_ELEMENT "PatternElement"
+#define S_PATTERN "Pattern"
+#define S_SIGNATURE "Signature"
+#define S_ABSTRACT_SIGNATURE "AbstractSignature"
+
 #define S_CTYPE_BOOL "CBool"
 #define S_CTYPE_NIL "CNil"
 #define S_CTYPE_NUMBER "CNumber"

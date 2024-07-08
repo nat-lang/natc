@@ -1,16 +1,20 @@
 
-// This module bridges the object language and the
-// vm's type system.
+// This module bridges the object language and
+// vm type systems.
 
 class TypeError extends Error {}
 
 class CType extends Base {}
+
+// literal types.
 
 class CBool extends CType {}
 class CNil extends CType {}
 class CNumber extends CType {}
 class CObject extends CType {}
 class CUndef extends CType {}
+
+// composite types.
 
 class OVariable extends CObject {}
 class OClass extends CObject {}
@@ -19,6 +23,32 @@ class OString extends CObject {}
 class OClosure extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
+
+// runtime representation of function signatures.
+
+class PatternElement extends Base {
+  init(value, type) => {
+    this.value = value;
+    this.type = type;
+  }
+}
+class Pattern extends Base {
+  init(*elements) => {
+    this.elements = elements;
+  }
+  __get__(idx) => this.elements[idx];
+}
+class Signature extends Base {
+  init(domain, range) => {
+    this.domain = domain;
+    this.range = range;
+  }
+}
+class AbstractSignature extends Signature {
+  init(fn) => {
+    this.fn = fn;
+  }
+}
 
 class Type extends Base {
   pp() => {
@@ -40,6 +70,16 @@ class Type extends Base {
 
   hash() => hash(this.str());
 }
+
+class TVar extends Type {
+  init(id) => {
+    this.id = id;
+  }
+  __eq__(other) => this.id == other.id;
+  str() => str(this.id);
+  fvs() => [this];
+}
+
 
 class TFunction extends Type {
   init(domain, range) => {

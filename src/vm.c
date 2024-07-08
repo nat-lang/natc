@@ -58,10 +58,17 @@ void initCore(Core* core) {
   core->astParameter = NULL;
   core->astOverload = NULL;
   core->astVariable = NULL;
+
+  core->patternElement = NULL;
+  core->pattern = NULL;
+  core->signature = NULL;
+  core->abstractSignature = NULL;
+
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
   core->vTypeNumber = NULL;
   core->vTypeUndef = NULL;
+  core->oTypeVariable = NULL;
   core->oTypeClass = NULL;
   core->oTypeInstance = NULL;
   core->oTypeString = NULL;
@@ -90,6 +97,7 @@ bool initVM() {
   initMap(&vm.infixes);
 
   initCore(&vm.core);
+  vm.tvs = 0;
 
   return initializeCore() == INTERPRET_OK;
 }
@@ -202,8 +210,11 @@ static bool vmInstantiateClass(ObjClass* klass, int argCount) {
          OBJ_VAL(klass));
 
   if (mapGet(&klass->fields, OBJ_VAL(intern(S_INIT)), &initializer)) {
+    printf("initializer for class: %s: ", klass->name->chars);
+    printValue(initializer);
     return vmCallValue(initializer, argCount);
   } else if (argCount != 0) {
+    printf("no initializer for class: %s\n", klass->name->chars);
     vmRuntimeError("Expected 0 arguments but got %d.", argCount);
     return false;
   }
@@ -217,6 +228,19 @@ bool vmInitInstance(ObjClass* klass, int argCount, int frames) {
     if (vmExecute(vm.frameCount - frames) != INTERPRET_OK) return false;
   }
 
+  return true;
+}
+
+bool vmInitPatternInstance(ObjPattern* pattern) {
+  vmPush(OBJ_VAL(vm.core.pattern));
+  for (int i = 0; i < pattern->count; i++) {
+    vmPush(OBJ_VAL(vm.core.patternElement));
+
+    vmPush(pattern->elements[i].value);
+    vmPush(pattern->elements[i].type);
+    if (!vmInitInstance(vm.core.patternElement, 2, 1)) return false;
+  }
+  if (!vmInitInstance(vm.core.pattern, pattern->count, 1)) return false;
   return true;
 }
 
@@ -385,7 +409,8 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
   Value scrutinee = vmPeek(0);
 
   for (int i = 0; i < caseCount; i++) {
-    if (!unify(cases[i]->function->pattern, scrutinee)) return false;
+    if (!unify(&cases[i]->function->signature->as.pattern->domain, scrutinee))
+      return false;
 
     if (AS_BOOL(vmPop())) {
       vmPop();  // the tuplified scrutinee.
@@ -425,9 +450,10 @@ bool vmCallValue(Value callee, int argCount) {
       }
       case OBJ_CLOSURE: {
         ObjClosure* closure = AS_CLOSURE(callee);
-        ObjPattern* pattern = closure->function->pattern;
+        ObjSignature* signature = closure->function->signature;
 
-        if (pattern != NULL && pattern->isLiteral)
+        if (signature != NULL && signature->type == SIG_PATTERN &&
+            signature->as.pattern->domain.isLiteral)
           return callCases(&closure, 1, argCount);
         return call(AS_CLOSURE(callee), argCount);
       }
@@ -553,13 +579,52 @@ void vmPattern(CallFrame* frame) {
   vmPush(OBJ_VAL(pattern));
 }
 
-void vmSignature(CallFrame* frame) {
-  vmPattern(frame);
+bool vmSignature(CallFrame* frame) {
+  ObjSignatureType type = READ_BYTE();
 
-  ObjPattern* pattern = AS_PATTERN(vmPeek(0));
+  switch (type) {
+    case SIG_PATTERN: {
+      Value domain = vmPeek(1);
+      Value range = vmPeek(0);
 
-  for (int i = 0; i < pattern->count; i++) vmPush(pattern->elements[i].type);
+      if (!IS_PATTERN(domain) || !IS_PATTERN(range)) {
+        vmRuntimeError("Pattern signature domain and range must be patterns.");
+        return false;
+      }
 
+      FunctionPattern* pattern =
+          newFunctionPattern(AS_PATTERN(domain), AS_PATTERN(range));
+
+      ObjSignature* signature = newSignature();
+
+      signature->type = SIG_PATTERN;
+      signature->as.pattern = pattern;
+      vmPop();
+      vmPop();
+      vmPush(OBJ_VAL(signature));
+      return true;
+    }
+    case SIG_CLOSURE: {
+      Value closure = vmPeek(0);
+
+      if (!IS_CLOSURE(closure)) {
+        vmRuntimeError("Closure signature must be closure.");
+        return false;
+      }
+
+      ObjSignature* signature = newSignature();
+
+      signature->type = SIG_CLOSURE;
+      signature->as.closure = (struct ObjClosure*)(closure.as.obj);
+      vmPop();
+      vmPush(OBJ_VAL(signature));
+      return true;
+    }
+    default:
+      break;
+  }
+
+  return false;
   // disassembleStack();
   // printf("\n");
 }
@@ -585,17 +650,6 @@ bool vmOverload(CallFrame* frame) {
 bool vmClosure(CallFrame* frame) {
   ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
   ObjClosure* closure = newClosure(function);
-
-  // disassembleStack();
-  // printf("\n");
-  Value pattern = vmPop();
-
-  if (!IS_PATTERN(pattern)) {
-    vmRuntimeError("Function signature must be a pattern object.");
-    return false;
-  }
-  function->pattern = AS_PATTERN(pattern);
-
   vmPush(OBJ_VAL(closure));
   vmCaptureUpvalues(closure, frame);
   return true;
@@ -643,20 +697,6 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
                 mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
   return true;
-}
-
-void vmInitPattern(ObjFunction* function) {
-  ObjPattern* pattern = newPattern(function->arity);
-
-  int i = pattern->count;
-  int j = i;
-  while (i > 0) {
-    pattern->elements[j - i].value = vmPeek(i * 2 - 1);
-    pattern->elements[j - i].type = vmPeek(i * 2 - 2);
-    i--;
-  }
-
-  function->pattern = pattern;
 }
 
 // Loop until we're back to [baseFrame] frames. Typically this
@@ -743,56 +783,81 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-        if (IS_INSTANCE(vmPeek(0))) {
-          ObjInstance* instance = AS_INSTANCE(vmPeek(0));
+        switch (OBJ_TYPE(vmPeek(0))) {
+          case OBJ_INSTANCE: {
+            ObjInstance* instance = AS_INSTANCE(vmPeek(0));
 
-          if (!mapGet(&instance->fields, name, &value)) {
-            // class prop. must be a method.
-            if (mapGet(&instance->klass->fields, name, &value))
-              bindClosure(vmPeek(0), &value);
+            if (!mapGet(&instance->fields, name, &value)) {
+              // class prop. must be a method.
+              if (mapGet(&instance->klass->fields, name, &value))
+                bindClosure(vmPeek(0), &value);
+            }
+
+            vmPop();  // instance.
+            vmPush(value);
+            break;
+          }
+          case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(vmPeek(0));
+
+            mapGet(&klass->fields, name, &value);
+            bindClosure(vmPeek(0), &value);
+            vmPop();  // class.
+            vmPush(value);
+            break;
+          }
+          case OBJ_VARIABLE: {
+            if (strcmp(AS_STRING(name)->chars, "name") == 0) {
+              value = OBJ_VAL(AS_VARIABLE(vmPeek(0))->name);
+              vmPop();
+            }
+
+            vmPush(value);
+            break;
           }
 
-          vmPop();  // instance.
-          vmPush(value);
-          break;
+          case OBJ_CLOSURE: {
+            ObjClosure* closure = AS_CLOSURE(vmPeek(0));
+
+            mapGet(&closure->function->fields, name, &value);
+
+            vmPop();  // closure.
+            vmPush(value);
+            break;
+          }
+          default: {
+            vmRuntimeError("Only objects and classes have properties (get).");
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
-
-        if (IS_CLASS(vmPeek(0))) {
-          ObjClass* klass = AS_CLASS(vmPeek(0));
-
-          mapGet(&klass->fields, name, &value);
-          bindClosure(vmPeek(0), &value);
-          vmPop();  // class.
-          vmPush(value);
-          break;
-        }
-
-        if (IS_VARIABLE(vmPeek(0)) &&
-            strcmp(AS_STRING(name)->chars, "name") == 0) {
-          vmPop();
-          vmPush(OBJ_VAL(AS_VARIABLE(vmPeek(0))->name));
-          break;
-        }
-
-        vmRuntimeError("Only objects and classes have properties (get).");
-        return INTERPRET_RUNTIME_ERROR;
 
         break;
       }
       case OP_SET_PROPERTY: {
-        if (!IS_INSTANCE(vmPeek(1)) && !IS_CLASS(vmPeek(1))) {
-          vmRuntimeError("Only objects and classes have properties (set).");
-          return INTERPRET_RUNTIME_ERROR;
+        ObjMap* fields;
+
+        switch (OBJ_TYPE(vmPeek(1))) {
+          case OBJ_INSTANCE:
+            fields = &AS_INSTANCE(vmPeek(1))->fields;
+            break;
+          case OBJ_CLASS:
+            fields = &AS_CLASS(vmPeek(1))->fields;
+            break;
+          case OBJ_CLOSURE:
+            fields = &AS_CLOSURE(vmPeek(1))->function->fields;
+            break;
+          default:
+            vmRuntimeError(
+                "Can only set property of object, class, or function.");
+            return INTERPRET_RUNTIME_ERROR;
         }
 
-        if (IS_INSTANCE(vmPeek(1)))
-          mapSet(&AS_INSTANCE(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
-        if (IS_CLASS(vmPeek(1)))
-          mapSet(&AS_CLASS(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
+        mapSet(fields, READ_CONSTANT(), vmPeek(0));
 
-        Value value = vmPop();
+        // Value value = vmPop();
         vmPop();
-        vmPush(value);
+        // vmPush(value);
+
         break;
       }
       case OP_EQUAL: {
@@ -1069,7 +1134,7 @@ InterpretResult vmExecute(int baseFrame) {
         Value key = vmPop();
         Value obj = vmPop();
 
-        // indexed access to sequences.
+        // indexed access to raw sequences.
         if (IS_SEQUENCE(obj)) {
           ObjSequence* seq = AS_SEQUENCE(obj);
           if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;

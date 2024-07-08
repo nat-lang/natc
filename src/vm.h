@@ -38,6 +38,11 @@ typedef struct {
   ObjClass* astOverload;
   ObjClass* astVariable;
 
+  ObjClass* patternElement;
+  ObjClass* pattern;
+  ObjClass* signature;
+  ObjClass* abstractSignature;
+
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;
   ObjClass* vTypeNumber;
@@ -70,6 +75,9 @@ typedef struct {
 
   // core defs.
   Core core;
+
+  // type variable count;
+  int tvs;
 
   // memory.
   int grayCount;
@@ -113,7 +121,7 @@ bool vmOverload(CallFrame* frame);
 void vmSequence(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmPattern(CallFrame* frame);
-void vmSignature(CallFrame* frame);
+bool vmSignature(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
 

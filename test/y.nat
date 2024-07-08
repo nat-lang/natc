@@ -1,0 +1,7 @@
+
+let check = SimpleTypeSystem.typecheck(() => {
+  let k = (a: num, b: num) => a + b;
+  k(1, 1);
+});
+
+assert(check.success());

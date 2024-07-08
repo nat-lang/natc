@@ -61,6 +61,7 @@ ObjClosure* newClosure(ObjFunction* function) {
   closure->function = function;
   closure->upvalues = upvalues;
   closure->upvalueCount = function->upvalueCount;
+
   return closure;
 }
 
@@ -78,6 +79,7 @@ ObjOverload* newOverload(int cases) {
 ObjVariable* newVariable(ObjString* name) {
   ObjVariable* variable = ALLOCATE_OBJ(ObjVariable, OBJ_VARIABLE);
   variable->name = name;
+  variable->id = -1;
   return variable;
 }
 
@@ -95,17 +97,35 @@ ObjPattern* newPattern(int count) {
   return pattern;
 }
 
+FunctionPattern* newFunctionPattern(ObjPattern* domain, ObjPattern* range) {
+  FunctionPattern* pattern = ALLOCATE(FunctionPattern, 1);
+  pattern->domain = *domain;
+  pattern->range = *range;
+  return pattern;
+}
+
+ObjSignature* newSignature() {
+  ObjSignature* signature = ALLOCATE_OBJ(ObjSignature, OBJ_SIGNATURE);
+  signature->type = SIG_UNDEF;
+  signature->as.closure = NULL;
+  signature->as.pattern = NULL;
+  return signature;
+}
+
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
 
   function->arity = 0;
   function->variadic = false;
   function->upvalueCount = 0;
-  function->pattern = NULL;
+  function->signature = NULL;
+  function->signature = newSignature();
   function->name = NULL;
 
+  initMap(&function->fields);
   initChunk(&function->chunk);
   initMap(&function->constants);
+
   return function;
 }
 
@@ -434,6 +454,9 @@ void printObject(Value value) {
     case OBJ_CLOSURE:
       printf("<fn %s at %p>", AS_CLOSURE(value)->function->name->chars,
              AS_CLOSURE(value));
+      break;
+    case OBJ_SIGNATURE:
+      printf("<signature>");
       break;
     case OBJ_FUNCTION:
       printf("<raw fn %s at %p>", AS_FUNCTION(value)->name->chars,

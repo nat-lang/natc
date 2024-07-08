@@ -406,6 +406,14 @@ bool __add__(int argCount, Value* args) {
   return true;
 }
 
+/*
+bool __tv__(int argCount, Value* args) {
+  vmPop();  // native fn.
+  vmPush(NUMBER_VAL());
+  return true;
+}
+*/
+
 InterpretResult initializeCore() {
   // native functions.
 
@@ -459,10 +467,18 @@ InterpretResult initializeCore() {
       (vm.core.astParameter = getGlobalClass(S_AST_PARAMETER)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.astVariable = getGlobalClass(S_AST_VARIABLE)) == NULL ||
+
+      (vm.core.patternElement = getGlobalClass(S_PATTERN_ELEMENT)) == NULL ||
+      (vm.core.pattern = getGlobalClass(S_PATTERN)) == NULL ||
+      (vm.core.signature = getGlobalClass(S_SIGNATURE)) == NULL ||
+      (vm.core.abstractSignature = getGlobalClass(S_ABSTRACT_SIGNATURE)) ==
+          NULL ||
+
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
       (vm.core.vTypeUndef = getGlobalClass(S_CTYPE_UNDEF)) == NULL ||
+
       (vm.core.oTypeVariable = getGlobalClass(S_OTYPE_VARIABLE)) == NULL ||
       (vm.core.oTypeClass = getGlobalClass(S_OTYPE_CLASS)) == NULL ||
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
