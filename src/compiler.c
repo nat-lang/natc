@@ -118,6 +118,10 @@ static bool prev(TokenType type) { return parser.previous.type == type; }
 static bool check(TokenType type) { return parser.current.type == type; }
 static bool peek(TokenType type) { return parser.next.type == type; }
 
+static bool checkVariable() {
+  return check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE);
+}
+
 // Keyword symbols that are also valid identifiers
 // aren't tokenized, so we need to check for the
 // bare string.
@@ -931,7 +935,7 @@ static void hoistLiteralParam(Compiler* cmp) {
 }
 
 static bool parameter(Compiler* cmp) {
-  if (check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) {
+  if (checkVariable()) {
     advance(cmp);
     declareVariable(cmp);
     markInitialized(cmp);
@@ -1107,8 +1111,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
 
   Parser checkpointB = checkpointA;
 
-  if ((check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) &&
-      peek(TOKEN_IN)) {
+  if ((checkVariable()) && peek(TOKEN_IN)) {
     // bound variable and iterable to draw from.
     beginScope(cmp);
     iter = iterator(cmp);
@@ -1535,7 +1538,7 @@ static void forStatement(Compiler* cmp) {
   beginScope(cmp);
   consume(cmp, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
-  if (check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) {
+  if (checkVariable()) {
     forInStatement(cmp);
   } else {
     forConditionStatement(cmp);
