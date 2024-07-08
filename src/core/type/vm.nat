@@ -20,6 +20,27 @@ class OClosure extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
 
+class PatternElement extends Base {
+  init(value, type) => {
+    this.value = value;
+    this.type = type;
+  }
+}
+
+class Pattern extends Base {
+  init(*elements) => {
+    this.elements = elements;
+  }
+  __get__(idx) => this.elements[idx];
+}
+
+class Signature extends Base {
+  init(domain, range) => {
+    this.domain = domain;
+    this.range = range;
+  }
+}
+
 class Type extends Base {
   pp() => {
     print this;

@@ -100,6 +100,9 @@ typedef struct {
   bool variadic;
   int upvalueCount;
   ObjPattern *pattern;
+
+  ObjMap fields;
+
   Chunk chunk;
   ObjString *name;
   // cache from values to constant indices

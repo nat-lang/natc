@@ -743,56 +743,78 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-        if (IS_INSTANCE(vmPeek(0))) {
-          ObjInstance* instance = AS_INSTANCE(vmPeek(0));
+        switch (OBJ_TYPE(vmPeek(0))) {
+          case OBJ_INSTANCE: {
+            ObjInstance* instance = AS_INSTANCE(vmPeek(0));
 
-          if (!mapGet(&instance->fields, name, &value)) {
-            // class prop. must be a method.
-            if (mapGet(&instance->klass->fields, name, &value))
-              bindClosure(vmPeek(0), &value);
+            if (!mapGet(&instance->fields, name, &value)) {
+              // class prop. must be a method.
+              if (mapGet(&instance->klass->fields, name, &value))
+                bindClosure(vmPeek(0), &value);
+            }
+
+            vmPop();  // instance.
+            vmPush(value);
+            break;
+          }
+          case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(vmPeek(0));
+
+            mapGet(&klass->fields, name, &value);
+            bindClosure(vmPeek(0), &value);
+            vmPop();  // class.
+            vmPush(value);
+            break;
+          }
+          case OBJ_VARIABLE: {
+            if (strcmp(AS_STRING(name)->chars, "name") == 0) {
+              value = OBJ_VAL(AS_VARIABLE(vmPeek(0))->name);
+              vmPop();
+            }
+
+            vmPush(value);
+            break;
           }
 
-          vmPop();  // instance.
-          vmPush(value);
-          break;
+          case OBJ_CLOSURE: {
+            ObjClosure* closure = AS_CLOSURE(vmPeek(0));
+
+            mapGet(&closure->function->fields, name, &value);
+
+            vmPop();  // closure.
+            vmPush(value);
+            break;
+          }
+          default: {
+            vmRuntimeError("Only objects and classes have properties (get).");
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
-
-        if (IS_CLASS(vmPeek(0))) {
-          ObjClass* klass = AS_CLASS(vmPeek(0));
-
-          mapGet(&klass->fields, name, &value);
-          bindClosure(vmPeek(0), &value);
-          vmPop();  // class.
-          vmPush(value);
-          break;
-        }
-
-        if (IS_VARIABLE(vmPeek(0)) &&
-            strcmp(AS_STRING(name)->chars, "name") == 0) {
-          vmPop();
-          vmPush(OBJ_VAL(AS_VARIABLE(vmPeek(0))->name));
-          break;
-        }
-
-        vmRuntimeError("Only objects and classes have properties (get).");
-        return INTERPRET_RUNTIME_ERROR;
 
         break;
       }
       case OP_SET_PROPERTY: {
-        if (!IS_INSTANCE(vmPeek(1)) && !IS_CLASS(vmPeek(1))) {
-          vmRuntimeError("Only objects and classes have properties (set).");
-          return INTERPRET_RUNTIME_ERROR;
+        Value name = READ_CONSTANT();
+        ObjMap* fields;
+
+        switch (OBJ_TYPE(vmPeek(1))) {
+          case OBJ_INSTANCE:
+            fields = &AS_INSTANCE(vmPeek(1))->fields;
+            break;
+          case OBJ_CLASS:
+            fields = &AS_CLASS(vmPeek(1))->fields;
+            break;
+          case OBJ_CLOSURE:
+            fields = &AS_CLOSURE(vmPeek(1))->function->fields;
+            break;
+          default:
+            vmRuntimeError(
+                "Can only set property of object, class, or function.");
+            return INTERPRET_RUNTIME_ERROR;
         }
 
-        if (IS_INSTANCE(vmPeek(1)))
-          mapSet(&AS_INSTANCE(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
-        if (IS_CLASS(vmPeek(1)))
-          mapSet(&AS_CLASS(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
-
-        Value value = vmPop();
+        mapSet(fields, name, vmPeek(0));
         vmPop();
-        vmPush(value);
         break;
       }
       case OP_EQUAL: {

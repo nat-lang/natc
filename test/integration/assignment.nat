@@ -1,4 +1,9 @@
 
+// property assignment leaves the possessor on the stack.
+
+let x = Object();
+assert((x.x = 1) == x);
+
 // assignment of a global from an immediate lambda invocation.
 
 let a = (() => {

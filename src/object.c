@@ -104,6 +104,7 @@ ObjFunction* newFunction() {
   function->pattern = NULL;
   function->name = NULL;
 
+  initMap(&function->fields);
   initChunk(&function->chunk);
   initMap(&function->constants);
   return function;
