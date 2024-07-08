@@ -4,6 +4,7 @@
 let f = 1 => true;
 
 assert(f(1));
+print f(2);
 assert(f(2) == undefined);
 
 let f = 1 => true | 2 => false;

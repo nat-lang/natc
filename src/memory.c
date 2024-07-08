@@ -127,20 +127,10 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)function->name);
       markMap(&function->fields);
       markArray(&function->chunk.constants);
-      markObject((Obj*)function->pattern);
       break;
     }
     case OBJ_VARIABLE: {
       markObject((Obj*)((ObjVariable*)object)->name);
-      break;
-    }
-    case OBJ_PATTERN: {
-      ObjPattern* pattern = (ObjPattern*)object;
-      for (int i = 0; i < pattern->count; i++) {
-        PatternElement element = pattern->elements[i];
-        markValue(element.value);
-        markValue(element.type);
-      }
       break;
     }
     case OBJ_MAP: {
@@ -202,12 +192,6 @@ static void freeObject(Obj* object) {
     }
     case OBJ_VARIABLE: {
       FREE(ObjVariable, object);
-      break;
-    }
-    case OBJ_PATTERN: {
-      ObjPattern* pattern = (ObjPattern*)object;
-      FREE_ARRAY(PatternElement, pattern->elements, pattern->count);
-      FREE(ObjPattern, object);
       break;
     }
     case OBJ_INSTANCE: {

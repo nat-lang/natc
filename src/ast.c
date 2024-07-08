@@ -197,10 +197,6 @@ bool astFrame(Value root) {
         if (!astClosure(AS_CLOSURE(vmPeek(0)))) return false;
         break;
       }
-      case OP_PATTERN: {
-        vmPattern(frame);
-        break;
-      }
       case OP_OVERLOAD: {
         if (!vmOverload(frame)) return false;
         if (!astOverload(AS_OVERLOAD(vmPeek(0)))) return false;
@@ -311,7 +307,7 @@ bool astFrame(Value root) {
   return false;
 }
 
-bool astClosure(ObjClosure* closure, Value signature) {
+bool astClosure(ObjClosure* closure) {
   // we'll populate the frame's local slots as we build
   // the tree, and exit the frame once we're done.
   vmInitFrame(closure, 0);

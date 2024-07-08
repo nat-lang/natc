@@ -112,7 +112,6 @@ void vmClosure(CallFrame* frame);
 bool vmOverload(CallFrame* frame);
 void vmSequence(CallFrame* frame);
 void vmVariable(CallFrame* frame);
-void vmPattern(CallFrame* frame);
 void vmSignature(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);

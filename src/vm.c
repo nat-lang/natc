@@ -361,24 +361,11 @@ bool vmTuplify(int count, bool replace) {
   return vmCallValue(OBJ_VAL(vm.core.tuple), count);
 }
 
-bool pushPatternElement(PatternElement element) {
-  vmPush(element.value);
-  vmPush(element.type);
-  if (!vmTuplify(2, true) && vmExecute(vm.frameCount - 1) == INTERPRET_OK)
-    return false;
-  return true;
-}
-
-bool unify(ObjPattern* pattern, Value value) {
+bool unify(ObjClosure* closure, Value value) {
   Value unifyFn = OBJ_VAL(vm.core.unify);
 
   vmPush(unifyFn);
-
-  for (int i = 0; i < pattern->count; i++)
-    pushPatternElement(pattern->elements[i]);
-
-  if (pattern->count > 0) vmTuplify(pattern->count, true);
-
+  vmPush(OBJ_VAL(closure));
   vmPush(value);
 
   return vmCallValue(unifyFn, 2) &&
@@ -391,8 +378,9 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
   Value scrutinee = vmPeek(0);
 
   for (int i = 0; i < caseCount; i++) {
-    if (!unify(cases[i]->function->pattern, scrutinee)) return false;
-
+    if (!unify(cases[i], scrutinee)) return false;
+    disassembleStack();
+    printf("\n");
     if (AS_BOOL(vmPop())) {
       vmPop();  // the tuplified scrutinee.
       return call(cases[i], argCount);
@@ -431,9 +419,8 @@ bool vmCallValue(Value callee, int argCount) {
       }
       case OBJ_CLOSURE: {
         ObjClosure* closure = AS_CLOSURE(callee);
-        ObjPattern* pattern = closure->function->pattern;
 
-        if (pattern != NULL && pattern->isLiteral)
+        if (closure->function->patterned)
           return callCases(&closure, 1, argCount);
         return call(AS_CLOSURE(callee), argCount);
       }
@@ -539,26 +526,6 @@ void vmVariable(CallFrame* frame) {
   vmPush(OBJ_VAL(var));
 }
 
-void vmPattern(CallFrame* frame) {
-  int count = READ_BYTE();
-  ObjPattern* pattern = newPattern(count);
-
-  int i = count;
-  while (i > 0) {
-    Value value = vmPeek(i * 2 - 1);
-    Value type = vmPeek(i * 2 - 2);
-    pattern->elements[count - i].value = value;
-    pattern->elements[count - i].type = type;
-
-    if (!IS_VARIABLE(value)) pattern->isLiteral = true;
-    i--;
-  }
-
-  for (int i = 0; i < count * 2; i++) vmPop();
-
-  vmPush(OBJ_VAL(pattern));
-}
-
 void vmClosure(CallFrame* frame) {
   ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
   ObjClosure* closure = newClosure(function);
@@ -636,20 +603,6 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
                 mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
   return true;
-}
-
-void vmInitPattern(ObjFunction* function) {
-  ObjPattern* pattern = newPattern(function->arity);
-
-  int i = pattern->count;
-  int j = i;
-  while (i > 0) {
-    pattern->elements[j - i].value = vmPeek(i * 2 - 1);
-    pattern->elements[j - i].type = vmPeek(i * 2 - 2);
-    i--;
-  }
-
-  function->pattern = pattern;
 }
 
 // Loop until we're back to [baseFrame] frames. Typically this
@@ -952,10 +905,6 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_VARIABLE: {
         vmVariable(frame);
-        break;
-      }
-      case OP_PATTERN: {
-        vmPattern(frame);
         break;
       }
       case OP_SIGNATURE: {
