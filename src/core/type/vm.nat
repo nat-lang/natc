@@ -32,6 +32,7 @@ class Pattern extends Base {
     this.elements = elements;
   }
   __get__(idx) => this.elements[idx];
+  __len__() => len(this.elements);
 }
 
 class Signature extends Base {

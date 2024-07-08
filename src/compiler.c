@@ -332,21 +332,29 @@ static void endScope(Compiler* cmp) {
   }
 }
 
-static void closeFunction(Compiler* cmp, Compiler* enclosing) {
-  ObjFunction* function = endCompiler(cmp);
-
-  emitConstInstr(enclosing, OP_CLOSURE,
-                 makeConstant(enclosing, OBJ_VAL(function)));
-
+static void closeUpvalues(ObjFunction* function, Compiler* cmp,
+                          Compiler* enclosing) {
   for (int i = 0; i < function->upvalueCount; i++) {
     emitByte(enclosing, cmp->upvalues[i].isLocal ? 1 : 0);
     emitByte(enclosing, cmp->upvalues[i].index);
   }
 }
 
+static void closeFunctionWithOp(Compiler* cmp, Compiler* enclosing, OpCode op) {
+  ObjFunction* function = endCompiler(cmp);
+
+  emitConstInstr(enclosing, op, makeConstant(enclosing, OBJ_VAL(function)));
+
+  closeUpvalues(function, cmp, enclosing);
+}
+
+static void closeFunction(Compiler* cmp, Compiler* enclosing) {
+  closeFunctionWithOp(cmp, enclosing, OP_CLOSURE);
+}
+
 static void function(Compiler* enclosing, FunctionType type, Token name);
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name);
-static bool hoistVariableParam(Compiler* cmp);
+static void hoistVariableParam(Compiler* cmp);
 static void expression(Compiler* cmp);
 static void boundExpression(Compiler* cmp, Token name);
 static void typeExpression(Compiler* cmp);
@@ -891,7 +899,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 
   if (cmp.function->arity > 0) {
     emitByte(&cmp, OP_RETURN);
-    emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
+    // compile my signature!
     closeFunction(&cmp, enclosing);
     return true;
   }
@@ -912,49 +920,58 @@ static void typeExpression(Compiler* cmp) {
 }
 
 // Emit a variable and optional type in the enclosing scope.
-// Report the presence of a type.
-static bool hoistVariableParam(Compiler* cmp) {
+static void hoistVariableParam(Compiler* cmp) {
   // param.
-  uint16_t constant = identifierConstant(cmp->enclosing, &parser.previous);
-  emitConstInstr(cmp->enclosing, OP_VARIABLE, constant);
+  uint16_t constant = identifierConstant(cmp, &parser.previous);
+  emitConstInstr(cmp, OP_VARIABLE, constant);
 
   // type.
-  if (match(cmp->enclosing, TOKEN_COLON)) {
-    expression(cmp->enclosing);
-    return true;
-  }
-
-  emitByte(cmp->enclosing, OP_UNDEFINED);
-  return false;
+  if (match(cmp, TOKEN_COLON))
+    expression(cmp);
+  else
+    emitByte(cmp, OP_UNDEFINED);
 }
 
 static void hoistLiteralParam(Compiler* cmp) {
-  parsePrecedence(cmp->enclosing, PREC_ASSIGNMENT);
+  parsePrecedence(cmp, PREC_ASSIGNMENT);
   // type.
-  emitByte(cmp->enclosing, OP_UNDEFINED);
+  emitByte(cmp, OP_UNDEFINED);
 }
 
-static bool parameter(Compiler* cmp) {
+static void parameter(Compiler* cmp, Compiler* sigCmp) {
+  getGlobalConstant(sigCmp, "PatternElement");
+
   if (checkVariable()) {
     advance(cmp);
     declareVariable(cmp);
     markInitialized(cmp);
 
-    return hoistVariableParam(cmp);
+    hoistVariableParam(sigCmp);
+  } else {
+    hoistLiteralParam(sigCmp);
+    addLocal(sigCmp, syntheticToken("#pattern"));
   }
-  hoistLiteralParam(cmp);
-  addLocal(cmp, syntheticToken("#pattern"));
-  return false;
+
+  emitBytes(sigCmp, OP_CALL, 2);
 }
 
 static void function(Compiler* enclosing, FunctionType type, Token name) {
+  Token sigToken = syntheticToken("signature");
+
+  Compiler sigCmp;
+  initCompiler(&sigCmp, enclosing, TYPE_IMPLICIT, sigToken);
+  beginScope(&sigCmp);
+
   Compiler cmp;
   initCompiler(&cmp, enclosing, type, name);
   beginScope(&cmp);
 
-  int paramAnnotations = 0;
-
   consume(&cmp, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+
+  getGlobalConstant(&sigCmp, "Signature");
+
+  // domain pattern.
+  getGlobalConstant(&sigCmp, "Pattern");
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       if (cmp.function->variadic)
@@ -972,41 +989,46 @@ static void function(Compiler* enclosing, FunctionType type, Token name) {
         parser.current.length--;
       }
 
-      if (parameter(&cmp)) paramAnnotations++;
+      parameter(&cmp, &sigCmp);
     } while (match(&cmp, TOKEN_COMMA));
   }
 
   consume(&cmp, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
 
-  if (type == TYPE_BOUND && paramAnnotations > 0) {
-    emitBytes(enclosing, OP_SIGNATURE, cmp.function->arity);
-    if (cmp.function->arity > 1)
-      emitBytes(enclosing, OP_SEQUENCE, cmp.function->arity);
-    emitByte(enclosing, OP_UNDEFINED);
-    nativePostfix(enclosing, "->", 2);
-
-    int var = enclosing->scopeDepth == 0 ? identifierConstant(enclosing, &name)
-                                         : resolveLocal(enclosing, &name);
-    defineType(enclosing, var);
-    emitByte(enclosing, OP_POP);
-  } else {
-    emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
-  }
-
+  emitBytes(&sigCmp, OP_CALL, cmp.function->arity);
+  // range pattern.
+  getGlobalConstant(&sigCmp, "Pattern");
+  emitBytes(&sigCmp, OP_CALL, 0);
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
+  // signature.
+  emitBytes(&sigCmp, OP_CALL, 2);
+  emitByte(&sigCmp, OP_RETURN);
 
   blockOrExpression(&cmp);
 
-  closeFunction(&cmp, enclosing);
+  closeFunction(&sigCmp, enclosing);
+  closeFunctionWithOp(&cmp, enclosing, OP_SIGNATURE);
 }
 
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
+  Token sigToken = syntheticToken("signature");
+
+  Compiler sigCmp;
+  initCompiler(&sigCmp, enclosing, TYPE_IMPLICIT, sigToken);
+  beginScope(&sigCmp);
+
   Compiler cmp;
   initCompiler(&cmp, enclosing, type, name);
   beginScope(&cmp);
 
+  getGlobalConstant(&sigCmp, "Signature");
+
   cmp.function->arity = 1;
-  parameter(&cmp);
+
+  getGlobalConstant(&sigCmp, "Pattern");
+  parameter(&cmp, &sigCmp);
+  // domain pattern.
+  emitBytes(&sigCmp, OP_CALL, cmp.function->arity);
 
   if (check(TOKEN_FAT_ARROW)) {
     advance(&cmp);
@@ -1016,9 +1038,15 @@ static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
     emitByte(&cmp, OP_RETURN);
   }
 
-  emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
+  // range pattern.
+  getGlobalConstant(&sigCmp, "Pattern");
+  emitBytes(&sigCmp, OP_CALL, 0);
+  // signature.
+  emitBytes(&sigCmp, OP_CALL, 2);
+  emitByte(&sigCmp, OP_RETURN);
 
-  closeFunction(&cmp, enclosing);
+  closeFunction(&sigCmp, enclosing);
+  closeFunctionWithOp(&cmp, enclosing, OP_SIGNATURE);
 }
 
 static void method(Compiler* cmp) {
@@ -1192,7 +1220,6 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
 
     // return the comprehension and call the closure immediately.
     emitByte(&cmp, OP_RETURN);
-    emitBytes(enclosing, OP_PATTERN, cmp.function->arity);
     closeFunction(&cmp, enclosing);
 
     emitBytes(enclosing, OP_CALL, 0);

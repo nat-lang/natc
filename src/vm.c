@@ -129,15 +129,6 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
 bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
 
-  if (IS_CLASS(receiver)) {
-    ObjClass* klass = AS_CLASS(receiver);
-    Value field;
-    if (mapGet(&klass->fields, OBJ_VAL(name), &field)) {
-      vm.stackTop[-argCount - 1] = receiver;
-      return vmCallValue(field, argCount);
-    }
-  }
-
   if (IS_INSTANCE(receiver)) {
     ObjInstance* instance = AS_INSTANCE(receiver);
     Value field;
@@ -149,8 +140,23 @@ bool vmInvoke(ObjString* name, int argCount) {
     return invokeFromClass(instance->klass, name, argCount);
   }
 
-  vmRuntimeError("Only instances and classes have methods.");
-  return false;
+  ObjMap* fields;
+  switch (OBJ_TYPE(receiver)) {
+    case OBJ_CLASS:
+      fields = &AS_CLASS(receiver)->fields;
+      break;
+    case OBJ_CLOSURE:
+      fields = &AS_CLOSURE(receiver)->function->fields;
+      break;
+    default:
+      vmRuntimeError("Only instances and classes have methods.");
+      return false;
+  }
+
+  Value field = NIL_VAL;
+  mapGet(fields, OBJ_VAL(name), &field);
+  vm.stackTop[-argCount - 1] = receiver;
+  return vmCallValue(field, argCount);
 }
 
 bool vmExecuteMethod(char* method, int argCount, int frames) {
@@ -304,7 +310,7 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   return true;
 }
 
-CallFrame* vmCallFrame(ObjClosure* closure, int offset) {
+CallFrame* vmInitFrame(ObjClosure* closure, int offset) {
   CallFrame* frame = &vm.frames[vm.frameCount++];
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
@@ -325,7 +331,7 @@ static bool call(ObjClosure* closure, int argCount) {
     return false;
   }
 
-  vmCallFrame(closure, argCount + 1);
+  vmInitFrame(closure, argCount + 1);
 
   return true;
 }
@@ -553,15 +559,21 @@ void vmPattern(CallFrame* frame) {
   vmPush(OBJ_VAL(pattern));
 }
 
+void vmClosure(CallFrame* frame) {
+  ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+  ObjClosure* closure = newClosure(function);
+
+  vmPush(OBJ_VAL(closure));
+  vmCaptureUpvalues(closure, frame);
+}
+
 void vmSignature(CallFrame* frame) {
-  vmPattern(frame);
+  ObjClosure* closure = AS_CLOSURE(vmPeek(0));
 
-  ObjPattern* pattern = AS_PATTERN(vmPeek(0));
-
-  for (int i = 0; i < pattern->count; i++) vmPush(pattern->elements[i].type);
-
-  // disassembleStack();
-  // printf("\n");
+  mapSet(&closure->function->fields, INTERN("signature"), vmPeek(1));
+  vmPop();
+  vmPop();
+  vmPush(OBJ_VAL(closure));
 }
 
 bool vmOverload(CallFrame* frame) {
@@ -579,25 +591,6 @@ bool vmOverload(CallFrame* frame) {
 
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
-  return true;
-}
-
-bool vmClosure(CallFrame* frame) {
-  ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-  ObjClosure* closure = newClosure(function);
-
-  // disassembleStack();
-  // printf("\n");
-  Value pattern = vmPop();
-
-  if (!IS_PATTERN(pattern)) {
-    vmRuntimeError("Function signature must be a pattern object.");
-    return false;
-  }
-  function->pattern = AS_PATTERN(pattern);
-
-  vmPush(OBJ_VAL(closure));
-  vmCaptureUpvalues(closure, frame);
   return true;
 }
 
@@ -743,6 +736,13 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
+#define ERROR "Can only get property of object, class, or function."
+
+        if (!IS_OBJ(vmPeek(0))) {
+          vmRuntimeError(ERROR);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
         switch (OBJ_TYPE(vmPeek(0))) {
           case OBJ_INSTANCE: {
             ObjInstance* instance = AS_INSTANCE(vmPeek(0));
@@ -785,10 +785,9 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
-          default: {
-            vmRuntimeError("Only objects and classes have properties (get).");
+          default:
+            vmRuntimeError(ERROR);
             return INTERPRET_RUNTIME_ERROR;
-          }
         }
 
         break;
@@ -944,7 +943,7 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_CLOSURE: {
-        if (!vmClosure(frame)) return INTERPRET_RUNTIME_ERROR;
+        vmClosure(frame);
         break;
       }
       case OP_OVERLOAD: {
@@ -960,6 +959,7 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_SIGNATURE: {
+        vmClosure(frame);
         vmSignature(frame);
         break;
       }

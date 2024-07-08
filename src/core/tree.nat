@@ -99,6 +99,8 @@ class Tree extends Object {
         return node;
     }
   }
+
+  collect(predicate) => [node | node in this, predicate(node)];
 }
 
 // Functions for building tree literals during compilation.

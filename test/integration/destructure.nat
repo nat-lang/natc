@@ -4,8 +4,9 @@
 let f <- (a) => 1;
 
 assert(f.name == "lambda");
-assert(f.signature is ASTSignature);
 assert(vType(f.function) == OClosure);
+assert(f.upvalues is Tuple);
+assert(f.signature is ASTSignature);
 
 // explicit and implicit returns.
 assert(len(f.children) == 2);
@@ -273,26 +274,16 @@ f <- () => {
 // (1) for the signature.
 
 let t0 = f[0];
-let t1 = f[1];
-
-assert(t0 is ASTLocalTypeAssignment);
-assert(t1 is ASTLocalTypeAssignment);
-
-// they both assign to 'k';
-assert(t0[0].id == 1);
-assert(t0[0].id == t1[0].id);
 
 // first assignment is undefined.
+
+assert(t0 is ASTLocalTypeAssignment);
 assert(t0[1] is ASTLiteral);
 assert(t0[1].resolve() == undefined);
 
-// second is (num -> num) -> undefined.
-assert(t1[1] is ASTApp);
-assert(t1[1].resolve() == (num -> num) -> undefined);
-
 // the closure's signature lives on its node.
 
-let k = f[2][1];
+let k = f[1][1];
 
 assert(k is ASTClosure);
 assert(k.signature is ASTSignature);
@@ -300,10 +291,6 @@ assert(k.signature is ASTSignature);
 let a = k.signature.params[0];
 
 assert(a is ASTParameter);
-
-let aType = a.type;
-
-assert(aType is ASTApp);
-assert(aType.resolve() is TFunction);
-assert(aType.resolve().domain == num);
-assert(aType.resolve().range == num);
+assert(a.type is TFunction);
+assert(a.type.domain == num);
+assert(a.type.range == num);

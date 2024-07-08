@@ -36,9 +36,10 @@ class ASTNode extends Tree {
     this.visit((node, varEnv) => {
       if (node is ASTClosure) {
         let closureEnv = VarEnv(varEnv.upvalues);
-    
-        for (param in node.signature.params)
+
+        for (param in node.signature.params) {
           rename(param, closureEnv.locals);
+        }
 
         for (upvalue in node.upvalues) {
           if (!closureEnv.upvalues[upvalue.id]) {
@@ -70,6 +71,7 @@ class ASTStatement extends ASTNode {}
 class ASTExpr extends ASTNode {}
 
 class ASTAssignment extends ASTStatement {}
+class ASTPropertyAssignment extends ASTAssignment {}
 class ASTLocalValueAssignment extends ASTAssignment {}
 class ASTTypeAssignment extends ASTStatement {}
 class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
@@ -91,6 +93,13 @@ class ASTSequence extends ASTExpr {
   resolve() => this.children.map(x => x.resolve());
 }
 
+class ASTPatternVariable extends ASTExpr {
+  init(var) => {
+    this.var = var;
+    super.init();
+  }
+}
+
 class ASTVariable extends ASTExpr {
   init(id) => {
     this.id = id;
@@ -104,7 +113,7 @@ class ASTVariable extends ASTExpr {
     return hash(this.uuid);
   }
 }
-class ASTTypeVariable extends ASTVariable {}
+
 class ASTLocal extends ASTVariable {}
 class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
@@ -152,19 +161,20 @@ class ASTInvocation extends ASTApp {
 }
 
 class ASTSignature extends ASTNode {
-  init(arity, *params) => {
+  init(arity, params) => {
     this.arity = arity;
     this.params = params;
   }
 }
 
 class ASTClosure extends ASTExpr {
-  init(name, function, signature, upvalues) => {
+  init(name, function, upvalues) => {
     this.name = name;
     this.function = function;
-    this.signature = signature;
-    this.children = [];
     this.upvalues = upvalues;
+    this.children = [];
+
+    this.signature = this.astSignature(function.signature);
   }
 
   resolve() => this.function;
@@ -179,7 +189,22 @@ class ASTClosure extends ASTExpr {
   opGetUpvalue(slot, localSlot) => ASTUpvalue(slot, localSlot);
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
   opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
-  opTypeVariable(var) => ASTTypeVariable(var.name);
+  opVariable(var) => ASTPatternVariable(var);
+
+  astSignature(signature) => {
+    if (!signature) return ASTSignature(0,[]);
+
+    let domain = signature().domain;
+    let params = [];
+
+    for (let i = 0; i < len(domain); i = i + 1) {
+      let param = domain[i];
+      // offset for the reserved stack slot.
+      params.push(ASTParameter(i + 1, param.value, param.type));
+    }
+
+    return ASTSignature(len(domain), params);
+  }
 
   // statements.
 
@@ -199,6 +224,12 @@ class ASTClosure extends ASTExpr {
     let node = ASTLocalTypeAssignment(local, value);
 
     this.children.push(node);
+  }
+
+  opSetProperty(obj, name, value) => {
+    let literal = ASTLiteral(name);
+    let assignment = ASTPropertyAssignment(obj, literal, value);
+    this.children.push(assignment);
   }
 
   opReturn(expr) => {
