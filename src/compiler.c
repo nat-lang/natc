@@ -948,8 +948,9 @@ static void parameter(Compiler* cmp, Compiler* sigCmp) {
 
     hoistVariableParam(sigCmp);
   } else {
+    cmp->function->patterned = true;
     hoistLiteralParam(sigCmp);
-    addLocal(sigCmp, syntheticToken("#pattern"));
+    addLocal(cmp, syntheticToken("#pattern"));
   }
 
   emitBytes(sigCmp, OP_CALL, 2);

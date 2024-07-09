@@ -1,25 +1,30 @@
 
-// [a] is a pattern element, [b] a scrutinee.
-let unifyPair = (a, b) => {
-  let vA = a[0], vB = b[0],
-      tA = a[1], tB = b[1];
+let unifyPair = (a: PatternElement, b: PatternElement) => {
 
   // if the pattern has no type annotation
   // then we just unify the param and the
   // scrutinee.
-  if (tA == undefined) {
-    if (isVar(vA))
+  if (a.type == undefined) {
+    if (isVar(a.value) or isVar(b.value))
       return true;
-    return vA == vB;
+    return a.value == b.value;
   }
 
-  return TypeSystem.unify(tB,tA);
+  return TypeSystem.unify(b.type, a.type);
 };
 
-let unify = (pattern, scrutinee) => {
+let unify = (function, scrutinee) => {
+
+  let pattern = function.signature().domain;
+
   if (len(pattern) != len(scrutinee)) return false;
 
-  let typedScrutinee = [(x, TypeSystem.type(x)) | x in scrutinee];
+  let typedScrutinee = Pattern(..[
+    PatternElement(x, TypeSystem.type(x)) | x in scrutinee
+  ]);
 
-  return zip(pattern, typedScrutinee).all(pair => unifyPair(..pair));
+  let result = zip(pattern, typedScrutinee).all(pair => unifyPair(..pair));
+
+
+  return result;
 };

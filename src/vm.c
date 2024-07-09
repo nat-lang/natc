@@ -379,10 +379,12 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
 
   for (int i = 0; i < caseCount; i++) {
     if (!unify(cases[i], scrutinee)) return false;
-    disassembleStack();
-    printf("\n");
+
     if (AS_BOOL(vmPop())) {
       vmPop();  // the tuplified scrutinee.
+
+      vm.stackTop[-1 - argCount] = OBJ_VAL(cases[i]);
+
       return call(cases[i], argCount);
     }
   }

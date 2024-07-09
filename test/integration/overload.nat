@@ -4,7 +4,6 @@
 let f = 1 => true;
 
 assert(f(1));
-print f(2);
 assert(f(2) == undefined);
 
 let f = 1 => true | 2 => false;
@@ -73,6 +72,9 @@ assert(f(3) == undefined);
 // literals & bound variables.
 
 let f = (2,x) => x | (x,2) => x;
+
+print f(3,2);
+print f(2,1);
 
 assert(f(2,1) == 1);
 assert(f(2,2) == 2);
