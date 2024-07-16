@@ -116,6 +116,11 @@ f <- (g) => (x) => 1;
 assert(f[0][0] is ASTClosure);
 assert(f[0][0][0][0] is ASTLiteral);
 
+f <- g x => 1;
+
+assert(f[0][0] is ASTClosure);
+assert(f[0][0][0][0] is ASTLiteral);
+
 f <- (g) => (x) => g(x);
 
 assert(f[0][0] is ASTClosure);
@@ -173,6 +178,24 @@ assert(f[3][1] is ASTLiteral);
 // k(j).
 assert(f[4] is ASTExprStatement);
 assert(f[5] is ASTImplicitReturn);
+
+// property assignment.
+
+f <- () => {
+  let a;
+  a.x = 1;
+};
+
+assert(f[0] is ASTLocalTypeAssignment);
+assert(f[1] is ASTLocalValueAssignment);
+
+assert(f[2] is ASTPropertyAssignment);
+
+assert(f[2][0] is ASTLocal);
+assert(f[2][1] is ASTLiteral);
+assert(f[2][1].resolve() == "x");
+assert(f[2][2] is ASTLiteral);
+assert(f[2][2].resolve() == 1);
 
 // closures.
 

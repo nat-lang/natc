@@ -1,6 +1,5 @@
 
 let unifyPair = (a: PatternElement, b: PatternElement) => {
-
   // if the pattern has no type annotation
   // then we just unify the param and the
   // scrutinee.
@@ -14,7 +13,6 @@ let unifyPair = (a: PatternElement, b: PatternElement) => {
 };
 
 let unify = (function, scrutinee) => {
-
   let pattern = function.signature().domain;
 
   if (len(pattern) != len(scrutinee)) return false;
@@ -24,7 +22,6 @@ let unify = (function, scrutinee) => {
   ]);
 
   let result = zip(pattern, typedScrutinee).all(pair => unifyPair(..pair));
-
 
   return result;
 };

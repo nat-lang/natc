@@ -1,7 +1,7 @@
 
 class TSum extends Type {
   init(type) => {
-    this.disjuncts = (Set.lift . typify)(type);
+    this.disjuncts = (Set.lift . TypeSystem.typify)(type);
   }
 
   union(other) => TSum(this.disjuncts.union(other.disjuncts));

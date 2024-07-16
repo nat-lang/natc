@@ -40,10 +40,7 @@ typedef struct {
 
   ObjClass* astClosure;
   ObjClass* astUpvalue;
-  ObjClass* astSignature;
-  ObjClass* astParameter;
   ObjClass* astOverload;
-  ObjClass* astVariable;
 
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;

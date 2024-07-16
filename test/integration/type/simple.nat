@@ -345,7 +345,7 @@ let h: num -> num = x => 1;
 
 check = typecheck(() => h(1));
 
-principal = check.principal();
+principal = check.mgu();
 hType = principal.find((n) => n.id == "h");
 
 assert(hType is TFunction);
@@ -356,7 +356,7 @@ let h: bool -> num = x => 1;
 
 check = typecheck(() => h(true));
 
-principal = check.principal();
+principal = check.mgu();
 hType = principal.find((n) => n.id == "h");
 
 assert(hType is TFunction);
@@ -367,7 +367,7 @@ let h: string -> num = x => 1;
 
 check = typecheck(() => h("a"));
 
-principal = check.principal();
+principal = check.mgu();
 hType = principal.find((n) => n.id == "h");
 
 assert(hType is TFunction);

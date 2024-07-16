@@ -353,6 +353,16 @@ static void closeFunction(Compiler* cmp, Compiler* enclosing) {
   closeFunctionWithOp(cmp, enclosing, OP_CLOSURE);
 }
 
+static void signFunction(Compiler* cmp, Compiler* sigCmp, Compiler* enclosing) {
+  ObjFunction* function = endCompiler(sigCmp);
+  vm.compiler = cmp;
+  emitConstInstr(enclosing, OP_CLOSURE,
+                 makeConstant(enclosing, OBJ_VAL(function)));
+  closeUpvalues(function, sigCmp, enclosing);
+
+  closeFunctionWithOp(cmp, enclosing, OP_SIGN);
+}
+
 static void function(Compiler* enclosing, FunctionType type, Token name);
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name);
 static void expression(Compiler* cmp);
@@ -899,7 +909,6 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 
   if (cmp.function->arity > 0) {
     emitByte(&cmp, OP_RETURN);
-    // compile my signature!
     closeFunction(&cmp, enclosing);
     return true;
   }
@@ -1001,13 +1010,7 @@ static void function(Compiler* enclosing, FunctionType type, Token name) {
 
   blockOrExpression(&cmp);
 
-  ObjFunction* function = endCompiler(&sigCmp);
-  vm.compiler = &cmp;
-  emitConstInstr(enclosing, OP_CLOSURE,
-                 makeConstant(enclosing, OBJ_VAL(function)));
-  closeUpvalues(function, &sigCmp, enclosing);
-
-  closeFunctionWithOp(&cmp, enclosing, OP_SIGN);
+  signFunction(&cmp, &sigCmp, enclosing);
 }
 
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
@@ -1045,13 +1048,7 @@ static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
   emitBytes(&sigCmp, OP_CALL, 2);
   emitByte(&sigCmp, OP_RETURN);
 
-  ObjFunction* function = endCompiler(&sigCmp);
-  vm.compiler = &cmp;
-  emitConstInstr(enclosing, OP_CLOSURE,
-                 makeConstant(enclosing, OBJ_VAL(function)));
-  closeUpvalues(function, &sigCmp, enclosing);
-
-  closeFunctionWithOp(&cmp, enclosing, OP_SIGN);
+  signFunction(&cmp, &sigCmp, enclosing);
 }
 
 static void method(Compiler* cmp) {

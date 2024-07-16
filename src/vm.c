@@ -49,6 +49,7 @@ void initCore(Core* core) {
   core->sArity = NULL;
   core->sPatterned = NULL;
   core->sVariadic = NULL;
+  core->sValues = NULL;
   core->sSignature = NULL;
 
   core->sName = intern("name");
@@ -65,12 +66,11 @@ void initCore(Core* core) {
   core->map = NULL;
   core->set = NULL;
   core->iterator = NULL;
+
   core->astClosure = NULL;
   core->astUpvalue = NULL;
-  core->astSignature = NULL;
-  core->astParameter = NULL;
   core->astOverload = NULL;
-  core->astVariable = NULL;
+
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
   core->vTypeNumber = NULL;

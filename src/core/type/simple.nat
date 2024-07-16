@@ -20,7 +20,17 @@ class Constraint {
 class AppConstraint extends Constraint {}
 
 class Solution extends Map {
-  entries() => super.entries().map((e) => Constraint(..e));
+  entries() => super.entries().map(e => Constraint(..e));
+
+  update(var: TVar, type: Type) => {
+    this[var] = type;
+
+    for (sub in this) {
+      this[sub.left] = sub.right.substitute(
+        Constraint(var, type)
+      );
+    }
+  }
 
   apply(c: Constraint) => {
     for (sub in this) {
@@ -30,9 +40,67 @@ class Solution extends Map {
 
     return c;
   }
+
   pp() => {
     for (sub in this) { sub.pp(); print ""; }
   }
+}
+
+class Type extends Base {
+  pp() => {
+    print this;
+  }
+
+  substitute(c) => {
+    if (this == c.left)
+      return c.right;
+    return this;
+  }
+
+  str() => {
+    return str(this);
+    // throw NotImplemented("Type classes must implement 'str' individually.");
+  }
+
+  fvs() => [];
+  hasFvs() => len(this.fvs()) > 0;
+
+  hash() => hash(this.str());
+
+  apply(solution) => solution.entries().reduce(
+    (type, sub) => type.substitute(sub),
+    this
+  );
+}
+
+class TFunction extends Type {
+  init(domain, range) => {
+    this.domain = domain;
+    this.range = range;
+  }
+
+  __eq__(other) => this.domain == other.domain and this.range == other.range;
+
+  str() => {
+    return "(" + this.domain.str() + " -> " + this.range.str() + ")";
+  }
+
+  fvs() => {
+    let fvs = [];
+    for (v in this.domain.fvs()) fvs.push(v);
+    for (v in this.range.fvs()) fvs.push(v);
+    return fvs;
+  }
+
+  pp() => {
+    this.domain.pp();
+    this.range.pp();
+  }
+
+  substitute(sub) => TFunction(
+    this.domain.substitute(sub),
+    this.range.substitute(sub)
+  );
 }
 
 class TVar extends Type {
@@ -42,6 +110,7 @@ class TVar extends Type {
   __eq__(other) => this.id == other.id;
   str() => str(this.id);
   fvs() => [this];
+  pp() => { print this.str(); }
 }
 
 class TypeVarSupply extends NameSupply {
@@ -66,23 +135,6 @@ class TNumber extends Type {
 class TString extends Type {
   str() => "string";
 }
-
-// Transform sequential and unit values into their
-// corresponding types, TProduct and TUnit.
-let typify = value => {
-  if (value == ())
-    return unit;
-  if (value == undefined)
-    return typeVar();
-  if (value is Sequential)
-    return TProduct(value.map(typify));
-  if (vType(value) == OSequence)
-    return typify(Sequence.fromRaw(value));
-  if (value is TFunction)
-    return typify(value.domain) -> typify(value.range);
-
-  return value;
-};
 
 class TProduct extends Type {
   init(elements) => {
@@ -115,6 +167,7 @@ let bool = TBoolean();
 let num = TNumber();
 let string = TString();
 let tClass = TClass();
+let infix -> = TFunction;
 
 class SimpleTypeSystem {
   // Map vm types to object language types.
@@ -129,6 +182,23 @@ class SimpleTypeSystem {
     if (type == OInstance) return value.__class__;
     if (type == OClass) return tClass;
     if (type == OClosure) return TFunction;
+  }
+
+  // Transform sequential and unit values into their
+  // corresponding types, TProduct and TUnit.
+  typify(value) => {
+    if (value == ())
+      return unit;
+    if (value == undefined)
+      return typeVar();
+    if (value is Sequential)
+      return TProduct(value.map(this.typify));
+    if (vType(value) == OSequence)
+      return this.typify(Sequence.fromRaw(value));
+    if (value is TFunction)
+      return this.typify(value.domain) -> this.typify(value.range);
+
+    return value;
   }
 
   inferType(node: ASTNode) => {
@@ -207,7 +277,7 @@ class SimpleTypeState {
     node.each(node => {
       if (node is ASTGlobal) {
         if (node.id in annotations)
-          this.typeEnv[node] = typify(annotations[node.id]);
+          this.typeEnv[node] = this.system.typify(annotations[node.id]);
       }
     });
 
@@ -228,7 +298,7 @@ class SimpleTypeState {
           if (type is ASTNode)
             type = type.resolve();
 
-          env[param] = typify(type);
+          env[param] = this.system.typify(type);
 
           return env;
         },
@@ -335,10 +405,11 @@ class SimpleTypeState {
       let func = node[0];
       let args = node[1];
 
-      let tFunc = this.constrain(func);
-      let tArgs = this.constrain(args);
+      let tFunc = this.principal(func);
+      let tArgs = this.principal(args);
 
       let tApp = typeVar();
+
       this.constraints.push(Constraint(tFunc, tArgs -> tApp));
       return tApp;
     }
@@ -348,7 +419,7 @@ class SimpleTypeState {
       let val = node[1];
 
       let tVar = this.lookup(var);
-      let tVal = typify(val.resolve());
+      let tVal = this.system.typify(val.resolve());
 
       this.constraints.push(Constraint(tVar, tVal));
 
@@ -378,18 +449,30 @@ class SimpleTypeState {
     throw TypeError("Unexpected syntax.");
   }
 
+  occurs(var: TVar, type: Type) => {
+    if (!(type is TVar) and var in type.fvs())
+      return true;
+    return false;
+  }
+
   unify(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
 
     // apply (type variable, type) unifiers to the solution.
     if (left is TVar) {
-      this.solution[left] = right;
+      if (this.occurs(left, right))
+        return false;
+
+      this.solution.update(left, right);
       this.constraints = this.constraints.map(this.solution.apply);
 
       return true;
     } else if (right is TVar) {
-      this.solution[right] = left;
+      if (this.occurs(right, left))
+        return false;
+
+      this.solution.update(right, left);
       this.constraints = this.constraints.map(this.solution.apply);
 
       return true;
@@ -441,12 +524,30 @@ class SimpleTypeState {
 
     this.constraints = unsolved;
 
+    if (this.debug) {
+      print "-------- SOLUTION ---------------";
+      for (c in this.solution) {
+        c.pp();
+        print "";
+      }
+      print "---------------------------";
+    }
+
     return this.solved();
+  }
+
+  principal(node) => {
+    let type = this.constrain(node);
+
+    if (this.solve())
+      return type.apply(this.solution);
+
+    return type;
   }
 
   // Compute the most general type for each variable in
   // the original environment.
-  principal() => {
+  mgu() => {
     let env = Map();
 
     for (x in this.typeEnv) {

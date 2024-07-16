@@ -352,6 +352,15 @@ bool __str__(int argCount, Value* args) {
           string = AS_CLASS(value)->name;
           break;
         }
+        case OBJ_INSTANCE: {
+          ObjInstance* instance = AS_INSTANCE(value);
+          char buffer[instance->klass->name->length + 6];
+          int length =
+              sprintf(buffer, "<%s obj>", instance->klass->name->chars);
+
+          string = copyString(buffer, length);
+          break;
+        }
         case OBJ_STRING: {
           string = AS_STRING(value);
           break;
@@ -458,10 +467,7 @@ InterpretResult initializeCore() {
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
-      (vm.core.astSignature = getGlobalClass(S_AST_SIGNATURE)) == NULL ||
-      (vm.core.astParameter = getGlobalClass(S_AST_PARAMETER)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
-      (vm.core.astVariable = getGlobalClass(S_AST_VARIABLE)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||

@@ -37,7 +37,7 @@ let a = (a: z -> z, b: z -> z) => {};
 
 let a = () => x((a: z, b: z) => {});
 
-// unparenthesized parameters.
+// curried shorthand.
 
 let id = x => x;
 
