@@ -42,6 +42,7 @@ typedef struct ClassCompiler {
 
 typedef struct Compiler {
   struct Compiler* enclosing;
+  struct Compiler* signature;
   ObjFunction* function;
   FunctionType functionType;
 
@@ -66,9 +67,7 @@ typedef enum {
   PREC_PRIMARY
 } Precedence;
 
-void initCompiler(Compiler* cmp, Compiler* enclosing, FunctionType functionType,
-                  Token name);
 ObjFunction* compile(Compiler* root, const char* source, char* path);
-void markCompilerRoots();
+void markCompilerRoots(Compiler* cmp);
 
 #endif

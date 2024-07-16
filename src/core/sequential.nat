@@ -44,6 +44,8 @@ class Sequential extends Object {
   all(predicate) => this.map(predicate).reduce((x,y) => x and y, true);
   some(predicate) => this.map(predicate).reduce((x,y) => x or y, false);
 
+  last() => this.values[len(this) - 1];
+
   pp() => {
     print this.values;
   }
@@ -63,5 +65,4 @@ class Sequence extends Sequential {
     for (x in elements)
       this.push(x);
   }
-  last() => this.values[len(this) - 1];
 }

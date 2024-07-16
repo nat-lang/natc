@@ -21,10 +21,7 @@ class TAbstract extends Type {
     }, len(fvs));
   }
 
-  fromClosure(closure: OClosure) => {
-    let node <- closure;
-    return TAbstract(closure, node.signature.arity);
-  }
+  fromClosure(closure: OClosure) => TAbstract(closure, closure.arity);
 }
 
 class PolyTypeState extends SimpleTypeState {
@@ -60,7 +57,7 @@ class PolyTypeState extends SimpleTypeState {
 
       return void;
     }
-  
+
     let type = super.constrain(node);
 
     if (node is ASTClosure and type.hasFvs()) {
@@ -71,7 +68,7 @@ class PolyTypeState extends SimpleTypeState {
   }
 
   transform(node: ASTNode) => {
-    super.transform(node);
+    node = super.transform(node);
 
     this.typeEnv.each(entry => {
       let var = entry[0];
@@ -81,6 +78,8 @@ class PolyTypeState extends SimpleTypeState {
         this.typeEnv[var] = TAbstract.fromClosure(type);
       }
     });
+
+    return node;
   }
 
   unify(constraint: Constraint) => {

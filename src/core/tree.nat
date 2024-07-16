@@ -23,7 +23,7 @@ class Tree extends Object {
 
     let i = 0;
     for (x in this.children) {
-      x.index(d + 1, i);
+      x.index(this.depth + 1, i);
       i = i + 1;
     }
   }

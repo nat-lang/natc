@@ -10,6 +10,7 @@ check = SimpleTypeSystem.typecheck(() => {
   id(1);
   id(true);
   id("string");
+  id(id);
 });
 
 assert(check.failure());
@@ -24,6 +25,7 @@ check = PolyTypeSystem.typecheck(() => {
   id(1);
   id(true);
   id("string");
+  id(id);
 });
 
 assert(check.success());
@@ -34,6 +36,7 @@ check = PolyTypeSystem.typecheck(() => {
   id(1);
   id(true);
   id("string");
+  id(id);
 });
 
 assert(check.success());
@@ -57,6 +60,7 @@ check = PolyTypeSystem.typecheck(() => {
   id(1);
   id(true);
   id("string");
+  id(id);
 });
 
 assert(check.success());
@@ -67,6 +71,7 @@ check = PolyTypeSystem.typecheck(() => {
   id(1);
   id(true);
   id("string");
+  id(id);
 });
 
 assert(check.success());
@@ -84,7 +89,27 @@ assert(t(num, string).range == string);
 
 // implicit abstraction in parameter annotation.
 
-// parameter 
+check = PolyTypeSystem.typecheck(() => {
+  let id = (x: w) => x;
+
+  id(1);
+  id(true);
+  id("string");
+  id(id);
+});
+
+assert(check.success());
+
+let id = (x: w) => x;
+
+check = PolyTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+  id(id);
+});
+
+assert(check.success());
 
 // reconstruction.
 
@@ -94,6 +119,7 @@ check = PolyTypeSystem.typecheck(() => {
   id(1);
   id(true);
   id("string");
+  id(id);
 });
 
 assert(check.success());

@@ -87,11 +87,9 @@ ObjClass* getGlobalClass(char* name) {
 ObjSequence* __sequentialInit__(int argCount) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
 
-  vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
-  mapSet(&obj->fields, vmPeek(1), vmPeek(0));
-  vmPop();
+  mapSet(&obj->fields, OBJ_VAL(vm.core.sValues), vmPeek(0));
   vmPop();
 
   int i = argCount;
@@ -269,9 +267,12 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_STRING:
           vmPush(OBJ_VAL(vm.core.oTypeString));
           break;
-        case OBJ_NATIVE:
+        case OBJ_BOUND_FUNCTION:
         case OBJ_CLOSURE:
           vmPush(OBJ_VAL(vm.core.oTypeClosure));
+          break;
+        case OBJ_NATIVE:
+          vmPush(OBJ_VAL(vm.core.oTypeNative));
           break;
         case OBJ_OVERLOAD:
           vmPush(OBJ_VAL(vm.core.oTypeOverload));
@@ -280,7 +281,9 @@ bool __vType__(int argCount, Value* args) {
           vmPush(OBJ_VAL(vm.core.oTypeSequence));
           break;
         default: {
+          printf("->");
           printValue(value);
+          printf("<-");
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
           return false;
         }
@@ -468,6 +471,7 @@ InterpretResult initializeCore() {
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
       (vm.core.oTypeString = getGlobalClass(S_OTYPE_STRING)) == NULL ||
       (vm.core.oTypeClosure = getGlobalClass(S_OTYPE_CLOSURE)) == NULL ||
+      (vm.core.oTypeNative = getGlobalClass(S_OTYPE_NATIVE)) == NULL ||
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
       (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 

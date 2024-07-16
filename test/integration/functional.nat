@@ -3,6 +3,12 @@
 // --------------------------------------
 
 let f = () => 1;
+
+assert(f.name == "f");
+assert(f.arity == 0);
+assert(f.variadic == false);
+assert(f.patterned == false);
+
 f.x = 1;
 assert(f.x == 1);
 

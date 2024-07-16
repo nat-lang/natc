@@ -245,7 +245,15 @@ static void markRoots() {
   markMap(&vm.globals);
   markMap(&vm.typeEnv);
   markMap(&vm.infixes);
-  markCompilerRoots();
+
+  markObject((Obj*)vm.core.sName);
+  markObject((Obj*)vm.core.sArity);
+  markObject((Obj*)vm.core.sPatterned);
+  markObject((Obj*)vm.core.sVariadic);
+  markObject((Obj*)vm.core.sValues);
+  markObject((Obj*)vm.core.sSignature);
+
+  markCompilerRoots(vm.compiler);
 }
 
 static void traceReferences() {

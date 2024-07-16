@@ -17,6 +17,7 @@ class OClass extends CObject {}
 class OInstance extends CObject {}
 class OString extends CObject {}
 class OClosure extends CObject {}
+class ONative extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
 
@@ -61,6 +62,8 @@ class Type extends Base {
   hasFvs() => len(this.fvs()) > 0;
 
   hash() => hash(this.str());
+
+  apply(s) => this;
 }
 
 class TFunction extends Type {
@@ -82,7 +85,9 @@ class TFunction extends Type {
 
   pp() => {
     this.domain.pp();
+    print "->";
     this.range.pp();
+    print "";
   }
 
   substitute(sub) => TFunction(

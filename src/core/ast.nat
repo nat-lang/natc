@@ -23,8 +23,7 @@ class ASTNode extends Tree {
 
   // Give the tree's variables uuids. Identify upvalues
   // with the locals they close over. 
-  uniquelyIdentifyVariables() => {
-    let uuids = NameSupply();
+  uniquelyIdentifyVariables(uuids) => {
     let globals = Map();
 
     let rename = (node: ASTVariable, env: Map) => {
@@ -37,7 +36,7 @@ class ASTNode extends Tree {
       if (node is ASTClosure) {
         let closureEnv = VarEnv(varEnv.upvalues);
 
-        for (param in node.signature.params) {
+        for (param in node.signature().params) {
           rename(param, closureEnv.locals);
         }
 
@@ -161,20 +160,16 @@ class ASTInvocation extends ASTApp {
 }
 
 class ASTSignature extends ASTNode {
-  init(arity, params) => {
-    this.arity = arity;
+  init(params) => {
     this.params = params;
   }
 }
 
 class ASTClosure extends ASTExpr {
-  init(name, function, upvalues) => {
-    this.name = name;
+  init(function, upvalues) => {
     this.function = function;
     this.upvalues = upvalues;
     this.children = [];
-
-    this.signature = this.astSignature(function.signature);
   }
 
   resolve() => this.function;
@@ -191,19 +186,38 @@ class ASTClosure extends ASTExpr {
   opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
   opVariable(var) => ASTPatternVariable(var);
 
-  astSignature(signature) => {
-    if (!signature) return ASTSignature(0,[]);
+  sign() => {
+    if (!this.function.signature) return ASTSignature([]);
 
-    let domain = signature().domain;
-    let params = [];
+    let ast = signature => {
+      let params = [];
 
-    for (let i = 0; i < len(domain); i = i + 1) {
-      let param = domain[i];
-      // offset for the reserved stack slot.
-      params.push(ASTParameter(i + 1, param.value, param.type));
+      for (let i = 0; i < len(signature.domain); i = i + 1) {
+        let param = signature.domain[i];
+        // the param's first argument tracks the local slot it refers
+        // to, so offset +1 for the initial reserved stack slot.
+        params.push(ASTParameter(i + 1, param.value, param.type));
+      }
+
+      return ASTSignature(params);
+    };
+
+    if (this.function.signature.arity == 0) {
+      return ast(this.function.signature());
     }
 
-    return ASTSignature(len(domain), params);
+    return ast(
+      this.function.signature(
+        ..[typeVar() | _ in range(0, this.function.signature.arity)]
+      )
+    );
+  }
+
+  signature() => {
+    if (!this._signature)
+      this._signature = this.sign();
+
+    return this._signature;
   }
 
   // statements.

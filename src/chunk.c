@@ -23,7 +23,7 @@ void freeChunk(Chunk* chunk) {
 // Write a new opcode [byte] to the [chunk].
 void writeChunk(Chunk* chunk, uint8_t byte, int line) {
   // +1 for this byte.
-  if (chunk->capacity < chunk->count + 2) {
+  if (chunk->capacity < chunk->count + 1) {
     int oldCapacity = chunk->capacity;
     chunk->capacity = GROW_CAPACITY(oldCapacity);
     chunk->code =

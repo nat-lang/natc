@@ -133,27 +133,18 @@ class SimpleTypeSystem {
 
   inferType(node: ASTNode) => {
     let state = this.TypeStateClass(this, false);
-    state.transform(node);
-    let type = state.constrain(node);
 
-    state.solve();
-
-    if (!state.solved())
-      throw Error("Can't infer type.");
-
-    type = type.apply(state.solution);
-
-    return type;
+    return state.infer(node);
   }
 
   // Assemble and return the [TypeState] produced
   // by [expr].
   typecheck(expr) => {
     let node <- expr;
-
     let state = this.TypeStateClass(this, false);
 
-    state.transform(node);
+    node = state.transform(node);
+
     state.constrain(node);
     state.solve();
 
@@ -170,8 +161,8 @@ class SimpleTypeSystem {
     let node: ASTClosure <- expr;
   
     // now check if it has a global type annotation.
-    exprType = globalTypeEnv()[node.name];
-    if (exprType and globals()[node.name] == expr)
+    exprType = globalTypeEnv()[node.function.name];
+    if (exprType and globals()[node.function.name] == expr)
       return exprType;
 
     // otherwise infer it.
@@ -195,6 +186,7 @@ class SimpleTypeState {
     this.solution = Solution();
     // print debugging information?
     this.debug = debug;
+    this.uuids = NameSupply();
   }
 
   // Look up the node in the [typeEnv]. If there's no
@@ -209,7 +201,7 @@ class SimpleTypeState {
   // Give [node]'s variables unique identifiers. Map the
   // global variables to their annotations if they exist.
   transform(node: ASTNode) => {
-    node.uniquelyIdentifyVariables();
+    node.uniquelyIdentifyVariables(this.uuids);
 
     let annotations = globalTypeEnv();
     node.each(node => {
@@ -218,13 +210,16 @@ class SimpleTypeState {
           this.typeEnv[node] = typify(annotations[node.id]);
       }
     });
+
+    return node;
   } 
 
   constrain(node: ASTNode) => {
     if (node is ASTClosure) {
       // give the parameters type vars if they don't
       // have annotations.
-      let fnEnv = node.signature.params.reduce(
+
+      let fnEnv = node.signature().params.reduce(
         (env: Map, param: ASTParameter) => {
           let type = param.type;
 
@@ -261,9 +256,9 @@ class SimpleTypeState {
       let tParams;
       let tReturns;
 
-      if (node.signature.arity == 0) {
+      if (node.function.arity == 0) {
         tParams = unit;
-      } else if (node.signature.arity == 1) {
+      } else if (node.function.arity == 1) {
         tParams = fnEnv.values()[0];
       } else {
         tParams = TProduct(fnEnv.values());
@@ -280,7 +275,7 @@ class SimpleTypeState {
       } else if (len(returns) == 1) {
         tReturns = returns[0];
       } else {
-        tReturns = tReturns;
+        tReturns = TProduct(returns);
       }
 
       return tParams -> tReturns;
@@ -294,19 +289,32 @@ class SimpleTypeState {
 
     if (node is ASTGlobal) {
       let value = node.resolve();
-      let literalType = this.system.literalType(value);
-      let annotationType = this.lookup(node);
+      let annotation = this.lookup(node);
+    
+      let type;
 
-      // todo: destructure and reconstruct the type of
-      // functions that are defined outside the scope of
-      // the check.
-      if (literalType == TFunction)
-        literalType = typeVar() -> typeVar();
+      // if it's a native we punt.
+      if (vType(value) == ONative) {
+        type = typeVar() -> typeVar();
 
-      // annotation and literal type should unify.
-      this.constraints.push(Constraint(annotationType, literalType));
+      // otherwise, if it's a function, destructure and constrain it.
+      } else if (vType(value) == OClosure) {
+        let ast <- value;
+        this.transform(ast);
+        type = this.constrain(ast);
 
-      return annotationType;
+      // else it has a base type.
+      } else {
+        type = this.system.literalType(value);
+      }
+  
+      // the annotation and inferred/literal type should unify.
+      this.constraints.push(Constraint(annotation, type));
+
+      if (this.solve())
+        type = type.apply(this.solution);
+
+      return type;
     }
 
     if (node is ASTVariable)
@@ -453,6 +461,19 @@ class SimpleTypeState {
     }
 
     return env;
+  }
+
+  infer(node: ASTNode) => {
+    node = this.transform(node);
+
+    let type = this.constrain(node);
+
+    if (!this.solve())
+      throw Error("Can't infer type.");
+
+    type = type.apply(this.solution);
+
+    return type;
   }
 
   solved() => len(this.constraints) == 0;

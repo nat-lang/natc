@@ -45,6 +45,19 @@ void vmRuntimeError(const char* format, ...) {
 }
 
 void initCore(Core* core) {
+  core->sName = NULL;
+  core->sArity = NULL;
+  core->sPatterned = NULL;
+  core->sVariadic = NULL;
+  core->sSignature = NULL;
+
+  core->sName = intern("name");
+  core->sArity = intern("arity");
+  core->sPatterned = intern("patterned");
+  core->sVariadic = intern("variadic");
+  core->sValues = intern("values");
+  core->sSignature = intern("signature");
+
   core->base = NULL;
   core->object = NULL;
   core->tuple = NULL;
@@ -66,6 +79,7 @@ void initCore(Core* core) {
   core->oTypeInstance = NULL;
   core->oTypeString = NULL;
   core->oTypeClosure = NULL;
+  core->oTypeNative = NULL;
   core->oTypeOverload = NULL;
   core->oTypeSequence = NULL;
   core->unify = NULL;
@@ -140,6 +154,13 @@ bool vmInvoke(ObjString* name, int argCount) {
     return invokeFromClass(instance->klass, name, argCount);
   }
 
+  char* error = "Only instances and classes have methods.";
+
+  if (!IS_OBJ(receiver)) {
+    vmRuntimeError(error);
+    return false;
+  }
+
   ObjMap* fields;
   switch (OBJ_TYPE(receiver)) {
     case OBJ_CLASS:
@@ -149,7 +170,7 @@ bool vmInvoke(ObjString* name, int argCount) {
       fields = &AS_CLOSURE(receiver)->function->fields;
       break;
     default:
-      vmRuntimeError("Only instances and classes have methods.");
+      vmRuntimeError(error);
       return false;
   }
 
@@ -463,7 +484,7 @@ static void bindClosure(Value receiver, Value* value) {
   }
 }
 
-static ObjUpvalue* captureUpvalue(Value* local, uint8_t slot) {
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot) {
   ObjUpvalue* prevUpvalue = NULL;
   ObjUpvalue* upvalue = vm.openUpvalues;
   while (upvalue != NULL && upvalue->location > local) {
@@ -492,7 +513,7 @@ void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame) {
     uint8_t isLocal = READ_BYTE();
     uint8_t index = READ_BYTE();
     if (isLocal) {
-      closure->upvalues[i] = captureUpvalue(frame->slots + index, index);
+      closure->upvalues[i] = vmCaptureUpvalue(frame->slots + index, index);
     } else {
       closure->upvalues[i] = frame->closure->upvalues[index];
     }
@@ -508,20 +529,6 @@ void vmCloseUpvalues(Value* last) {
   }
 }
 
-void vmSequence(CallFrame* frame) {
-  int count = READ_BYTE();
-
-  ObjSequence* seq = newSequence();
-  vmPush(OBJ_VAL(seq));
-
-  for (int i = 0; i < count; i++)
-    writeValueArray(&seq->values, vmPeek(count - i));
-
-  vmPop();  // seq.
-  while (count--) vmPop();
-  vmPush(OBJ_VAL(seq));
-}
-
 void vmVariable(CallFrame* frame) {
   ObjString* name = READ_STRING();
   ObjVariable* var = newVariable(name);
@@ -534,12 +541,20 @@ void vmClosure(CallFrame* frame) {
 
   vmPush(OBJ_VAL(closure));
   vmCaptureUpvalues(closure, frame);
+
+  mapSet(&function->fields, OBJ_VAL(vm.core.sName), OBJ_VAL(function->name));
+  mapSet(&function->fields, OBJ_VAL(vm.core.sArity),
+         NUMBER_VAL(function->arity));
+  mapSet(&function->fields, OBJ_VAL(vm.core.sPatterned),
+         BOOL_VAL(function->patterned));
+  mapSet(&function->fields, OBJ_VAL(vm.core.sVariadic),
+         BOOL_VAL(function->variadic));
 }
 
-void vmSignature(CallFrame* frame) {
+void vmSign(CallFrame* frame) {
   ObjClosure* closure = AS_CLOSURE(vmPeek(0));
 
-  mapSet(&closure->function->fields, INTERN("signature"), vmPeek(1));
+  mapSet(&closure->function->fields, OBJ_VAL(vm.core.sSignature), vmPeek(1));
   vmPop();
   vmPop();
   vmPush(OBJ_VAL(closure));
@@ -586,7 +601,7 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
 }
 
 bool vmSequenceValueField(ObjInstance* obj, Value* seq) {
-  if (!mapGet(&obj->fields, INTERN("values"), seq)) {
+  if (!mapGet(&obj->fields, OBJ_VAL(vm.core.sValues), seq)) {
     vmRuntimeError("Sequence instance missing its values!");
     return false;
   }
@@ -909,9 +924,9 @@ InterpretResult vmExecute(int baseFrame) {
         vmVariable(frame);
         break;
       }
-      case OP_SIGNATURE: {
+      case OP_SIGN: {
         vmClosure(frame);
-        vmSignature(frame);
+        vmSign(frame);
         break;
       }
       case OP_CLOSE_UPVALUE: {
@@ -1165,10 +1180,6 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_UNIT: {
         vmPush(UNIT_VAL);
-        break;
-      }
-      case OP_SEQUENCE: {
-        vmSequence(frame);
         break;
       }
       default:

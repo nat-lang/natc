@@ -3,10 +3,9 @@
 
 let f <- (a) => 1;
 
-assert(f.name == "lambda");
 assert(vType(f.function) == OClosure);
 assert(f.upvalues is Tuple);
-assert(f.signature is ASTSignature);
+assert(vType(f.signature) == OClosure);
 
 // explicit and implicit returns.
 assert(len(f.children) == 2);
@@ -191,10 +190,10 @@ f <- (x,z) => {
 // upvalues are identified with the locals
 // they close over.
 
-f.uniquelyIdentifyVariables();
+f.uniquelyIdentifyVariables(NameSupply());
 
-let x = f.signature.params[0];
-let z = f.signature.params[1];
+let x = f.signature().params[0];
+let z = f.signature().params[1];
 let y = f[1][0];
 
 let g = f[3][1];
@@ -275,7 +274,7 @@ f <- () => {
 
 let t0 = f[0];
 
-// first assignment is undefined.
+// let assignment is to undefined.
 
 assert(t0 is ASTLocalTypeAssignment);
 assert(t0[1] is ASTLiteral);
@@ -286,11 +285,22 @@ assert(t0[1].resolve() == undefined);
 let k = f[1][1];
 
 assert(k is ASTClosure);
-assert(k.signature is ASTSignature);
+assert(k.signature() is ASTSignature);
 
-let a = k.signature.params[0];
+let a = k.signature().params[0];
 
 assert(a is ASTParameter);
 assert(a.type is TFunction);
 assert(a.type.domain == num);
 assert(a.type.range == num);
+
+// the signature registers implicitly abstracted type variables.
+
+f <- () => {
+  let k = (a: w -> w) => a;
+};
+
+let k = f[1][1];
+
+assert(k is ASTClosure);
+assert(k.signature() is ASTSignature);

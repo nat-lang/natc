@@ -29,3 +29,12 @@ let iter = object => {
 
   throw IterationProtocolError("Must define an '__iter__' method to iterate.");
 };
+
+let range = (x,y) => {
+  if (x == y) return [];
+
+  let seq = [x];
+  for (let i = x + 1; i < y; i = i + 1)
+    seq.push(i);
+  return seq;
+};

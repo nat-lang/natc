@@ -23,6 +23,13 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjString* sName;
+  ObjString* sArity;
+  ObjString* sPatterned;
+  ObjString* sVariadic;
+  ObjString* sValues;
+  ObjString* sSignature;
+
   ObjClass* base;
   ObjClass* object;
   ObjClass* tuple;
@@ -47,6 +54,7 @@ typedef struct {
   ObjClass* oTypeInstance;
   ObjClass* oTypeString;
   ObjClass* oTypeClosure;
+  ObjClass* oTypeNative;
   ObjClass* oTypeOverload;
   ObjClass* oTypeSequence;
 
@@ -112,8 +120,9 @@ void vmClosure(CallFrame* frame);
 bool vmOverload(CallFrame* frame);
 void vmSequence(CallFrame* frame);
 void vmVariable(CallFrame* frame);
-void vmSignature(CallFrame* frame);
+void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
 
 #endif
