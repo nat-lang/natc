@@ -31,7 +31,7 @@ class PolyTypeState extends SimpleTypeState {
     if (node is ASTClosure and type.hasFvs()) {
       return TAbstract.generalize(type);
     }
-  
+
     return type;
   }
 

@@ -547,7 +547,7 @@ class SimpleTypeState {
 
   // Compute the most general type for each variable in
   // the original environment.
-  mgu() => {
+  principalEnv() => {
     let env = Map();
 
     for (x in this.typeEnv) {
