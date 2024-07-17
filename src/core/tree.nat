@@ -1,6 +1,5 @@
 let -1 = 1 - 2;
 
-
 class Tree extends Object {
   init(data, children) => {
     this.data = data;
@@ -24,7 +23,7 @@ class Tree extends Object {
 
     let i = 0;
     for (x in this.children) {
-      x.index(d + 1, i);
+      x.index(this.depth + 1, i);
       i = i + 1;
     }
   }
@@ -52,6 +51,10 @@ class Tree extends Object {
     if (this.leaf()) return [this.data];
 
     return [leaf | child in this.children, leaf in child.leaves()];
+  }
+
+  each(fn) => {
+    for (x in this) fn(x);
   }
 
   // Map the data.
@@ -85,8 +88,9 @@ class Tree extends Object {
     acc = fn(this, acc);
 
     // accumulate vertically, but not horizontally.
-    for (child in this.children)
+    for (child in this.children) {
       child.visit(fn, acc);
+    }
   }
 
   find(predicate) => {
@@ -95,18 +99,20 @@ class Tree extends Object {
         return node;
     }
   }
+
+  collect(predicate) => [node | node in this, predicate(node)];
 }
 
 // Functions for building tree literals during compilation.
 
 // Childless tree.
-let LeafNode = (data) => Tree(data, []);
+let LeafNode = data => Tree(data, []);
 
 // Dataless tree.
 let Root = (*children) => Tree(nil, children);
 
 // Convert [data] to a [Tree] if it's not already.
-let Node = (value) => {
+let Node = value => {
   if (value is Tree)
     return value;
   return LeafNode(value);

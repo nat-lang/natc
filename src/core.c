@@ -5,6 +5,9 @@
 #include <string.h>
 #include <time.h>
 
+#include "compiler.h"
+#include "io.h"
+
 static void defineNativeFn(char* name, int arity, bool variadic,
                            NativeFn function, ObjMap* dest) {
   // keep the values on the stack so they're
@@ -17,6 +20,16 @@ static void defineNativeFn(char* name, int arity, bool variadic,
   mapSet(dest, vmPeek(1), vmPeek(0));
   vmPop();
   vmPop();
+}
+
+static void defineNativeInfixGlobal(char* name, int arity, NativeFn function,
+                                    Precedence prec) {
+  defineNativeFn(name, arity, false, function, &vm.globals);
+
+  Value fn;
+  Value fnName = INTERN(name);
+  mapGet(&vm.globals, fnName, &fn);
+  mapSet(&vm.infixes, fnName, NUMBER_VAL(prec));
 }
 
 static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
@@ -74,11 +87,9 @@ ObjClass* getGlobalClass(char* name) {
 ObjSequence* __sequentialInit__(int argCount) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
 
-  vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
-  mapSet(&obj->fields, vmPeek(1), vmPeek(0));
-  vmPop();
+  mapSet(&obj->fields, OBJ_VAL(vm.core.sValues), vmPeek(0));
   vmPop();
 
   int i = argCount;
@@ -256,15 +267,23 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_STRING:
           vmPush(OBJ_VAL(vm.core.oTypeString));
           break;
-        case OBJ_NATIVE:
+        case OBJ_BOUND_FUNCTION:
         case OBJ_CLOSURE:
           vmPush(OBJ_VAL(vm.core.oTypeClosure));
+          break;
+        case OBJ_NATIVE:
+          vmPush(OBJ_VAL(vm.core.oTypeNative));
           break;
         case OBJ_OVERLOAD:
           vmPush(OBJ_VAL(vm.core.oTypeOverload));
           break;
+        case OBJ_SEQUENCE:
+          vmPush(OBJ_VAL(vm.core.oTypeSequence));
+          break;
         default: {
+          printf("->");
           printValue(value);
+          printf("<-");
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
           return false;
         }
@@ -333,6 +352,15 @@ bool __str__(int argCount, Value* args) {
           string = AS_CLASS(value)->name;
           break;
         }
+        case OBJ_INSTANCE: {
+          ObjInstance* instance = AS_INSTANCE(value);
+          char buffer[instance->klass->name->length + 6];
+          int length =
+              sprintf(buffer, "<%s obj>", instance->klass->name->chars);
+
+          string = copyString(buffer, length);
+          break;
+        }
         case OBJ_STRING: {
           string = AS_STRING(value);
           break;
@@ -389,6 +417,7 @@ bool __add__(int argCount, Value* args) {
   }
   return true;
 }
+
 InterpretResult initializeCore() {
   // native functions.
 
@@ -402,14 +431,14 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
 
-  defineNativeFnGlobal("__gt__", 2, __gt__);
-  defineNativeFnGlobal("__lt__", 2, __lt__);
-  defineNativeFnGlobal("__gte__", 2, __gte__);
-  defineNativeFnGlobal("__lte__", 2, __lte__);
-  defineNativeFnGlobal("__add__", 2, __add__);
-  defineNativeFnGlobal("__sub__", 2, __sub__);
-  defineNativeFnGlobal("__div__", 2, __div__);
-  defineNativeFnGlobal("__mul__", 2, __mul__);
+  defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
+  defineNativeInfixGlobal(">=", 2, __gte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<=", 2, __lte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("+", 2, __add__, PREC_TERM);
+  defineNativeInfixGlobal("-", 2, __sub__, PREC_TERM);
+  defineNativeInfixGlobal("/", 2, __div__, PREC_FACTOR);
+  defineNativeInfixGlobal("*", 2, __mul__, PREC_FACTOR);
 
   // native classes.
 
@@ -438,8 +467,6 @@ InterpretResult initializeCore() {
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
-      (vm.core.astSignature = getGlobalClass(S_AST_SIGNATURE)) == NULL ||
-      (vm.core.astParameter = getGlobalClass(S_AST_PARAMETER)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
@@ -450,6 +477,7 @@ InterpretResult initializeCore() {
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
       (vm.core.oTypeString = getGlobalClass(S_OTYPE_STRING)) == NULL ||
       (vm.core.oTypeClosure = getGlobalClass(S_OTYPE_CLOSURE)) == NULL ||
+      (vm.core.oTypeNative = getGlobalClass(S_OTYPE_NATIVE)) == NULL ||
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
       (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 

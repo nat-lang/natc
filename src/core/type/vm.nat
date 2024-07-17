@@ -4,7 +4,7 @@
 
 class TypeError extends Error {}
 
-class CType {}
+class CType extends Base {}
 
 class CBool extends CType {}
 class CNil extends CType {}
@@ -17,8 +17,31 @@ class OClass extends CObject {}
 class OInstance extends CObject {}
 class OString extends CObject {}
 class OClosure extends CObject {}
+class ONative extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
+
+class PatternElement extends Base {
+  init(value, type) => {
+    this.value = value;
+    this.type = type;
+  }
+}
+
+class Pattern extends Base {
+  init(*elements) => {
+    this.elements = elements;
+  }
+  __get__(idx) => this.elements[idx];
+  __len__() => len(this.elements);
+}
+
+class Signature extends Base {
+  init(domain, range) => {
+    this.domain = domain;
+    this.range = range;
+  }
+}
 
 let isSubclass = (a, b) => {
   if (vType(a) != OClass or vType(b) != OClass) 
@@ -34,6 +57,7 @@ let isSubclass = (a, b) => {
   return false;
 };
 
+let isVar = x => vType(x) == OVariable;
 let isClass = a => vType(a) == OClass;
 
 // Is [a] an instance of [b]?

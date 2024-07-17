@@ -84,7 +84,7 @@ assert(check.failure());
 let f: (num, num) -> num = (x,y) => 1;
 
 env = globalTypeEnv();
-assert(env["f"] == TProduct(num, num) -> num);
+assert(env["f"] == (num, num) -> num);
 
 check = typecheck(() => f(1,1));
 assert(check.success());
@@ -161,6 +161,7 @@ check = typecheck(() => {
   let k = (a: num, b: num) => a + b;
   k(1, 1);
 });
+
 assert(check.success());
 
 check = typecheck(() => {
@@ -194,21 +195,21 @@ assert(check.failure());
 check = typecheck(() => {
   let k = (a: num -> num, b: (num -> num) -> num) => b(a);
 
-  k(x => x, (f) => f(1));
+  k(x => x, f => f(1));
 });
 assert(check.success());
 
 check = typecheck(() => {
   let k = (a: num -> num, b: (num -> num) -> num) => b(a);
 
-  k(x => x, (f) => f("a"));
+  k(x => x, f => f("a"));
 });
 assert(check.failure());
 
 check = typecheck(() => {
   let k = (a: num -> num, b: (num -> num) -> num) => b(a);
 
-  k(x => x, (f) => f(true));
+  k(x => x, f => f(true));
 });
 assert(check.failure());
 
@@ -338,14 +339,14 @@ assert(check.failure());
 // --------------------------------------------
 
 let hType;
-let principal;
+let env;
 
 let h: num -> num = x => 1;
 
 check = typecheck(() => h(1));
 
-principal = check.principal();
-hType = principal.find((n) => n.id == "h");
+env = check.principalEnv();
+hType = env.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TNumber);
@@ -355,8 +356,8 @@ let h: bool -> num = x => 1;
 
 check = typecheck(() => h(true));
 
-principal = check.principal();
-hType = principal.find((n) => n.id == "h");
+env = check.principalEnv();
+hType = env.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TBoolean);
@@ -366,8 +367,8 @@ let h: string -> num = x => 1;
 
 check = typecheck(() => h("a"));
 
-principal = check.principal();
-hType = principal.find((n) => n.id == "h");
+env = check.principalEnv();
+hType = env.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TString);
@@ -383,7 +384,7 @@ assert(type == num -> num);
 let f: (num, num) -> num = (x,y) => 1;
 let type = SimpleTypeSystem.type((x,y) => f(x,y));
 
-assert(type == (num, num) -> num);
+assert(type == TProduct([num, num]) -> num);
 
 // with constraints on upvalues.
 

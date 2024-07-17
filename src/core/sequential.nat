@@ -41,11 +41,20 @@ class Sequential extends Object {
     return seq;
   }
 
-  all(predicate) => this.map(predicate).reduce(and, true);
-  some(predicate) => this.map(predicate).reduce(or, false);
+  all(predicate) => this.map(predicate).reduce((x,y) => x and y, true);
+  some(predicate) => this.map(predicate).reduce((x,y) => x or y, false);
+
+  last() => this.values[len(this) - 1];
 
   pp() => {
     print this.values;
+  }
+
+  fromRaw(raw) => {
+    let seq = Sequence();
+    for (let i = 0; i < len(raw); i = i + 1)
+      seq.push(raw[i]);
+    return seq;
   }
 }
 
@@ -56,5 +65,4 @@ class Sequence extends Sequential {
     for (x in elements)
       this.push(x);
   }
-  last() => this.values[len(this) - 1];
 }

@@ -126,6 +126,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return byteInstruction("OP_CALL_POSTFIX", chunk, offset);
     case OP_INVOKE:
       return invokeInstruction("OP_INVOKE", chunk, offset);
+    case OP_SIGN:
     case OP_CLOSURE: {
       uint16_t constant = readShort(chunk, offset);
       offset += 3;
@@ -147,8 +148,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     }
     case OP_VARIABLE:
       return constantInstruction("OP_VARIABLE", chunk, offset);
-    case OP_PATTERN:
-      return byteInstruction("OP_PATTERN", chunk, offset);
     case OP_CLOSE_UPVALUE:
       return simpleInstruction("OP_CLOSE_UPVALUE", offset);
     case OP_IMPLICIT_RETURN:

@@ -18,7 +18,7 @@ class Iterator {
   __len__() => this.end - this.idx;
 }
 
-let iter = (object) => {
+let iter = object => {
   if (object is Sequential)
     return Iterator(object, 0, len(object));
 
@@ -28,4 +28,13 @@ let iter = (object) => {
   if (object.has("__iter__")) return object.__iter__();
 
   throw IterationProtocolError("Must define an '__iter__' method to iterate.");
+};
+
+let range = (x,y) => {
+  if (x == y) return [];
+
+  let seq = [x];
+  for (let i = x + 1; i < y; i = i + 1)
+    seq.push(i);
+  return seq;
 };

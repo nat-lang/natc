@@ -81,29 +81,16 @@ ObjVariable* newVariable(ObjString* name) {
   return variable;
 }
 
-ObjPattern* newPattern(int count) {
-  PatternElement* elements = ALLOCATE(PatternElement, count);
-  for (int i = 0; i < count; i++) {
-    elements[i].value = UNDEF_VAL;
-    elements[i].type = UNDEF_VAL;
-  }
-
-  ObjPattern* pattern = ALLOCATE_OBJ(ObjPattern, OBJ_PATTERN);
-  pattern->count = count;
-  pattern->isLiteral = false;
-  pattern->elements = elements;
-  return pattern;
-}
-
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
 
   function->arity = 0;
   function->variadic = false;
+  function->patterned = false;
   function->upvalueCount = 0;
-  function->pattern = NULL;
   function->name = NULL;
 
+  initMap(&function->fields);
   initChunk(&function->chunk);
   initMap(&function->constants);
   return function;
@@ -432,11 +419,11 @@ void printObject(Value value) {
       printf("<class %s>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
-      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
+      printf("<fn %s at %p>", AS_CLOSURE(value)->function->name->chars,
              AS_CLOSURE(value));
       break;
     case OBJ_FUNCTION:
-      printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,
+      printf("<raw fn %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
     case OBJ_OVERLOAD:
@@ -444,9 +431,6 @@ void printObject(Value value) {
       break;
     case OBJ_VARIABLE:
       printf("<var %s>", AS_VARIABLE(value)->name->chars);
-      break;
-    case OBJ_PATTERN:
-      printf("<pattern>");
       break;
     case OBJ_INSTANCE:
       printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,

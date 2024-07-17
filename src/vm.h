@@ -23,6 +23,13 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjString* sName;
+  ObjString* sArity;
+  ObjString* sPatterned;
+  ObjString* sVariadic;
+  ObjString* sValues;
+  ObjString* sSignature;
+
   ObjClass* base;
   ObjClass* object;
   ObjClass* tuple;
@@ -33,8 +40,6 @@ typedef struct {
 
   ObjClass* astClosure;
   ObjClass* astUpvalue;
-  ObjClass* astSignature;
-  ObjClass* astParameter;
   ObjClass* astOverload;
 
   ObjClass* vTypeBool;
@@ -46,6 +51,7 @@ typedef struct {
   ObjClass* oTypeInstance;
   ObjClass* oTypeString;
   ObjClass* oTypeClosure;
+  ObjClass* oTypeNative;
   ObjClass* oTypeOverload;
   ObjClass* oTypeSequence;
 
@@ -104,14 +110,16 @@ bool vmInitInstance(ObjClass* klass, int argCount, int frames);
 bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
-CallFrame* vmCallFrame(ObjClosure* closure, int offset);
+CallFrame* vmInitFrame(ObjClosure* closure, int offset);
 bool vmCallValue(Value value, int argCount);
 void vmCloseUpvalues(Value* last);
-bool vmClosure(CallFrame* frame);
+void vmClosure(CallFrame* frame);
 bool vmOverload(CallFrame* frame);
+void vmSequence(CallFrame* frame);
 void vmVariable(CallFrame* frame);
-void vmPattern(CallFrame* frame);
+void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
 
 #endif
