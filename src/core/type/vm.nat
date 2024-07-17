@@ -17,64 +17,31 @@ class OClass extends CObject {}
 class OInstance extends CObject {}
 class OString extends CObject {}
 class OClosure extends CObject {}
+class ONative extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
 
-class Type extends Base {
-  pp() => {
-    print this;
+class PatternElement extends Base {
+  init(value, type) => {
+    this.value = value;
+    this.type = type;
   }
-
-  substitute(c) => {
-    if (this == c.left)
-      return c.right;
-    return this;
-  }
-
-  str() => {
-    throw NotImplemented("Type classes must implement 'str' individually.");
-  }
-
-  fvs() => [];
-  hasFvs() => len(this.fvs()) > 0;
-
-  hash() => hash(this.str());
 }
 
-class TFunction extends Type {
+class Pattern extends Base {
+  init(*elements) => {
+    this.elements = elements;
+  }
+  __get__(idx) => this.elements[idx];
+  __len__() => len(this.elements);
+}
+
+class Signature extends Base {
   init(domain, range) => {
     this.domain = domain;
     this.range = range;
   }
-
-  __eq__(other) => this.domain == other.domain and this.range == other.range;
-
-  str() => "(" + this.domain.str() + " -> " + this.range.str() + ")";
-
-  fvs() => {
-    let fvs = [];
-    for (v in this.domain.fvs()) fvs.push(v);
-    for (v in this.range.fvs()) fvs.push(v);
-    return fvs;
-  }
-
-  pp() => {
-    this.domain.pp();
-    this.range.pp();
-  }
-
-  substitute(sub) => TFunction(
-    this.domain.substitute(sub),
-    this.range.substitute(sub)
-  );
-
-  apply(solution) => solution.entries().reduce(
-    (type, sub) => type.substitute(sub),
-    this
-  );
 }
-
-let infix -> = TFunction;
 
 let isSubclass = (a, b) => {
   if (vType(a) != OClass or vType(b) != OClass) 

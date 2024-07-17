@@ -122,16 +122,16 @@ bool astFrame(Value root) {
         return true;
       }
       case OP_GET_GLOBAL: {
-        vmPush(root);
         ObjString* name = READ_STRING();
+        vmPush(root);
         vmPush(OBJ_VAL(name));
 
         if (!executeMethod("opGetGlobal", 1)) return false;
         break;
       }
       case OP_GET_LOCAL: {
-        vmPush(root);
         uint8_t slot = READ_SHORT();
+        vmPush(root);
         vmPush(NUMBER_VAL(slot));
 
         if (!executeMethod("opGetLocal", 1)) return false;
@@ -150,26 +150,51 @@ bool astFrame(Value root) {
         break;
       }
       case OP_GET_UPVALUE: {
-        vmPush(root);
         uint8_t slot = READ_SHORT();
         ObjUpvalue* upvalue = frame->closure->upvalues[slot];
 
+        vmPush(root);
         vmPush(NUMBER_VAL((uintptr_t)upvalue));
         vmPush(NUMBER_VAL(upvalue->slot));
 
         if (!executeMethod("opGetUpvalue", 2)) return false;
         break;
       }
+      case OP_SET_PROPERTY: {
+        Value key = READ_CONSTANT();
+
+        Value value = vmPop();
+        Value object = vmPop();
+
+        vmPush(root);
+        vmPush(object);
+        vmPush(key);
+        vmPush(value);
+
+        if (!executeMethod("opSetProperty", 3)) return false;
+
+        vmPush(object);
+        break;
+      }
       case OP_VARIABLE: {
+        vmPush(root);
         vmVariable(frame);
+        if (!executeMethod("opVariable", 1)) return false;
         break;
       }
-      case OP_SIGNATURE: {
-        vmSignature(frame);
-        break;
-      }
-      case OP_PATTERN: {
-        vmPattern(frame);
+      case OP_SIGN: {
+        // replace the signature's ast with the signature itself.
+        Value astSignature = vmPeek(0);
+        Value signature;
+        mapGet(&AS_INSTANCE(astSignature)->fields, INTERN("function"),
+               &signature);
+        vmPop();
+        vmPush(signature);
+
+        vmClosure(frame);
+        vmSign(frame);
+
+        if (!astClosure(AS_CLOSURE(vmPeek(0)))) return false;
         break;
       }
       case OP_OVERLOAD: {
@@ -178,7 +203,7 @@ bool astFrame(Value root) {
         break;
       }
       case OP_CLOSURE: {
-        if (!vmClosure(frame)) return false;
+        vmClosure(frame);
         if (!astClosure(AS_CLOSURE(vmPeek(0)))) return false;
         break;
       }
@@ -263,14 +288,6 @@ bool astFrame(Value root) {
         if (!executeMethod("opLiteral", 1)) return false;
         break;
       }
-      case OP_SEQUENCE: {
-        vmSequence(frame);
-        Value seq = vmPop();
-        vmPush(root);
-        vmPush(seq);
-        if (!executeMethod("opSequence", 1)) return false;
-        break;
-      }
       default: {
         vmRuntimeError("Unhandled destructured opcode (%i).", instruction);
         return false;
@@ -285,33 +302,16 @@ bool astFrame(Value root) {
 bool astClosure(ObjClosure* closure) {
   // we'll populate the frame's local slots as we build
   // the tree, and exit the frame once we're done.
-  vmCallFrame(closure, 0);
+  vmInitFrame(closure, 0);
 
   // the root of the tree is an [ASTClosure] instance that has
-  // four arguments.
+  // two arguments.
   vmPush(OBJ_VAL(vm.core.astClosure));
 
-  // the function's name.
-  vmPush(OBJ_VAL(closure->function->name));
-
-  // the function itself.
+  // (1) the function itself.
   vmPush(OBJ_VAL(closure));
 
-  // the function's signature.
-  vmPush(OBJ_VAL(vm.core.astSignature));
-  vmPush(NUMBER_VAL(closure->function->arity));
-  for (int i = 0; i < closure->function->arity; i++) {
-    vmPush(OBJ_VAL(vm.core.astParameter));
-    // offset the reserved stack slot.
-    vmPush(NUMBER_VAL(i + 1));
-    vmPush(closure->function->pattern->elements[i].value);
-    vmPush(closure->function->pattern->elements[i].type);
-    if (!initInstance(vm.core.astParameter, 3)) return false;
-  }
-  if (!initInstance(vm.core.astSignature, closure->function->arity + 1))
-    return false;
-
-  // the closure's upvalues.
+  // (2) the closure's upvalues.
   for (int i = 0; i < closure->upvalueCount; i++) {
     vmPush(OBJ_VAL(vm.core.astUpvalue));
     vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
@@ -320,12 +320,14 @@ bool astClosure(ObjClosure* closure) {
   }
   if (!vmTuplify(closure->upvalueCount, true)) return false;
 
-  if (!initInstance(vm.core.astClosure, 4)) return false;
+  if (!initInstance(vm.core.astClosure, 2)) return false;
 
   return astFrame(vmPeek(0));
 }
 
 bool astOverload(ObjOverload* overload) {
+  vmPop();
+
   vmPush(OBJ_VAL(vm.core.astOverload));
   vmPush(OBJ_VAL(overload));
   vmPush(NUMBER_VAL(overload->cases));

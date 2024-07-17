@@ -21,83 +21,42 @@ class TAbstract extends Type {
     }, len(fvs));
   }
 
-  fromClosure(closure: OClosure) => {
-    let node <- closure;
-    return TAbstract(closure, node.signature.arity);
-  }
+  fromClosure(closure: OClosure) => TAbstract(closure, closure.arity);
 }
 
 class PolyTypeState extends SimpleTypeState {
   constrain(node: ASTNode) => {
-    if (node is ASTAssignment) {
-      let var = node[0];
-      let val = node[1];
-
-      let tVar = this.lookup(var);
-      let tVal = this.constrain(val);
-
-      this.constraints.push(Constraint(tVar, tVal));
-
-      if (tVal is TAbstract)
-        this.typeEnv[var] = tVal;
-
-      return void;
-    }
-  
-    if (node is ASTLocalTypeAssignment) {
-      let var = node[0];
-      let val = node[1];
-
-      if (var in this.typeEnv)
-        throw TypeError("Variable already has a type annotation.");
-
-      let type = val.resolve();
-
-      if (vType(type) == OClosure)
-        type = TAbstract.fromClosure(type);
-
-      this.typeEnv[var] = type;
-
-      return void;
-    }
-  
     let type = super.constrain(node);
 
     if (node is ASTClosure and type.hasFvs()) {
       return TAbstract.generalize(type);
     }
-  
+
     return type;
-  }
-
-  transform(node: ASTNode) => {
-    super.transform(node);
-
-    this.typeEnv.each(entry => {
-      let var = entry[0];
-      let type = entry[1];
-
-      if (vType(type) == OClosure) {
-        this.typeEnv[var] = TAbstract.fromClosure(type);
-      }
-    });
   }
 
   unify(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
 
-    if (left is TAbstract)
+    if (left is TAbstract and !(right is TVar))
       left = left.instantiate(typeVar);
     
-    if (right is TAbstract)
+    if (right is TAbstract and !(left is TVar))
       right = right.instantiate(typeVar);
     
     return super.unify(Constraint(left, right));
   }
 }
 
-class PolyTypeSystem extends SimpleTypeSystem {}
+class PolyTypeSystem extends SimpleTypeSystem {
+  typify(value) => {
+    if (vType(value) == OClosure)
+      return TAbstract.fromClosure(value);
+
+    return super.typify(value);
+  }
+}
 
 PolyTypeSystem.TypeStateClass = PolyTypeState;
 

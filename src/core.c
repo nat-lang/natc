@@ -87,11 +87,9 @@ ObjClass* getGlobalClass(char* name) {
 ObjSequence* __sequentialInit__(int argCount) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
 
-  vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
-  mapSet(&obj->fields, vmPeek(1), vmPeek(0));
-  vmPop();
+  mapSet(&obj->fields, OBJ_VAL(vm.core.sValues), vmPeek(0));
   vmPop();
 
   int i = argCount;
@@ -269,9 +267,12 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_STRING:
           vmPush(OBJ_VAL(vm.core.oTypeString));
           break;
-        case OBJ_NATIVE:
+        case OBJ_BOUND_FUNCTION:
         case OBJ_CLOSURE:
           vmPush(OBJ_VAL(vm.core.oTypeClosure));
+          break;
+        case OBJ_NATIVE:
+          vmPush(OBJ_VAL(vm.core.oTypeNative));
           break;
         case OBJ_OVERLOAD:
           vmPush(OBJ_VAL(vm.core.oTypeOverload));
@@ -280,7 +281,9 @@ bool __vType__(int argCount, Value* args) {
           vmPush(OBJ_VAL(vm.core.oTypeSequence));
           break;
         default: {
+          printf("->");
           printValue(value);
+          printf("<-");
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
           return false;
         }
@@ -347,6 +350,15 @@ bool __str__(int argCount, Value* args) {
       switch (OBJ_TYPE(value)) {
         case OBJ_CLASS: {
           string = AS_CLASS(value)->name;
+          break;
+        }
+        case OBJ_INSTANCE: {
+          ObjInstance* instance = AS_INSTANCE(value);
+          char buffer[instance->klass->name->length + 6];
+          int length =
+              sprintf(buffer, "<%s obj>", instance->klass->name->chars);
+
+          string = copyString(buffer, length);
           break;
         }
         case OBJ_STRING: {
@@ -455,10 +467,7 @@ InterpretResult initializeCore() {
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
-      (vm.core.astSignature = getGlobalClass(S_AST_SIGNATURE)) == NULL ||
-      (vm.core.astParameter = getGlobalClass(S_AST_PARAMETER)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
-      (vm.core.astVariable = getGlobalClass(S_AST_VARIABLE)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
@@ -468,6 +477,7 @@ InterpretResult initializeCore() {
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
       (vm.core.oTypeString = getGlobalClass(S_OTYPE_STRING)) == NULL ||
       (vm.core.oTypeClosure = getGlobalClass(S_OTYPE_CLOSURE)) == NULL ||
+      (vm.core.oTypeNative = getGlobalClass(S_OTYPE_NATIVE)) == NULL ||
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
       (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 

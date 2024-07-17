@@ -339,14 +339,14 @@ assert(check.failure());
 // --------------------------------------------
 
 let hType;
-let principal;
+let env;
 
 let h: num -> num = x => 1;
 
 check = typecheck(() => h(1));
 
-principal = check.principal();
-hType = principal.find((n) => n.id == "h");
+env = check.principalEnv();
+hType = env.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TNumber);
@@ -356,8 +356,8 @@ let h: bool -> num = x => 1;
 
 check = typecheck(() => h(true));
 
-principal = check.principal();
-hType = principal.find((n) => n.id == "h");
+env = check.principalEnv();
+hType = env.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TBoolean);
@@ -367,8 +367,8 @@ let h: string -> num = x => 1;
 
 check = typecheck(() => h("a"));
 
-principal = check.principal();
-hType = principal.find((n) => n.id == "h");
+env = check.principalEnv();
+hType = env.find((n) => n.id == "h");
 
 assert(hType is TFunction);
 assert(hType.domain is TString);

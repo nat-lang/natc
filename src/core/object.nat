@@ -17,4 +17,7 @@ class Object extends Base {
   }
 
   substitute(s) => this;
+
+  pp() => { print str(this); }
+  fvs() => [];
 }

@@ -52,8 +52,6 @@ assert(t(num).domain == num);
 assert(t(num).range == num);
 
 check = PolyTypeSystem.typecheck(() => {
-  let id: w -> w = x => x;
-
   id(1);
   id(true);
   id("string");
@@ -61,9 +59,9 @@ check = PolyTypeSystem.typecheck(() => {
 
 assert(check.success());
 
-let id: w -> w = x => x;
-
 check = PolyTypeSystem.typecheck(() => {
+  let id: w -> w = x => x;
+
   id(1);
   id(true);
   id("string");
@@ -84,7 +82,35 @@ assert(t(num, string).range == string);
 
 // implicit abstraction in parameter annotation.
 
-// parameter 
+let id = (x: w) => x;
+
+check = PolyTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => {
+  let id = (x: w) => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// identity between type variables.
+
+check = PolyTypeSystem.typecheck((x: w -> z, y: w) => x(y));
+
+assert(check.success());
+
+check = PolyTypeSystem.typecheck((x: w -> z, y: w) => y(x));
+
+assert(check.failure());
 
 // reconstruction.
 

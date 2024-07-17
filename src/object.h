@@ -54,7 +54,6 @@ typedef enum {
   OBJ_UPVALUE,
   OBJ_SPREAD,
   OBJ_VARIABLE,
-  OBJ_PATTERN,
 } ObjType;
 
 struct Obj {
@@ -82,24 +81,14 @@ typedef struct {
 } ObjVariable;
 
 typedef struct {
-  Value value;
-  Value type;
-} PatternElement;
-
-typedef struct {
-  Obj obj;
-  int count;
-  // does the pattern have values?
-  bool isLiteral;
-  PatternElement *elements;
-} ObjPattern;
-
-typedef struct {
   Obj obj;
   int arity;
   bool variadic;
+  bool patterned;
   int upvalueCount;
-  ObjPattern *pattern;
+
+  ObjMap fields;
+
   Chunk chunk;
   ObjString *name;
   // cache from values to constant indices
@@ -189,7 +178,6 @@ ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
-ObjPattern *newPattern(int count);
 ObjInstance *newInstance(ObjClass *klass);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
