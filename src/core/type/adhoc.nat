@@ -1,0 +1,85 @@
+
+class TOverload extends Type {
+  init(*cases) => {
+    if (len(cases) == 0)
+      throw TypeError("TOverload requires at least one case.");
+
+    this.cases = cases;
+  }
+
+  unit(type) => {
+    if (type is TOverload)
+      return type;
+    return TOverload(type);
+  }
+
+  lift(type) => {
+    // if a function has a disjunctive domain we can map it
+    // into an overload with a case for each disjunct.
+    if (type is TFunction and type.domain is TSum)
+      return TOverload(..[x -> type.range | x in type.domain]);
+
+    return this.unit(type);
+  }
+
+  concat(that) => TOverload(..this.cases.concat(that.cases));
+
+  __eq__(that) => that is TOverload and this.cases == that.cases;
+
+  str() => "TOverload(" + join([x.str() | x in this.cases], ", ") + ")";
+  pp() => { print this.str(); }
+}
+
+let infix(7) <+> = (a, b) => TOverload.unit(a).concat(TOverload.unit(b));
+
+class AdhocTypeState extends SubtypeState {
+  init(sys, debug) => {
+    super.init(sys, false);
+  }
+  constrain(node: ASTNode) => {
+    if (node is ASTOverload) {
+      let tCases = node.children.map(this.principal);
+      return TOverload(..tCases);
+    }
+
+    return super.constrain(node);
+  }
+
+  unify(constraint: Constraint) => {
+    if (constraint is SubtypeConstraint) {
+      let left = constraint.left,
+          right = constraint.right;
+
+      if (left is TOverload or right is TOverload) {
+        left = TOverload.lift(left);
+        right = TOverload.lift(right);
+
+        return right.cases.all(
+          rCase => left.cases.some(
+            lCase => this.unify(
+              SubtypeConstraint(lCase, rCase)
+            )
+          )
+        );
+      }
+    }
+
+    return super.unify(constraint);
+  }
+
+  type(expr) => {
+    if (vType(expr) == OOverload)
+      return this.infer(expr);
+    return super.type(expr);
+  }
+}
+
+class AdhocTypeSystem extends SubtypeSystem {
+  literalType(value) => {
+    if (vType(value) == OOverload)
+      return TOverload;
+    return super.literalType(value);
+  }
+}
+
+AdhocTypeSystem.TypeStateClass = AdhocTypeState;

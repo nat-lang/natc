@@ -42,6 +42,7 @@ typedef struct {
   ObjClass* astUpvalue;
   ObjClass* astOverload;
 
+  ObjClass* vTypeUnit;
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;
   ObjClass* vTypeNumber;

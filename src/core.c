@@ -281,9 +281,6 @@ bool __vType__(int argCount, Value* args) {
           vmPush(OBJ_VAL(vm.core.oTypeSequence));
           break;
         default: {
-          printf("->");
-          printValue(value);
-          printf("<-");
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
           return false;
         }
@@ -354,9 +351,9 @@ bool __str__(int argCount, Value* args) {
         }
         case OBJ_INSTANCE: {
           ObjInstance* instance = AS_INSTANCE(value);
-          char buffer[instance->klass->name->length + 6];
+          char buffer[instance->klass->name->length + 9];
           int length =
-              sprintf(buffer, "<%s obj>", instance->klass->name->chars);
+              sprintf(buffer, "<%s object>", instance->klass->name->chars);
 
           string = copyString(buffer, length);
           break;
@@ -468,6 +465,7 @@ InterpretResult initializeCore() {
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
+      (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
       (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||

@@ -1,6 +1,6 @@
-let infix || = (a, b) => TSum.lift(a).union(TSum.lift(b));
-let typecheck = SubtypeSystem.typecheck;
+
 let check;
+let typecheck = SubtypeSystem.typecheck;
 
 // arguments must be subtypes.
 
@@ -39,9 +39,13 @@ assert(check.failure());
 // the subtype relation for functions is contravariant in the domain
 // and covariant in the range.
 
-// domain:
+// contravariant domains:
 
 let f: (bool -> void) -> void = f => {};
+
+// (bool -> void) -> void < ((bool || string) -> void) -> w
+//   .. (bool -> void) > (bool || string) -> void
+//   .. bool           < bool || string
 
 check = typecheck((x: (bool || string) -> void) => f(x));
 assert(check.success());
@@ -60,7 +64,7 @@ assert(check.success());
 check = typecheck((x: (bool || string || num) -> void) => f(x));
 assert(check.success());
 
-// range:
+// covariant ranges:
 
 let f: (() -> bool) -> void = g => {};
 
@@ -85,16 +89,17 @@ assert(check.failure());
 
 let f: (num, num) || (string, string) -> void = x => {};
 
-check = typecheck((x: (string,string)) => f(x));
+check = typecheck((x: (string, string)) => f(x));
+check.ppConstraints();
 assert(check.success());
 
-check = typecheck((x: (num,num)) => f(x));
+check = typecheck((x: (num, num)) => f(x));
 assert(check.success());
 
-check = typecheck((x: (num,string)) => f(x));
+check = typecheck((x: (num, string)) => f(x));
 assert(check.failure());
 
-check = typecheck((x: (string,num)) => f(x));
+check = typecheck((x: (string, num)) => f(x));
 assert(check.failure());
 
 // reconstruction.

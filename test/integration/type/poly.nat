@@ -90,6 +90,7 @@ check = PolyTypeSystem.typecheck(() => {
   id("string");
 });
 
+check.ppConstraints();
 assert(check.success());
 
 check = PolyTypeSystem.typecheck(() => {
@@ -102,17 +103,20 @@ check = PolyTypeSystem.typecheck(() => {
 
 assert(check.success());
 
-// identity between type variables.
+// identity between type variables is preserved.
 
-check = PolyTypeSystem.typecheck((x: w -> z, y: w) => x(y));
-
+check = PolyTypeSystem.typecheck((x: w -> z, y: u) => y(x));
 assert(check.success());
 
 check = PolyTypeSystem.typecheck((x: w -> z, y: w) => y(x));
-
 assert(check.failure());
 
+check = PolyTypeSystem.typecheck((x: w -> z, y: w) => x(y));
+assert(check.success());
+
 // reconstruction.
+
+// first order succeeds:
 
 check = PolyTypeSystem.typecheck(() => {
   let id = x => x;
@@ -123,3 +127,13 @@ check = PolyTypeSystem.typecheck(() => {
 });
 
 assert(check.success());
+
+// second order fails:
+
+check = PolyTypeSystem.typecheck((id) => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.failure());

@@ -6,11 +6,11 @@ class Map extends Object {
     }
   }
 
-  // Does each key in [this] map to the same value in [other]?
-  subMap(other) => {
+  // Does each key in [this] map to the same value in [that]?
+  subMap(that) => {
     for (key in this.keys()) {
-      if (!(key in other)) return false;
-      if (other[key] != this[key]) return false;
+      if (!(key in that)) return false;
+      if (that[key] != this[key]) return false;
     }
     return true;
   }
@@ -29,9 +29,9 @@ class Map extends Object {
     for (x in this) fn(x);
   }
 
-  __eq__(other) => {
-    if (len(this) != len(other)) return false;
+  __eq__(that) => {
+    if (len(this) != len(that)) return false;
 
-    return this.subMap(other) and other.subMap(this);
+    return this.subMap(that) and that.subMap(this);
   }
 }

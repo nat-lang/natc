@@ -6,6 +6,7 @@ class TypeError extends Error {}
 
 class CType extends Base {}
 
+class CUnit extends CType {}
 class CBool extends CType {}
 class CNil extends CType {}
 class CNumber extends CType {}
@@ -20,28 +21,6 @@ class OClosure extends CObject {}
 class ONative extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
-
-class PatternElement extends Base {
-  init(value, type) => {
-    this.value = value;
-    this.type = type;
-  }
-}
-
-class Pattern extends Base {
-  init(*elements) => {
-    this.elements = elements;
-  }
-  __get__(idx) => this.elements[idx];
-  __len__() => len(this.elements);
-}
-
-class Signature extends Base {
-  init(domain, range) => {
-    this.domain = domain;
-    this.range = range;
-  }
-}
 
 let isSubclass = (a, b) => {
   if (vType(a) != OClass or vType(b) != OClass) 
@@ -70,3 +49,25 @@ let infix(5) is = (a, b) => {
 
   return isSubclass(a.__class__, b);
 };
+
+class PatternElement extends Base {
+  init(value, type) => {
+    this.value = value;
+    this.type = type;
+  }
+}
+
+class Pattern extends Base {
+  init(*elements) => {
+    this.elements = elements;
+  }
+  __get__(idx) => this.elements[idx];
+  __len__() => len(this.elements);
+}
+
+class Signature extends Base {
+  init(domain, range) => {
+    this.domain = domain;
+    this.range = range;
+  }
+}
