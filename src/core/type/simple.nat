@@ -10,11 +10,9 @@ class Constraint {
     this.right = right;
   }
 
-  pp() => {
-    pp(this.left);
-    print "x";
-    pp(this.right);
-  }
+  str() => this.left.str() + " ~ " + this.right.str();
+
+  pp() => { print this.str(); }
 }
 
 class AppConstraint extends Constraint {}
@@ -79,10 +77,10 @@ class TFunction extends Type {
     this.range = range;
   }
 
-  __eq__(other) => this.domain == other.domain and this.range == other.range;
+  __eq__(that) => this.domain == that.domain and this.range == that.range;
 
   str() => {
-    return "(" + this.domain.str() + " -> " + this.range.str() + ")";
+    return this.domain.str() + " -> " + this.range.str();
   }
 
   fvs() => {
@@ -93,8 +91,7 @@ class TFunction extends Type {
   }
 
   pp() => {
-    this.domain.pp();
-    this.range.pp();
+    print this.str();
   }
 
   substitute(sub) => TFunction(
@@ -107,8 +104,8 @@ class TVar extends Type {
   init(id) => {
     this.id = id;
   }
-  __eq__(other) => this.id == other.id;
-  str() => str(this.id);
+  __eq__(that) => this.id == that.id;
+  str() => "<var " + str(this.id) + ">";
   fvs() => [this];
   pp() => { print this.str(); }
 }
@@ -122,6 +119,9 @@ let typeVar = globalTypeVarSupply.fresh;
 
 class TUnit extends Type {
   str() => "()";
+}
+class TUndefined extends Type {
+  str() => "undef";
 }
 class TVoid extends Type {
   str() => "void";
@@ -141,6 +141,8 @@ class TProduct extends Type {
     this.elements = elements;
   }
 
+  str() => "TProduct(" + join(this.elements.map(x => x.str()), ", ") + ")";
+
   pp() => { print this.elements.values; }
 
   substitute(c: Constraint) => {
@@ -149,7 +151,7 @@ class TProduct extends Type {
 
   hash() => this.elements.hash();
 
-  __eq__(other) => this.elements == other.elements;
+  __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
 }
 
@@ -162,19 +164,21 @@ class TOverload extends Type {
 class TClass extends Type {}
 
 let unit = TUnit();
+let undef = TUndefined();
 let void = TVoid();
 let bool = TBoolean();
 let num = TNumber();
 let string = TString();
 let tClass = TClass();
-let infix -> = TFunction;
+let infix(8) -> = TFunction;
 
 class SimpleTypeSystem {
   // Map vm types to object language types.
   literalType(value) => {
     let type = vType(value);
 
-    if (type == ()) return unit;
+    if (type == CUnit) return unit;
+    if (type == CUndef) return undef;
     if (type == CNil) return void;
     if (type == CBool) return bool;
     if (type == CNumber) return num;
@@ -201,12 +205,6 @@ class SimpleTypeSystem {
     return value;
   }
 
-  inferType(node: ASTNode) => {
-    let state = this.TypeStateClass(this, false);
-
-    return state.infer(node);
-  }
-
   // Assemble and return the [TypeState] produced
   // by [expr].
   typecheck(expr) => {
@@ -223,20 +221,9 @@ class SimpleTypeSystem {
 
   // Calculate the type of [expr], inferring it if necessary.
   type(expr) => {
-    // if it's not a function, return its literal type.
-    let exprType = this.literalType(expr);
-    if (exprType != TFunction)
-      return exprType;
+    let state = this.TypeStateClass(this, false);
   
-    let node: ASTClosure <- expr;
-  
-    // now check if it has a global type annotation.
-    exprType = globalTypeEnv()[node.function.name];
-    if (exprType and globals()[node.function.name] == expr)
-      return exprType;
-
-    // otherwise infer it.
-    return this.inferType(node);
+    return state.type(expr);
   }
 
   unify(a,b) => this.TypeStateClass(this, false).unify(
@@ -248,7 +235,7 @@ class SimpleTypeSystem {
 class SimpleTypeState {
   init(system: SimpleTypeSystem, debug: bool) => {
     this.system = system;
-    // map from variables to types.
+    // map from ast variables to types.
     this.typeEnv = Map();
     // constraint stack.
     this.constraints = [];
@@ -323,8 +310,7 @@ class SimpleTypeState {
       );
 
       // now build the type of the function.
-      let tParams;
-      let tReturns;
+      let tParams, tReturns;
 
       if (node.function.arity == 0) {
         tParams = unit;
@@ -355,36 +341,11 @@ class SimpleTypeState {
       return this.system.literalType(node.value);
     
     if (node is ASTNegation)
-      return this.constrain(node[0]);
+      return this.principal(node[0]);
 
     if (node is ASTGlobal) {
       let value = node.resolve();
-      let annotation = this.lookup(node);
-    
-      let type;
-
-      // if it's a native we punt.
-      if (vType(value) == ONative) {
-        type = typeVar() -> typeVar();
-
-      // otherwise, if it's a function, destructure and constrain it.
-      } else if (vType(value) == OClosure) {
-        let ast <- value;
-        this.transform(ast);
-        type = this.constrain(ast);
-
-      // else it has a base type.
-      } else {
-        type = this.system.literalType(value);
-      }
-  
-      // the annotation and inferred/literal type should unify.
-      this.constraints.push(Constraint(annotation, type));
-
-      if (this.solve())
-        type = type.apply(this.solution);
-
-      return type;
+      return this.type(value);
     }
 
     if (node is ASTVariable)
@@ -446,9 +407,10 @@ class SimpleTypeState {
     if (node is ASTReturn) 
       return this.constrain(node[0]);
 
-    throw TypeError("Unexpected syntax.");
+    throw TypeError("Unexpected syntax: " + str(node) + ".");
   }
 
+  // The occurs check.
   occurs(var: TVar, type: Type) => {
     if (!(type is TVar) and var in type.fvs())
       return true;
@@ -496,7 +458,7 @@ class SimpleTypeState {
       } else {
         return false;
       }
-    } 
+    }
 
     return left == right;
   }
@@ -524,19 +486,17 @@ class SimpleTypeState {
 
     this.constraints = unsolved;
 
-    if (this.debug) {
+    if (this.debug and len(this.solution) > 0) {
       print "-------- SOLUTION ---------------";
-      for (c in this.solution) {
-        c.pp();
-        print "";
-      }
-      print "---------------------------";
+      for (c in this.solution)
+        print c.left.str() + " = " + c.right.str();
+      print "---------------------------------";
     }
 
     return this.solved();
   }
 
-  principal(node) => {
+  principal(node: ASTNode) => {
     let type = this.constrain(node);
 
     if (this.solve())
@@ -564,17 +524,29 @@ class SimpleTypeState {
     return env;
   }
 
-  infer(node: ASTNode) => {
+  infer(expr) => {
+    let node <- expr;
     node = this.transform(node);
+    return this.principal(node);
+  }
 
-    let type = this.constrain(node);
+  type(expr) => {
+    // if it's a native we punt.
+    if (vType(expr) == ONative)
+      return typeVar() -> typeVar();
 
-    if (!this.solve())
-      throw Error("Can't infer type.");
+    // if it's not a function return its literal type.
+    let exprType = this.system.literalType(expr);
+    if (exprType != TFunction)
+      return exprType;
+  
+    // now check if it has a global type annotation.
+    exprType = globalTypeEnv()[expr.name];
+    if (exprType and globals()[expr.name] == expr)
+      return this.system.typify(exprType);
 
-    type = type.apply(this.solution);
-
-    return type;
+    // otherwise infer it.
+    return this.infer(expr);
   }
 
   solved() => len(this.constraints) == 0;
@@ -582,10 +554,8 @@ class SimpleTypeState {
   failure() => !this.solved();
 
   ppConstraints() => {
-    for (c in this.constraints) {
-      print "######## " + str(c.__class__) + " ########";
-      c.pp();
-      print "############################";
+    for (let i = 0; i < len(this.constraints); i = i + 1) {
+      print str(i) + ") " + this.constraints[i].str();
     }
   }
 }

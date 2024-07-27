@@ -17,23 +17,6 @@ class Tree extends Object {
     return Iterator(nodes, 0, len(nodes));
   }
 
-  index(depth, breadth) => {
-    this.depth = depth;
-    this.breadth = breadth;
-
-    let i = 0;
-    for (x in this.children) {
-      x.index(this.depth + 1, i);
-      i = i + 1;
-    }
-  }
-  
-  id() => {
-    if (this.depth == -1 or this.breadth == -1)
-      throw Error("Must call 'index' before accessing 'id'.");
-    return (this.depth, this.breadth);
-  }
-
   depthFirst() => {
     let seq = [this];
 
@@ -93,12 +76,7 @@ class Tree extends Object {
     }
   }
 
-  find(predicate) => {
-    for (node in this) {
-      if (predicate(node))
-        return node;
-    }
-  }
+  find(predicate) => this.depthFirst().find(predicate);
 
   collect(predicate) => [node | node in this, predicate(node)];
 }

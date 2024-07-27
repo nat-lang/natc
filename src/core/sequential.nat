@@ -35,14 +35,34 @@ class Sequential extends Object {
 
   filter(predicate) => [x | x in this, !predicate(x)];
 
-  concat(other) => {
+  concat(that) => {
     let seq = [x | x in this];
-    for (x in other) seq.push(x);
+    for (x in that) seq.push(x);
     return seq;
   }
 
-  all(predicate) => this.map(predicate).reduce((x,y) => x and y, true);
-  some(predicate) => this.map(predicate).reduce((x,y) => x or y, false);
+  some(predicate) => {
+    for (x in this)
+      if (predicate(x))
+        return true;
+    return false;
+  }
+
+  all(predicate) => {
+    for (x in this)
+      if (!predicate(x))
+        return false;
+    return true;
+  }
+
+  first(predicate) => {
+    for (x in this) {
+      if (predicate(x))
+        return x;
+    }
+  }
+
+  find(predicate) => this.first(predicate);
 
   last() => this.values[len(this) - 1];
 

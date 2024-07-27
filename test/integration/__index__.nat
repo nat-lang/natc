@@ -29,6 +29,7 @@ import test/integration/string
 import test/integration/tree
 import test/integration/type/simple
 import test/integration/type/subtype
+import test/integration/type/adhoc
 import test/integration/type/poly
 
 conclude("integration");

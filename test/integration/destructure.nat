@@ -249,7 +249,7 @@ assert(j_a_up.uuid == a.uuid);
 f <- 1 => true | 2 => false;
 
 assert(vType(f.overload) == OOverload);
-assert(f.cases == 2);
+assert(f.count == 2);
 assert(f[0] is ASTClosure);
 assert(f[1] is ASTClosure);
 
