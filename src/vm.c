@@ -766,6 +766,13 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         ObjMap* fields;
 
+        char* error = "Can only set property of object, class, or function.";
+
+        if (!IS_OBJ(vmPeek(1))) {
+          vmRuntimeError(error);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
         switch (OBJ_TYPE(vmPeek(1))) {
           case OBJ_INSTANCE:
             fields = &AS_INSTANCE(vmPeek(1))->fields;
@@ -777,8 +784,7 @@ InterpretResult vmExecute(int baseFrame) {
             fields = &AS_CLOSURE(vmPeek(1))->function->fields;
             break;
           default:
-            vmRuntimeError(
-                "Can only set property of object, class, or function.");
+            vmRuntimeError(error);
             return INTERPRET_RUNTIME_ERROR;
         }
 

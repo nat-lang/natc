@@ -258,9 +258,9 @@ class ASTClosure extends ASTExpr {
 }
 
 class ASTOverload extends ASTExpr {
-  init(overload, cases, closures) => {
+  init(overload, count, closures) => {
     this.overload = overload;
-    this.cases = cases;
+    this.count = count;
     this.children = closures;
   }
 }

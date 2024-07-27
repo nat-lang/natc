@@ -1,2 +1,3 @@
 
 let infix(5) implies = (x, y) => !x or y;
+let infix(5) equal = tuple => tuple[0] == tuple[1];

@@ -1,11 +1,6 @@
 
 // naked literals.
 
-let f = 1 => true;
-
-assert(f(1));
-assert(f(2) == undefined);
-
 let f = 1 => true | 2 => false;
 
 assert(f(1));
@@ -24,10 +19,6 @@ assert(f(undefined));
 assert(f(false) == false);
 
 // parenthesized literals.
-
-let f = (true) => false;
-
-assert(f(true) == false);
 
 let f = (true) => false | (false) => true;
 
@@ -91,7 +82,9 @@ assert(f(false) == true);
 
 // functional type patterns.
 
-let f = (x: num -> num) => x(1) | (x: string -> string) => x("1") | (x: bool -> bool) => x(true);
+let f = (x: num -> num) => x(1)
+      | (x: string -> string) => x("1")
+      | (x: bool -> bool) => x(true);
 
 assert(f((x: num) => x) == 1);
 assert(f((x: string) => x) == "1");
@@ -140,4 +133,3 @@ assert(f(2,"1") == true);
 // let f = (a: x -> y, b: x) => a(b) | (a: x, b: x -> y) => b(a);
 
 // let f: (x,y) => ((x -> y, x) -> y) & ((x, x -> y) -> y) = (a, b) => a(b) | (a, b) => b(a);
- 

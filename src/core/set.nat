@@ -44,64 +44,64 @@ class Set extends Object {
     return sum;
   }
 
-  // Is [this] a subset of or equal to [other]?
-  subsetEq(other) => {
-    if (len(this) > len(other))
+  // Is [this] a subset of or equal to [that]?
+  subsetEq(that) => {
+    if (len(this) > len(that))
       return false;
 
     for (x in this) {
-      if (!other(x))
+      if (!that(x))
         return false;
     }
   
     return true;
   }
 
-  // Is [this] a proper subset of [other]?
-  subset(other) => {
-    if (len(this) == len(other))
+  // Is [this] a proper subset of [that]?
+  subset(that) => {
+    if (len(this) == len(that))
       return false;
 
-    return this.subsetEq(other);
+    return this.subsetEq(that);
   }
 
-  // Is [this] a proper superset of [other]?
-  supset(other) => other.subset(this);
+  // Is [this] a proper superset of [that]?
+  supset(that) => that.subset(this);
 
-  // Is [this] a superset of or equal to [other]?
-  supsetEq(other) => other.subsetEq(this);
+  // Is [this] a superset of or equal to [that]?
+  supsetEq(that) => that.subsetEq(this);
 
-  // Is [this] equal to [other]?
-  __eq__(other) => this.subsetEq(other) and other.subsetEq(this);
+  // Is [this] equal to [that]?
+  __eq__(that) => this.subsetEq(that) and that.subsetEq(this);
 
-  union(other) => {
+  union(that) => {
     let set = {};
 
     for (x in this)
       set.add(x);
 
-    for (x in other)
+    for (x in that)
       set.add(x);
 
     return set;
   }
 
-  intersection(other) => {
+  intersection(that) => {
     let set = {};
 
     for (x in this)
-      if (x in other)
+      if (x in that)
         set.add(x);
     
     return set;
   }
 
-  // Relative complement of [other] in [this].
-  complement(other) => {
+  // Relative complement of [that] in [this].
+  complement(that) => {
     let set = {};
 
     for (x in this)
-      if (!other(x))
+      if (!that(x))
         set.add(x);
     
     return set;
@@ -125,17 +125,16 @@ class Set extends Object {
     return powerset;
   }
 
-  map(predicate) => this.elements.map(predicate);
-  all(predicate) => this.elements.all(predicate);
+  map(predicate) => this.elements().map(predicate);
+  reduce(fn, acc) => this.elements().reduce(fn, acc);
+  all(predicate) => this.elements().all(predicate);
   each(predicate) => this.all(predicate);
-  some(predicate) => this.elements.some(predicate);
+  some(predicate) => this.elements().some(predicate);
 
+  str() => "Set(" + join([x.str() | x in this.elements()], ", ") + ")";
   pp() => {
-    print this.elements().values;
+    print this.str();
   }
 
-  lift(value) => {
-    if (value is Set) return value;
-    return Set(value);
-  }
+  fromSeq(seq: Sequential) => Set(..seq);
 }

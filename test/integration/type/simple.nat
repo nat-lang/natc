@@ -381,6 +381,11 @@ let type = SimpleTypeSystem.type(x => f(x));
 
 assert(type == num -> num);
 
+let g: num -> bool = x => true;
+let type = SimpleTypeSystem.type(x => (g . f)(x));
+
+assert(type == num -> bool);
+
 let f: (num, num) -> num = (x,y) => 1;
 let type = SimpleTypeSystem.type((x,y) => f(x,y));
 
