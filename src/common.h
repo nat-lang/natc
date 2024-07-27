@@ -37,18 +37,28 @@
 #define S_SET "Set"
 #define S_TREE "Tree"
 #define S_ITERATOR "Iterator"
-#define S_AST_NODE "ASTNode"
-#define S_AST_CLOSURE "ASTClosure"
-#define S_AST_SIGNATURE "ASTSignature"
 
+#define S_AST_CLOSURE "ASTClosure"
+#define S_AST_UPVALUE "ASTUpvalue"
+#define S_AST_SIGNATURE "ASTSignature"
+#define S_AST_PARAMETER "ASTParameter"
+#define S_AST_OVERLOAD "ASTOverload"
+#define S_AST_VARIABLE "ASTVariable"
+
+#define S_CTYPE_UNIT "CUnit"
 #define S_CTYPE_BOOL "CBool"
 #define S_CTYPE_NIL "CNil"
 #define S_CTYPE_NUMBER "CNumber"
 #define S_CTYPE_UNDEF "CUndef"
+#define S_OTYPE_VARIABLE "OVariable"
 #define S_OTYPE_CLASS "OClass"
 #define S_OTYPE_INSTANCE "OInstance"
 #define S_OTYPE_STRING "OString"
 #define S_OTYPE_CLOSURE "OClosure"
+#define S_OTYPE_NATIVE "ONative"
+#define S_OTYPE_OVERLOAD "OOverload"
 #define S_OTYPE_SEQUENCE "OSequence"
+
+#define S_UNIFY "unify"
 
 #endif

@@ -11,6 +11,9 @@
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
+#define IS_OVERLOAD(value) isObjType(value, OBJ_OVERLOAD)
+#define IS_VARIABLE(value) isObjType(value, OBJ_VARIABLE)
+#define IS_PATTERN(value) isObjType(value, OBJ_PATTERN)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_MAP(value) isObjType(value, OBJ_MAP)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
@@ -22,6 +25,9 @@
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
+#define AS_OVERLOAD(value) ((ObjOverload *)AS_OBJ(value))
+#define AS_VARIABLE(value) (((ObjVariable *)AS_OBJ(value)))
+#define AS_PATTERN(value) (((ObjPattern *)AS_OBJ(value)))
 #define AS_INSTANCE(value) ((ObjInstance *)AS_OBJ(value))
 #define AS_MAP(value) ((ObjMap *)AS_OBJ(value))
 #define AS_NATIVE(value) (((ObjNative *)AS_OBJ(value)))
@@ -39,6 +45,7 @@ typedef enum {
   OBJ_CLASS,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
+  OBJ_OVERLOAD,
   OBJ_INSTANCE,
   OBJ_MAP,
   OBJ_NATIVE,
@@ -46,6 +53,7 @@ typedef enum {
   OBJ_STRING,
   OBJ_UPVALUE,
   OBJ_SPREAD,
+  OBJ_VARIABLE,
 } ObjType;
 
 struct Obj {
@@ -69,9 +77,18 @@ typedef struct {
 
 typedef struct {
   Obj obj;
+  ObjString *name;
+} ObjVariable;
+
+typedef struct {
+  Obj obj;
   int arity;
-  int upvalueCount;
   bool variadic;
+  bool patterned;
+  int upvalueCount;
+
+  ObjMap fields;
+
   Chunk chunk;
   ObjString *name;
   // cache from values to constant indices
@@ -100,6 +117,9 @@ typedef struct ObjUpvalue {
   Obj obj;
   Value *location;
   Value closed;
+  // the address of the local that's closed over.
+  // we stash this only to reconstruct the ast.
+  uint8_t slot;
   struct ObjUpvalue *next;
 } ObjUpvalue;
 
@@ -109,6 +129,12 @@ typedef struct {
   ObjUpvalue **upvalues;
   int upvalueCount;
 } ObjClosure;
+
+typedef struct {
+  Obj obj;
+  int cases;
+  ObjClosure **closures;
+} ObjOverload;
 
 typedef struct ObjClass {
   Obj obj;
@@ -150,8 +176,9 @@ ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
+ObjOverload *newOverload(int cases);
+ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
-ObjMap *newMap();
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();
@@ -159,8 +186,9 @@ ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
 ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjString *intern(const char *chars);
-ObjUpvalue *newUpvalue(Value *slot);
+ObjUpvalue *newUpvalue(Value *value, uint8_t slot);
 ObjSpread *newSpread(Value value);
+
 void printObject(Value value);
 
 static inline bool isObjType(Value value, ObjType type) {
@@ -182,6 +210,5 @@ ObjString *mapFindString(ObjMap *map, const char *chars, int length,
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
 bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
-uint32_t hashObject(Obj *object);
 bool objectsEqual(Obj *a, Obj *b);
 #endif

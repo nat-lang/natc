@@ -103,9 +103,14 @@ static void blackenObject(Obj* object) {
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
-      for (int i = 0; i < closure->upvalueCount; i++) {
+      for (int i = 0; i < closure->upvalueCount; i++)
         markObject((Obj*)closure->upvalues[i]);
-      }
+      break;
+    }
+    case OBJ_OVERLOAD: {
+      ObjOverload* overload = (ObjOverload*)object;
+      for (int i = 0; i < overload->cases; i++)
+        markObject((Obj*)overload->closures[i]);
       break;
     }
     case OBJ_INSTANCE: {
@@ -120,7 +125,12 @@ static void blackenObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
+      markMap(&function->fields);
       markArray(&function->chunk.constants);
+      break;
+    }
+    case OBJ_VARIABLE: {
+      markObject((Obj*)((ObjVariable*)object)->name);
       break;
     }
     case OBJ_MAP: {
@@ -169,8 +179,19 @@ static void freeObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
+      freeMap(&function->fields);
       freeMap(&function->constants);
       FREE(ObjFunction, object);
+      break;
+    }
+    case OBJ_OVERLOAD: {
+      ObjOverload* overload = (ObjOverload*)object;
+      FREE_ARRAY(ObjOverload*, overload->closures, overload->cases);
+      FREE(ObjOverload, object);
+      break;
+    }
+    case OBJ_VARIABLE: {
+      FREE(ObjVariable, object);
       break;
     }
     case OBJ_INSTANCE: {
@@ -224,7 +245,15 @@ static void markRoots() {
   markMap(&vm.globals);
   markMap(&vm.typeEnv);
   markMap(&vm.infixes);
-  markCompilerRoots();
+
+  markObject((Obj*)vm.core.sName);
+  markObject((Obj*)vm.core.sArity);
+  markObject((Obj*)vm.core.sPatterned);
+  markObject((Obj*)vm.core.sVariadic);
+  markObject((Obj*)vm.core.sValues);
+  markObject((Obj*)vm.core.sSignature);
+
+  markCompilerRoots(vm.compiler);
 }
 
 static void traceReferences() {

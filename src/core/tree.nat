@@ -1,8 +1,12 @@
+let -1 = 1 - 2;
 
 class Tree extends Object {
   init(data, children) => {
     this.data = data;
     this.children = children;
+
+    this.depth = -1;
+    this.breadth = -1;
   }
 
   // Subscript access is to children.
@@ -22,16 +26,33 @@ class Tree extends Object {
     return seq;
   }
 
-  isLeaf() => len(this.children) == 0;
+  leaf() => len(this.children) == 0;
+  unary() => len(this.children) == 1;
+  binary() => len(this.children) == 2;
 
   leaves() => {
-    if (this.isLeaf()) return [this.data];
+    if (this.leaf()) return [this.data];
 
     return [leaf | child in this.children, leaf in child.leaves()];
   }
 
-  map(fn) => {
+  each(fn) => {
+    for (x in this) fn(x);
+  }
+
+  // Map the data.
+  dmap(fn) => {
     let tree = Tree(fn(this.data), []);
+
+    for (child in this.children)
+      tree.children.push(child.dmap(fn));
+
+    return tree;
+  }
+
+  // Map the nodes.
+  map(fn) => {
+    let tree = fn(this);
 
     for (child in this.children)
       tree.children.push(child.map(fn));
@@ -49,22 +70,28 @@ class Tree extends Object {
   visit(fn, acc) => {
     acc = fn(this, acc);
 
-    for (child in this.children)
+    // accumulate vertically, but not horizontally.
+    for (child in this.children) {
       child.visit(fn, acc);
+    }
   }
+
+  find(predicate) => this.depthFirst().find(predicate);
+
+  collect(predicate) => [node | node in this, predicate(node)];
 }
 
 // Functions for building tree literals during compilation.
 
 // Childless tree.
-let LeafNode = (data) => Tree(data, []);
+let LeafNode = data => Tree(data, []);
 
 // Dataless tree.
 let Root = (*children) => Tree(nil, children);
 
 // Convert [data] to a [Tree] if it's not already.
-let Node = (value) => {
-  if (type(value) != Tree)
-    return LeafNode(value);
-  return value;
+let Node = value => {
+  if (value is Tree)
+    return value;
+  return LeafNode(value);
 };

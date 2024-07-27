@@ -1,0 +1,73 @@
+
+// This module bridges the object language and the
+// vm's type system.
+
+class TypeError extends Error {}
+
+class CType extends Base {}
+
+class CUnit extends CType {}
+class CBool extends CType {}
+class CNil extends CType {}
+class CNumber extends CType {}
+class CObject extends CType {}
+class CUndef extends CType {}
+
+class OVariable extends CObject {}
+class OClass extends CObject {}
+class OInstance extends CObject {}
+class OString extends CObject {}
+class OClosure extends CObject {}
+class ONative extends CObject {}
+class OOverload extends CObject {}
+class OSequence extends CObject {}
+
+let isSubclass = (a, b) => {
+  if (vType(a) != OClass or vType(b) != OClass) 
+    return false;
+  
+  let klass = a;
+
+  while (klass != nil) {
+    if (klass == b) return true;
+    klass = klass.__superclass__;
+  }
+
+  return false;
+};
+
+let isVar = x => vType(x) == OVariable;
+let isClass = a => vType(a) == OClass;
+
+// Is [a] an instance of [b]?
+let infix(5) is = (a, b) => {
+  let aType = vType(a);
+  let bType = vType(b);
+
+  if (aType != OInstance or bType != OClass)
+    return false;
+
+  return isSubclass(a.__class__, b);
+};
+
+class PatternElement extends Base {
+  init(value, type) => {
+    this.value = value;
+    this.type = type;
+  }
+}
+
+class Pattern extends Base {
+  init(*elements) => {
+    this.elements = elements;
+  }
+  __get__(idx) => this.elements[idx];
+  __len__() => len(this.elements);
+}
+
+class Signature extends Base {
+  init(domain, range) => {
+    this.domain = domain;
+    this.range = range;
+  }
+}

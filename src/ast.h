@@ -3,6 +3,6 @@
 
 #include "object.h"
 
-bool readAST(ObjClosure* closure);
+bool ast(Value value);
 
 #endif

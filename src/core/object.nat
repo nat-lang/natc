@@ -1,21 +1,23 @@
+
 let private = () => [
   "__class__"
 ];
 
 class Object extends Base {
-  keys() => super.keys().filter((x) => x in private());
+  keys() => super.keys().filter(x => x in private());
   values() => [this[key] | key in this.keys()];
   entries() => [(key, this[key]) | key in this.keys()];
 
   __len__() => len(this.keys());
-  __iter__() => {
-    let entries = this.entries();
-  
-    return Iterator(entries, 0, len(entries));
-  }
+  __iter__() => iter(this.entries());
 
   extend(other: Object) => {
     for (x in other)
       this[x[0]] = x[1];
   }
+
+  substitute(s) => this;
+
+  pp() => { print str(this); }
+  fvs() => [];
 }

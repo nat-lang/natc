@@ -1,0 +1,14 @@
+
+let join = (seq: Sequential, sep: string) => {
+  let i = 0, s = "";
+
+  for (x in seq) {
+    if (i == 0)
+      s = s + x;
+    else
+      s = s + sep + x;
+    i = i + 1;
+  }
+
+  return s;
+};

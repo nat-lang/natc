@@ -1,0 +1,135 @@
+
+// naked literals.
+
+let f = 1 => true | 2 => false;
+
+assert(f(1));
+assert(f(2) == false);
+assert(f(3) == undefined);
+
+let f = nil => true;
+
+assert(f(nil));
+assert(f(2) == undefined);
+
+let f = nil => true | undefined => true | false => false;
+
+assert(f(nil));
+assert(f(undefined));
+assert(f(false) == false);
+
+// parenthesized literals.
+
+let f = (true) => false | (false) => true;
+
+assert(f(true) == false);
+assert(f(false) == true);
+
+// bound cases.
+
+let f = 1 => true | 2 => false | x => x;
+
+assert(f(1));
+assert(f(2) == false);
+assert(f(3) == 3);
+
+let f = x => true | 1 => false;
+assert(f(1) == true);
+
+let f = x => true | y => false;
+assert(f(1) == true);
+
+// multiple arguments.
+
+let f = (0,1) => 2 | (1,0) => 3;
+
+assert(f(0,1) == 2);
+assert(f(1,0) == 3);
+
+let f = (0,1) => 2 | (1,0) => 3 | (x,y) => (x + y) * 2;
+
+assert(f(0,1) == 2);
+assert(f(1,0) == 3);
+assert(f(1,1) == 4);
+
+// blocks.
+
+let f = 1 => { return true; } | 2 => { return false; }; 
+
+assert(f(1) == true);
+assert(f(2) == false);
+assert(f(3) == undefined);
+
+// literals & bound variables.
+
+let f = (2,x) => x | (x,2) => x;
+
+assert(f(2,1) == 1);
+assert(f(2,2) == 2);
+assert(f(2,3) == 3);
+
+assert(f(1,2) == 1);
+assert(f(2,2) == 2);
+assert(f(3,2) == 3);
+
+// type patterns.
+
+let f = (x: num) => true | (x: string) => false | (x: bool) => true;
+
+assert(f(1) == true);
+assert(f("1") == false);
+assert(f(false) == true);
+
+// functional type patterns.
+
+let f = (x: num -> num) => x(1)
+      | (x: string -> string) => x("1")
+      | (x: bool -> bool) => x(true);
+
+assert(f((x: num) => x) == 1);
+assert(f((x: string) => x) == "1");
+assert(f((x: bool) => x) == true);
+
+let g: num -> num = x => x;
+let h: string -> string = x => x;
+let k: bool -> bool = x => x;
+
+assert(f(g) == 1);
+assert(f(h) == "1");
+assert(f(k) == true);
+
+// class type patterns.
+
+class A {}
+class B {}
+
+let f = (x: A) => true | (x: B) => false;
+
+let a = A(), b = B();
+
+assert(f(a) == true);
+assert(f(b) == false);
+
+// matches subtypes.
+
+class C extends B {}
+
+let f = (x: B) => true | (x: C) => false;
+
+let c = C();
+
+assert(f(c) == true);
+
+// literals & type patterns.
+
+let f = (1, x: num) => true | (1, x: string) => false | (2, x: string) => true;
+
+assert(f(1,1) == true);
+assert(f(1,"1") == false);
+assert(f(2,"1") == true);
+
+// type patterns with type variables.
+
+// let f = (a: x -> y, b: x) => a(b) | (a: x, b: x -> y) => b(a);
+
+// let f: (x,y) => ((x -> y, x) -> y) & ((x, x -> y) -> y) = (a, b) => a(b) | (a, b) => b(a);

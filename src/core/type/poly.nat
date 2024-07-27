@@ -1,0 +1,62 @@
+class TAbstract extends Type {
+  init(fn, arity) => {
+    this.fn = fn;
+    this.arity = arity;
+  }
+
+  instantiate(nameSupply) => {
+    let tVars = [];
+    for (let i = 0; i < this.arity; i = i + 1)
+      tVars.push(nameSupply());
+    return this.fn(..tVars);
+  }
+
+  generalize(type: TFunction) => {
+    let fvs = type.fvs();
+
+    return TAbstract((*args) => {
+      let s = Solution(..zip(fvs, args));
+      type.apply(s);
+      return type;
+    }, len(fvs));
+  }
+
+  fromClosure(closure: OClosure) => TAbstract(closure, closure.arity);
+}
+
+class PolyTypeState extends SimpleTypeState {
+  constrain(node: ASTNode) => {
+    let type = super.constrain(node);
+
+    if (node is ASTClosure and type.hasFvs()) {
+      return TAbstract.generalize(type);
+    }
+
+    return type;
+  }
+
+  unify(constraint: Constraint) => {
+    let left = constraint.left,
+        right = constraint.right;
+
+    if (left is TAbstract and !(right is TVar))
+      left = left.instantiate(typeVar);
+    
+    if (right is TAbstract and !(left is TVar))
+      right = right.instantiate(typeVar);
+    
+    return super.unify(Constraint(left, right));
+  }
+}
+
+class PolyTypeSystem extends SimpleTypeSystem {
+  typify(value) => {
+    if (vType(value) == OClosure)
+      return TAbstract.fromClosure(value);
+
+    return super.typify(value);
+  }
+}
+
+PolyTypeSystem.TypeStateClass = PolyTypeState;
+

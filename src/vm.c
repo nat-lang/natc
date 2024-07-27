@@ -44,24 +44,45 @@ void vmRuntimeError(const char* format, ...) {
   resetStack();
 }
 
-void initClasses(Classes* classes) {
-  classes->base = NULL;
-  classes->object = NULL;
-  classes->tuple = NULL;
-  classes->sequence = NULL;
-  classes->map = NULL;
-  classes->set = NULL;
-  classes->iterator = NULL;
-  classes->astClosure = NULL;
-  classes->vTypeBool = NULL;
-  classes->vTypeNil = NULL;
-  classes->vTypeNumber = NULL;
-  classes->vTypeUndef = NULL;
-  classes->oTypeClass = NULL;
-  classes->oTypeInstance = NULL;
-  classes->oTypeString = NULL;
-  classes->oTypeClosure = NULL;
-  classes->oTypeSequence = NULL;
+void initCore(Core* core) {
+  core->sName = NULL;
+  core->sArity = NULL;
+  core->sPatterned = NULL;
+  core->sVariadic = NULL;
+  core->sValues = NULL;
+  core->sSignature = NULL;
+
+  core->sName = intern("name");
+  core->sArity = intern("arity");
+  core->sPatterned = intern("patterned");
+  core->sVariadic = intern("variadic");
+  core->sValues = intern("values");
+  core->sSignature = intern("signature");
+
+  core->base = NULL;
+  core->object = NULL;
+  core->tuple = NULL;
+  core->sequence = NULL;
+  core->map = NULL;
+  core->set = NULL;
+  core->iterator = NULL;
+
+  core->astClosure = NULL;
+  core->astUpvalue = NULL;
+  core->astOverload = NULL;
+
+  core->vTypeBool = NULL;
+  core->vTypeNil = NULL;
+  core->vTypeNumber = NULL;
+  core->vTypeUndef = NULL;
+  core->oTypeClass = NULL;
+  core->oTypeInstance = NULL;
+  core->oTypeString = NULL;
+  core->oTypeClosure = NULL;
+  core->oTypeNative = NULL;
+  core->oTypeOverload = NULL;
+  core->oTypeSequence = NULL;
+  core->unify = NULL;
 }
 
 bool initVM() {
@@ -75,12 +96,14 @@ bool initVM() {
   vm.grayCapacity = 0;
   vm.grayStack = NULL;
 
+  vm.compiler = NULL;
+
   initMap(&vm.globals);
   initMap(&vm.typeEnv);
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   return initializeCore() == INTERPRET_OK;
 }
@@ -88,9 +111,8 @@ bool initVM() {
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
-  freeMap(&vm.infixes);
 
-  initClasses(&vm.classes);
+  initCore(&vm.core);
 
   freeObjects();
 }
@@ -121,20 +143,41 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
 bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
 
-  if (!IS_INSTANCE(receiver)) {
-    vmRuntimeError("Only instances have methods.");
+  if (IS_INSTANCE(receiver)) {
+    ObjInstance* instance = AS_INSTANCE(receiver);
+    Value field;
+    if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
+      vm.stackTop[-argCount - 1] = receiver;
+      return vmCallValue(field, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+  }
+
+  char* error = "Only instances and classes have methods.";
+
+  if (!IS_OBJ(receiver)) {
+    vmRuntimeError(error);
     return false;
   }
 
-  ObjInstance* instance = AS_INSTANCE(receiver);
-
-  Value field;
-  if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
-    vm.stackTop[-argCount - 1] = field;
-    return vmCallValue(field, argCount);
+  ObjMap* fields;
+  switch (OBJ_TYPE(receiver)) {
+    case OBJ_CLASS:
+      fields = &AS_CLASS(receiver)->fields;
+      break;
+    case OBJ_CLOSURE:
+      fields = &AS_CLOSURE(receiver)->function->fields;
+      break;
+    default:
+      vmRuntimeError(error);
+      return false;
   }
 
-  return invokeFromClass(instance->klass, name, argCount);
+  Value field = NIL_VAL;
+  mapGet(fields, OBJ_VAL(name), &field);
+  vm.stackTop[-argCount - 1] = receiver;
+  return vmCallValue(field, argCount);
 }
 
 bool vmExecuteMethod(char* method, int argCount, int frames) {
@@ -161,8 +204,8 @@ bool vmHashValue(Value value, uint32_t* hash) {
   vmPush(value);
   if (!vmExecuteMethod(S_HASH, 0, 1)) return false;
 
-  if (!IS_NUMBER(vmPeek(0))) {
-    vmRuntimeError("'%s' function must return a number.", S_HASH);
+  if (!IS_NUMBER(vmPeek(0)) || AS_NUMBER(vmPeek(0)) < 0) {
+    vmRuntimeError("'%s' function must return a natural number.", S_HASH);
     return false;
   }
 
@@ -246,8 +289,8 @@ static bool spread(int* argCount) {
 // [Sequence] argument.
 static bool variadify(ObjClosure* closure, int* argCount) {
   // put a sequence on the stack.
-  vmPush(OBJ_VAL(newInstance(vm.classes.sequence)));
-  vmInstantiateClass(vm.classes.sequence, 0);
+  vmPush(OBJ_VAL(newInstance(vm.core.sequence)));
+  vmInstantiateClass(vm.core.sequence, 0);
 
   // either the function was called (a) with arity - 1 arguments
   // or (b) with arity - n arguments for n > 1. (a) is valid;
@@ -288,6 +331,14 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   return true;
 }
 
+CallFrame* vmInitFrame(ObjClosure* closure, int offset) {
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->closure = closure;
+  frame->ip = closure->function->chunk.code;
+  frame->slots = vm.stackTop - offset;
+  return frame;
+}
+
 static bool call(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
@@ -301,10 +352,7 @@ static bool call(ObjClosure* closure, int argCount) {
     return false;
   }
 
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->closure = closure;
-  frame->ip = closure->function->chunk.code;
-  frame->slots = vm.stackTop - argCount - 1;
+  vmInitFrame(closure, argCount + 1);
 
   return true;
 }
@@ -315,6 +363,60 @@ static bool callNative(ObjNative* native, int argCount) {
   if (!native->variadic && !checkArity(native->arity, argCount)) return false;
 
   return (native->function)(argCount, vm.stackTop - argCount);
+}
+
+// Wrap the top [count] values in a tuple and put it
+// on the stack, optionally leaving the values below it.
+bool vmTuplify(int count, bool replace) {
+  int i = count;
+  Value args[count];
+
+  if (replace)
+    while (i--) args[i] = vmPop();
+  else
+    while (i--) args[count - i - 1] = vmPeek(i);
+
+  vmPush(OBJ_VAL(vm.core.tuple));
+  while (++i < count) vmPush(args[i]);
+
+  return vmCallValue(OBJ_VAL(vm.core.tuple), count);
+}
+
+bool unify(ObjClosure* closure, Value value) {
+  Value unifyFn = OBJ_VAL(vm.core.unify);
+
+  vmPush(unifyFn);
+  vmPush(OBJ_VAL(closure));
+  vmPush(value);
+
+  return vmCallValue(unifyFn, 2) &&
+         vmExecute(vm.frameCount - 1) == INTERPRET_OK;
+}
+
+static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
+  if (!vmTuplify(argCount, false)) return false;
+
+  Value scrutinee = vmPeek(0);
+
+  for (int i = 0; i < caseCount; i++) {
+    if (!unify(cases[i], scrutinee)) return false;
+
+    if (AS_BOOL(vmPop())) {
+      vmPop();  // the tuplified scrutinee.
+
+      vm.stackTop[-1 - argCount] = OBJ_VAL(cases[i]);
+
+      return call(cases[i], argCount);
+    }
+  }
+
+  // no match: replace the arguments and the case object with undef.
+  vmPop();                     // tuplified scrutinee.
+  while (argCount--) vmPop();  // args.
+  vmPop();                     // case.
+  vmPush(UNDEF_VAL);
+
+  return true;
 }
 
 bool vmCallValue(Value callee, int argCount) {
@@ -338,8 +440,17 @@ bool vmCallValue(Value callee, int argCount) {
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
         return vmInstantiateClass(klass, argCount);
       }
-      case OBJ_CLOSURE:
+      case OBJ_CLOSURE: {
+        ObjClosure* closure = AS_CLOSURE(callee);
+
+        if (closure->function->patterned)
+          return callCases(&closure, 1, argCount);
         return call(AS_CLOSURE(callee), argCount);
+      }
+      case OBJ_OVERLOAD: {
+        ObjOverload* overload = AS_OVERLOAD(callee);
+        return callCases(overload->closures, overload->cases, argCount);
+      }
       case OBJ_NATIVE:
         return callNative(AS_NATIVE(callee), argCount);
       case OBJ_INSTANCE: {
@@ -373,7 +484,7 @@ static void bindClosure(Value receiver, Value* value) {
   }
 }
 
-static ObjUpvalue* captureUpvalue(Value* local) {
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot) {
   ObjUpvalue* prevUpvalue = NULL;
   ObjUpvalue* upvalue = vm.openUpvalues;
   while (upvalue != NULL && upvalue->location > local) {
@@ -385,7 +496,7 @@ static ObjUpvalue* captureUpvalue(Value* local) {
     return upvalue;
   }
 
-  ObjUpvalue* createdUpvalue = newUpvalue(local);
+  ObjUpvalue* createdUpvalue = newUpvalue(local, slot);
   createdUpvalue->next = upvalue;
 
   if (prevUpvalue == NULL) {
@@ -402,14 +513,14 @@ void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame) {
     uint8_t isLocal = READ_BYTE();
     uint8_t index = READ_BYTE();
     if (isLocal) {
-      closure->upvalues[i] = captureUpvalue(frame->slots + index);
+      closure->upvalues[i] = vmCaptureUpvalue(frame->slots + index, index);
     } else {
       closure->upvalues[i] = frame->closure->upvalues[index];
     }
   }
 }
 
-static void closeUpvalues(Value* last) {
+void vmCloseUpvalues(Value* last) {
   while (vm.openUpvalues != NULL && vm.openUpvalues->location >= last) {
     ObjUpvalue* upvalue = vm.openUpvalues;
     upvalue->closed = *upvalue->location;
@@ -418,8 +529,58 @@ static void closeUpvalues(Value* last) {
   }
 }
 
+void vmVariable(CallFrame* frame) {
+  ObjString* name = READ_STRING();
+  ObjVariable* var = newVariable(name);
+  vmPush(OBJ_VAL(var));
+}
+
+void vmClosure(CallFrame* frame) {
+  ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+  ObjClosure* closure = newClosure(function);
+
+  vmPush(OBJ_VAL(closure));
+  vmCaptureUpvalues(closure, frame);
+
+  mapSet(&function->fields, OBJ_VAL(vm.core.sName), OBJ_VAL(function->name));
+  mapSet(&function->fields, OBJ_VAL(vm.core.sArity),
+         NUMBER_VAL(function->arity));
+  mapSet(&function->fields, OBJ_VAL(vm.core.sPatterned),
+         BOOL_VAL(function->patterned));
+  mapSet(&function->fields, OBJ_VAL(vm.core.sVariadic),
+         BOOL_VAL(function->variadic));
+}
+
+void vmSign(CallFrame* frame) {
+  ObjClosure* closure = AS_CLOSURE(vmPeek(0));
+
+  mapSet(&closure->function->fields, OBJ_VAL(vm.core.sSignature), vmPeek(1));
+  vmPop();
+  vmPop();
+  vmPush(OBJ_VAL(closure));
+}
+
+bool vmOverload(CallFrame* frame) {
+  int cases = READ_BYTE();
+  ObjOverload* overload = newOverload(cases);
+
+  for (int i = cases; i > 0; i--) {
+    if (!IS_CLOSURE(vmPeek(i - 1))) {
+      vmRuntimeError("Overload operand must be a function.");
+      return false;
+    }
+
+    overload->closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+  }
+
+  while (cases--) vmPop();
+  vmPush(OBJ_VAL(overload));
+  return true;
+}
+
 static bool isFalsey(Value value) {
-  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+  return IS_NIL(value) || IS_UNDEF(value) ||
+         (IS_BOOL(value) && !AS_BOOL(value));
 }
 
 static bool validateSeqIdx(ObjSequence* seq, Value idx) {
@@ -440,7 +601,7 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
 }
 
 bool vmSequenceValueField(ObjInstance* obj, Value* seq) {
-  if (!mapGet(&obj->fields, INTERN("values"), seq)) {
+  if (!mapGet(&obj->fields, OBJ_VAL(vm.core.sValues), seq)) {
     vmRuntimeError("Sequence instance missing its values!");
     return false;
   }
@@ -545,49 +706,90 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-        if (IS_INSTANCE(vmPeek(0))) {
-          ObjInstance* instance = AS_INSTANCE(vmPeek(0));
+#define ERROR "Can only get property of object, class, or function."
 
-          if (!mapGet(&instance->fields, name, &value)) {
-            // class prop. must be a method.
-            if (mapGet(&instance->klass->fields, name, &value))
-              bindClosure(vmPeek(0), &value);
+        if (!IS_OBJ(vmPeek(0))) {
+          vmRuntimeError(ERROR);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        switch (OBJ_TYPE(vmPeek(0))) {
+          case OBJ_INSTANCE: {
+            ObjInstance* instance = AS_INSTANCE(vmPeek(0));
+
+            if (!mapGet(&instance->fields, name, &value)) {
+              // class prop. must be a method.
+              if (mapGet(&instance->klass->fields, name, &value))
+                bindClosure(vmPeek(0), &value);
+            }
+
+            vmPop();  // instance.
+            vmPush(value);
+            break;
+          }
+          case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(vmPeek(0));
+
+            mapGet(&klass->fields, name, &value);
+            bindClosure(vmPeek(0), &value);
+            vmPop();  // class.
+            vmPush(value);
+            break;
+          }
+          case OBJ_VARIABLE: {
+            if (strcmp(AS_STRING(name)->chars, "name") == 0) {
+              value = OBJ_VAL(AS_VARIABLE(vmPeek(0))->name);
+              vmPop();
+            }
+
+            vmPush(value);
+            break;
           }
 
-          vmPop();  // instance.
-          vmPush(value);
-          break;
+          case OBJ_CLOSURE: {
+            ObjClosure* closure = AS_CLOSURE(vmPeek(0));
+
+            mapGet(&closure->function->fields, name, &value);
+
+            vmPop();  // closure.
+            vmPush(value);
+            break;
+          }
+          default:
+            vmRuntimeError(ERROR);
+            return INTERPRET_RUNTIME_ERROR;
         }
-
-        if (IS_CLASS(vmPeek(0))) {
-          ObjClass* klass = AS_CLASS(vmPeek(0));
-
-          mapGet(&klass->fields, name, &value);
-          bindClosure(vmPeek(0), &value);
-          vmPop();  // class.
-          vmPush(value);
-          break;
-        }
-
-        vmRuntimeError("Only objects and classes have properties (get).");
-        return INTERPRET_RUNTIME_ERROR;
 
         break;
       }
       case OP_SET_PROPERTY: {
-        if (!IS_INSTANCE(vmPeek(1)) && !IS_CLASS(vmPeek(1))) {
-          vmRuntimeError("Only objects and classes have properties (set).");
+        Value name = READ_CONSTANT();
+        ObjMap* fields;
+
+        char* error = "Can only set property of object, class, or function.";
+
+        if (!IS_OBJ(vmPeek(1))) {
+          vmRuntimeError(error);
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        if (IS_INSTANCE(vmPeek(1)))
-          mapSet(&AS_INSTANCE(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
-        if (IS_CLASS(vmPeek(1)))
-          mapSet(&AS_CLASS(vmPeek(1))->fields, READ_CONSTANT(), vmPeek(0));
+        switch (OBJ_TYPE(vmPeek(1))) {
+          case OBJ_INSTANCE:
+            fields = &AS_INSTANCE(vmPeek(1))->fields;
+            break;
+          case OBJ_CLASS:
+            fields = &AS_CLASS(vmPeek(1))->fields;
+            break;
+          case OBJ_CLOSURE:
+            fields = &AS_CLOSURE(vmPeek(1))->function->fields;
+            break;
+          default:
+            vmRuntimeError(error);
+            return INTERPRET_RUNTIME_ERROR;
+        }
 
-        Value value = vmPop();
+        mapSet(fields, name, vmPeek(0));
         vmPop();
-        vmPush(value);
         break;
       }
       case OP_EQUAL: {
@@ -717,21 +919,31 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_CLOSURE: {
-        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = newClosure(function);
-        vmPush(OBJ_VAL(closure));
-        vmCaptureUpvalues(closure, frame);
+        vmClosure(frame);
+        break;
+      }
+      case OP_OVERLOAD: {
+        if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
+        break;
+      }
+      case OP_VARIABLE: {
+        vmVariable(frame);
+        break;
+      }
+      case OP_SIGN: {
+        vmClosure(frame);
+        vmSign(frame);
         break;
       }
       case OP_CLOSE_UPVALUE: {
-        closeUpvalues(vm.stackTop - 1);
+        vmCloseUpvalues(vm.stackTop - 1);
         vmPop();
         break;
       }
       case OP_IMPLICIT_RETURN:
       case OP_RETURN: {
         Value value = vmPop();
-        closeUpvalues(frame->slots);
+        vmCloseUpvalues(frame->slots);
         vm.frameCount--;
 
         if (vm.frameCount == 0) {
@@ -815,6 +1027,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPop();
 
         InterpretResult result = interpretFile(importLoc->chars);
+
         if (result != INTERPRET_OK) return result;
         // pop the return value of the module's function.
         // if/when import statements become selective, this'll
@@ -938,26 +1151,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DESTRUCTURE: {
         Value value = vmPeek(0);
-
-        switch (value.vType) {
-          case VAL_OBJ: {
-            switch (OBJ_TYPE(value)) {
-              case OBJ_CLOSURE: {
-                ObjClosure* closure = AS_CLOSURE(value);
-
-                if (!readAST(closure)) return INTERPRET_RUNTIME_ERROR;
-                break;
-              }
-              default:
-                vmRuntimeError("Undestructurable object.");
-                return INTERPRET_RUNTIME_ERROR;
-            }
-            break;
-          }
-          default:
-            vmRuntimeError("Undestructurable value.");
-            return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!ast(value)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_SET_TYPE_LOCAL: {
@@ -977,10 +1171,10 @@ InterpretResult vmExecute(int baseFrame) {
         Value value = vmPeek(0);
 
         ObjClass lca;
-        if (!IS_INSTANCE(value) &&
-            leastCommonAncestor(AS_INSTANCE(value)->klass, vm.classes.sequence,
-                                &lca) &&
-            &lca == vm.classes.sequence) {
+        if (!IS_INSTANCE(value) ||
+            (leastCommonAncestor(AS_INSTANCE(value)->klass, vm.core.sequence,
+                                 &lca) &&
+             &lca == vm.core.sequence)) {
           vmRuntimeError("Only sequential values can spread.");
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -1002,7 +1196,8 @@ InterpretResult vmExecute(int baseFrame) {
 }
 
 InterpretResult vmInterpret(char* path, const char* source) {
-  ObjFunction* function = compile(source, path);
+  ObjFunction* function = compile(vm.compiler, source, path);
+
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(function));

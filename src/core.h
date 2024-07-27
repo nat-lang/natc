@@ -1,9 +1,6 @@
 #ifndef core_h
 #define core_h
 
-#include "compiler.h"
-#include "debug.h"
-#include "io.h"
 #include "object.h"
 #include "value.h"
 #include "vm.h"

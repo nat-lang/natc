@@ -5,6 +5,9 @@
 #include <string.h>
 #include <time.h>
 
+#include "compiler.h"
+#include "io.h"
+
 static void defineNativeFn(char* name, int arity, bool variadic,
                            NativeFn function, ObjMap* dest) {
   // keep the values on the stack so they're
@@ -17,6 +20,16 @@ static void defineNativeFn(char* name, int arity, bool variadic,
   mapSet(dest, vmPeek(1), vmPeek(0));
   vmPop();
   vmPop();
+}
+
+static void defineNativeInfixGlobal(char* name, int arity, NativeFn function,
+                                    Precedence prec) {
+  defineNativeFn(name, arity, false, function, &vm.globals);
+
+  Value fn;
+  Value fnName = INTERN(name);
+  mapGet(&vm.globals, fnName, &fn);
+  mapSet(&vm.infixes, fnName, NUMBER_VAL(prec));
 }
 
 static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
@@ -39,14 +52,44 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
+ObjClosure* getGlobalClosure(char* name) {
+  Value obj;
+
+  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
+    vmRuntimeError("Couldn't find function '%s'.", name);
+    return NULL;
+  }
+
+  if (!IS_CLOSURE(obj)) {
+    vmRuntimeError("Not a closure: '%s'.", name);
+    return NULL;
+  }
+
+  return AS_CLOSURE(obj);
+}
+
+ObjClass* getGlobalClass(char* name) {
+  Value obj;
+
+  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
+    vmRuntimeError("Couldn't find class '%s'.", name);
+    return NULL;
+  }
+
+  if (!IS_CLASS(obj)) {
+    vmRuntimeError("Not a class: '%s'.", name);
+    return NULL;
+  }
+
+  return AS_CLASS(obj);
+}
+
 ObjSequence* __sequentialInit__(int argCount) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(argCount));
 
-  vmPush(INTERN("values"));
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
-  mapSet(&obj->fields, vmPeek(1), vmPeek(0));
-  vmPop();
+  mapSet(&obj->fields, OBJ_VAL(vm.core.sValues), vmPeek(0));
   vmPop();
 
   int i = argCount;
@@ -90,27 +133,11 @@ bool __tupleInit__(int argCount, Value* args) {
   return true;
 }
 
-ObjClass* getClass(char* name) {
-  Value obj;
-
-  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
-    vmRuntimeError("Couldn't find class %s", name);
-    return NULL;
-  }
-
-  if (!IS_CLASS(obj)) {
-    vmRuntimeError("Not a class: %s", name);
-    return NULL;
-  }
-
-  return AS_CLASS(obj);
-}
-
 bool __objKeys__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
 
   // the key sequence.
-  vmPush(OBJ_VAL(vm.classes.sequence));
+  vmPush(OBJ_VAL(vm.core.sequence));
   if (!vmCallValue(vmPeek(0), 0)) return false;
 
   for (int i = 0; i < obj->fields.capacity; i++) {
@@ -202,6 +229,13 @@ bool __hash__(int argCount, Value* args) {
   return true;
 }
 
+bool __hashable__(int argCount, Value* args) {
+  Value value = vmPop();
+  vmPop();  // native fn.
+  vmPush(BOOL_VAL(isHashable(value)));
+  return true;
+}
+
 bool __vType__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
@@ -211,37 +245,49 @@ bool __vType__(int argCount, Value* args) {
       vmPush(value);
       break;
     case VAL_BOOL:
-      vmPush(OBJ_VAL(vm.classes.vTypeBool));
+      vmPush(OBJ_VAL(vm.core.vTypeBool));
       break;
     case VAL_NUMBER:
-      vmPush(OBJ_VAL(vm.classes.vTypeNumber));
+      vmPush(OBJ_VAL(vm.core.vTypeNumber));
       break;
     case VAL_NIL:
-      vmPush(OBJ_VAL(vm.classes.vTypeNil));
+      vmPush(OBJ_VAL(vm.core.vTypeNil));
       break;
     case VAL_OBJ:
       switch (AS_OBJ(value)->oType) {
+        case OBJ_VARIABLE:
+          vmPush(OBJ_VAL(vm.core.oTypeVariable));
+          break;
         case OBJ_CLASS:
-          vmPush(OBJ_VAL(vm.classes.oTypeClass));
+          vmPush(OBJ_VAL(vm.core.oTypeClass));
           break;
         case OBJ_INSTANCE:
-          vmPush(OBJ_VAL(vm.classes.oTypeInstance));
+          vmPush(OBJ_VAL(vm.core.oTypeInstance));
           break;
         case OBJ_STRING:
-          vmPush(OBJ_VAL(vm.classes.oTypeString));
+          vmPush(OBJ_VAL(vm.core.oTypeString));
           break;
+        case OBJ_BOUND_FUNCTION:
         case OBJ_CLOSURE:
-          vmPush(OBJ_VAL(vm.classes.oTypeClosure));
+          vmPush(OBJ_VAL(vm.core.oTypeClosure));
+          break;
+        case OBJ_NATIVE:
+          vmPush(OBJ_VAL(vm.core.oTypeNative));
+          break;
+        case OBJ_OVERLOAD:
+          vmPush(OBJ_VAL(vm.core.oTypeOverload));
+          break;
+        case OBJ_SEQUENCE:
+          vmPush(OBJ_VAL(vm.core.oTypeSequence));
           break;
         default: {
-          printValue(value);
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
           return false;
         }
       }
       break;
     case VAL_UNDEF:
-      vmPush(OBJ_VAL(vm.classes.vTypeUndef));
+      vmPush(OBJ_VAL(vm.core.vTypeUndef));
       break;
     default:
       vmRuntimeError("Unexpected value.");
@@ -253,8 +299,8 @@ bool __vType__(int argCount, Value* args) {
 bool __globals__(int argCount, Value* args) {
   vmPop();  // native fn.
 
-  vmPush(OBJ_VAL(vm.classes.map));
-  vmInitInstance(vm.classes.map, 0, 1);
+  vmPush(OBJ_VAL(vm.core.map));
+  vmInitInstance(vm.core.map, 0, 1);
   mapAddAll(&vm.globals, &AS_INSTANCE(vmPeek(0))->fields);
 
   return true;
@@ -262,8 +308,8 @@ bool __globals__(int argCount, Value* args) {
 
 bool __globalTypeEnv__(int argCount, Value* args) {
   vmPop();  // native fn.
-  vmPush(OBJ_VAL(newInstance(vm.classes.map)));
-  vmInitInstance(vm.classes.map, 0, 1);
+  vmPush(OBJ_VAL(newInstance(vm.core.map)));
+  vmInitInstance(vm.core.map, 0, 1);
   mapAddAll(&vm.typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
   return true;
 }
@@ -301,6 +347,19 @@ bool __str__(int argCount, Value* args) {
       switch (OBJ_TYPE(value)) {
         case OBJ_CLASS: {
           string = AS_CLASS(value)->name;
+          break;
+        }
+        case OBJ_INSTANCE: {
+          ObjInstance* instance = AS_INSTANCE(value);
+          char buffer[instance->klass->name->length + 9];
+          int length =
+              sprintf(buffer, "<%s object>", instance->klass->name->chars);
+
+          string = copyString(buffer, length);
+          break;
+        }
+        case OBJ_STRING: {
+          string = AS_STRING(value);
           break;
         }
         default: {
@@ -362,26 +421,27 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);
+  defineNativeFnGlobal("hashable", 1, __hashable__);
   defineNativeFnGlobal("vType", 1, __vType__);
   defineNativeFnGlobal("globals", 0, __globals__);
   defineNativeFnGlobal("globalTypeEnv", 0, __globalTypeEnv__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
 
-  defineNativeFnGlobal("__gt__", 2, __gt__);
-  defineNativeFnGlobal("__lt__", 2, __lt__);
-  defineNativeFnGlobal("__gte__", 2, __gte__);
-  defineNativeFnGlobal("__lte__", 2, __lte__);
-  defineNativeFnGlobal("__add__", 2, __add__);
-  defineNativeFnGlobal("__sub__", 2, __sub__);
-  defineNativeFnGlobal("__div__", 2, __div__);
-  defineNativeFnGlobal("__mul__", 2, __mul__);
+  defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
+  defineNativeInfixGlobal(">=", 2, __gte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<=", 2, __lte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("+", 2, __add__, PREC_TERM);
+  defineNativeInfixGlobal("-", 2, __sub__, PREC_TERM);
+  defineNativeInfixGlobal("/", 2, __div__, PREC_FACTOR);
+  defineNativeInfixGlobal("*", 2, __mul__, PREC_FACTOR);
 
   // native classes.
 
-  vm.classes.base = defineNativeClass(S_BASE);
-  defineNativeFnMethod("has", 1, false, __objHas__, vm.classes.base);
-  defineNativeFnMethod("keys", 0, false, __objKeys__, vm.classes.base);
+  vm.core.base = defineNativeClass(S_BASE);
+  defineNativeFnMethod("has", 1, false, __objHas__, vm.core.base);
+  defineNativeFnMethod("keys", 0, false, __objKeys__, vm.core.base);
 
   // core classes.
 
@@ -389,29 +449,38 @@ InterpretResult initializeCore() {
 
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
-  vm.classes.object = getClass(S_OBJECT);
+  if ((vm.core.object = getGlobalClass(S_OBJECT)) == NULL) return false;
 
-  vm.classes.tuple = getClass(S_TUPLE);
-  defineNativeFnMethod(S_INIT, 0, true, __tupleInit__, vm.classes.tuple);
+  if ((vm.core.tuple = getGlobalClass(S_TUPLE)) == NULL) return false;
+  defineNativeFnMethod(S_INIT, 0, true, __tupleInit__, vm.core.tuple);
 
-  vm.classes.sequence = getClass(S_SEQUENCE);
-  defineNativeFnMethod(S_INIT, 0, true, __sequenceInit__, vm.classes.sequence);
-  defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.classes.sequence);
-  defineNativeFnMethod(S_ADD, 1, false, __sequencePush__, vm.classes.sequence);
-  defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.classes.sequence);
+  if ((vm.core.sequence = getGlobalClass(S_SEQUENCE)) == NULL) return false;
+  defineNativeFnMethod(S_INIT, 0, true, __sequenceInit__, vm.core.sequence);
+  defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.core.sequence);
+  defineNativeFnMethod(S_ADD, 1, false, __sequencePush__, vm.core.sequence);
+  defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.core.sequence);
 
-  vm.classes.map = getClass(S_MAP);
-  vm.classes.set = getClass(S_SET);
-  vm.classes.astClosure = getClass(S_AST_CLOSURE);
+  if ((vm.core.map = getGlobalClass(S_MAP)) == NULL ||
+      (vm.core.set = getGlobalClass(S_SET)) == NULL ||
+      (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
+      (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
+      (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
+      (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
+      (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
+      (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
+      (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
+      (vm.core.vTypeUndef = getGlobalClass(S_CTYPE_UNDEF)) == NULL ||
+      (vm.core.oTypeVariable = getGlobalClass(S_OTYPE_VARIABLE)) == NULL ||
+      (vm.core.oTypeClass = getGlobalClass(S_OTYPE_CLASS)) == NULL ||
+      (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
+      (vm.core.oTypeString = getGlobalClass(S_OTYPE_STRING)) == NULL ||
+      (vm.core.oTypeClosure = getGlobalClass(S_OTYPE_CLOSURE)) == NULL ||
+      (vm.core.oTypeNative = getGlobalClass(S_OTYPE_NATIVE)) == NULL ||
+      (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
+      (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 
-  vm.classes.vTypeBool = getClass(S_CTYPE_BOOL);
-  vm.classes.vTypeNil = getClass(S_CTYPE_NIL);
-  vm.classes.vTypeNumber = getClass(S_CTYPE_NUMBER);
-  vm.classes.vTypeUndef = getClass(S_CTYPE_UNDEF);
-  vm.classes.oTypeClass = getClass(S_OTYPE_CLASS);
-  vm.classes.oTypeInstance = getClass(S_OTYPE_INSTANCE);
-  vm.classes.oTypeString = getClass(S_OTYPE_STRING);
-  vm.classes.oTypeClosure = getClass(S_OTYPE_CLOSURE);
-  vm.classes.oTypeSequence = getClass(S_OTYPE_SEQUENCE);
+      (vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL)
+    return INTERPRET_RUNTIME_ERROR;
+
   return INTERPRET_OK;
 }

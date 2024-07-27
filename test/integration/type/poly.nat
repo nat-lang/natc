@@ -1,0 +1,139 @@
+import src/core/type/poly
+
+let check;
+
+// the simple type system fails here.
+
+check = SimpleTypeSystem.typecheck(() => {
+  let id = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.failure());
+
+// but the polymorphic type system succeeds.
+
+// explicit abstraction.
+
+check = PolyTypeSystem.typecheck(() => {
+  let id: (a => a -> a) = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+let id: (a => a -> a) = x => x;
+
+check = PolyTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// implicit abstraction in let annotation.
+
+// one parameter.
+
+let f: w -> w = x => x;
+let t = globalTypeEnv()["f"];
+
+assert(vType(t) == OClosure);
+
+assert(t(num) is TFunction);
+assert(t(num).domain == num);
+assert(t(num).range == num);
+
+check = PolyTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => {
+  let id: w -> w = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// two parameters.
+
+let f: x -> y = x => x;
+let t = globalTypeEnv()["f"];
+
+assert(vType(t) == OClosure);
+
+assert(t(num, string) is TFunction);
+assert(t(num, string).domain == num);
+assert(t(num, string).range == string);
+
+// implicit abstraction in parameter annotation.
+
+let id = (x: w) => x;
+
+check = PolyTypeSystem.typecheck(() => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+check.ppConstraints();
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => {
+  let id = (x: w) => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// identity between type variables is preserved.
+
+check = PolyTypeSystem.typecheck((x: w -> z, y: u) => y(x));
+assert(check.success());
+
+check = PolyTypeSystem.typecheck((x: w -> z, y: w) => y(x));
+assert(check.failure());
+
+check = PolyTypeSystem.typecheck((x: w -> z, y: w) => x(y));
+assert(check.success());
+
+// reconstruction.
+
+// first order succeeds:
+
+check = PolyTypeSystem.typecheck(() => {
+  let id = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.success());
+
+// second order fails:
+
+check = PolyTypeSystem.typecheck((id) => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+assert(check.failure());

@@ -55,9 +55,7 @@ ObjClass* newClass(ObjString* name) {
 
 ObjClosure* newClosure(ObjFunction* function) {
   ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
-  for (int i = 0; i < function->upvalueCount; i++) {
-    upvalues[i] = NULL;
-  }
+  for (int i = 0; i < function->upvalueCount; i++) upvalues[i] = NULL;
 
   ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
   closure->function = function;
@@ -66,12 +64,33 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
+ObjOverload* newOverload(int cases) {
+  ObjClosure** closures = ALLOCATE(ObjClosure*, cases);
+  for (int i = 0; i < cases; i++) closures[i] = NULL;
+
+  ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
+  overload->closures = closures;
+  overload->cases = cases;
+
+  return overload;
+}
+
+ObjVariable* newVariable(ObjString* name) {
+  ObjVariable* variable = ALLOCATE_OBJ(ObjVariable, OBJ_VARIABLE);
+  variable->name = name;
+  return variable;
+}
+
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+
   function->arity = 0;
+  function->variadic = false;
+  function->patterned = false;
   function->upvalueCount = 0;
   function->name = NULL;
-  function->variadic = false;
+
+  initMap(&function->fields);
   initChunk(&function->chunk);
   initMap(&function->constants);
   return function;
@@ -122,16 +141,6 @@ static uint32_t hashString(const char* key, int length) {
   return hash;
 }
 
-// Generate a hash code for [object].
-uint32_t hashObject(Obj* object) {
-  switch (object->oType) {
-    case OBJ_STRING:
-      return ((ObjString*)object)->hash;
-    default:
-      return object->hash;
-  }
-}
-
 ObjString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
   ObjString* interned = mapFindString(&vm.strings, chars, length, hash);
@@ -167,9 +176,10 @@ ObjString* intern(const char* chars) {
   return copyString(chars, strlen(chars));
 }
 
-ObjUpvalue* newUpvalue(Value* slot) {
+ObjUpvalue* newUpvalue(Value* value, uint8_t slot) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
-  upvalue->location = slot;
+  upvalue->location = value;
+  upvalue->slot = slot;
   upvalue->closed = NIL_VAL;
   upvalue->next = NULL;
   return upvalue;
@@ -202,14 +212,14 @@ static MapEntry* mapFindHash(MapEntry* entries, int capacity, Value key,
 
     if (IS_UNDEF(entry->key)) {
       if (IS_NIL(entry->value)) {
-        // Empty entry.
+        // empty entry.
         return tombstone != NULL ? tombstone : entry;
       } else {
-        // We found a tombstone.
+        // we found a tombstone.
         if (tombstone == NULL) tombstone = entry;
       }
     } else if (valuesEqual(entry->key, key)) {
-      // We found the key.
+      // we found the key.
       return entry;
     }
 
@@ -406,15 +416,21 @@ void printObject(Value value) {
       break;
     }
     case OBJ_CLASS:
-      printf("<%s class>", AS_CLASS(value)->name->chars);
+      printf("<class %s>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
-      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
+      printf("<fn %s at %p>", AS_CLOSURE(value)->function->name->chars,
              AS_CLOSURE(value));
       break;
     case OBJ_FUNCTION:
-      printf("<fn %s at %p>", AS_FUNCTION(value)->name->chars,
+      printf("<raw fn %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
+      break;
+    case OBJ_OVERLOAD:
+      printf("<overload at %p>", AS_OVERLOAD(value));
+      break;
+    case OBJ_VARIABLE:
+      printf("<var %s>", AS_VARIABLE(value)->name->chars);
       break;
     case OBJ_INSTANCE:
       printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,

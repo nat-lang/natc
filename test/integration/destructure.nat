@@ -3,9 +3,9 @@
 
 let f <- (a) => 1;
 
-assert(f.name == "lambda");
-assert(f.signature is ASTSignature);
-assert(type(f.function) == TFunction);
+assert(vType(f.function) == OClosure);
+assert(f.upvalues is Tuple);
+assert(vType(f.signature) == OClosure);
 
 // explicit and implicit returns.
 assert(len(f.children) == 2);
@@ -13,12 +13,20 @@ assert(len(f.children) == 2);
 // explicit.
 assert(f[0] is ASTReturn);
 assert(f[0][0] is ASTLiteral);
-assert(f[0][0].data == 1);
+assert(f[0][0].value == 1);
 
 // implicit.
 assert(f[1] is ASTImplicitReturn);
 assert(f[1][0] is ASTLiteral);
-assert(f[1][0].data == nil);
+assert(f[1][0].value == nil);
+
+// negation.
+
+let f <- (a) => !a;
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTNegation);
+assert(f[0][0][0] is ASTLocal);
 
 // constant function to global.
 f <- (a) => c;
@@ -29,12 +37,12 @@ assert(len(f.children) == 2);
 // explicit.
 assert(f[0] is ASTReturn);
 assert(f[0][0] is ASTGlobal);
-assert(f[0][0].data == "c");
+assert(f[0][0].id == "c");
 
 // implicit.
 assert(f[1] is ASTImplicitReturn);
 assert(f[1][0] is ASTLiteral);
-assert(f[1][0].data == nil);
+assert(f[1][0].value == nil);
 
 // constant function to local.
 f <- (a) => a;
@@ -45,14 +53,14 @@ assert(len(f.children) == 2);
 // explicit.
 assert(f[0] is ASTReturn);
 assert(f[0][0] is ASTLocal);
-assert(f[0][0].data == 1);
+assert(f[0][0].id == 1);
 
 // implicit.
 assert(f[1] is ASTImplicitReturn);
 assert(f[1][0] is ASTLiteral);
-assert(f[1][0].data == nil);
+assert(f[1][0].value == nil);
 
-// function to binary application.
+// function to infix.
 
 f <- (a) => a + 1;
 
@@ -60,39 +68,55 @@ let r = f[0];
 
 assert(r is ASTReturn);
 assert(r[0] is ASTApp);
-assert(r[0][0].data == "+");
+assert(r[0][0].id == "+");
 
 f <- (a) => +(a, 1);
 
 let r = f[0];
 assert(r is ASTReturn);
 assert(r[0] is ASTApp);
-assert(r[0][0].data == "+");
+assert(r[0][0].id == "+");
 
-f <- (a) => a and true;
+// these now require jump ast.
 
-let r = f[0];
-assert(r is ASTReturn);
-assert(r[0] is ASTApp);
-assert(r[0][0].data == "and");
+// f <- (a) => a and true;
 
-f <- (a) => a or true;
+// let r = f[0];
+// assert(r is ASTReturn);
+// assert(r[0] is ASTApp);
+// assert(r[0][0].id == "and");
 
-let r = f[0];
-assert(r is ASTReturn);
-assert(r[0] is ASTApp);
-assert(r[0][0].data == "or");
+// f <- (a) => a or true;
 
-f <- (a) => a implies b;
+// let r = f[0];
+// assert(r is ASTReturn);
+// assert(r[0] is ASTApp);
+// assert(r[0][0].id == "or");
 
-let r = f[0];
-assert(r is ASTReturn);
-assert(r[0] is ASTApp);
-assert(r[0][0].data == "implies");
+// f <- (a) => a implies b;
+
+// let r = f[0];
+// assert(r is ASTReturn);
+// assert(r[0] is ASTApp);
+// assert(r[0][0].id == "implies");
+
+// function to postfix.
+
+f <- (a) => [1,2,3];
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTApp);
+assert(f[0][0][0].id == "Sequence");
+assert(f[0][0][1].resolve() == [1,2,3]);
 
 // function to function.
 
 f <- (g) => (x) => 1;
+
+assert(f[0][0] is ASTClosure);
+assert(f[0][0][0][0] is ASTLiteral);
+
+f <- g x => 1;
 
 assert(f[0][0] is ASTClosure);
 assert(f[0][0][0][0] is ASTLiteral);
@@ -142,6 +166,7 @@ f <- (g) => {
 };
 
 assert(len(f.children) == 6);
+
 // k.
 assert(f[0] is ASTLocalTypeAssignment);
 assert(f[1] is ASTLocalValueAssignment);
@@ -154,6 +179,101 @@ assert(f[3][1] is ASTLiteral);
 assert(f[4] is ASTExprStatement);
 assert(f[5] is ASTImplicitReturn);
 
+// property assignment.
+
+f <- () => {
+  let a;
+  a.x = 1;
+};
+
+assert(f[0] is ASTLocalTypeAssignment);
+assert(f[1] is ASTLocalValueAssignment);
+
+assert(f[2] is ASTPropertyAssignment);
+
+assert(f[2][0] is ASTLocal);
+assert(f[2][1] is ASTLiteral);
+assert(f[2][1].resolve() == "x");
+assert(f[2][2] is ASTLiteral);
+assert(f[2][2].resolve() == 1);
+
+// closures.
+
+f <- (x,z) => {
+  let y;
+  
+  let g = () => x + z;
+  let h = () => x + y;
+  let j = () => {
+    let a;
+    return () => x + y + a;
+  };
+};
+
+// upvalues are identified with the locals
+// they close over.
+
+f.uniquelyIdentifyVariables(NameSupply());
+
+let x = f.signature().params[0];
+let z = f.signature().params[1];
+let y = f[1][0];
+
+let g = f[3][1];
+let h = f[5][1];
+let j = f[7][1];
+
+let g_x_up = g[0][0][1][0];
+let g_z_up = g[0][0][1][1];
+
+assert(g_x_up.uuid == x.uuid);
+assert(g_z_up.uuid == z.uuid);
+
+let h_x_up = h[0][0][1][0];
+let h_y_up = h[0][0][1][1];
+
+assert(h_x_up.uuid == x.uuid);
+assert(h_y_up.uuid == y.uuid);
+
+let a = j[1][0];
+let j_x_up = j[2][0][0][0][1][0][1][0];
+let j_y_up = j[2][0][0][0][1][0][1][1];
+let j_a_up = j[2][0][0][0][1][1];
+
+assert(j_x_up.uuid == x.uuid);
+assert(j_y_up.uuid == y.uuid);
+assert(j_a_up.uuid == a.uuid);
+
+// overloaded functions.
+
+f <- 1 => true | 2 => false;
+
+assert(vType(f.overload) == OOverload);
+assert(f.count == 2);
+assert(f[0] is ASTClosure);
+assert(f[1] is ASTClosure);
+
+// invocation.
+
+class A {}
+let a = A();
+
+f <- () => a.f();
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTInvocation);
+assert(f[0][0][0].resolve() is A);
+assert(f[0][0][1] == "f");
+assert(f[0][0][2].leaf());
+
+f <- () => a.f(1,2,3);
+
+assert(f[0] is ASTReturn);
+assert(f[0][0] is ASTInvocation);
+assert(f[0][0][0].resolve() is A);
+assert(f[0][0][1] == "f");
+assert(f[0][0][2].resolve() == [1,2,3]);
+
 // resolution, aka evaluation.
 
 // obj language.
@@ -165,16 +285,45 @@ f <- (g) => {
 assert(f[1][1] is ASTApp);
 assert(f[1][1].resolve() == 2);
 
-// parameter annotation.
+// type language.
 
 f <- () => {
   let k = (a: num -> num) => a(1);
 };
 
-assert(f[1][1] is ASTClosure);
+// two type assignments for 'k':
+// (0) for the let declaration,
+// (1) for the signature.
 
-let closure = f[1][1];
-assert(closure.signature.params[0] is ASTLocalTypeAssignment);
+let t0 = f[0];
 
-let typeAssignment = closure.signature.params[0];
-assert(typeAssignment[1].resolve() is TFunction);
+// let assignment is to undefined.
+
+assert(t0 is ASTLocalTypeAssignment);
+assert(t0[1] is ASTLiteral);
+assert(t0[1].resolve() == undefined);
+
+// the closure's signature lives on its node.
+
+let k = f[1][1];
+
+assert(k is ASTClosure);
+assert(k.signature() is ASTSignature);
+
+let a = k.signature().params[0];
+
+assert(a is ASTParameter);
+assert(a.type is TFunction);
+assert(a.type.domain == num);
+assert(a.type.range == num);
+
+// the signature registers implicitly abstracted type variables.
+
+f <- () => {
+  let k = (a: w -> w) => a;
+};
+
+let k = f[1][1];
+
+assert(k is ASTClosure);
+assert(k.signature() is ASTSignature);

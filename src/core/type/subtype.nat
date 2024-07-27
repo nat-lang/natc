@@ -1,0 +1,96 @@
+
+class TSum extends Type {
+  init(*types) => {
+    this.disjuncts = (Set.fromSeq . fmap(TypeSystem.typify))(types);
+  }
+
+  union(that: TSum) => TSum(
+    ..this.disjuncts.union(that.disjuncts).elements()
+  );
+
+  elements() => this.disjuncts.elements();
+
+  subtypeOf(that: TSum) => this.disjuncts.subsetEq(that.disjuncts);
+
+  lift(type) => {
+    if (type is TSum) return type;
+    return TSum(type);
+  }
+
+  str() => "TSum(" + join(this.elements().map(x => x.str()), ", ") + ")";
+
+  pp() => { print this.str(); }
+
+  hash() => this.disjuncts.hash();
+  
+  __eq__(that) => this.disjuncts == that.disjuncts;
+  __in__(element) => element in this.disjuncts;
+  __iter__() => iter(this.disjuncts);
+}
+
+let infix(9) || = (a, b) => TSum.lift(a).union(TSum.lift(b));
+
+class SubtypeConstraint extends Constraint {
+  str() => this.left.str() + " < " + this.right.str();
+}
+
+class SubtypeState extends SimpleTypeState {
+  constrain(node: ASTNode) => {
+    if (node is ASTApp) {
+      let func = node[0];
+      let args = node[1];
+
+      let tFunc = this.constrain(func);
+
+      let tArgs = this.constrain(args);
+      let tApp = typeVar();
+
+      this.constraints.push(SubtypeConstraint(tFunc, tArgs -> tApp));
+      
+      return tApp;
+    }
+
+    return super.constrain(node);
+  }
+
+  unify(constraint: Constraint) => {
+    if (constraint is SubtypeConstraint) {
+      let left = constraint.left,
+          right = constraint.right;
+    
+      if (left is TVar or right is TVar) {
+        return super.unify(constraint);
+
+      // a -> b < c -> d iff a > c and b < d.
+      } else if (left is TFunction and right is TFunction) {
+        return [
+          SubtypeConstraint(right.domain, left.domain),
+          SubtypeConstraint(left.range, right.range)
+        ].all(this.unify);
+
+      } else if (left is TProduct and right is TProduct) {
+        if (len(left) == len(right)) {
+          return zip(left.elements, right.elements)
+            .map(x => SubtypeConstraint(..x))
+            .all(this.unify);
+        }
+        return false;
+
+      } else if (isClass(left) and isClass(right)) {
+        return isSubclass(left, right);
+      } else {
+        let a = TSum.lift(left);
+        let b = TSum.lift(right);
+
+        return a.subtypeOf(b);
+      }
+    }
+
+    return super.unify(constraint);
+  }
+}
+
+class SubtypeSystem extends SimpleTypeSystem {}
+
+SubtypeSystem.ConstraintClass = SubtypeConstraint;
+SubtypeSystem.TypeStateClass = SubtypeState;

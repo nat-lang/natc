@@ -1,5 +1,7 @@
-class Error {
+class Error extends Base {
   init(message) => {
     this.message = message;
   }
 }
+
+class NotImplemented extends Error {}

@@ -22,8 +22,6 @@ class Sequential extends Object {
     return false;
   }
 
-  __iter__() => Iterator(this, 0, len(this));
-
   hash() => this.map(hash).reduce(+, 0);
 
   map(fn) => [fn(value) | value in this];
@@ -37,17 +35,46 @@ class Sequential extends Object {
 
   filter(predicate) => [x | x in this, !predicate(x)];
 
-  concat(other) => {
+  concat(that) => {
     let seq = [x | x in this];
-    for (x in other) seq.push(x);
+    for (x in that) seq.push(x);
     return seq;
   }
 
-  all(predicate) => this.map(predicate).reduce(and, true);
-  some(predicate) => this.map(predicate).reduce(or, false);
+  some(predicate) => {
+    for (x in this)
+      if (predicate(x))
+        return true;
+    return false;
+  }
+
+  all(predicate) => {
+    for (x in this)
+      if (!predicate(x))
+        return false;
+    return true;
+  }
+
+  first(predicate) => {
+    for (x in this) {
+      if (predicate(x))
+        return x;
+    }
+  }
+
+  find(predicate) => this.first(predicate);
+
+  last() => this.values[len(this) - 1];
 
   pp() => {
     print this.values;
+  }
+
+  fromRaw(raw) => {
+    let seq = Sequence();
+    for (let i = 0; i < len(raw); i = i + 1)
+      seq.push(raw[i]);
+    return seq;
   }
 }
 
@@ -58,5 +85,4 @@ class Sequence extends Sequential {
     for (x in elements)
       this.push(x);
   }
-  last() => this.values[len(this) - 1];
 }

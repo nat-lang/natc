@@ -2,6 +2,7 @@
 #define nat_vm_h
 
 #include "chunk.h"
+#include "compiler.h"
 #include "object.h"
 #include "value.h"
 
@@ -22,6 +23,13 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjString* sName;
+  ObjString* sArity;
+  ObjString* sPatterned;
+  ObjString* sVariadic;
+  ObjString* sValues;
+  ObjString* sSignature;
+
   ObjClass* base;
   ObjClass* object;
   ObjClass* tuple;
@@ -31,17 +39,25 @@ typedef struct {
   ObjClass* iterator;
 
   ObjClass* astClosure;
+  ObjClass* astUpvalue;
+  ObjClass* astOverload;
 
+  ObjClass* vTypeUnit;
   ObjClass* vTypeBool;
   ObjClass* vTypeNil;
   ObjClass* vTypeNumber;
   ObjClass* vTypeUndef;
+  ObjClass* oTypeVariable;
   ObjClass* oTypeClass;
   ObjClass* oTypeInstance;
   ObjClass* oTypeString;
   ObjClass* oTypeClosure;
+  ObjClass* oTypeNative;
+  ObjClass* oTypeOverload;
   ObjClass* oTypeSequence;
-} Classes;
+
+  ObjClosure* unify;
+} Core;
 
 typedef struct {
   Value stack[STACK_MAX];
@@ -59,7 +75,7 @@ typedef struct {
   ObjUpvalue* openUpvalues;
 
   // core defs.
-  Classes classes;
+  Core core;
 
   // memory.
   int grayCount;
@@ -68,6 +84,8 @@ typedef struct {
 
   size_t bytesAllocated;
   size_t nextGC;
+
+  Compiler* compiler;
 } VM;
 
 typedef enum {
@@ -83,6 +101,7 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
+InterpretResult vmInterpretImport(char* path, const char* source);
 InterpretResult vmInterpret(char* path, const char* source);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
@@ -92,8 +111,16 @@ bool vmInitInstance(ObjClass* klass, int argCount, int frames);
 bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
+CallFrame* vmInitFrame(ObjClosure* closure, int offset);
 bool vmCallValue(Value value, int argCount);
-void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame);
+void vmCloseUpvalues(Value* last);
+void vmClosure(CallFrame* frame);
+bool vmOverload(CallFrame* frame);
+void vmSequence(CallFrame* frame);
+void vmVariable(CallFrame* frame);
+void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
+bool vmTuplify(int count, bool replace);
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
 
 #endif
