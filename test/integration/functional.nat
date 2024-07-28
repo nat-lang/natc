@@ -284,7 +284,6 @@ assert(v.f(1,2,3) is Sequence);
 // --------------------------------------
 
 let f = 1 => true;
-
 assert(f(1));
 assert(f(2) == undefined);
 

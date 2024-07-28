@@ -55,7 +55,7 @@ class PolyTypeState extends SubtypeState {
     if (right is TAbstract and !(left is TVar))
       right = right.instantiate(typeVar);
     
-    return super.unify(Constraint(left, right));
+    return super.unify(PolyTypeSystem.ConstraintClass(left, right));
   }
 }
 

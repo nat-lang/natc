@@ -216,6 +216,8 @@ class SimpleTypeSystem {
     return state;
   }
 
+  newState() => this.TypeStateClass(this, false);
+
   // Calculate the type of [expr], inferring it if necessary.
   type(expr) => {
     let state = this.TypeStateClass(this, false);
@@ -443,7 +445,7 @@ class SimpleTypeState {
         Constraint(left.range, right.range)
       ]);
 
-      return true;
+      return this.solve();
     // product types of equal length become pairwise sequences of constraints.
     } else if (left is TProduct and right is TProduct) {
       if (len(left) == len(right)) {
@@ -482,8 +484,7 @@ class SimpleTypeState {
 
     if (this.debug and len(this.solution) > 0) {
       print "--------- SOLUTION -----------";
-      for (c in this.solution)
-        print c.left.str() + " = " + c.right.str();
+      this.ppSolution();
       print "------------------------------";
     }
 
@@ -517,8 +518,6 @@ class SimpleTypeState {
 
     return env;
   }
-
-  foo() => {}
 
   infer(expr) => {
     let node <- expr;
@@ -560,6 +559,10 @@ class SimpleTypeState {
     for (let i = 0; i < len(this.insoluble); i = i + 1) {
       print str(i) + ") " + this.insoluble[i].str();
     }
+  }
+  ppSolution() => {
+    for (c in this.solution)
+      print c.left.str() + " = " + c.right.str();
   }
 }
 

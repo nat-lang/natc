@@ -66,16 +66,19 @@ class SubtypeState extends SimpleTypeState {
 
       // a -> b < c -> d iff a > c and b < d.
       } else if (left is TFunction and right is TFunction) {
-        return [
+        this.constraints.extend([
           SubtypeConstraint(right.domain, left.domain),
           SubtypeConstraint(left.range, right.range)
-        ].all(this.unify);
+        ]);
+
+        return this.solve();
 
       } else if (left is TProduct and right is TProduct) {
         if (len(left) == len(right)) {
-          return zip(left.elements, right.elements)
-            .map(x => SubtypeConstraint(..x))
-            .all(this.unify);
+          this.constraints.extend([
+            SubtypeConstraint(..x) | x in zip(left.elements, right.elements)
+          ]);
+          return this.solve();
         }
         return false;
 

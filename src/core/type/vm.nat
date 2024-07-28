@@ -63,6 +63,7 @@ class Pattern extends Base {
   map(fn) => Pattern(..this.elements.map(fn));
   __get__(idx) => this.elements[idx];
   __len__() => len(this.elements);
+  __iter__() => iter(this.elements);
 }
 
 class Signature extends Base {
