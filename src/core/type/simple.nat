@@ -518,8 +518,6 @@ class SimpleTypeState {
     return env;
   }
 
-  foo() => {}
-
   infer(expr) => {
     let node <- expr;
 
