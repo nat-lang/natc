@@ -4,7 +4,7 @@
 let f <- (a) => 1;
 
 assert(vType(f.function) == OClosure);
-assert(f.upvalues is Tuple);
+assert(f.upvalues is Sequence);
 assert(vType(f.signature) == OClosure);
 
 // explicit and implicit returns.

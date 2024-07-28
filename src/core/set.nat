@@ -1,5 +1,4 @@
 
-
 class Set extends Object {
   init(*elements) => {
     this.map = Map();
@@ -136,5 +135,11 @@ class Set extends Object {
     print this.str();
   }
 
+  toSeq() => this.elements();
   fromSeq(seq: Sequential) => Set(..seq);
 }
+
+let bigUnion = (*sets) => sets.reduce(
+  (big, set) => big.union(set),
+  {}
+);

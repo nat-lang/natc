@@ -1,5 +1,21 @@
 import src/core/type/poly
 
+// type generalization, aka abstraction.
+
+let a = TVar("a"),
+    b = TVar("b"),
+    c = TVar("c"),
+    d = TVar("d");
+
+let h = TAbstract.generalize(a);
+assert(h.fn(b) == b);
+
+let f = TAbstract.generalize(a -> b);
+assert(f.fn(c,d) == c -> d);
+
+let g = TAbstract.generalize(TProduct([a,b]));
+assert(g.fn(c,d) == TProduct([c,d]));
+
 let check;
 
 // the simple type system fails here.

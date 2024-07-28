@@ -14,17 +14,27 @@ class TAbstract extends Type {
   generalize(type: TFunction) => {
     let fvs = type.fvs();
 
+    // simulate the function with type substitution.
     return TAbstract((*args) => {
-      let s = Solution(..zip(fvs, args));
-      type.apply(s);
-      return type;
+      let s = Substitution(..zip(fvs.toSeq(), args));
+      return type.apply(s);
     }, len(fvs));
   }
 
   fromClosure(closure: OClosure) => TAbstract(closure, closure.arity);
+
+  str() => {
+    let tVars = [
+      ["u", "v", "w", "x", "y", "z"][i] | i in range(0, this.arity)
+    ];
+    class PrettyTVar extends TVar { str() => this.id; }
+    let type = this.fn(..[PrettyTVar(v) | v in tVars]);
+    return "(" + join([v | v in tVars], ",") + ") => " + type.str();
+  }
+  pp() => { print this.str(); }
 }
 
-class PolyTypeState extends SimpleTypeState {
+class PolyTypeState extends SubtypeState {
   constrain(node: ASTNode) => {
     let type = super.constrain(node);
 
@@ -49,7 +59,7 @@ class PolyTypeState extends SimpleTypeState {
   }
 }
 
-class PolyTypeSystem extends SimpleTypeSystem {
+class PolyTypeSystem extends SubtypeSystem {
   typify(value) => {
     if (vType(value) == OClosure)
       return TAbstract.fromClosure(value);
@@ -59,4 +69,3 @@ class PolyTypeSystem extends SimpleTypeSystem {
 }
 
 PolyTypeSystem.TypeStateClass = PolyTypeState;
-

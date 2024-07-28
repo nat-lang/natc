@@ -45,7 +45,7 @@ let f: (bool -> void) -> void = f => {};
 
 // (bool -> void) -> void < ((bool || string) -> void) -> w
 //   .. (bool -> void) > (bool || string) -> void
-//   .. bool           < bool || string
+//   .. bool           < (bool || string)
 
 check = typecheck((x: (bool || string) -> void) => f(x));
 assert(check.success());

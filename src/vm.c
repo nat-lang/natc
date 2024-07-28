@@ -376,10 +376,10 @@ bool vmTuplify(int count, bool replace) {
   else
     while (i--) args[count - i - 1] = vmPeek(i);
 
-  vmPush(OBJ_VAL(vm.core.tuple));
+  vmPush(OBJ_VAL(vm.core.sequence));
   while (++i < count) vmPush(args[i]);
 
-  return vmCallValue(OBJ_VAL(vm.core.tuple), count);
+  return vmCallValue(OBJ_VAL(vm.core.sequence), count);
 }
 
 bool unify(ObjClosure* closure, Value value) {

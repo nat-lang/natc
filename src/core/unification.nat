@@ -15,6 +15,12 @@ let unifyPair = (a: PatternElement, b: PatternElement) => {
 let unify = (function, scrutinee) => {
   let pattern = function.signature().domain;
 
+  pattern = pattern.map((el: PatternElement) => {
+    if (el.type != undefined)
+      return PatternElement(el.value, TypeSystem.typify(el.type));
+    return el; 
+  });
+
   if (len(pattern) != len(scrutinee)) return false;
 
   let typedScrutinee = Pattern(..[
