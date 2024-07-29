@@ -919,6 +919,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
   }
 
   // discard the function if it has no parameters; it'll be gc'd.
+  vm.compiler = enclosing;
   gotoParser(checkpoint);
   return false;
 }
