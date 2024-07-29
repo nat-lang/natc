@@ -57,12 +57,13 @@ class AdhocTypeState extends SubtypeState {
         return right.cases.all(
           rCase => left.cases.some(
             lCase => {
-              let unifiable = this.unify(SubtypeConstraint(lCase, rCase));
+              let unified = this.unify(SubtypeConstraint(lCase, rCase));
               
-              // a failure here is not necessarily a failure to unify globally.
-              if (!unifiable) this.insoluble = [];
+              // a failure here is not necessarily a
+              // failure to unify globally.
+              if (!unified) this.insoluble = [];
               
-              return unifiable;
+              return unified;
             }
           )
         );

@@ -7,6 +7,16 @@ assert(vType(f.function) == OClosure);
 assert(f.upvalues is Sequence);
 assert(vType(f.signature) == OClosure);
 
+assert(f.signature() is ASTSignature);
+assert(len(f.signature().params) == 1);
+
+let p = f.signature().params[0];
+
+assert(p is ASTParameter);
+assert(p.id == 1);
+assert(p.value == nil);
+assert(p.type == undefined);
+
 // explicit and implicit returns.
 assert(len(f.children) == 2);
 
@@ -114,6 +124,7 @@ assert(f[0][0][1].resolve() == [1,2,3]);
 f <- (g) => (x) => 1;
 
 assert(f[0][0] is ASTClosure);
+
 assert(f[0][0][0][0] is ASTLiteral);
 
 f <- g x => 1;
@@ -326,4 +337,13 @@ f <- () => {
 let k = f[1][1];
 
 assert(k is ASTClosure);
+assert(vType(k.function.signature) == OClosure);
 assert(k.signature() is ASTSignature);
+assert(len(k.signature().params) == 1);
+
+let p = k.signature().params[0];
+
+assert(p is ASTParameter);
+assert(p.id == 1);
+assert(p.value == nil);
+assert(p.type is ->);

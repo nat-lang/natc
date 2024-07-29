@@ -552,12 +552,10 @@ void vmClosure(CallFrame* frame) {
 }
 
 void vmSign(CallFrame* frame) {
-  ObjClosure* closure = AS_CLOSURE(vmPeek(0));
+  ObjClosure* closure = AS_CLOSURE(vmPeek(1));
 
-  mapSet(&closure->function->fields, OBJ_VAL(vm.core.sSignature), vmPeek(1));
+  mapSet(&closure->function->fields, OBJ_VAL(vm.core.sSignature), vmPeek(0));
   vmPop();
-  vmPop();
-  vmPush(OBJ_VAL(closure));
 }
 
 bool vmOverload(CallFrame* frame) {
@@ -931,8 +929,15 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_SIGN: {
-        vmClosure(frame);
-        vmSign(frame);
+        ObjClosure* closure = AS_CLOSURE(vmPeek(0));
+        vmClosure(frame);  // create the signature.
+
+        mapSet(&closure->function->fields, OBJ_VAL(vm.core.sSignature),
+               vmPeek(0));
+
+        // pop the signature and leave the signed
+        // function on the stack.
+        vmPop();
         break;
       }
       case OP_CLOSE_UPVALUE: {
@@ -1025,7 +1030,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(OBJ_VAL(baseDir));
         ObjString* importLoc = concatenateStrings(baseDir, AS_STRING(path));
         vmPop();
-
+        vmPush(OBJ_VAL(importLoc));
         InterpretResult result = interpretFile(importLoc->chars);
 
         if (result != INTERPRET_OK) return result;
@@ -1033,6 +1038,7 @@ InterpretResult vmExecute(int baseFrame) {
         // if/when import statements become selective, this'll
         // probably stick around.
         vmPop();
+        vmPop();  // pop the imported module's name.
         break;
       }
       case OP_THROW: {

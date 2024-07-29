@@ -265,7 +265,9 @@ static void patchJump(Compiler* cmp, int offset) {
 
 void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
                   FunctionType functionType, Token name) {
+  cmp->enclosing = NULL;
   cmp->enclosing = enclosing;
+  cmp->signature = NULL;
   cmp->signature = signature;
   cmp->function = NULL;
   cmp->function = newFunction();
@@ -296,24 +298,27 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   }
 }
 
-static ObjFunction* endCompiler(Compiler* cmp) {
+static void emitDefaultReturn(Compiler* cmp) {
   if (cmp->functionType == TYPE_INITIALIZER)
     emitConstInstr(cmp, OP_GET_LOCAL, 0);
   else
     emitByte(cmp, OP_NIL);
   emitByte(cmp, OP_IMPLICIT_RETURN);
+}
 
-  ObjFunction* function = cmp->function;
+static ObjFunction* endCompiler(Compiler* cmp) {
+  emitDefaultReturn(cmp);
 
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-    disassembleChunk(&function->chunk, function->name != NULL
-                                           ? function->name->chars
-                                           : "<script>");
+    disassembleChunk(&cmp->function->chunk, cmp->function->name != NULL
+                                                ? cmp->function->name->chars
+                                                : "<script>");
   }
 #endif
+
   vm.compiler = cmp->enclosing;
-  return function;
+  return cmp->function;
 }
 
 static void beginScope(Compiler* cmp) { cmp->scopeDepth++; }
@@ -354,13 +359,13 @@ static void closeFunction(Compiler* cmp, Compiler* enclosing) {
 }
 
 static void signFunction(Compiler* cmp, Compiler* sigCmp, Compiler* enclosing) {
-  ObjFunction* function = endCompiler(sigCmp);
-  vm.compiler = cmp;
+  emitDefaultReturn(cmp);
+  ObjFunction* function = cmp->function;
   emitConstInstr(enclosing, OP_CLOSURE,
                  makeConstant(enclosing, OBJ_VAL(function)));
-  closeUpvalues(function, sigCmp, enclosing);
+  closeUpvalues(function, cmp, enclosing);
 
-  closeFunctionWithOp(cmp, enclosing, OP_SIGN);
+  closeFunctionWithOp(sigCmp, enclosing, OP_SIGN);
 }
 
 static void function(Compiler* enclosing, FunctionType type, Token name);
