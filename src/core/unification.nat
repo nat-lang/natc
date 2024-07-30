@@ -22,8 +22,8 @@ let unify = (function, arguments) => {
     // if the parameter's type is undefined then it's either
     // an unannotated variable or a literal value. if it's a
     // variable then it unifies unconditionally. if it's a literal
-    // then it unifies by equality. we just fail here if it's a
-    // literal and it fails to unify.
+    // then it unifies by equality. we fail here just in case it's
+    // a literal and it fails to unify.
     if (param.type == undefined) {
       if (isVar(param.value) or param.value == arguments[i])
         paramTypes.push(typeVar());
@@ -45,7 +45,6 @@ let unify = (function, arguments) => {
       TProduct(paramTypes)
     )
   );
-  let result = state.solve();
 
-  return result;
+  return state.solve();
 };

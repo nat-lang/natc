@@ -234,7 +234,7 @@ assert(check.failure());
 check = typecheck((x: bool) => f(f(x)));
 assert(check.failure());
 
-// this is sound, but typing it correctly requires an abstraction
+// this is sound, but typing it requires an abstraction
 // as the two applications of f share a type variable.
 
 check = typecheck((x: num) => f(f(x)));

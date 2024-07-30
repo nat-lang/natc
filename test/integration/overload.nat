@@ -130,15 +130,30 @@ assert(f(2,"1") == true);
 
 // type patterns with type variables.
 
+let f = (a: num, b: num) => a | (a: x, b: x) => b;
+
+// literal types.
+
+assert(f(1,2) == 1);
+assert(f(true, false) == false);
+assert(f(nil, nil) == nil);
+assert(f(x => x, x => x * 2)(1) == 2);
+
+// annotated types.
+
+assert(f(1, true) == undefined);
+assert(f(true, 1) == undefined);
+assert(f((x: num) => x, (x: bool) => x) == undefined);
+
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-// dispatch.
+// literal types.
 
 assert(f(x => x, 1) == 1);
 assert(f(1, x => x) == 1);
 
-// constraints.
+// annotated types.
 
 assert(f((x: num) => x, 1) == 1);
 assert(f((x: string) => x, 1) == undefined);
@@ -147,3 +162,12 @@ assert(f((x: bool) => x, 1) == undefined);
 assert(f(1, (x: num) => x) == 1);
 assert(f(1, (x: string) => x) == undefined);
 assert(f(1, (x: bool) => x) == undefined);
+
+// overloads can dispatch on overloads.
+
+let f = (g: num -> bool <+> string -> bool) => 1
+      | (g: num -> bool <+> bool -> bool) => 2;
+
+assert(f((x: num) => true | (x: string) => false) == 1);
+assert(f((x: num) => true | (x: bool) => false) == 2);
+assert(f((x: string) => true | (x: bool) => false) == undefined);
