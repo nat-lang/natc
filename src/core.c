@@ -401,17 +401,30 @@ bool __add__(int argCount, Value* args) {
     ObjString* result = concatenateStrings(a, b);
     vmPop();
     vmPop();
-    vmPop();  // fn
+    vmPop();  // fn.
     vmPush(OBJ_VAL(result));
   } else if (IS_NUMBER(vmPeek(0)) && IS_NUMBER(vmPeek(1))) {
     double b = AS_NUMBER(vmPop());
     double a = AS_NUMBER(vmPop());
-    vmPop();  // fn
+    vmPop();  // fn.
     vmPush(NUMBER_VAL(a + b));
   } else {
     vmRuntimeError("Operands must be two numbers or two strings.");
     return false;
   }
+  return true;
+}
+
+bool __resolveUpvalue__(int argCount, Value* args) {
+  Value value = vmPop();
+
+  if (!IS_UPVALUE(value)) {
+    vmRuntimeError("Not an upvalue.");
+    return false;
+  }
+
+  vmPop();  // fn.
+  vmPush(*AS_UPVALUE(value)->location);
   return true;
 }
 
@@ -427,6 +440,7 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("globalTypeEnv", 0, __globalTypeEnv__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
+  defineNativeFnGlobal("resolveUpvalue", 1, __resolveUpvalue__);
 
   defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
   defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);

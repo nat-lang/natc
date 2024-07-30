@@ -446,7 +446,7 @@ void printObject(Value value) {
       printf("%s", AS_CSTRING(value));
       break;
     case OBJ_UPVALUE:
-      printf("upvalue");
+      printf("<upvalue at %p>", AS_UPVALUE(value));
       break;
     case OBJ_SEQUENCE:
       printValueArray(&AS_SEQUENCE(value)->values);

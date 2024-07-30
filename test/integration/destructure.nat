@@ -255,6 +255,23 @@ assert(j_x_up.uuid == x.uuid);
 assert(j_y_up.uuid == y.uuid);
 assert(j_a_up.uuid == a.uuid);
 
+// ASTUpvalues resolve to the values of their upvalues.
+
+let g = (() => {
+  let x = 1;
+  let f <- () => x;
+  return (f, y => { x = y; });
+})();
+
+let f = g[0];
+let set = g[1];
+
+assert(f[0][0] is ASTUpvalue);
+assert(f[0][0].resolve() == 1);
+
+set(2);
+assert(f[0][0].resolve() == 2);
+
 // overloaded functions.
 
 f <- 1 => true | 2 => false;

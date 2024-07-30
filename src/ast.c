@@ -156,8 +156,9 @@ bool astFrame(Value root) {
         vmPush(root);
         vmPush(NUMBER_VAL((uintptr_t)upvalue));
         vmPush(NUMBER_VAL(upvalue->slot));
+        vmPush(OBJ_VAL(upvalue));
 
-        if (!executeMethod("opGetUpvalue", 2)) return false;
+        if (!executeMethod("opGetUpvalue", 3)) return false;
         break;
       }
       case OP_SET_PROPERTY: {
@@ -311,7 +312,8 @@ bool astClosure(ObjClosure* closure) {
     vmPush(OBJ_VAL(vm.core.astUpvalue));
     vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
-    if (!initInstance(vm.core.astUpvalue, 2)) return false;
+    vmPush(OBJ_VAL(closure->upvalues[i]));
+    if (!initInstance(vm.core.astUpvalue, 3)) return false;
   }
   if (!vmTuplify(closure->upvalueCount, true)) return false;
 

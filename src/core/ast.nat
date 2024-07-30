@@ -118,10 +118,12 @@ class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
 }
 class ASTUpvalue extends ASTVariable {
-  init(id, localId) => {
+  init(id, localId, upvalue) => {
     super.init(id);
     this.localId = localId;
+    this.upvalue = upvalue;
   }
+  resolve() => resolveUpvalue(this.upvalue);
 }
 
 class ASTParameter extends ASTLocal {
@@ -181,7 +183,7 @@ class ASTClosure extends ASTExpr {
   opSequence(seq) => ASTSequence(..Sequential.fromRaw(seq));
   opGetLocal(slot) => ASTLocal(slot);
   opGetGlobal(name) => ASTGlobal(name);
-  opGetUpvalue(slot, localSlot) => ASTUpvalue(slot, localSlot);
+  opGetUpvalue(address, localSlot, upvalue) => ASTUpvalue(address, localSlot, upvalue);
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
   opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
   opVariable(var) => ASTPatternVariable(var);
