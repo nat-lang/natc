@@ -17,6 +17,8 @@ class TSum extends Type {
     return TSum(type);
   }
 
+  fvs() => bigUnion(..[x.fvs() | x in this]);
+
   str() => "TSum(" + join(this.elements().map(x => x.str()), ", ") + ")";
 
   pp() => { print this.str(); }
@@ -41,11 +43,12 @@ class SubtypeState extends SimpleTypeState {
       let args = node[1];
 
       let tFunc = this.constrain(func);
-
       let tArgs = this.constrain(args);
       let tApp = typeVar();
-
-      this.constraints.push(SubtypeConstraint(tFunc, tArgs -> tApp));
+      
+      this.constraints.push(
+        SubtypeConstraint(tFunc, tArgs -> tApp)
+      );
       
       return tApp;
     }
@@ -63,21 +66,24 @@ class SubtypeState extends SimpleTypeState {
 
       // a -> b < c -> d iff a > c and b < d.
       } else if (left is TFunction and right is TFunction) {
-        return [
+        this.constraints.extend([
           SubtypeConstraint(right.domain, left.domain),
           SubtypeConstraint(left.range, right.range)
-        ].all(this.unify);
+        ]);
+
+        return this.solve();
 
       } else if (left is TProduct and right is TProduct) {
         if (len(left) == len(right)) {
-          return zip(left.elements, right.elements)
-            .map(x => SubtypeConstraint(..x))
-            .all(this.unify);
+          this.constraints.extend([
+            SubtypeConstraint(..x) | x in zip(left.elements, right.elements)
+          ]);
+          return this.solve();
         }
         return false;
 
-      } else if (isClass(left) and isClass(right)) {
-        return isSubclass(left, right);
+      } else if (left is TClass and right is TClass) {
+        return isSubclass(left.klass, right.klass);
       } else {
         let a = TSum.lift(left);
         let b = TSum.lift(right);

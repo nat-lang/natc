@@ -16,8 +16,6 @@ class Object extends Base {
       this[x[0]] = x[1];
   }
 
-  substitute(s) => this;
-
   pp() => { print str(this); }
-  fvs() => [];
+  fvs() => Set();
 }

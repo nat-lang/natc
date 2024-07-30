@@ -37,7 +37,6 @@ let isSubclass = (a, b) => {
 };
 
 let isVar = x => vType(x) == OVariable;
-let isClass = a => vType(a) == OClass;
 
 // Is [a] an instance of [b]?
 let infix(5) is = (a, b) => {
@@ -61,8 +60,10 @@ class Pattern extends Base {
   init(*elements) => {
     this.elements = elements;
   }
+  map(fn) => Pattern(..this.elements.map(fn));
   __get__(idx) => this.elements[idx];
   __len__() => len(this.elements);
+  __iter__() => iter(this.elements);
 }
 
 class Signature extends Base {

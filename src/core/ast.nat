@@ -12,7 +12,6 @@ class VarEnv {
   init(upvalues) => {
     this.locals = Map();
     this.upvalues = upvalues;
-    this.typeVars = Map();
   }
 }
 
@@ -53,8 +52,9 @@ class ASTNode extends Tree {
         rename(node, varEnv.locals);
 
       if (node is ASTUpvalue) {
-        if (!varEnv.upvalues[node.id])
+        if (!varEnv.upvalues[node.id]) {
           throw Error("Upvalue (" + str(node.id) + ") missing uuid.");
+        }
         node.uuid = varEnv.upvalues[node.id];
       }
 
@@ -221,6 +221,10 @@ class ASTClosure extends ASTExpr {
   }
 
   // statements.
+
+  opSignature(signature) => {
+    this.function.signature = signature;
+  }
 
   opExprStatement(expr) => {
     let node = ASTExprStatement(expr);

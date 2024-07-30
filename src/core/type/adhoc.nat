@@ -33,9 +33,6 @@ class TOverload extends Type {
 let infix(7) <+> = (a, b) => TOverload.unit(a).concat(TOverload.unit(b));
 
 class AdhocTypeState extends SubtypeState {
-  init(sys, debug) => {
-    super.init(sys, false);
-  }
   constrain(node: ASTNode) => {
     if (node is ASTOverload) {
       let tCases = node.children.map(this.principal);
@@ -54,11 +51,18 @@ class AdhocTypeState extends SubtypeState {
         left = TOverload.lift(left);
         right = TOverload.lift(right);
 
+        // ∀x in right. ∃y in left. y < x
         return right.cases.all(
           rCase => left.cases.some(
-            lCase => this.unify(
-              SubtypeConstraint(lCase, rCase)
-            )
+            lCase => {
+              let unified = this.unify(SubtypeConstraint(lCase, rCase));
+              
+              // clear the failure cache. a failure here is
+              // not necessarily a failure to unify globally.
+              if (!unified) this.insoluble = [];
+              
+              return unified;
+            }
           )
         );
       }
@@ -68,8 +72,9 @@ class AdhocTypeState extends SubtypeState {
   }
 
   type(expr) => {
-    if (vType(expr) == OOverload)
+    if (vType(expr) == OOverload) {
       return this.infer(expr);
+    }
     return super.type(expr);
   }
 }

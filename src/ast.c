@@ -183,18 +183,13 @@ bool astFrame(Value root) {
         break;
       }
       case OP_SIGN: {
-        // replace the signature's ast with the signature itself.
-        Value astSignature = vmPeek(0);
-        Value signature;
-        mapGet(&AS_INSTANCE(astSignature)->fields, INTERN("function"),
-               &signature);
-        vmPop();
-        vmPush(signature);
-
         vmClosure(frame);
-        vmSign(frame);
-
-        if (!astClosure(AS_CLOSURE(vmPeek(0)))) return false;
+        Value closure = vmPeek(1);
+        if (!executeMethod("opSignature", 1)) return false;
+        // pop the signature and leave the signed
+        // function's ast on the stack.
+        vmPop();
+        vmPush(closure);
         break;
       }
       case OP_OVERLOAD: {

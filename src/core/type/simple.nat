@@ -1,9 +1,4 @@
 
-let pp = v => {
-  if (v.has("pp")) v.pp();
-  else print v;
-};
-
 class Constraint {
   init(left, right) => {
     this.left = left;
@@ -17,7 +12,7 @@ class Constraint {
 
 class AppConstraint extends Constraint {}
 
-class Solution extends Map {
+class Substitution extends Map {
   entries() => super.entries().map(e => Constraint(..e));
 
   update(var: TVar, type: Type) => {
@@ -45,30 +40,22 @@ class Solution extends Map {
 }
 
 class Type extends Base {
-  pp() => {
-    print this;
-  }
-
   substitute(c) => {
     if (this == c.left)
       return c.right;
     return this;
   }
 
-  str() => {
-    return str(this);
-    // throw NotImplemented("Type classes must implement 'str' individually.");
-  }
-
-  fvs() => [];
+  fvs() => Set();
   hasFvs() => len(this.fvs()) > 0;
-
   hash() => hash(this.str());
-
   apply(solution) => solution.entries().reduce(
     (type, sub) => type.substitute(sub),
     this
   );
+
+  str() => str(this);
+  pp() => { print this; }
 }
 
 class TFunction extends Type {
@@ -83,12 +70,7 @@ class TFunction extends Type {
     return this.domain.str() + " -> " + this.range.str();
   }
 
-  fvs() => {
-    let fvs = [];
-    for (v in this.domain.fvs()) fvs.push(v);
-    for (v in this.range.fvs()) fvs.push(v);
-    return fvs;
-  }
+  fvs() => this.domain.fvs().union(this.range.fvs());
 
   pp() => {
     print this.str();
@@ -105,8 +87,9 @@ class TVar extends Type {
     this.id = id;
   }
   __eq__(that) => this.id == that.id;
+  hash() => hash(this.id);
+  fvs() => Set(this);
   str() => "<var " + str(this.id) + ">";
-  fvs() => [this];
   pp() => { print this.str(); }
 }
 
@@ -141,9 +124,11 @@ class TProduct extends Type {
     this.elements = elements;
   }
 
+  fvs() => bigUnion(..[x.fvs() | x in this.elements]);
+
   str() => "TProduct(" + join(this.elements.map(x => x.str()), ", ") + ")";
 
-  pp() => { print this.elements.values; }
+  pp() => { print this.str(); }
 
   substitute(c: Constraint) => {
     return TProduct(this.elements.map(x => x.substitute(c)));
@@ -151,6 +136,7 @@ class TProduct extends Type {
 
   hash() => this.elements.hash();
 
+  __iter__() => iter(this.elements);
   __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
 }
@@ -161,7 +147,14 @@ class TOverload extends Type {
   }
 }
 
-class TClass extends Type {}
+class TClass extends Type {
+  init(klass) => {
+    this.klass = klass;
+  }
+  substitute(s) => this;
+  hash() => hash(this.klass);
+  __eq__(that) => this.klass == that.klass;
+}
 
 let unit = TUnit();
 let undef = TUndefined();
@@ -169,7 +162,6 @@ let void = TVoid();
 let bool = TBoolean();
 let num = TNumber();
 let string = TString();
-let tClass = TClass();
 let infix(8) -> = TFunction;
 
 class SimpleTypeSystem {
@@ -183,13 +175,16 @@ class SimpleTypeSystem {
     if (type == CBool) return bool;
     if (type == CNumber) return num;
     if (type == OString) return string; 
-    if (type == OInstance) return value.__class__;
-    if (type == OClass) return tClass;
+    if (type == OInstance) return TClass(value.__class__);
+    if (type == OClass) return TClass(value);
     if (type == OClosure) return TFunction;
+
+    throw TypeError("Don't know the literal type of " + str(value) + ".");
   }
 
-  // Transform sequential and unit values into their
-  // corresponding types, TProduct and TUnit.
+  // Classes, sequences, units, and undefined values do double
+  // duty as values and types during annotation. Here we map
+  // those values into unambiguous type objects. 
   typify(value) => {
     if (value == ())
       return unit;
@@ -199,6 +194,8 @@ class SimpleTypeSystem {
       return TProduct(value.map(this.typify));
     if (vType(value) == OSequence)
       return this.typify(Sequence.fromRaw(value));
+    if (vType(value) == OClass)
+      return TClass(value);
     if (value is TFunction)
       return this.typify(value.domain) -> this.typify(value.range);
 
@@ -218,6 +215,8 @@ class SimpleTypeSystem {
 
     return state;
   }
+
+  newState() => this.TypeStateClass(this, false);
 
   // Calculate the type of [expr], inferring it if necessary.
   type(expr) => {
@@ -239,19 +238,22 @@ class SimpleTypeState {
     this.typeEnv = Map();
     // constraint stack.
     this.constraints = [];
+    this.insoluble = [];
     // most general set of unifiers.
-    this.solution = Solution();
+    this.solution = Substitution();
     // print debugging information?
     this.debug = debug;
     this.uuids = NameSupply();
   }
 
-  // Look up the node in the [typeEnv]. If there's no
-  // type entry, then mint a fresh type var.
+  // Look up the node in the [typeEnv]. If there's an entry,
+  // apply the current solution. Otherwise mint a fresh type
+  // var.
   lookup(node: ASTVariable) => {
-    if (!this.typeEnv[node])
-        this.typeEnv[node] = typeVar();
+    if (this.typeEnv[node])
+      return this.typeEnv[node].apply(this.solution);
 
+    this.typeEnv[node] = typeVar();
     return this.typeEnv[node];
   }
 
@@ -275,7 +277,6 @@ class SimpleTypeState {
     if (node is ASTClosure) {
       // give the parameters type vars if they don't
       // have annotations.
-
       let fnEnv = node.signature().params.reduce(
         (env: Map, param: ASTParameter) => {
           let type = param.type;
@@ -350,7 +351,7 @@ class SimpleTypeState {
 
     if (node is ASTVariable)
       return this.lookup(node);
-    
+
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
 
@@ -368,10 +369,11 @@ class SimpleTypeState {
 
       let tFunc = this.principal(func);
       let tArgs = this.principal(args);
-
       let tApp = typeVar();
 
       this.constraints.push(Constraint(tFunc, tArgs -> tApp));
+      this.solve();
+
       return tApp;
     }
 
@@ -383,6 +385,7 @@ class SimpleTypeState {
       let tVal = this.system.typify(val.resolve());
 
       this.constraints.push(Constraint(tVar, tVal));
+      this.solve();
 
       return void;
     }
@@ -395,6 +398,7 @@ class SimpleTypeState {
       let tVal = this.constrain(val);
 
       this.constraints.push(Constraint(tVar, tVal));
+      this.solve();
 
       // this should eventually respect a possibly user
       // defined __set__ method that returns something.
@@ -411,11 +415,7 @@ class SimpleTypeState {
   }
 
   // The occurs check.
-  occurs(var: TVar, type: Type) => {
-    if (!(type is TVar) and var in type.fvs())
-      return true;
-    return false;
-  }
+  occurs(var: TVar, type: Type) => !(type is TVar) and var in type.fvs();
 
   unify(constraint: Constraint) => {
     let left = constraint.left,
@@ -445,7 +445,7 @@ class SimpleTypeState {
         Constraint(left.range, right.range)
       ]);
 
-      return true;
+      return this.solve();
     // product types of equal length become pairwise sequences of constraints.
     } else if (left is TProduct and right is TProduct) {
       if (len(left) == len(right)) {
@@ -465,32 +465,27 @@ class SimpleTypeState {
 
   // Solve the state's [constraints].
   solve() => {
-    let unsolved = [];
-
     let i = 0;
     while (len(this.constraints) > 0) {
       if (this.debug) {
-        print "-------- STEP " + str(i) + " -------------------";
+        print "----------- STEP " + str(i) + " -----------";
         this.ppConstraints();
-        print "---------------------------";
+        print "------------------------------";
       }
 
       let constraint = this.constraints.pop();
       let unifiable = this.unify(constraint);
 
       if (!unifiable)
-        unsolved.push(constraint);
+        this.insoluble.push(constraint);
 
       i = i + 1;
     }
 
-    this.constraints = unsolved;
-
     if (this.debug and len(this.solution) > 0) {
-      print "-------- SOLUTION ---------------";
-      for (c in this.solution)
-        print c.left.str() + " = " + c.right.str();
-      print "---------------------------------";
+      print "--------- SOLUTION -----------";
+      this.ppSolution();
+      print "------------------------------";
     }
 
     return this.solved();
@@ -526,7 +521,9 @@ class SimpleTypeState {
 
   infer(expr) => {
     let node <- expr;
+
     node = this.transform(node);
+    
     return this.principal(node);
   }
 
@@ -549,7 +546,7 @@ class SimpleTypeState {
     return this.infer(expr);
   }
 
-  solved() => len(this.constraints) == 0;
+  solved() => len(this.constraints) == 0 and len(this.insoluble) == 0;
   success() => this.solved();
   failure() => !this.solved();
 
@@ -557,6 +554,15 @@ class SimpleTypeState {
     for (let i = 0; i < len(this.constraints); i = i + 1) {
       print str(i) + ") " + this.constraints[i].str();
     }
+  }
+  ppInsoluble() => {
+    for (let i = 0; i < len(this.insoluble); i = i + 1) {
+      print str(i) + ") " + this.insoluble[i].str();
+    }
+  }
+  ppSolution() => {
+    for (c in this.solution)
+      print c.left.str() + " = " + c.right.str();
   }
 }
 

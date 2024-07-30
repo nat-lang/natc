@@ -115,7 +115,7 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// declaration annotations.
+// declaration annotation.
 
 let f: num -> num = x => 1;
 
@@ -311,7 +311,7 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// declarations constrain parameter annotations.
+// declaration annotations constrain parameter annotations.
 
 check = typecheck(() => {
   let f: num -> num = (a: num) => a;
@@ -323,7 +323,7 @@ check = typecheck(() => {
 });
 assert(check.failure());
 
-// declarations constrain return types.
+// declaration annotations constrain return types.
 
 check = typecheck(() => {
   let f: () -> num = () => 1;
