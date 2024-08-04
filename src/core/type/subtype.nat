@@ -9,20 +9,15 @@ class TSum extends Type {
   );
 
   elements() => this.disjuncts.elements();
-
   subtypeOf(that: TSum) => this.disjuncts.subsetEq(that.disjuncts);
-
   lift(type) => {
     if (type is TSum) return type;
     return TSum(type);
   }
 
   fvs() => bigUnion(..[x.fvs() | x in this]);
-
   str() => "TSum(" + join(this.elements().map(x => x.str()), ", ") + ")";
-
   pp() => { print this.str(); }
-
   hash() => this.disjuncts.hash();
   
   __eq__(that) => this.disjuncts == that.disjuncts;
@@ -51,6 +46,30 @@ class SubtypeState extends SimpleTypeState {
       );
       
       return tApp;
+    }
+
+    if (node is ASTMembership) {
+      let element = node[0];
+      let collection = node[1];
+
+      let tElement = this.principal(element);
+      let tCollection =  this.principal(collection);
+
+      this.constraints.push(
+        SubtypeConstraint(tCollection, TInstance(Base))
+      );
+
+      // this will become a predication against the type
+      // rather than the value once TInstance is a record.
+      if (tCollection is TInstance and "__in__" in tCollection.klass) {
+        let tIn = this.type(tCollection.klass.__in__);
+
+        this.constraints.push(
+          SubtypeConstraint(tIn, tElement -> bool)
+        );
+      }
+
+      return bool;
     }
 
     return super.constrain(node);
@@ -82,7 +101,7 @@ class SubtypeState extends SimpleTypeState {
         }
         return false;
 
-      } else if (left is TClass and right is TClass) {
+      } else if (left is TInstance and right is TInstance) {
         return isSubclass(left.klass, right.klass);
       } else {
         let a = TSum.lift(left);

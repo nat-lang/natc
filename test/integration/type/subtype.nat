@@ -90,7 +90,6 @@ assert(check.failure());
 let f: (num, num) || (string, string) -> void = x => {};
 
 check = typecheck((x: (string, string)) => f(x));
-check.ppConstraints();
 assert(check.success());
 
 check = typecheck((x: (num, num)) => f(x));
@@ -172,4 +171,25 @@ check = typecheck((x: B) => f(x));
 assert(check.failure());
 
 check = typecheck((x: A) => f(x));
+assert(check.failure());
+
+// membership.
+// --------------------------------------------
+
+class A {}
+
+check = typecheck(x => x in A());
+assert(check.success());
+
+class B {
+  __in__(x: num) => false;
+}
+
+check = typecheck(x => x in B());
+assert(check.success());
+
+check = typecheck(x => 1 in B());
+assert(check.success());
+
+check = typecheck(x => true in B());
 assert(check.failure());

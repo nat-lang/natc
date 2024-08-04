@@ -61,7 +61,7 @@ assert(check.success());
 let f: w -> w = x => x;
 let t = globalTypeEnv()["f"];
 
-assert(vType(t) == OClosure);
+assert(vType(t) == OFunction);
 
 assert(t(num) is TFunction);
 assert(t(num).domain == num);
@@ -90,7 +90,7 @@ assert(check.success());
 let f: x -> y = x => x;
 let t = globalTypeEnv()["f"];
 
-assert(vType(t) == OClosure);
+assert(vType(t) == OFunction);
 
 assert(t(num, string) is TFunction);
 assert(t(num, string).domain == num);
@@ -106,7 +106,6 @@ check = PolyTypeSystem.typecheck(() => {
   id("string");
 });
 
-check.ppConstraints();
 assert(check.success());
 
 check = PolyTypeSystem.typecheck(() => {
@@ -152,4 +151,48 @@ check = PolyTypeSystem.typecheck((id) => {
   id("string");
 });
 
+assert(check.failure());
+
+// poly adhoc.
+
+let f = (a: x -> y, b: x) => a(b)
+      | (a: x, b: x -> y) => b(a);
+
+let g: num -> string = x => "y";
+let h: string -> num = x => 1;
+
+check = PolyTypeSystem.typecheck(() => f(g, 1));
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => f(1, g));
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => f(h, f(1, g)));
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => f(h, f(g, 1)));
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => f(f(g, 1), h));
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => f(f(1, g), h));
+assert(check.success());
+
+check = PolyTypeSystem.typecheck(() => f(g, "x"));
+assert(check.failure());
+
+check = PolyTypeSystem.typecheck(() => f("x", g));
+assert(check.failure());
+
+check = PolyTypeSystem.typecheck(() => f(h, f("x", g)));
+assert(check.failure());
+
+check = PolyTypeSystem.typecheck(() => f(h, f(g, "x")));
+assert(check.failure());
+
+check = PolyTypeSystem.typecheck(() => f(f(g, "x"), h));
+assert(check.failure());
+
+check = PolyTypeSystem.typecheck(() => f(f("x", g), h));
 assert(check.failure());

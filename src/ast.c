@@ -10,6 +10,7 @@
 #include "vm.h"
 
 bool astClosure(ObjClosure* closure);
+bool astLocal(uint8_t slot);
 bool astOverload(ObjOverload* overload);
 
 static bool executeMethod(char* method, int argCount) {
@@ -86,7 +87,6 @@ bool astFrame(Value root) {
         vmPush(value);
 
         if (!executeMethod("opExprStatement", 1)) return false;
-
         vmPop();  // nil.
         break;
       }
@@ -101,7 +101,6 @@ bool astFrame(Value root) {
         vmPush(value);
 
         if (!executeMethod("opReturn", 1)) return false;
-
         vmPop();  // nil.
         break;
       }
@@ -131,10 +130,7 @@ bool astFrame(Value root) {
       }
       case OP_GET_LOCAL: {
         uint8_t slot = READ_SHORT();
-        vmPush(root);
-        vmPush(NUMBER_VAL(slot));
-
-        if (!executeMethod("opGetLocal", 1)) return false;
+        if (!astLocal(slot)) return false;
         break;
       }
       case OP_SET_LOCAL: {
@@ -142,7 +138,8 @@ bool astFrame(Value root) {
         Value value = vmPeek(0);
 
         vmPush(root);
-        vmPush(NUMBER_VAL(slot));
+
+        if (!astLocal(slot)) return false;
         vmPush(value);
 
         if (!executeMethod("opSetLocalValue", 2)) return false;
@@ -159,6 +156,17 @@ bool astFrame(Value root) {
         vmPush(OBJ_VAL(upvalue));
 
         if (!executeMethod("opGetUpvalue", 3)) return false;
+        break;
+      }
+      case OP_GET_PROPERTY: {
+        Value key = READ_CONSTANT();
+        Value obj = vmPop();
+
+        vmPush(root);
+        vmPush(obj);
+        vmPush(key);
+        if (!executeMethod("opGetProperty", 2)) return false;
+
         break;
       }
       case OP_SET_PROPERTY: {
@@ -263,16 +271,27 @@ bool astFrame(Value root) {
         break;
       }
 
+      case OP_MEMBER: {
+        Value obj = vmPop();
+        Value val = vmPop();
+
+        vmPush(root);
+        vmPush(val);
+        vmPush(obj);
+        if (!executeMethod("opMember", 2)) return false;
+
+        break;
+      }
+
       case OP_SET_TYPE_LOCAL: {
         uint8_t slot = READ_SHORT();
         Value value = vmPeek(0);
 
         vmPush(root);
-        vmPush(NUMBER_VAL(slot));
+        if (!astLocal(slot)) return false;
         vmPush(value);
 
         if (!executeMethod("opSetLocalType", 2)) return false;
-
         vmPop();  // nil.
         break;
       }
@@ -295,6 +314,23 @@ bool astFrame(Value root) {
   return false;
 }
 
+bool astLocal(uint8_t slot) {
+  vmPush(OBJ_VAL(vm.core.astLocal));
+  vmPush(NUMBER_VAL(slot));
+  return initInstance(vm.core.astLocal, 1);
+}
+
+bool astUpvalues(ObjClosure* closure) {
+  for (int i = 0; i < closure->upvalueCount; i++) {
+    vmPush(OBJ_VAL(vm.core.astUpvalue));
+    vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
+    vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
+    vmPush(OBJ_VAL(closure->upvalues[i]));
+    if (!initInstance(vm.core.astUpvalue, 3)) return false;
+  }
+  return vmTuplify(closure->upvalueCount, true);
+}
+
 bool astClosure(ObjClosure* closure) {
   // we'll populate the frame's local slots as we build
   // the tree, and exit the frame once we're done.
@@ -303,23 +339,40 @@ bool astClosure(ObjClosure* closure) {
   // the root of the tree is an [ASTClosure] instance that has
   // two arguments.
   vmPush(OBJ_VAL(vm.core.astClosure));
-
   // (1) the function itself.
   vmPush(OBJ_VAL(closure));
-
   // (2) the closure's upvalues.
-  for (int i = 0; i < closure->upvalueCount; i++) {
-    vmPush(OBJ_VAL(vm.core.astUpvalue));
-    vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
-    vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
-    vmPush(OBJ_VAL(closure->upvalues[i]));
-    if (!initInstance(vm.core.astUpvalue, 3)) return false;
-  }
-  if (!vmTuplify(closure->upvalueCount, true)) return false;
+  if (!astUpvalues(closure)) return false;
 
   if (!initInstance(vm.core.astClosure, 2)) return false;
 
   return astFrame(vmPeek(0));
+}
+
+bool astBoundFunction(ObjBoundFunction* obj) {
+  vmPop();
+
+  if (obj->type == BOUND_NATIVE) {
+    vmRuntimeError("Undestructurable native.");
+    return false;
+  }
+
+  if (!IS_INSTANCE(obj->receiver) && !IS_CLASS(obj->receiver)) {
+    vmRuntimeError("Receiver not instance or class.");
+    return false;
+  }
+
+  ObjClosure* closure = obj->bound.method;
+  ObjClass* klass = AS_INSTANCE(obj->receiver)->klass;
+
+  vmPush(OBJ_VAL(vm.core.astMethod));
+  vmPush(OBJ_VAL(klass));
+  vmPush(OBJ_VAL(obj));
+  vmPush(obj->receiver);
+  vmPush(OBJ_VAL(closure));
+  if (!astClosure(closure)) return false;
+
+  return initInstance(vm.core.astMethod, 4);
 }
 
 bool astOverload(ObjOverload* overload) {
@@ -343,6 +396,8 @@ bool ast(Value value) {
   switch (value.vType) {
     case VAL_OBJ: {
       switch (OBJ_TYPE(value)) {
+        case OBJ_BOUND_FUNCTION:
+          return astBoundFunction(AS_BOUND_FUNCTION(value));
         case OBJ_CLOSURE:
           return astClosure(AS_CLOSURE(value));
         case OBJ_OVERLOAD:

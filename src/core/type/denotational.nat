@@ -1,30 +1,43 @@
-import src/core/type/simple
 
 class CompositionError extends Error {}
 
-class Domain extends Set {
+class Domain extends Type {
   init(name, *elements) => {
     this.name = name;
-    super.init(..elements);
+    this.elements = Set(..elements);
   }
 
   substitute(c) => this;
   str() => this.name;
 
-  __in__(value) => {
-    if (!hashable(value)) return false;
-    return super.__in__(value);
+  __iter__() => iter(this.elements);
+  // functions are not hashable atm.
+  __in__(value) => hashable(value) and value in this.elements;
+  __eq__(that) => this.elements == that.elements;
+}
+
+class DenotationalTypeState extends PolyTypeState {
+  unify(constraint: Constraint) => {
+    if (constraint is SubtypeConstraint) {
+      if (constraint.left is Domain and constraint.right is Domain) {
+        return constraint.left.elements.subsetEq(constraint.right.elements);
+      }
+    }
+
+    return super.unify(constraint);
   }
 }
 
-class DenotationalTypeState extends SimpleTypeState {}
-
-class DenotationalTypeSystem extends SimpleTypeSystem {
+class DenotationalTypeSystem extends PolyTypeSystem {
   init() => {
     // map from names to domains.
     this.domains = Map();
     // map from literals to their domain names.
     this.literals = Map();
+  }
+
+  resetState() => {
+    this.state = this.TypeStateClass(this, false);
   }
 
   addDomain(domain: Domain) => {
@@ -36,17 +49,10 @@ class DenotationalTypeSystem extends SimpleTypeSystem {
   }
 
   literalType(value) => {
-    let valueType = vType(value);
-
-    if (valueType == CNil) return void;
-    if (valueType == OInstance) return value.__class__;
-    if (valueType == OClass) return tClass;
-    if (valueType == OClosure) return TFunction;
-
-    if (value in this.literals)
+    if (hashable(value) and value in this.literals)
       return this.domains[this.literals[value]];
 
-    throw TypeError("Don't know how to type.");
+    return super.literalType(value);
   }
 }
 
@@ -67,117 +73,47 @@ class TypedTree extends Tree {
   }
 }
 
-class CompositionTypeSystem extends DenotationalTypeSystem {
-  init() => {
-    super.init();
-    this.state = DenotationalTypeState(this, false);
-  }
-
-  // Annotate the tree with typing info.
-  typecheck(node: Tree, throwOnFailure: bool) => {
-    if (node.binary()) {
-      let aTypedTree = this.typecheck(node[0], throwOnFailure),
-          bTypedTree = this.typecheck(node[1], throwOnFailure);
-
-      let a = aTypedTree.data,
-          b = bTypedTree.data;
-
-      let aType = aTypedTree.type,
-          bType = bTypedTree.type;
-
-      let type = void;
-
-      print "checking: " + aType.str() + " / " + bType.str() + ".";
-
-      if (aType is ->) {
-        if (bType == aType.domain)
-          type = aType.range;
-      }
-      
-      if (bType is ->) {
-        if (aType == bType.domain)
-          type = bType.range;
-      }
-
-      if (type == void and throwOnFailure) throw Error(
-        "Failure at (" + str(node.depth) + "," + str(node.breadth) + "). " +
-        "Can't type: " + aType.str() + " / " + bType.str() + "."
-      );
-
-      return TypedTree(node.data, [aTypedTree, bTypedTree], type);
-    }
-
-    if (node.unary()) {
-      let typedChild = this.typecheck(node[0]);
-
-      return TypedTree(
-        node.data,
-        [typedChild],
-        typedChild.type
-      );
-    }
-    
-    if (node.leaf()) {
-      return TypedTree(
-        node.data, [], this.type(node.data, throwOnFailure)
-      );
-    }
-
-    throw CompositionError("Nonbinary tree.");
-  }
-
-  type(value, throwOnFailure: bool) => {
-    // if it's not a function, return its literal type.
-    let exprType = this.literalType(value);
-    if (exprType != TFunction)
-      return exprType;
-  
-    // now check if it has a global type annotation.
-    let node: ASTClosure <- value;
-    exprType = globalTypeEnv()[node.name];
-    if (exprType and globals()[node.name] == value) {
-      return exprType;
-    }
-
-    // otherwise infer it.
-    this.state.rename(node);
-    exprType = this.state.constrain(node);
-    this.state.unify();
-
-    if (throwOnFailure and !this.state.unified()) {
-      print value;
-      throw Error("Can't infer type.");
-    }
-
-    exprType.apply(this.state.solution);
-
-    return exprType;
-  }
-}
-
 class CompositionSystem {
-  init(typeSystem, binaryRules, unaryRules, typeShifters) => {
-    this.typeSystem = typeSystem;
+  init(binaryRules, unaryRules, typeShifters) => {
     this.binaryRules = binaryRules;
     this.unaryRules = unaryRules;
     this.typeShifters = typeShifters;
   }
 
-  typecheck(node: Tree, throwOnFailure: bool) => this.typeSystem.typecheck(node, throwOnFailure);
-
-  interpret(node: Tree) => {
-    if (node.binary()) {
-      let a = this.interpret(node[0]),
-          b = this.interpret(node[1]);
-
-      return this.binaryRules.reduce(
-        (nodes, rule) => rule(..nodes),
-        (a, b)
-      );
+  // Decorate the tree with type information.
+  decorate(node: Tree) => {
+    if (node.leaf()) {
+      let data = node.data;
+      return TypedTree(() => data, [], TypeSystem.type(node.data));
     }
 
-    if (node.leaf()) return node.data;
+    if (node.unary()) {
+      let child = this.decorate(node[0]);
 
-    throw Error("Can't interpret nonbinary tree.");
+      return TypedTree(child.data, [child], child.type);
+    }
+
+    if (node.binary()) {
+      let left = this.decorate(node[0]),
+          right = this.decorate(node[1]);
+
+      for (rule in this.binaryRules) {
+        let l = left.data, r = right.data, data = () => rule(l(), r());
+
+        let type = TypeSystem.type(data);
+
+        if (type.range) {
+          return TypedTree(data, [left, right], type);
+        }
+      }
+
+      return TypedTree(node.data, node.children, nil);
+    }
+
+    throw CompositionError("Nonbinary tree.");
   }
+
+  type(node: Tree) => this.decorate(node).type;
+  interpret(node: Tree) => this.decorate(node).data;
+  typecheck(node: Tree) => this.type(node) != nil;
 }

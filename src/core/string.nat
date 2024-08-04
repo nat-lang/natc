@@ -12,3 +12,5 @@ let join = (seq: Sequential, sep: string) => {
 
   return s;
 };
+
+let indent = (x: num) => join([" " | _ in range(0, x)], "");

@@ -3,9 +3,9 @@
 
 let f <- (a) => 1;
 
-assert(vType(f.function) == OClosure);
+assert(vType(f.function) == OFunction);
+assert(vType(f.function.signature) == OFunction);
 assert(f.upvalues is Sequence);
-assert(vType(f.signature) == OClosure);
 
 assert(f.signature() is ASTSignature);
 assert(len(f.signature().params) == 1);
@@ -190,6 +190,22 @@ assert(f[3][1] is ASTLiteral);
 assert(f[4] is ASTExprStatement);
 assert(f[5] is ASTImplicitReturn);
 
+// property access.
+
+let obj = Object();
+obj.one = 2;
+
+f <- () => obj.one;
+
+let r = f[0][0];
+
+assert(r is ASTPropertyAccess);
+assert(r[0] is ASTGlobal);
+assert(r[0].id == "obj");
+assert(r[0].resolve() == obj);
+assert(r[1] is ASTLiteral);
+assert(r[1].resolve() == "one");
+
 // property assignment.
 
 f <- () => {
@@ -208,6 +224,18 @@ assert(f[2][1].resolve() == "x");
 assert(f[2][2] is ASTLiteral);
 assert(f[2][2].resolve() == 1);
 
+// membership.
+
+f <- () => 1 in [1,2];
+
+let r = f[0][0];
+
+assert(r is ASTMembership);
+assert(r[0] is ASTLiteral);
+assert(r[0].resolve() == 1);
+assert(r[1] is ASTApp);
+assert(r[1].resolve() == [1,2]);
+
 // closures.
 
 f <- (x,z) => {
@@ -220,6 +248,8 @@ f <- (x,z) => {
     return () => x + y + a;
   };
 };
+
+// upvalues.
 
 // upvalues are identified with the locals
 // they close over.
@@ -272,6 +302,36 @@ assert(f[0][0].resolve() == 1);
 set(2);
 assert(f[0][0].resolve() == 2);
 
+// locals.
+
+let f <- () => {
+  let a = 1;
+  a;
+  a = 2;
+  a;
+};
+
+assert(f[0] is ASTLocalTypeAssignment);
+assert(f[0][0] is ASTLocal);
+
+assert(f[1] is ASTLocalValueAssignment);
+assert(f[1][0] is ASTLocal);
+assert(f[1][1] is ASTLiteral);
+
+assert(f[2] is ASTExprStatement);
+assert(f[2][0] is ASTLocal);
+
+assert(f[3] is ASTLocalValueAssignment);
+assert(f[3][0] is ASTLocal);
+assert(f[3][1] is ASTLiteral);
+
+assert(f[4] is ASTExprStatement);
+assert(f[4][0] is ASTLiteral);
+assert(f[4][0].resolve() == 2);
+
+assert(f[5] is ASTExprStatement);
+assert(f[5][0] is ASTLocal);
+
 // overloaded functions.
 
 f <- 1 => true | 2 => false;
@@ -281,10 +341,54 @@ assert(f.count == 2);
 assert(f[0] is ASTClosure);
 assert(f[1] is ASTClosure);
 
-// invocation.
+// classes.
 
-class A {}
+// methods.
+
+class A { f(a) => this; }
+
 let a = A();
+let f <- a.f;
+
+assert(f is ASTMethod);
+
+assert(f.klass == A);
+assert(vType(f.method) == OBoundFunction);
+assert(f.receiver == a);
+assert(f[0] is ASTClosure);
+
+assert(vType(f[0].function) == OFunction);
+assert(vType(f[0].function.signature) == OFunction);
+assert(f[0].upvalues is Sequence);
+assert(f[0].signature() is ASTSignature);
+assert(len(f[0].signature().params) == 1);
+
+let p = f[0].signature().params[0];
+
+assert(p is ASTParameter);
+assert(p.id == 1);
+assert(p.value == nil);
+assert(p.type == undefined);
+
+// membership in methods.
+
+class A {
+  f(x) => x in this.y;
+}
+
+let a = A();
+let f <- a.f;
+
+assert(f is ASTMethod);
+assert(f[0] is ASTClosure);
+assert(f[0][0] is ASTReturn);
+assert(f[0][0][0] is ASTMembership);
+assert(f[0][0][0][0] is ASTLocal);
+assert(f[0][0][0][1] is ASTPropertyAccess);
+assert(f[0][0][0][1][0] is ASTLocal);
+assert(f[0][0][0][1][1] is ASTLiteral);
+
+// invocation.
 
 f <- () => a.f();
 
@@ -302,18 +406,7 @@ assert(f[0][0][0].resolve() is A);
 assert(f[0][0][1] == "f");
 assert(f[0][0][2].resolve() == [1,2,3]);
 
-// resolution, aka evaluation.
-
-// obj language.
-
-f <- (g) => {
-  let k = 1 + 1;
-};
-
-assert(f[1][1] is ASTApp);
-assert(f[1][1].resolve() == 2);
-
-// type language.
+// type assignment.
 
 f <- () => {
   let k = (a: num -> num) => a(1);
@@ -354,7 +447,7 @@ f <- () => {
 let k = f[1][1];
 
 assert(k is ASTClosure);
-assert(vType(k.function.signature) == OClosure);
+assert(vType(k.function.signature) == OFunction);
 assert(k.signature() is ASTSignature);
 assert(len(k.signature().params) == 1);
 

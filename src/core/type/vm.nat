@@ -17,8 +17,9 @@ class OVariable extends CObject {}
 class OClass extends CObject {}
 class OInstance extends CObject {}
 class OString extends CObject {}
-class OClosure extends CObject {}
 class ONative extends CObject {}
+class OFunction extends CObject {}
+class OBoundFunction extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
 

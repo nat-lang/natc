@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "compiler.h"
+#include "debug.h"
 #include "io.h"
 
 static void defineNativeFn(char* name, int arity, bool variadic,
@@ -157,19 +158,6 @@ bool __objKeys__(int argCount, Value* args) {
   return true;
 }
 
-bool __objHas__(int argCount, Value* args) {
-  uint32_t hash;
-  if (!vmHashValue(vmPeek(0), &hash)) return false;
-
-  bool hasKey =
-      mapHasHash(&AS_INSTANCE(vmPeek(1))->fields, vmPeek(0), hash) ||
-      mapHasHash(&AS_INSTANCE(vmPeek(1))->klass->fields, vmPeek(0), hash);
-  vmPop();  // key.
-  vmPop();  // obj.
-  vmPush(BOOL_VAL(hasKey));
-  return true;
-}
-
 bool __randomNumber__(int argCount, Value* args) {
   Value upperBound = vmPop();
   vmPop();  // native fn.
@@ -267,9 +255,16 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_STRING:
           vmPush(OBJ_VAL(vm.core.oTypeString));
           break;
-        case OBJ_BOUND_FUNCTION:
+        case OBJ_BOUND_FUNCTION: {
+          ObjBoundFunction* obj = AS_BOUND_FUNCTION(value);
+          if (obj->type == BOUND_NATIVE)
+            vmPush(OBJ_VAL(vm.core.oTypeNative));
+          else
+            vmPush(OBJ_VAL(vm.core.oTypeBoundFunction));
+          break;
+        }
         case OBJ_CLOSURE:
-          vmPush(OBJ_VAL(vm.core.oTypeClosure));
+          vmPush(OBJ_VAL(vm.core.oTypeFunction));
           break;
         case OBJ_NATIVE:
           vmPush(OBJ_VAL(vm.core.oTypeNative));
@@ -428,6 +423,13 @@ bool __resolveUpvalue__(int argCount, Value* args) {
   return true;
 }
 
+bool __stackTrace__(int argCount, Value* args) {
+  vmPop();
+  disassembleStack();
+  printf("\n");
+  return true;
+}
+
 InterpretResult initializeCore() {
   // native functions.
 
@@ -441,6 +443,7 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
   defineNativeFnGlobal("resolveUpvalue", 1, __resolveUpvalue__);
+  defineNativeFnGlobal("stackTrace", 0, __stackTrace__);
 
   defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
   defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
@@ -454,7 +457,6 @@ InterpretResult initializeCore() {
   // native classes.
 
   vm.core.base = defineNativeClass(S_BASE);
-  defineNativeFnMethod("has", 1, false, __objHas__, vm.core.base);
   defineNativeFnMethod("keys", 0, false, __objKeys__, vm.core.base);
 
   // core classes.
@@ -477,8 +479,11 @@ InterpretResult initializeCore() {
   if ((vm.core.map = getGlobalClass(S_MAP)) == NULL ||
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
+      (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
       (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
+      (vm.core.astLocal = getGlobalClass(S_AST_LOCAL)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
+      (vm.core.astMembership = getGlobalClass(S_AST_MEMBERSHIP)) == NULL ||
       (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
@@ -488,8 +493,10 @@ InterpretResult initializeCore() {
       (vm.core.oTypeClass = getGlobalClass(S_OTYPE_CLASS)) == NULL ||
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
       (vm.core.oTypeString = getGlobalClass(S_OTYPE_STRING)) == NULL ||
-      (vm.core.oTypeClosure = getGlobalClass(S_OTYPE_CLOSURE)) == NULL ||
       (vm.core.oTypeNative = getGlobalClass(S_OTYPE_NATIVE)) == NULL ||
+      (vm.core.oTypeFunction = getGlobalClass(S_OTYPE_FUNCTION)) == NULL ||
+      (vm.core.oTypeBoundFunction = getGlobalClass(S_OTYPE_BOUND_FUNCTION)) ==
+          NULL ||
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
       (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 
