@@ -1,8 +1,12 @@
-import src/core/type/adhoc
 
-let check;
 let type = AdhocTypeSystem.type;
-let typecheck = AdhocTypeSystem.typecheck;
+
+let typecheck = x => assert(
+  AdhocTypeSystem.typecheck(x).success()
+);
+let typefail = x => assert(
+  AdhocTypeSystem.typecheck(x).failure()
+);
 
 // the overload type derives from the signatures of its cases.
 
@@ -58,114 +62,79 @@ assert(f != (bool -> void <+> bool -> void));
 let f = (x: num) => nil | (x: bool) => nil;
 
 // (num -> void <+> bool -> void) < num -> w
-check = typecheck((x: num) => f(x));
-assert(check.success());
+typecheck((x: num) => f(x));
 
 // (num -> void <+> bool -> void) < bool -> w
-check = typecheck((x: bool) => f(x));
-assert(check.success());
+typecheck((x: bool) => f(x));
 
 // (num -> void <+> bool -> void) < (num || bool) -> w
 // (num -> void <+> bool -> void) < (num -> w <+> bool -> w)
-check = typecheck((x: num || bool) => f(x));
-assert(check.success());
+typecheck((x: num || bool) => f(x));
 
 // (num -> void <+> bool -> void) < (num || bool || string) -> w
 // (num -> void <+> bool -> void) < (num -> w <+> bool -> w <+> string -> w)
-check = typecheck((x: num || bool || string) => f(x));
-assert(check.failure());
+typefail((x: num || bool || string) => f(x));
 
 // order of the cases doesn't matter.
 
 let f = (x: bool) => nil | (x: num) => nil;
 
-check = typecheck((x: num) => f(x));
-assert(check.success());
+typecheck((x: num) => f(x));
+typecheck((x: bool) => f(x));
+typecheck((x: num || bool) => f(x));
 
-check = typecheck((x: bool) => f(x));
-assert(check.success());
-
-check = typecheck((x: num || bool) => f(x));
-assert(check.success());
-
-check = typecheck((x: num || bool || string) => f(x));
-assert(check.failure());
+typefail((x: num || bool || string) => f(x));
 
 // heterogenous range.
 
 let f = (x: num) => true | (x: bool) => nil;
 
 // (num -> bool <+> bool -> void) < num -> w
-check = typecheck((x: num) => f(x));
-assert(check.success());
+typecheck((x: num) => f(x));
 
 // (num -> bool <+> bool -> void) < bool -> w
-check = typecheck((x: bool) => f(x));
-assert(check.success());
+typecheck((x: bool) => f(x));
 
 // (num -> bool <+> bool -> void) < (num || bool) -> w
 // (num -> bool <+> bool -> void) < (num -> w <+> bool -> w)
-check = typecheck((x: bool || num) => f(x));
-assert(check.success());
+typecheck((x: bool || num) => f(x));
 
 // (num -> bool <+> bool -> void) < (num || bool || string) -> w
 // (num -> bool <+> bool -> void) < (num -> w <+> bool -> w <+> string -> w)
-check = typecheck((x: num || bool || string) => f(x));
-assert(check.failure());
+typefail((x: num || bool || string) => f(x));
 
 // constraints on range.
 
 let f = (x: num) => nil | (x: void) => true;
-
 let g = (x: bool) => x;
 
-check = typecheck((x: num || void) => g(f(x)));
-assert(check.failure());
+typefail((x: num || void) => g(f(x)));
+typefail((x: num) => g(f(x)));
 
-check = typecheck((x: num) => g(f(x)));
-assert(check.failure());
-
-check = typecheck((x: void) => g(f(x)));
-assert(check.success());
+typecheck((x: void) => g(f(x)));
 
 let h = (x: void) => x;
 
-check = typecheck((x: num || void) => h(f(x)));
-assert(check.failure());
+typefail((x: num || void) => h(f(x)));
+typefail((x: void) => h(f(x)));
 
-check = typecheck((x: void) => h(f(x)));
-assert(check.failure());
-
-check = typecheck((x: num) => h(f(x)));
-assert(check.success());
+typecheck((x: num) => h(f(x)));
 
 let k = (x: bool || void) => x;
 
-check = typecheck((x: num || void || string) => k(f(x)));
-assert(check.failure());
+typefail((x: num || void || string) => k(f(x)));
 
-check = typecheck((x: num || void) => k(f(x)));
-assert(check.success());
-
-check = typecheck((x: void) => k(f(x)));
-assert(check.success());
-
-check = typecheck((x: num) => k(f(x)));
-assert(check.success());
+typecheck((x: num || void) => k(f(x)));
+typecheck((x: void) => k(f(x)));
+typecheck((x: num) => k(f(x)));
 
 let j = (x: bool || void || string) => x;
 
-check = typecheck((x: num || void || string) => j(f(x)));
-assert(check.failure());
+typefail((x: num || void || string) => j(f(x)));
 
-check = typecheck((x: num || void) => j(f(x)));
-assert(check.success());
-
-check = typecheck((x: void) => j(f(x)));
-assert(check.success());
-
-check = typecheck((x: num) => j(f(x)));
-assert(check.success());
+typecheck((x: num || void) => j(f(x)));
+typecheck((x: void) => j(f(x)));
+typecheck((x: num) => j(f(x)));
 
 // fn is subtype of overload
 // --------------------------------------
@@ -177,28 +146,19 @@ assert(check.success());
 let g : (num -> bool <+> string -> bool) -> void;
     g = f => nil;
 
-check = typecheck((f: (num || string) -> bool) => g(f));
-assert(check.success());
+typecheck((f: (num || string) -> bool) => g(f));
 
-check = typecheck((f: (num || string) -> (bool || void)) => g(f));
-assert(check.failure());
-
-check = typecheck((f: num -> bool) => g(f));
-assert(check.failure());
-
-check = typecheck((f: string -> bool) => g(f));
-assert(check.failure());
+typefail((f: (num || string) -> (bool || void)) => g(f));
+typefail((f: num -> bool) => g(f));
+typefail((f: string -> bool) => g(f));
 
 // overload has heterogenous range.
 
 let g : (num -> bool <+> string -> string) -> void;
     g = f => nil;
 
-check = typecheck((f: (num || string) -> (bool || string)) => g(f));
-assert(check.failure());
-
-check = typecheck((f: (num || string) -> (bool || string)) => g(f));
-assert(check.failure());
+typefail((f: (num || string) -> (bool || string)) => g(f));
+typefail((f: (num || string) -> (bool || string)) => g(f));
 
 // overload is subtype of overload.
 // --------------------------------------
@@ -206,33 +166,20 @@ assert(check.failure());
 let g : (num -> bool <+> string -> bool) -> void;
     g = f => nil;
 
-check = typecheck((f: num -> bool <+> string -> bool) => g(f));
-assert(check.success());
+typecheck((f: num -> bool <+> string -> bool) => g(f));
+typecheck((f: string -> bool <+> num -> bool) => g(f));
 
-check = typecheck((f: string -> bool <+> num -> bool) => g(f));
-assert(check.success());
+typefail((f: num -> void <+> string -> bool) => g(f));
+typefail((f: num -> bool <+> string -> void) => g(f));
 
-check = typecheck((f: num -> void <+> string -> bool) => g(f));
-assert(check.failure());
-
-check = typecheck((f: num -> bool <+> string -> void) => g(f));
-assert(check.failure());
-
-check = typecheck((f: string -> bool <+> num -> bool <+> bool -> bool) => g(f));
-assert(check.success());
-
-check = typecheck((f: string -> bool <+> num -> bool <+> bool -> void) => g(f));
-assert(check.success());
+typecheck((f: string -> bool <+> num -> bool <+> bool -> bool) => g(f));
+typecheck((f: string -> bool <+> num -> bool <+> bool -> void) => g(f));
 
 // an overload composes with itself when its signature allows.
 
 let f = (x: num) => true | (x: bool) => nil;
 
-check = typecheck((x: num || bool) => f(f(x)));
-assert(check.failure());
+typefail((x: num || bool) => f(f(x)));
+typefail((x: bool) => f(f(x)));
 
-check = typecheck((x: bool) => f(f(x)));
-assert(check.failure());
-
-check = typecheck((x: num) => f(f(x)));
-assert(check.success());
+typecheck((x: num) => f(f(x)));

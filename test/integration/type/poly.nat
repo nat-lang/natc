@@ -1,4 +1,9 @@
-import src/core/type/poly
+let typecheck = x => assert(
+  PolyTypeSystem.typecheck(x).success()
+);
+let typefail = x => assert(
+  PolyTypeSystem.typecheck(x).failure()
+);
 
 // type generalization, aka abstraction.
 
@@ -16,11 +21,9 @@ assert(f.fn(c,d) == c -> d);
 let g = TAbstract.generalize(TProduct([a,b]));
 assert(g.fn(c,d) == TProduct([c,d]));
 
-let check;
-
 // the simple type system fails here.
 
-check = SimpleTypeSystem.typecheck(() => {
+let check = SimpleTypeSystem.typecheck(() => {
   let id = x => x;
 
   id(1);
@@ -34,7 +37,7 @@ assert(check.failure());
 
 // explicit abstraction.
 
-check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   let id: (a => a -> a) = x => x;
 
   id(1);
@@ -42,17 +45,13 @@ check = PolyTypeSystem.typecheck(() => {
   id("string");
 });
 
-assert(check.success());
-
 let id: (a => a -> a) = x => x;
 
-check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   id(1);
   id(true);
   id("string");
 });
-
-assert(check.success());
 
 // implicit abstraction in let annotation.
 
@@ -67,23 +66,19 @@ assert(t(num) is TFunction);
 assert(t(num).domain == num);
 assert(t(num).range == num);
 
-check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   id(1);
   id(true);
   id("string");
 });
 
-assert(check.success());
-
-check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   let id: w -> w = x => x;
 
   id(1);
   id(true);
   id("string");
 });
-
-assert(check.success());
 
 // two parameters.
 
@@ -100,15 +95,13 @@ assert(t(num, string).range == string);
 
 let id = (x: w) => x;
 
-check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   id(1);
   id(true);
   id("string");
 });
 
-assert(check.success());
-
-check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   let id = (x: w) => x;
 
   id(1);
@@ -116,24 +109,18 @@ check = PolyTypeSystem.typecheck(() => {
   id("string");
 });
 
-assert(check.success());
-
 // identity between type variables is preserved.
 
-check = PolyTypeSystem.typecheck((x: w -> z, y: u) => y(x));
-assert(check.success());
+typecheck((x: w -> z, y: u) => y(x));
+typecheck((x: w -> z, y: w) => x(y));
 
-check = PolyTypeSystem.typecheck((x: w -> z, y: w) => y(x));
-assert(check.failure());
-
-check = PolyTypeSystem.typecheck((x: w -> z, y: w) => x(y));
-assert(check.success());
+typefail((x: w -> z, y: w) => y(x));
 
 // reconstruction.
 
-// first order succeeds:
+// first order succeeds.
 
-check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   let id = x => x;
 
   id(1);
@@ -141,17 +128,13 @@ check = PolyTypeSystem.typecheck(() => {
   id("string");
 });
 
-assert(check.success());
+// second order fails.
 
-// second order fails:
-
-check = PolyTypeSystem.typecheck((id) => {
+typefail((id) => {
   id(1);
   id(true);
   id("string");
 });
-
-assert(check.failure());
 
 // poly adhoc.
 
@@ -161,38 +144,16 @@ let f = (a: x -> y, b: x) => a(b)
 let g: num -> string = x => "y";
 let h: string -> num = x => 1;
 
-check = PolyTypeSystem.typecheck(() => f(g, 1));
-assert(check.success());
+typecheck(() => f(g, 1));
+typecheck(() => f(1, g));
+typecheck(() => f(h, f(1, g)));
+typecheck(() => f(h, f(g, 1)));
+typecheck(() => f(f(g, 1), h));
+typecheck(() => f(f(1, g), h));
 
-check = PolyTypeSystem.typecheck(() => f(1, g));
-assert(check.success());
-
-check = PolyTypeSystem.typecheck(() => f(h, f(1, g)));
-assert(check.success());
-
-check = PolyTypeSystem.typecheck(() => f(h, f(g, 1)));
-assert(check.success());
-
-check = PolyTypeSystem.typecheck(() => f(f(g, 1), h));
-assert(check.success());
-
-check = PolyTypeSystem.typecheck(() => f(f(1, g), h));
-assert(check.success());
-
-check = PolyTypeSystem.typecheck(() => f(g, "x"));
-assert(check.failure());
-
-check = PolyTypeSystem.typecheck(() => f("x", g));
-assert(check.failure());
-
-check = PolyTypeSystem.typecheck(() => f(h, f("x", g)));
-assert(check.failure());
-
-check = PolyTypeSystem.typecheck(() => f(h, f(g, "x")));
-assert(check.failure());
-
-check = PolyTypeSystem.typecheck(() => f(f(g, "x"), h));
-assert(check.failure());
-
-check = PolyTypeSystem.typecheck(() => f(f("x", g), h));
-assert(check.failure());
+typefail(() => f(g, "x"));
+typefail(() => f("x", g));
+typefail(() => f(h, f("x", g)));
+typefail(() => f(h, f(g, "x")));
+typefail(() => f(f(g, "x"), h));
+typefail(() => f(f("x", g), h));
