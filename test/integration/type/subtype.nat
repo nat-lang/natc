@@ -1,40 +1,29 @@
 
-let check;
-let typecheck = SubtypeSystem.typecheck;
+let typecheck = x => assert(
+  SubtypeSystem.typecheck(x).success()
+);
+let typefail = x => assert(
+  SubtypeSystem.typecheck(x).failure()
+);
 
 // arguments must be subtypes.
 
 let f: num -> void;
 let g: bool -> void;
 
-check = typecheck((x: num || bool) => f(x));
-assert(check.failure());
-
-check = typecheck((x: num || bool) => g(x));
-assert(check.failure());
+typefail((x: num || bool) => f(x));
+typefail((x: num || bool) => g(x));
 
 let f: (bool || string) -> void = x => {};
 
-check = typecheck((x: bool) => f(x));
-assert(check.success());
+typecheck((x: bool) => f(x));
+typecheck((x: string) => f(x));
+typecheck((x: bool || string) => f(x));
 
-check = typecheck((x: string) => f(x));
-assert(check.success());
-
-check = typecheck((x: bool || string) => f(x));
-assert(check.success());
-
-check = typecheck((x: num) => f(x));
-assert(check.failure());
-
-check = typecheck((x: bool || num) => f(x));
-assert(check.failure());
-
-check = typecheck((x: string || num) => f(x));
-assert(check.failure());
-
-check = typecheck((x: bool || string || num) => f(x));
-assert(check.failure());
+typefail((x: num) => f(x));
+typefail((x: bool || num) => f(x));
+typefail((x: string || num) => f(x));
+typefail((x: bool || string || num) => f(x));
 
 // the subtype relation for functions is contravariant in the domain
 // and covariant in the range.
@@ -47,60 +36,39 @@ let f: (bool -> void) -> void = f => {};
 //   .. (bool -> void) > (bool || string) -> void
 //   .. bool           < (bool || string)
 
-check = typecheck((x: (bool || string) -> void) => f(x));
-assert(check.success());
+typecheck((x: (bool || string) -> void) => f(x));
 
 let f: ((bool || string) -> void) -> void = f => {};
 
-check = typecheck((x: bool -> void) => f(x));
-assert(check.failure());
+typefail((x: bool -> void) => f(x));
+typefail((x: string -> void) => f(x));
 
-check = typecheck((x: string -> void) => f(x));
-assert(check.failure());
-
-check = typecheck((x: (bool || string) -> void) => f(x));
-assert(check.success());
-
-check = typecheck((x: (bool || string || num) -> void) => f(x));
-assert(check.success());
+typecheck((x: (bool || string) -> void) => f(x));
+typecheck((x: (bool || string || num) -> void) => f(x));
 
 // covariant ranges:
 
 let f: (() -> bool) -> void = g => {};
 
-check = typecheck((x: () -> (bool || string)) => f(x));
-assert(check.failure());
+typefail((x: () -> (bool || string)) => f(x));
 
 let f: (() -> (bool || string)) -> void = g => {};
 
-check = typecheck((x: () -> bool) => f(x));
-assert(check.success());
+typecheck((x: () -> bool) => f(x));
+typecheck((x: () -> string) => f(x));
+typecheck((x: () -> (bool || string)) => f(x));
 
-check = typecheck((x: () -> string) => f(x));
-assert(check.success());
-
-check = typecheck((x: () -> (bool || string)) => f(x));
-assert(check.success());
-
-check = typecheck((x: () -> (bool || string || num)) => f(x));
-assert(check.failure());
+typefail((x: () -> (bool || string || num)) => f(x));
 
 // sums of products.
 
 let f: (num, num) || (string, string) -> void = x => {};
 
-check = typecheck((x: (string, string)) => f(x));
-check.ppConstraints();
-assert(check.success());
+typecheck((x: (string, string)) => f(x));
+typecheck((x: (num, num)) => f(x));
 
-check = typecheck((x: (num, num)) => f(x));
-assert(check.success());
-
-check = typecheck((x: (num, string)) => f(x));
-assert(check.failure());
-
-check = typecheck((x: (string, num)) => f(x));
-assert(check.failure());
+typefail((x: (num, string)) => f(x));
+typefail((x: (string, num)) => f(x));
 
 // reconstruction.
 
@@ -114,29 +82,14 @@ assert(type == (num || string) -> void);
 
 let f: (num || string, num || bool) -> void = (x,y) => {};
 
-check = typecheck((x: num, y: num) => f(x,y));
-assert(check.success());
-
-check = typecheck((x: num, y: bool) => f(x,y));
-assert(check.success());
-
-check = typecheck((x: string, y: num) => f(x,y));
-assert(check.success());
-
-check = typecheck((x: string, y: bool) => f(x,y));
-assert(check.success());
-
-check = typecheck((x: num || string, y: num) => f(x,y));
-assert(check.success());
-
-check = typecheck((x: num || string, y: bool) => f(x,y));
-assert(check.success());
-
-check = typecheck((x: string, y: num || bool) => f(x,y));
-assert(check.success());
-
-check = typecheck((x: num, y: num || bool) => f(x,y));
-assert(check.success());
+typecheck((x: num, y: num) => f(x,y));
+typecheck((x: num, y: bool) => f(x,y));
+typecheck((x: string, y: num) => f(x,y));
+typecheck((x: string, y: bool) => f(x,y));
+typecheck((x: num || string, y: num) => f(x,y));
+typecheck((x: num || string, y: bool) => f(x,y));
+typecheck((x: string, y: num || bool) => f(x,y));
+typecheck((x: num, y: num || bool) => f(x,y));
 
 // classes.
 
@@ -148,28 +101,37 @@ let f: A -> A = x => x;
 
 // subclasses are subtypes.
 
-check = typecheck((x: B) => f(x));
-assert(check.success());
+typecheck((x: B) => f(x));
 
 // the relation is reflexive.
 
-check = typecheck((x: A) => f(x));
-assert(check.success());
+typecheck((x: A) => f(x));
 
 // transitive.
 
-check = typecheck((x: C) => f(x));
-assert(check.success());
+typecheck((x: C) => f(x));
 
 let f: C -> C = x => x;
 
-check = typecheck((x: C) => f(x));
-assert(check.success());
+typecheck((x: C) => f(x));
 
 // asymmetric.
 
-check = typecheck((x: B) => f(x));
-assert(check.failure());
+typefail((x: B) => f(x));
+typefail((x: A) => f(x));
 
-check = typecheck((x: A) => f(x));
-assert(check.failure());
+// membership.
+// --------------------------------------------
+
+class A {}
+
+typecheck(x => x in A());
+
+class B {
+  __in__(x: num) => false;
+}
+
+typecheck(x => x in B());
+typecheck(x => 1 in B());
+
+typefail(x => true in B());

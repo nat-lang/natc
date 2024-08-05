@@ -6,7 +6,7 @@
 #include "object.h"
 #include "value.h"
 
-#define FRAMES_MAX 64
+#define FRAMES_MAX 2000
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
 #define READ_BYTE() (*frame->ip++)
@@ -39,8 +39,11 @@ typedef struct {
   ObjClass* iterator;
 
   ObjClass* astClosure;
+  ObjClass* astMethod;
   ObjClass* astUpvalue;
+  ObjClass* astLocal;
   ObjClass* astOverload;
+  ObjClass* astMembership;
 
   ObjClass* vTypeUnit;
   ObjClass* vTypeBool;
@@ -51,8 +54,9 @@ typedef struct {
   ObjClass* oTypeClass;
   ObjClass* oTypeInstance;
   ObjClass* oTypeString;
-  ObjClass* oTypeClosure;
   ObjClass* oTypeNative;
+  ObjClass* oTypeFunction;
+  ObjClass* oTypeBoundFunction;
   ObjClass* oTypeOverload;
   ObjClass* oTypeSequence;
 

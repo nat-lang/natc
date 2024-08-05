@@ -13,7 +13,7 @@ let unify = (function, arguments) => {
   if (len(signature.domain) != len(arguments))
     return false;
 
-  let state = TypeSystem.newState();
+  let state = TypeSystem.TypeStateClass(TypeSystem, false);
   let paramTypes = [];
 
   for (let i = 0; i < len(arguments); i = i + 1) {

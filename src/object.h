@@ -20,6 +20,7 @@
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
 #define IS_SPREAD(value) isObjType(value, OBJ_SPREAD)
+#define IS_UPVALUE(value) isObjType(value, OBJ_UPVALUE)
 
 #define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
@@ -35,6 +36,7 @@
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
 #define AS_SPREAD(value) (((ObjSpread *)AS_OBJ(value)))
+#define AS_UPVALUE(value) (((ObjUpvalue *)AS_OBJ(value)))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 

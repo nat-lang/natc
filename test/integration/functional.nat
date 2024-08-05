@@ -20,23 +20,36 @@ assert(j.variadic);
 let k = 1 => 1;
 assert(k.patterned);
 
+// function properties can be assigned.
+
+f.x = 1;
+assert(f.x == 1);
+
+// methods have the same default properties.
+
+class A { f() => {} }
+
+let f = A().f;
+
+assert(f.name == "f");
+assert(f.arity == 0);
+assert(f.variadic == false);
+assert(f.patterned == false);
+
+// and they can be assigned.
+
+f.x = 1;
+assert(f.x == 1);
+
 // anonymous functions have a name.
 
-// fixme: this causes valgrind to report an invalid read, notably
-// only on the ci runner.
-
-// assert((() => true).name == "lambda");
+assert((() => true).name == "lambda");
 
 // functions assigned after declaration have names.
 
 let g;
 g = () => 1;
 assert(g.name == "g");
-
-// function properties can be assigned.
-
-f.x = 1;
-assert(f.x == 1);
 
 // functions have optional type annotations.
 // --------------------------------------
@@ -147,7 +160,7 @@ let k = a . (b . c);
 assert(h(1) == j(1));
 assert(j(1) == k(1));
 
-// functions can have variable length domains.
+// functions can have variable length parameters.
 // --------------------------------------
 
 // 100% variadic.
@@ -264,7 +277,7 @@ h = (1, *args) => {
 };
 h(1);
 
-// methods can have variable length domains too.
+// methods can have variable length parameters too.
 
 class Variadic {
   call(*args) => args;

@@ -34,4 +34,6 @@ class Map extends Object {
 
     return this.subMap(that) and that.subMap(this);
   }
+
+  copy() => this.__class__(..this.entries());
 }

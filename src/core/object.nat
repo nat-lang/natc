@@ -11,8 +11,8 @@ class Object extends Base {
   __len__() => len(this.keys());
   __iter__() => iter(this.entries());
 
-  extend(other: Object) => {
-    for (x in other)
+  extend(obj: Object) => {
+    for (x in obj)
       this[x[0]] = x[1];
   }
 

@@ -51,12 +51,8 @@ class ASTNode extends Tree {
       if (node is ASTLocal)
         rename(node, varEnv.locals);
 
-      if (node is ASTUpvalue) {
-        if (!varEnv.upvalues[node.id]) {
-          throw Error("Upvalue (" + str(node.id) + ") missing uuid.");
-        }
+      if (node is ASTUpvalue)
         node.uuid = varEnv.upvalues[node.id];
-      }
 
       if (node is ASTGlobal)
         rename(node, globals);
@@ -89,7 +85,7 @@ class ASTLiteral extends ASTExpr {
 class ASTNegation extends ASTExpr {}
 
 class ASTSequence extends ASTExpr {
-  resolve() => this.children.map(x => x.resolve());
+  resolve() => this.children.map(node => node.resolve());
 }
 
 class ASTPatternVariable extends ASTExpr {
@@ -118,13 +114,15 @@ class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
 }
 class ASTUpvalue extends ASTVariable {
-  init(id, localId) => {
+  init(id, localId, upvalue) => {
     super.init(id);
     this.localId = localId;
+    this.upvalue = upvalue;
   }
+  resolve() => resolveUpvalue(this.upvalue);
 }
 
-class ASTParameter extends ASTLocal {
+class ASTParameter extends ASTVariable {
   init(id, name, type) => {
     super.init(id);
     this.name = name;
@@ -133,7 +131,7 @@ class ASTParameter extends ASTLocal {
 }
 
 class ASTArgumentSequence extends ASTExpr {
-  resolve() => this.children.map((node) => node.resolve());
+  resolve() => this.children.map(node => node.resolve());
 }
 
 class ASTApp extends ASTExprStatement {
@@ -141,7 +139,9 @@ class ASTApp extends ASTExprStatement {
     let fn = this[0].resolve();
     let args = this[1].resolve();
 
-    return fn(..args);
+    if (len(args) > 0)
+      return fn(..args);
+    return fn();
   }
 
   resolve() => this.evaluate();
@@ -159,6 +159,18 @@ class ASTInvocation extends ASTApp {
   resolve() => this.evaluate();
 }
 
+class ASTPropertyAccess extends ASTExpr {
+  init(obj, key) => {
+    this.children = [obj, key];
+  }
+}
+
+class ASTMembership extends ASTExpr {
+  init(element, collection) => {
+    this.children = [element, collection];
+  }
+}
+
 class ASTSignature extends ASTNode {
   init(params) => {
     this.params = params;
@@ -173,18 +185,6 @@ class ASTClosure extends ASTExpr {
   }
 
   resolve() => this.function;
-
-  // expressions.
-
-  opLiteral(value) => ASTLiteral(value);
-  opNot(value) => ASTNegation(value);
-  opSequence(seq) => ASTSequence(..Sequential.fromRaw(seq));
-  opGetLocal(slot) => ASTLocal(slot);
-  opGetGlobal(name) => ASTGlobal(name);
-  opGetUpvalue(slot, localSlot) => ASTUpvalue(slot, localSlot);
-  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
-  opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
-  opVariable(var) => ASTPatternVariable(var);
 
   sign() => {
     if (!this.function.signature) return ASTSignature([]);
@@ -220,6 +220,19 @@ class ASTClosure extends ASTExpr {
     return this._signature;
   }
 
+  // expressions.
+
+  opLiteral(value) => ASTLiteral(value);
+  opNot(value) => ASTNegation(value);
+  opSequence(seq) => ASTSequence(..Sequential.fromRaw(seq));
+  opGetGlobal(name) => ASTGlobal(name);
+  opGetUpvalue(address, localSlot, upvalue) => ASTUpvalue(address, localSlot, upvalue);
+  opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
+  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
+  opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
+  opVariable(var) => ASTPatternVariable(var);
+  opMember(element, collection) => ASTMembership(element, collection);
+
   // statements.
 
   opSignature(signature) => {
@@ -231,16 +244,13 @@ class ASTClosure extends ASTExpr {
     this.children.push(node);
   }
 
-  opSetLocalValue(slot, value) => {
-    let local = ASTLocal(slot);
+  opSetLocalValue(local, value) => {
     let node = ASTLocalValueAssignment(local, value);
     this.children.push(node);
   }
 
-  opSetLocalType(slot, value) => {
-    let local = ASTLocal(slot);
-    let node = ASTLocalTypeAssignment(local, value);
-
+  opSetLocalType(local, type) => {
+    let node = ASTLocalTypeAssignment(local, type);
     this.children.push(node);
   }
 
@@ -261,6 +271,15 @@ class ASTClosure extends ASTExpr {
   }
 }
 
+class ASTMethod extends ASTExpr {
+  init(klass, method, receiver, closure) => {
+    this.klass = klass;
+    this.method = method;
+    this.receiver = receiver;
+    this.children = [closure];
+  }
+}
+
 class ASTOverload extends ASTExpr {
   init(overload, count, closures) => {
     this.overload = overload;
@@ -268,3 +287,4 @@ class ASTOverload extends ASTExpr {
     this.children = closures;
   }
 }
+

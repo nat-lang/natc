@@ -68,8 +68,11 @@ void initCore(Core* core) {
   core->iterator = NULL;
 
   core->astClosure = NULL;
+  core->astMethod = NULL;
   core->astUpvalue = NULL;
+  core->astLocal = NULL;
   core->astOverload = NULL;
+  core->astMembership = NULL;
 
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
@@ -78,8 +81,9 @@ void initCore(Core* core) {
   core->oTypeClass = NULL;
   core->oTypeInstance = NULL;
   core->oTypeString = NULL;
-  core->oTypeClosure = NULL;
   core->oTypeNative = NULL;
+  core->oTypeFunction = NULL;
+  core->oTypeBoundFunction = NULL;
   core->oTypeOverload = NULL;
   core->oTypeSequence = NULL;
   core->unify = NULL;
@@ -717,8 +721,9 @@ InterpretResult vmExecute(int baseFrame) {
 
             if (!mapGet(&instance->fields, name, &value)) {
               // class prop. must be a method.
-              if (mapGet(&instance->klass->fields, name, &value))
+              if (mapGet(&instance->klass->fields, name, &value)) {
                 bindClosure(vmPeek(0), &value);
+              }
             }
 
             vmPop();  // instance.
@@ -743,7 +748,17 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
+          case OBJ_BOUND_FUNCTION: {
+            ObjBoundFunction* obj = AS_BOUND_FUNCTION(vmPop());
 
+            if (obj->type == BOUND_NATIVE) {
+              vmRuntimeError("Natives have no properties.");
+              return INTERPRET_RUNTIME_ERROR;
+            }
+
+            vmPush(OBJ_VAL(obj->bound.method));
+          }
+            __attribute__((fallthrough));
           case OBJ_CLOSURE: {
             ObjClosure* closure = AS_CLOSURE(vmPeek(0));
 
@@ -753,6 +768,7 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
+
           default:
             vmRuntimeError(ERROR);
             return INTERPRET_RUNTIME_ERROR;
@@ -778,6 +794,15 @@ InterpretResult vmExecute(int baseFrame) {
           case OBJ_CLASS:
             fields = &AS_CLASS(vmPeek(1))->fields;
             break;
+          case OBJ_BOUND_FUNCTION: {
+            ObjBoundFunction* obj = AS_BOUND_FUNCTION(vmPeek(1));
+            if (obj->type == BOUND_NATIVE) {
+              vmRuntimeError("Can't set property of native.");
+              return INTERPRET_RUNTIME_ERROR;
+            }
+            fields = &obj->bound.method->function->fields;
+            break;
+          }
           case OBJ_CLOSURE:
             fields = &AS_CLOSURE(vmPeek(1))->function->fields;
             break;
@@ -989,33 +1014,48 @@ InterpretResult vmExecute(int baseFrame) {
         Value obj = vmPop();
         Value val = vmPop();
 
-        if (IS_SEQUENCE(obj)) {
-          bool seqHasVal = findInValueArray(&AS_SEQUENCE(obj)->values, val);
-          vmPush(BOOL_VAL(seqHasVal));
-          break;
-        }
+        char* error =
+            "Only objects, classes, and sequences may be tested for "
+            "membership.";
 
-        if (!IS_INSTANCE(obj)) {
-          vmRuntimeError(
-              "Only objects or sequences may be tested for membership.");
+        if (!IS_OBJ(obj)) {
+          vmRuntimeError(error);
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        ObjInstance* instance = AS_INSTANCE(obj);
+        switch (OBJ_TYPE(obj)) {
+          case OBJ_INSTANCE: {
+            ObjInstance* instance = AS_INSTANCE(obj);
 
-        // classes can override the membership predicate.
-        Value memFn;
-        if (mapGet(&instance->klass->fields, INTERN(S_IN), &memFn)) {
-          vmPush(obj);
-          vmPush(val);
+            // classes can override the membership predicate.
+            Value memFn;
+            if (mapGet(&instance->klass->fields, INTERN(S_IN), &memFn)) {
+              vmPush(obj);
+              vmPush(val);
 
-          if (!vmCallValue(memFn, 1)) return INTERPRET_RUNTIME_ERROR;
+              if (!vmCallValue(memFn, 1)) return INTERPRET_RUNTIME_ERROR;
 
-          frame = &vm.frames[vm.frameCount - 1];
-          break;
+              frame = &vm.frames[vm.frameCount - 1];
+              break;
+            }
+
+            if (!vmInstanceHas(instance, val)) return INTERPRET_RUNTIME_ERROR;
+            break;
+          }
+          case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(obj);
+            uint32_t hash;
+            if (!vmHashValue(val, &hash)) return false;
+
+            bool hasKey = mapHasHash(&klass->fields, val, hash);
+            vmPush(BOOL_VAL(hasKey));
+            break;
+          }
+          default: {
+            vmRuntimeError(error);
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
-
-        if (!vmInstanceHas(instance, val)) return INTERPRET_RUNTIME_ERROR;
 
         break;
       }

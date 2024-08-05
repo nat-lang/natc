@@ -71,7 +71,6 @@ ObjOverload* newOverload(int cases) {
   ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
   overload->closures = closures;
   overload->cases = cases;
-
   return overload;
 }
 
@@ -446,7 +445,7 @@ void printObject(Value value) {
       printf("%s", AS_CSTRING(value));
       break;
     case OBJ_UPVALUE:
-      printf("upvalue");
+      printf("<upvalue at %p>", AS_UPVALUE(value));
       break;
     case OBJ_SEQUENCE:
       printValueArray(&AS_SEQUENCE(value)->values);

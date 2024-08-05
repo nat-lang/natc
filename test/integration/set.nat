@@ -129,3 +129,15 @@ assert(hash({1}) == hash({1}));
 assert(hash({1}) != hash({{1}}));
 
 assert(hash(1) != hash({1}));
+
+let s = Set();
+const A, B, C;
+
+s.add((A,B));
+assert((A,B) in s);
+assert(len(s) == 1);
+
+s.add((B,C));
+assert(len(s) == 2);
+assert((A,B) in s);
+assert((B,C) in s);

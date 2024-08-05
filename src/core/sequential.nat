@@ -22,7 +22,8 @@ class Sequential extends Object {
     return false;
   }
 
-  hash() => this.map(hash).reduce(+, 0);
+  copy() => [x | x in this];
+  hash() => hash(join(this.map(str), ""));
 
   map(fn) => [fn(value) | value in this];
 

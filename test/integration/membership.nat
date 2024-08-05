@@ -1,15 +1,11 @@
-// native membership.
+// sequence membership.
 
 let seq = [1,2,3];
 
 assert(1 in seq);
-assert(1 in seq.values);
-
 assert(2 in seq);
-assert(2 in seq.values);
-
+assert(3 in seq);
 assert(!(4 in seq));
-assert(!(4 in seq.values));
 
 // extensible membership.
 
@@ -23,3 +19,12 @@ class Inhabitable {
 }
 
 assert(1 in Inhabitable(1));
+
+// class membership.
+
+class A {
+  f() => 1;
+}
+
+assert("f" in A);
+
