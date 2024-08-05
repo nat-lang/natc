@@ -18,3 +18,4 @@ import src/core/type/poly
 import src/core/type/denotational
 import src/core/type/system
 import src/core/unification
+import src/core/composition

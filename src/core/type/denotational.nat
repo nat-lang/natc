@@ -11,7 +11,7 @@ class Domain extends Type {
   str() => this.name;
 
   __iter__() => iter(this.elements);
-  // functions are not hashable atm.
+  // functions are not hashable atm. guard against them.
   __in__(value) => hashable(value) and value in this.elements;
   __eq__(that) => this.elements == that.elements;
 }
@@ -36,10 +36,6 @@ class DenotationalTypeSystem extends PolyTypeSystem {
     this.literals = Map();
   }
 
-  resetState() => {
-    this.state = this.TypeStateClass(this, false);
-  }
-
   addDomain(domain: Domain) => {
     this.domains[domain.name] = domain;
 
@@ -57,63 +53,3 @@ class DenotationalTypeSystem extends PolyTypeSystem {
 }
 
 DenotationalTypeSystem.TypeStateClass = DenotationalTypeState;
-
-class TypedTree extends Tree {
-  init(data, children, type: Type) => {
-    super.init(data, children);
-    this.type = type;
-  }
-  str() => {
-    let s = "[";
-    s = s + this.type.str();
-    for (x in this.children)
-      s = s + " " + x.str();
-    s = s + "]";
-    return s;
-  }
-}
-
-class CompositionSystem {
-  init(binaryRules, unaryRules, typeShifters) => {
-    this.binaryRules = binaryRules;
-    this.unaryRules = unaryRules;
-    this.typeShifters = typeShifters;
-  }
-
-  // Decorate the tree with type information.
-  decorate(node: Tree) => {
-    if (node.leaf()) {
-      let data = node.data;
-      return TypedTree(() => data, [], TypeSystem.type(node.data));
-    }
-
-    if (node.unary()) {
-      let child = this.decorate(node[0]);
-
-      return TypedTree(child.data, [child], child.type);
-    }
-
-    if (node.binary()) {
-      let left = this.decorate(node[0]),
-          right = this.decorate(node[1]);
-
-      for (rule in this.binaryRules) {
-        let l = left.data, r = right.data, data = () => rule(l(), r());
-
-        let type = TypeSystem.type(data);
-
-        if (type.range) {
-          return TypedTree(data, [left, right], type);
-        }
-      }
-
-      return TypedTree(node.data, node.children, nil);
-    }
-
-    throw CompositionError("Nonbinary tree.");
-  }
-
-  type(node: Tree) => this.decorate(node).type;
-  interpret(node: Tree) => this.decorate(node).data;
-  typecheck(node: Tree) => this.type(node) != nil;
-}
