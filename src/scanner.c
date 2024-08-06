@@ -150,6 +150,8 @@ static TokenType identifierType() {
       }
       break;
     }
+    case 'd':
+      return checkpointKeyword(1, 2, "om", TOKEN_DOM);
     case 'e':
       if (scanner.current - scanner.start > 1) {
         switch (scanner.start[1]) {

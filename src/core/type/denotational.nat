@@ -2,9 +2,11 @@
 class CompositionError extends Error {}
 
 class Domain extends Type {
-  init(name, *elements) => {
+  init(name, elements) => {
     this.name = name;
-    this.elements = Set(..elements);
+    this.elements = elements;
+
+    TypeSystem.addDomain(this);
   }
 
   substitute(c) => this;

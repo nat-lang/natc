@@ -784,13 +784,21 @@ static uint16_t parseVariable(Compiler* cmp, const char* errorMessage) {
   return identifierConstant(cmp, &parser.previous);
 }
 
-static void defineVariable(Compiler* cmp, uint16_t variable) {
+static void defineVariable(Compiler* cmp, uint16_t var) {
   if (cmp->scopeDepth > 0) {
     markInitialized(cmp);
     return;
   }
 
-  emitConstInstr(cmp, OP_DEFINE_GLOBAL, variable);
+  emitConstInstr(cmp, OP_DEFINE_GLOBAL, var);
+}
+
+static void setVariable(Compiler* cmp, uint16_t var) {
+  if (cmp->scopeDepth > 0) {
+    emitConstInstr(cmp, OP_SET_LOCAL, var);
+  } else {
+    emitConstInstr(cmp, OP_SET_GLOBAL, var);
+  }
 }
 
 typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
@@ -1475,14 +1483,14 @@ static void letDeclaration(Compiler* cmp) {
     emitByte(cmp, OP_NIL);
   }
 
-  if (cmp->scopeDepth > 0) {
-    emitConstInstr(cmp, OP_SET_LOCAL, var);
-  } else {
-    emitConstInstr(cmp, OP_SET_GLOBAL, var);
+  setVariable(cmp, var);
 
-    if (infixPrecedence != -1) {
+  if (infixPrecedence != -1) {
+    if (cmp->scopeDepth == 0) {
       Value name = cmp->function->chunk.constants.values[var];
       mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
+    } else {
+      error(cmp, "Can only infix global.");
     }
   }
 
@@ -1512,6 +1520,24 @@ static void constDeclaration(Compiler* cmp) {
   } while (match(cmp, TOKEN_COMMA));
 
   consume(cmp, TOKEN_SEMICOLON, "Expect ';' after constant declaration.");
+}
+
+static void domainDeclaration(Compiler* cmp) {
+  uint16_t var = parseVariable(cmp, "Expect domain name.");
+  Token name = parser.previous;
+  emitByte(cmp, OP_UNDEFINED);
+  defineVariable(cmp, var);
+
+  consume(cmp, TOKEN_EQUAL, "Expect domain assignment.");
+  getGlobalConstant(cmp, "Domain");
+  loadConstant(cmp, identifierToken(name));
+  consume(cmp, TOKEN_LEFT_BRACE, "Expect domain elements.");
+  braces(cmp, false);
+
+  emitBytes(cmp, OP_CALL, 2);
+
+  setVariable(cmp, var);
+  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after domain declaration.");
 }
 
 static void expressionStatement(Compiler* cmp) {
@@ -1684,6 +1710,8 @@ static void declaration(Compiler* cmp) {
     multiLetDeclaration(cmp);
   } else if (match(cmp, TOKEN_CONST)) {
     constDeclaration(cmp);
+  } else if (match(cmp, TOKEN_DOM)) {
+    domainDeclaration(cmp);
   } else {
     statement(cmp);
   }
