@@ -14,6 +14,8 @@
 
 #define GC_HEAP_GROW_FACTOR 2
 
+static void markArray(ValueArray* array);
+
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
   vm.bytesAllocated += newSize - oldSize;
 
@@ -77,6 +79,8 @@ static void blackenObject(Obj* object) {
   printValue(OBJ_VAL(object));
   printf("\n");
 #endif
+
+  markArray(&object->annotations);
 
   switch (object->oType) {
     case OBJ_BOUND_FUNCTION: {
@@ -243,7 +247,6 @@ static void markRoots() {
   }
 
   markMap(&vm.globals);
-  markMap(&vm.typeEnv);
   markMap(&vm.infixes);
 
   markObject((Obj*)vm.core.sName);

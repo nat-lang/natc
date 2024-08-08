@@ -84,12 +84,6 @@ class AdhocTypeState extends SubtypeState {
   }
 }
 
-class AdhocTypeSystem extends SubtypeSystem {
-  literalType(value) => {
-    if (vType(value) == OOverload)
-      return TOverload;
-    return super.literalType(value);
-  }
-}
+class AdhocTypeSystem extends SubtypeSystem {}
 
 AdhocTypeSystem.TypeStateClass = AdhocTypeState;

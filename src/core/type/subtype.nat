@@ -1,7 +1,8 @@
 
 class TSum extends Type {
   init(*types) => {
-    this.disjuncts = (Set.fromSeq . fmap(TypeSystem.typify))(types);
+    let typified = types.map(TypeSystem.typify);
+    this.disjuncts = Set.fromSeq(typified);
   }
 
   union(that: TSum) => TSum(

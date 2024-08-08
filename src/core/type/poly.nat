@@ -1,3 +1,5 @@
+
+
 class TAbstract extends Type {
   init(fn, arity) => {
     this.fn = fn;
@@ -8,16 +10,21 @@ class TAbstract extends Type {
     let tVars = [];
     for (let i = 0; i < this.arity; i = i + 1)
       tVars.push(nameSupply());
-    return this.fn(..tVars);
+    return TypeSystem.typify(this.fn(..tVars));
   }
 
   generalize(type: TFunction) => {
-    let fvs = type.fvs();
-
+    // instantiate any abstractions lower in the
+    // type so that we're always first order.
+    let normal = type.map(
+      (x: TAbstract) => x.instantiate(typeVar) | x => x
+    );
+    let fvs = normal.fvs();
+  
     // simulate the function with type substitution.
     return TAbstract((*args) => {
       let s = Substitution(..zip(fvs.toSeq(), args));
-      return type.apply(s);
+      return normal.apply(s);
     }, len(fvs));
   }
 
@@ -28,7 +35,7 @@ class TAbstract extends Type {
       ["u", "v", "w", "x", "y", "z"][i] | i in range(0, this.arity)
     ];
     class PrettyTVar extends TVar { str() => this.id; }
-    let type = this.fn(..[PrettyTVar(v) | v in tVars]);
+    let type = TypeSystem.typify(this.fn(..[PrettyTVar(v) | v in tVars]));
     return "(" + join([v | v in tVars], ",") + ") => " + type.str();
   }
   pp() => { print this.str(); }
@@ -55,7 +62,22 @@ class PolyTypeState extends AdhocTypeState {
     if (right is TAbstract and !(left is TVar))
       right = right.instantiate(typeVar);
     
-    return super.unify(PolyTypeSystem.ConstraintClass(left, right));
+    return super.unify(this.system.ConstraintClass(left, right));
+  }
+
+  // Calculate the type of [expr], inferring it if necessary.
+  type(expr) => {
+    let type = this.system.literalType(expr);
+    if (type) return type;
+
+    type = this.infer(expr);
+
+    // instantiate abstract types if we have
+    // annotations to incorporate.
+    if (len(annotations(expr)) > 0 and type is TAbstract)
+      type = type.instantiate(typeVar);
+
+    return this.unifyAnnotations(expr, type);
   }
 }
 

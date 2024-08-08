@@ -1,0 +1,36 @@
+
+// globals.
+
+let f: 1 = () => 1;
+
+assert(annotations(f) == [1]);
+
+f: 2;
+
+assert(annotations(f) == [1,2]);
+
+// locals.
+
+(() => {
+  let f: 1 = () => 1;
+
+  assert(annotations(f) == [1]);
+
+  f: 2;
+
+  assert(annotations(f) == [1,2]);
+})();
+
+// upvalues.
+
+(() => {
+  let x: 2 = (() => {
+    let x: 1 = () => 1;
+    return x;
+  })();
+
+  assert(annotations(x) == [1, 2]);
+
+  x: 3;
+  assert(annotations(x) == [1, 2, 3]);
+})();

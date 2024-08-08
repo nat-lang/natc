@@ -103,7 +103,6 @@ bool initVM() {
   vm.compiler = NULL;
 
   initMap(&vm.globals);
-  initMap(&vm.typeEnv);
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
@@ -889,10 +888,8 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CALL: {
         int argCount = READ_BYTE();
-        if (!vmCallValue(vmPeek(argCount), argCount)) {
+        if (!vmCallValue(vmPeek(argCount), argCount))
           return INTERPRET_RUNTIME_ERROR;
-        }
-
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1201,16 +1198,29 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_SET_TYPE_LOCAL: {
-        READ_SHORT();
+        uint8_t slot = READ_SHORT();
+        Value local = frame->slots[slot];
+
+        if (IS_OBJ(local)) {
+          Obj* obj = AS_OBJ(local);
+          writeValueArray(&obj->annotations, vmPeek(0));
+        }
+
         break;
       }
       case OP_SET_TYPE_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (!mapHas(&vm.globals, name)) {
+        Value global;
+        if (!mapGet(&vm.globals, name, &global)) {
           vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
-        mapSet(&vm.typeEnv, name, vmPeek(0));
+
+        if (IS_OBJ(global)) {
+          Obj* obj = AS_OBJ(global);
+          writeValueArray(&obj->annotations, vmPeek(0));
+        }
+
         break;
       }
       case OP_SPREAD: {

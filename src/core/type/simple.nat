@@ -56,6 +56,7 @@ class Type extends Base {
 
   str() => str(this);
   pp() => { print this.str(); }
+  map(fn) => fn(this);
 }
 
 class TFunction extends Type {
@@ -82,9 +83,9 @@ class TFunction extends Type {
     this.domain.substitute(sub),
     this.range.substitute(sub)
   );
-}
 
-class TBoundFunction extends TFunction {}
+  map(fn) => TFunction(this.domain.map(fn), this.range.map(fn));
+}
 
 class TVar extends Type {
   init(id) => {
@@ -137,12 +138,15 @@ class TProduct extends Type {
   __iter__() => iter(this.elements);
   __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
+
+   map(fn) => TProduct(this.elements.map(fn));
 }
 
 class TOverload extends Type {
   init(functions) => {
     this.functions = functions;
   }
+  map(fn) => TOverload(this.functions.map(fn));
 }
 
 class TClass extends Type {
@@ -178,9 +182,18 @@ class SimpleTypeSystem {
     if (type == CBool) return bool;
     if (type == CNumber) return num;
     if (type == OString) return string; 
-    if (type == OInstance) return TInstance(value.__class__);
-    if (type == OFunction) return TFunction;
-    if (type == OBoundFunction) return TBoundFunction;
+    if (type == OInstance) {
+      // this is a hack until classes are mapped
+      // systematically to type constructors.
+      if (value is Tuple)
+        return TProduct(value.map(this.type));
+      return TInstance(value.__class__);
+    }
+    // if it's a native we punt.
+    if (type == ONative) return typeVar() -> typeVar();
+    if (type == OFunction) return nil;
+    if (type == OBoundFunction) return nil;
+    if (type == OOverload) return nil;
     // we'll treat the type of a class as synonymous with
     // its initializer for now; this'll need to be revised
     // when we type property access.
@@ -206,7 +219,7 @@ class SimpleTypeSystem {
       return unit;
     if (value == undefined)
       return typeVar();
-    if (value is Sequential)
+    if (value is Tuple)
       return TProduct(value.map(this.typify));
     if (vType(value) == OSequence)
       return this.typify(Sequence.fromRaw(value));
@@ -220,9 +233,9 @@ class SimpleTypeSystem {
 
   // Assemble and return the [TypeState] produced
   // by [expr].
-  typecheck(expr) => {
+  _typecheck(expr, debug) => {
     let node <- expr;
-    let state = this.TypeStateClass(this, false);
+    let state = this.TypeStateClass(this, debug);
 
     node = state.transform(node);
 
@@ -231,6 +244,8 @@ class SimpleTypeSystem {
 
     return state;
   }
+
+  typecheck(expr) => this._typecheck(expr, false);
 
   newState() => this.TypeStateClass(this, false);
 
@@ -296,14 +311,6 @@ class SimpleTypeState {
   // global variables to their annotations if they exist.
   transform(node: ASTNode) => {
     node.uniquelyIdentifyVariables(this.uuids);
-
-    let annotations = globalTypeEnv();
-    node.each(node => {
-      if (node is ASTGlobal) {
-        if (node.id in annotations)
-          this.typeEnv[node] = this.system.typify(annotations[node.id]);
-      }
-    });
 
     return node;
   } 
@@ -557,25 +564,31 @@ class SimpleTypeState {
     return this.principal(node);
   }
 
+  unifyAnnotations(expr, type) => {
+    let tAnnotations = annotations(expr);
+
+    if (len(tAnnotations) > 0) {
+      for (a in tAnnotations) {
+        this.constraints.push(
+          Constraint(this.system.typify(a), type)
+        );
+      }
+
+      if (this.solve())
+        return type.apply(this.solution);
+    }
+
+    return type;
+  }
+
   // Calculate the type of [expr], inferring it if necessary.
   type(expr) => {
-    // if it's a native we punt.
-    if (vType(expr) == ONative)
-      return typeVar() -> typeVar();
+    let type = this.system.literalType(expr);
+    if (type) return type;
 
-    // if it's not a function return its literal type.
-    let exprType = this.system.literalType(expr);
-    if (exprType != TFunction and exprType != TBoundFunction)
-      return exprType;
+    type = this.infer(expr);
 
-    // now check if it has a global type annotation.
-    // todo: constrain this annotation against the inferred type.
-    exprType = globalTypeEnv()[expr.name];
-    if (exprType and globals()[expr.name] == expr)
-      return this.system.typify(exprType);
-
-    // otherwise infer it.
-    return this.infer(expr);
+    return this.unifyAnnotations(expr, type);
   }
 
   solved() => len(this.constraints) == 0 and len(this.insoluble) == 0;

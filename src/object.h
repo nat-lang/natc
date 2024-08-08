@@ -63,6 +63,7 @@ struct Obj {
   bool isMarked;
   uint32_t hash;
   struct Obj *next;
+  ValueArray annotations;
 };
 
 typedef struct {
