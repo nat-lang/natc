@@ -141,15 +141,13 @@ assert(f(1, true) == undefined);
 assert(f(true, 1) == undefined);
 assert(f((x: num) => x, (x: bool) => x) == undefined);
 
+// type patterns with type variables that constrain each other.
+
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-// literal types.
-
 assert(f(x => x, 1) == 1);
 assert(f(1, x => x) == 1);
-
-// annotated types.
 
 assert(f((x: num) => x, 1) == 1);
 assert(f((x: string) => x, 1) == undefined);

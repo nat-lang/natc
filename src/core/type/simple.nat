@@ -182,13 +182,7 @@ class SimpleTypeSystem {
     if (type == CBool) return bool;
     if (type == CNumber) return num;
     if (type == OString) return string; 
-    if (type == OInstance) {
-      // this is a hack until classes are mapped
-      // systematically to type constructors.
-      if (value is Tuple)
-        return TProduct(value.map(this.type));
-      return TInstance(value.__class__);
-    }
+    if (type == OInstance) return TInstance(value.__class__);
     // if it's a native we punt.
     if (type == ONative) return typeVar() -> typeVar();
     if (type == OFunction) return nil;
@@ -320,17 +314,9 @@ class SimpleTypeState {
       return this.constrain(node[0]);
 
     if (node is ASTClosure) {
-      let parameters = node.signature().params;
       // map the parameter annotations into types.
-      let paramTypes = parameters.map(p => {
-        let type = p.type;
-        
-        // it's not an ASTNode when we're pattern matching.
-        if (type is ASTNode)
-          type = type.resolve();
-
-        return this.system.typify(type);
-      });
+      let parameters = node.signature().params;
+      let paramTypes = parameters.map(p => this.system.typify(p.type));
 
       // since the params and their types are keyed by uuid,
       // we can just update the global type env when checking
@@ -371,9 +357,10 @@ class SimpleTypeState {
       } else if (len(returnTypes) == 1) {
         tReturns = returnTypes[0];
       } else {
-        tReturns = TProduct(returnTypes);
+        throw TypeError("Don't know how to type multiple returns.");
       }
 
+      // apply any inferences from the body to the signature.
       return (tParams -> tReturns).apply(this.solution);
     }
 
