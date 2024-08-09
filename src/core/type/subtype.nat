@@ -100,6 +100,7 @@ class SubtypeState extends SimpleTypeState {
           ]);
           return this.solve();
         }
+
         return false;
 
       } else if (left is TInstance and right is TInstance) {

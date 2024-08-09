@@ -249,9 +249,28 @@ class SimpleTypeSystem {
     return state.type(expr);
   }
 
-  unify(a,b) => this.newState().unify(
-    this.ConstraintClass(a,b)
-  );
+  instantiate(func, *args) => {
+    let state = this.newState();
+    let tFunc = state.type(func);
+
+    let tArgs;
+    if (len(args) == 0)
+      tArgs = void;
+    else if (len(args) == 1)
+      tArgs = state.type(args[0]);
+    else
+      tArgs = state.type(args);
+
+    let tApp = typeVar();
+
+    state.constraints.push(
+      TypeSystem.ConstraintClass(tFunc, tArgs -> tApp)
+    );
+
+    state.solve();
+
+    return tApp.apply(state.solution);
+  }
 }
 
 class SimpleTypeState {
@@ -357,6 +376,7 @@ class SimpleTypeState {
       } else if (len(returnTypes) == 1) {
         tReturns = returnTypes[0];
       } else {
+        // the simple type system can't type a disjunctive range.
         throw TypeError("Don't know how to type multiple returns.");
       }
 

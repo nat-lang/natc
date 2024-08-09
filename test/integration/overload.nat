@@ -157,7 +157,7 @@ assert(f(1, (x: num) => x) == 1);
 assert(f(1, (x: string) => x) == undefined);
 assert(f(1, (x: bool) => x) == undefined);
 
-// overloads can dispatch on saturated abstract types.
+// overloads can dispatch on instantiated abstract types.
 
 let g: num -> bool = x => x == 1;
 let k: bool -> bool = x => !x;

@@ -115,7 +115,7 @@ bool vmInitInstance(ObjClass* klass, int argCount, int frames);
 bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount, int frames);
 bool vmHashValue(Value value, uint32_t* hash);
-CallFrame* vmInitFrame(ObjClosure* closure, int offset);
+void vmInitFrame(ObjClosure* closure, int offset);
 bool vmCallValue(Value value, int argCount);
 void vmCloseUpvalues(Value* last);
 void vmClosure(CallFrame* frame);
@@ -125,6 +125,7 @@ void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
+ObjClosure* vmGetGlobalClosure(char* name);
 ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
 
 #endif

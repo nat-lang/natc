@@ -334,12 +334,11 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   return true;
 }
 
-CallFrame* vmInitFrame(ObjClosure* closure, int offset) {
+void vmInitFrame(ObjClosure* closure, int offset) {
   CallFrame* frame = &vm.frames[vm.frameCount++];
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
   frame->slots = vm.stackTop - offset;
-  return frame;
 }
 
 static bool call(ObjClosure* closure, int argCount) {
@@ -368,7 +367,7 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
-// Wrap the top [count] values in a tuple and put it
+// Wrap the top [count] values in a sequence and put it
 // on the stack, optionally leaving the values below it.
 bool vmTuplify(int count, bool replace) {
   int i = count;
@@ -422,13 +421,13 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
   return true;
 }
 
-bool vmCallValue(Value callee, int argCount) {
-  if (IS_OBJ(callee)) {
-    switch (OBJ_TYPE(callee)) {
+bool vmCallValue(Value caller, int argCount) {
+  if (IS_OBJ(caller)) {
+    switch (OBJ_TYPE(caller)) {
       case OBJ_BOUND_FUNCTION: {
-        ObjBoundFunction* obj = AS_BOUND_FUNCTION(callee);
+        ObjBoundFunction* obj = AS_BOUND_FUNCTION(caller);
         vm.stackTop[-argCount - 1] = obj->receiver;
-        switch (BOUND_FUNCTION_TYPE(callee)) {
+        switch (BOUND_FUNCTION_TYPE(caller)) {
           case BOUND_METHOD:
             return call(obj->bound.method, argCount);
           case BOUND_NATIVE:
@@ -439,25 +438,25 @@ bool vmCallValue(Value callee, int argCount) {
         }
       }
       case OBJ_CLASS: {
-        ObjClass* klass = AS_CLASS(callee);
+        ObjClass* klass = AS_CLASS(caller);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
         return vmInstantiateClass(klass, argCount);
       }
       case OBJ_CLOSURE: {
-        ObjClosure* closure = AS_CLOSURE(callee);
+        ObjClosure* closure = AS_CLOSURE(caller);
 
         if (closure->function->patterned)
           return callCases(&closure, 1, argCount);
-        return call(AS_CLOSURE(callee), argCount);
+        return call(AS_CLOSURE(caller), argCount);
       }
       case OBJ_OVERLOAD: {
-        ObjOverload* overload = AS_OVERLOAD(callee);
+        ObjOverload* overload = AS_OVERLOAD(caller);
         return callCases(overload->closures, overload->cases, argCount);
       }
       case OBJ_NATIVE:
-        return callNative(AS_NATIVE(callee), argCount);
+        return callNative(AS_NATIVE(caller), argCount);
       case OBJ_INSTANCE: {
-        ObjInstance* instance = AS_INSTANCE(callee);
+        ObjInstance* instance = AS_INSTANCE(caller);
         Value callFn;
         if (mapGet(&instance->klass->fields, INTERN(S_CALL), &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
@@ -620,6 +619,43 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
   bool hasKey = mapHasHash(&instance->fields, value, hash) ||
                 mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
+  return true;
+}
+
+ObjClosure* vmGetGlobalClosure(char* name) {
+  Value obj;
+
+  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
+    vmRuntimeError("Couldn't find function '%s'.", name);
+    return NULL;
+  }
+
+  if (!IS_CLOSURE(obj)) {
+    vmRuntimeError("Not a closure: '%s'.", name);
+    return NULL;
+  }
+
+  return AS_CLOSURE(obj);
+}
+
+bool propagateAnnotation(Value caller, int argCount, Value args[argCount]) {
+  Value typeSystem;
+  if (!mapGet(&vm.globals, INTERN(S_TYPE_SYSTEM), &typeSystem)) {
+    vmRuntimeError("Couldn't find %s.", S_TYPE_SYSTEM);
+    return false;
+  }
+
+  vmPush(typeSystem);
+  vmPush(caller);
+  for (int i = 0; i < argCount; i++) vmPush(args[i]);
+
+  if (!vmExecuteMethod("instantiate", argCount + 1, 1)) return false;
+
+  Value annotation = vmPop();
+
+  if (IS_OBJ(vmPeek(0)))
+    writeValueArray(&AS_OBJ(vmPeek(0))->annotations, annotation);
+
   return true;
 }
 
@@ -888,9 +924,27 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CALL: {
         int argCount = READ_BYTE();
-        if (!vmCallValue(vmPeek(argCount), argCount))
+        Value caller = vmPeek(argCount);
+        Value args[argCount];
+
+        // if the caller has type annotations then propagate
+        // them to its return value.
+        bool propagate =
+            IS_OBJ(caller) && AS_OBJ(caller)->annotations.count > 0;
+        if (propagate) {
+          for (int i = argCount; i > 0; i--) {
+            args[argCount - i] = vmPeek(i - 1);
+          }
+        }
+
+        if (!vmCallValue(caller, argCount) ||
+            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
+
+        if (propagate && !propagateAnnotation(caller, argCount, args))
+          return INTERPRET_RUNTIME_ERROR;
+
         break;
       }
       case OP_CALL_INFIX: {
@@ -902,9 +956,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(left);
         vmPush(right);
 
-        if (!vmCallValue(infix, 2)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!vmCallValue(infix, 2)) return INTERPRET_RUNTIME_ERROR;
 
         frame = &vm.frames[vm.frameCount - 1];
         break;
@@ -919,9 +971,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(postfix);
         while (++i < argCount) vmPush(args[i]);
 
-        if (!vmCallValue(postfix, argCount)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!vmCallValue(postfix, argCount)) return INTERPRET_RUNTIME_ERROR;
 
         frame = &vm.frames[vm.frameCount - 1];
         break;

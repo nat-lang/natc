@@ -53,22 +53,6 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
-ObjClosure* getGlobalClosure(char* name) {
-  Value obj;
-
-  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
-    vmRuntimeError("Couldn't find function '%s'.", name);
-    return NULL;
-  }
-
-  if (!IS_CLOSURE(obj)) {
-    vmRuntimeError("Not a closure: '%s'.", name);
-    return NULL;
-  }
-
-  return AS_CLOSURE(obj);
-}
-
 ObjClass* getGlobalClass(char* name) {
   Value obj;
 
@@ -509,7 +493,7 @@ InterpretResult initializeCore() {
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
       (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 
-      (vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL)
+      (vm.core.unify = vmGetGlobalClosure(S_UNIFY)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   return INTERPRET_OK;
