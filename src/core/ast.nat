@@ -84,6 +84,12 @@ class ASTLiteral extends ASTExpr {
 }
 class ASTNegation extends ASTExpr {}
 
+class ASTEquality extends ASTExpr {
+  init(left, right) => {
+    this.children = [left, right];
+  }
+}
+
 class ASTSequence extends ASTExpr {
   resolve() => this.children.map(node => node.resolve());
 }
@@ -186,6 +192,7 @@ class ASTClosure extends ASTExpr {
 
   resolve() => this.function;
 
+  // Wrap [this] function's signature in ast.
   sign() => {
     if (!this.function.signature) return ASTSignature([]);
 
@@ -213,6 +220,7 @@ class ASTClosure extends ASTExpr {
     );
   }
 
+  // Memoize the signature ast.
   signature() => {
     if (!this._signature)
       this._signature = this.sign();
@@ -224,6 +232,7 @@ class ASTClosure extends ASTExpr {
 
   opLiteral(value) => ASTLiteral(value);
   opNot(value) => ASTNegation(value);
+  opEqual(left, right) => ASTEquality(left, right);
   opSequence(seq) => ASTSequence(..Sequential.fromRaw(seq));
   opGetGlobal(name) => ASTGlobal(name);
   opGetUpvalue(address, localSlot, upvalue) => ASTUpvalue(address, localSlot, upvalue);

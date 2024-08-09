@@ -8,16 +8,18 @@ class Constraint {
   str() => this.left.str() + " ~ " + this.right.str();
 }
 
+let infix(6) ~ = Constraint;
+
 class AppConstraint extends Constraint {}
 
 class Substitution extends Map {
-  entries() => super.entries().map(e => Constraint(..e));
+  entries() => super.entries().map(e => e[0] ~ e[1]);
 
   update(var: TVar, type: Type) => {
     this[var] = type;
 
     for (sub in this) {
-      this[sub.left] = sub.right.substitute(Constraint(var, type));
+      this[sub.left] = sub.right.substitute(var ~ type);
     }
   }
 
@@ -389,6 +391,17 @@ class SimpleTypeState {
     
     if (node is ASTNegation)
       return this.principal(node[0]);
+    
+    if (node is ASTEquality) {
+      let left = node[0], right = node[1];
+
+      let tLeft = this.principal(left),
+          tRight = this.principal(right);
+
+      this.constraints.push(tLeft ~ tRight);
+
+      return bool;
+    }
 
     if (node is ASTGlobal) {
       let value = node.resolve();
@@ -427,7 +440,7 @@ class SimpleTypeState {
       let tArgs = this.principal(args);
       let tApp = typeVar();
 
-      this.constraints.push(Constraint(tFunc, tArgs -> tApp));
+      this.constraints.push(tFunc ~ tArgs -> tApp);
 
       return tApp;
     }
@@ -439,7 +452,7 @@ class SimpleTypeState {
       let tVar = this.lookup(var);
       let tVal = this.system.typify(val.resolve());
 
-      this.constraints.push(Constraint(tVar, tVal));
+      this.constraints.push(tVar ~ tVal);
 
       return void;
     }
@@ -451,7 +464,7 @@ class SimpleTypeState {
       let tVar = this.lookup(var);
       let tVal = this.principal(val);
 
-      this.constraints.push(Constraint(tVar, tVal));
+      this.constraints.push(tVar ~ tVal);
 
       // this should eventually respect a possibly user
       // defined __set__ method that returns something.
@@ -502,8 +515,8 @@ class SimpleTypeState {
     // function constraints become domain/domain range/range constraints.
     if (left is TFunction and right is TFunction) {
       this.constraints.extend([
-        Constraint(left.domain, right.domain),
-        Constraint(left.range, right.range)
+        (left.domain ~ right.domain),
+        (left.range ~ right.range)
       ]);
 
       return this.solve();
@@ -514,7 +527,7 @@ class SimpleTypeState {
       if (len(left) == len(right)) {
 
         this.constraints.extend(
-          zip(left.elements, right.elements).map((x) => Constraint(..x))
+          zip(left.elements, right.elements).map(x => x[0] ~ x[1])
         );
 
         return this.solve();
@@ -577,7 +590,7 @@ class SimpleTypeState {
     if (len(tAnnotations) > 0) {
       for (a in tAnnotations) {
         this.constraints.push(
-          Constraint(this.system.typify(a), type)
+          this.system.typify(a) ~ type
         );
       }
 

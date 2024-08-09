@@ -185,6 +185,17 @@ bool astFrame(Value root) {
         vmPush(object);
         break;
       }
+      case OP_EQUAL: {
+        Value left = vmPop();
+        Value right = vmPop();
+
+        vmPush(root);
+        vmPush(left);
+        vmPush(right);
+
+        if (!executeMethod("opEqual", 2)) return false;
+        break;
+      }
       case OP_VARIABLE: {
         vmPush(root);
         vmVariable(frame);

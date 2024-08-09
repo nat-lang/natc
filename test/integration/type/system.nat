@@ -1,0 +1,40 @@
+
+let g: num -> (num -> num) = x y => y;
+
+TypeSystem.type(g(1)).pp();
+
+let f: w -> (w -> w) = x y => y;
+
+TypeSystem.type(f(1)).pp();
+
+assert(TypeSystem.type(f(1)) == num -> num);
+
+let f: w -> (w -> bool) = x y => true;
+
+print "instantiate f to " + instantiate(f, 1).str();
+
+let g: w -> (u -> (w,u)) = x y => (x,y);
+
+print "instantiate g to " + instantiate(g, 1).str();
+
+let h: num -> (u -> (num,u)) = x y => (x,y);
+
+print "instantiate h to " + instantiate(h, 1).str();
+
+let i: u -> (v -> (w -> (u,v,w))) = x y z => (x,y,z);
+
+print "instantiate i to " + instantiate(i, 1).str();
+
+let j: u -> (num -> (u,num)) = x y => (x,y);
+
+print "instantiate j to " + instantiate(j, 1).str();
+
+let k: (u,v) -> ((v,u) -> u) = (x, y) => z => x;
+
+print "instantiate k to " + instantiate(k, (1,true)).str();
+
+let m: v -> ((v,u) -> v) = a => (x, y) => a;
+
+print "instantiate m to " + instantiate(m, 1).str();
+
+let f' = (x: w) => (y: w) => (x,y);
