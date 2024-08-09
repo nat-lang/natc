@@ -163,6 +163,8 @@ static void freeObject(Obj* object) {
   printf("%p free type %d\n", (void*)object, object->type);
 #endif
 
+  freeValueArray(&object->annotations);
+
   switch (object->oType) {
     case OBJ_BOUND_FUNCTION:
       FREE(ObjBoundFunction, object);
