@@ -143,8 +143,8 @@ typecheck((x: num) => j(f(x)));
 
 // overload has uniform range.
 
-let g : (num -> bool <+> string -> bool) -> void;
-    g = f => nil;
+let g : (num -> bool <+> string -> bool) -> void
+      = f => nil;
 
 typecheck((f: (num || string) -> bool) => g(f));
 
@@ -154,8 +154,8 @@ typefail((f: string -> bool) => g(f));
 
 // overload has heterogenous range.
 
-let g : (num -> bool <+> string -> string) -> void;
-    g = f => nil;
+let g : (num -> bool <+> string -> string) -> void
+      = f => nil;
 
 typefail((f: (num || string) -> (bool || string)) => g(f));
 typefail((f: (num || string) -> (bool || string)) => g(f));
@@ -163,8 +163,8 @@ typefail((f: (num || string) -> (bool || string)) => g(f));
 // overload is subtype of overload.
 // --------------------------------------
 
-let g : (num -> bool <+> string -> bool) -> void;
-    g = f => nil;
+let g : (num -> bool <+> string -> bool) -> void
+      = f => nil;
 
 typecheck((f: num -> bool <+> string -> bool) => g(f));
 typecheck((f: string -> bool <+> num -> bool) => g(f));

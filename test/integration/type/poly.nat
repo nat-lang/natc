@@ -5,6 +5,8 @@ let typefail = x => assert(
   PolyTypeSystem.typecheck(x).failure()
 );
 
+let type = PolyTypeSystem.type;
+
 // type generalization, aka abstraction.
 
 let a = TVar("a"),
@@ -37,13 +39,15 @@ assert(check.failure());
 
 // explicit abstraction.
 
-typecheck(() => {
+let check = PolyTypeSystem.typecheck(() => {
   let id: (a => a -> a) = x => x;
 
   id(1);
   id(true);
   id("string");
 });
+
+check.ppInsoluble();
 
 let id: (a => a -> a) = x => x;
 
@@ -58,7 +62,8 @@ typecheck(() => {
 // one parameter.
 
 let f: w -> w = x => x;
-let t = globalTypeEnv()["f"];
+
+let t = annotations(f)[0];
 
 assert(vType(t) == OFunction);
 
@@ -83,7 +88,8 @@ typecheck(() => {
 // two parameters.
 
 let f: x -> y = x => x;
-let t = globalTypeEnv()["f"];
+
+let t = annotations(f)[0];
 
 assert(vType(t) == OFunction);
 
@@ -116,25 +122,36 @@ typecheck((x: w -> z, y: w) => x(y));
 
 typefail((x: w -> z, y: w) => y(x));
 
-// reconstruction.
+// nested abstract types normalize to a single first order type.
 
-// first order succeeds.
+let t = type(x y => y);
 
-typecheck(() => {
-  let id = x => x;
+assert(t is TAbstract);
+assert(t.fn(num,num) == num -> (num -> num));
 
-  id(1);
-  id(true);
-  id("string");
-});
+// abstract types become concrete when saturated.
 
-// second order fails.
+let f: w -> (w -> w) = x y => y;
 
-typefail((id) => {
-  id(1);
-  id(true);
-  id("string");
-});
+typecheck(() => f(1)(1));
+typecheck(() => f(true)(true));
+
+typefail(() => f(true)(1));
+typefail(() => f(1)(true));
+
+let infix @ : ((v -> w), (u -> v)) -> (u -> w)
+            = (f, g) => x => f(g(x));
+
+typecheck((f: bool -> num, g: num -> bool, x: num) => (f @ g)(x));
+
+typefail((f: num -> num, g: num -> bool, x: num) => (f @ g)(x));
+
+typecheck(
+  (x: num, h: num -> bool, g: bool -> string, f: string -> num) => {
+    ((f @ g) @ h)(x);
+    (f @ (g @ h))(x);
+  }
+);
 
 // poly adhoc.
 
@@ -157,3 +174,23 @@ typefail(() => f(h, f("x", g)));
 typefail(() => f(h, f(g, "x")));
 typefail(() => f(f(g, "x"), h));
 typefail(() => f(f("x", g), h));
+
+// reconstruction.
+
+// first order succeeds.
+
+typecheck(() => {
+  let id = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+// second order fails.
+
+typefail((id) => {
+  id(1);
+  id(true);
+  id("string");
+});

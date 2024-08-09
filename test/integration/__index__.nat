@@ -4,6 +4,7 @@ let conclude = begin();
 
 import test/integration/affix
 import test/integration/assignment
+import test/integration/annotation
 import test/integration/block
 import test/integration/class
 import test/integration/const
@@ -11,7 +12,6 @@ import test/integration/closure
 import test/integration/destructure
 import test/integration/equality
 import test/integration/functional
-import test/integration/overload
 import test/integration/hash
 import test/integration/iteration
 import test/integration/length
@@ -31,5 +31,6 @@ import test/integration/type/simple
 import test/integration/type/subtype
 import test/integration/type/adhoc
 import test/integration/type/poly
+import test/integration/overload
 
 conclude("integration");

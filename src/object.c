@@ -20,6 +20,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
   object->isMarked = false;
   object->next = vm.objects;
   object->hash = 0;
+  initValueArray(&object->annotations);
   vm.objects = object;
 
 #ifdef DEBUG_LOG_GC

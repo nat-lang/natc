@@ -285,11 +285,11 @@ bool astFrame(Value root) {
 
       case OP_SET_TYPE_LOCAL: {
         uint8_t slot = READ_SHORT();
-        Value value = vmPeek(0);
+        Value type = vmPeek(0);
 
         vmPush(root);
         if (!astLocal(slot)) return false;
-        vmPush(value);
+        vmPush(type);
 
         if (!executeMethod("opSetLocalType", 2)) return false;
         vmPop();  // nil.

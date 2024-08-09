@@ -1466,13 +1466,11 @@ static void letDeclaration(Compiler* cmp) {
   emitByte(cmp, OP_UNDEFINED);
   defineVariable(cmp, var);
 
+  bool annotated = false;
   if (match(cmp, TOKEN_COLON)) {
     typeExpression(cmp);
-  } else {
-    emitByte(cmp, OP_UNDEFINED);
+    annotated = true;
   }
-  defineType(cmp, var);
-  emitByte(cmp, OP_POP);  // the type.
 
   if (match(cmp, TOKEN_EQUAL)) {
     boundExpression(cmp, name);
@@ -1484,17 +1482,19 @@ static void letDeclaration(Compiler* cmp) {
   }
 
   setVariable(cmp, var);
+  emitByte(cmp, OP_POP);
 
-  if (infixPrecedence != -1) {
-    if (cmp->scopeDepth == 0) {
-      Value name = cmp->function->chunk.constants.values[var];
-      mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
-    } else {
-      error(cmp, "Can only infix global.");
-    }
+  if (annotated) {
+    // after the value assignment so that we're setting
+    // the type of the value;
+    defineType(cmp, var);
+    emitByte(cmp, OP_POP);  // the type.
   }
 
-  emitByte(cmp, OP_POP);
+  if (infixPrecedence != -1) {
+    Value name = cmp->function->chunk.constants.values[var];
+    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
+  }
 }
 
 static void singleLetDeclaration(Compiler* cmp) {
