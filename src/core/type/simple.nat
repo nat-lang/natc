@@ -1,4 +1,6 @@
 
+class SimpleTypeError extends TypeError {}
+
 class Constraint {
   init(left, right) => {
     this.left = left;
@@ -244,6 +246,7 @@ class SimpleTypeSystem {
   typecheck(expr) => this._typecheck(expr, false);
 
   newState() => this.TypeStateClass(this, false);
+  dNewState() => this.TypeStateClass(this, true);
 
   type(expr) => {
     let state = this.newState();
@@ -271,7 +274,12 @@ class SimpleTypeSystem {
 
     state.solve();
 
-    return tApp.apply(state.solution);
+    tApp = tApp.apply(state.solution);
+
+    if (tApp.hasFvs())
+      tApp = TGeneralization(tApp);
+
+    return tApp;
   }
 }
 
@@ -304,7 +312,7 @@ class SimpleTypeState {
 
   // Look up the node in the [typeEnv]. If there's an entry,
   // apply the current solution. Otherwise mint a fresh type
-  // var.
+  // variable.
   lookup(node: ASTVariable) => {
     if (this.typeEnv[node])
       return this.typeEnv[node].apply(this.solution);
@@ -322,75 +330,78 @@ class SimpleTypeState {
       return type.apply(this.solution);
   }
 
-  // Give [node]'s variables unique identifiers. Map the
-  // global variables to their annotations if they exist.
+  // Give [node]'s variables unique identifiers.
   transform(node: ASTNode) => {
     node.uniquelyIdentifyVariables(this.uuids);
 
     return node;
   } 
 
+  constrainFnParams(node: ASTClosure) => {
+    // map the parameter annotations into types.
+    let parameters = node.signature().params;
+    let paramTypes = parameters.map(p => this.system.typify(p.type));
+
+    // since the params and their types are keyed by uuid
+    // we can just update the global type env.
+    this.typeEnv.extend(Map(..zip(parameters, paramTypes)));
+
+    if (node.function.arity == 0)
+      return unit;
+    else if (node.function.arity == 1)
+      return paramTypes[0];
+    else
+      return TProduct(paramTypes);
+  }
+
+  constrainFnReturns(node: ASTClosure) => {
+    // track the types of the return values as we check the body.
+    let returnTypes = node.children.reduce(
+      (types, node) => {
+        let type = this.principal(node);
+
+        if (node is ASTReturn) types.push(type);
+
+        return types;
+      }, []
+    );
+  
+    // there's always an implicit return. for now, if there are
+    // explicit returns as well, we'll just ignore the implicit
+    // one. once we have ast nodes for conditionals we can be
+    // more discriminating.
+    let tImplicitReturn = returnTypes.pop();
+
+    if (len(returnTypes) == 0)
+      return tImplicitReturn;
+    else if (len(returnTypes) == 1)
+      return returnTypes[0];
+    else
+      // the simple type system can't type a disjunctive range.
+      throw SimpleTypeError("Don't know how to type multiple returns.");
+  }
+
   constrain(node: ASTNode) => {
     if (node is ASTMethod)
       return this.constrain(node[0]);
 
     if (node is ASTClosure) {
-      // map the parameter annotations into types.
-      let parameters = node.signature().params;
-      let paramTypes = parameters.map(p => this.system.typify(p.type));
+      let tParams = this.constrainFnParams(node),
+          tReturns = this.constrainFnReturns(node);
 
-      // since the params and their types are keyed by uuid,
-      // we can just update the global type env when checking
-      // the body of a function.
-      this.typeEnv.extend(Map(..zip(parameters, paramTypes)));
-
-      // track the types of the return values as we check the body.
-      let returnTypes = node.children.reduce(
-        (types, node) => {
-          let type = this.principal(node);
-
-          if (node is ASTReturn)
-            types.push(type);
-
-          return types;
-        }, []
-      );
-
-      // now build the type of the function.
-      let tParams, tReturns;
-
-      if (node.function.arity == 0) {
-        tParams = unit;
-      } else if (node.function.arity == 1) {
-        tParams = paramTypes[0];
-      } else {
-        tParams = TProduct(paramTypes);
-      }
-
-      // there's always an implicit return. for now, if there are
-      // explicit returns as well, we'll just ignore the implicit
-      // one. once we have ast nodes for conditionals we can be
-      // more discriminating.
-      let tImplicitReturn = returnTypes.pop();
-
-      if (len(returnTypes) == 0) {
-        tReturns = tImplicitReturn;
-      } else if (len(returnTypes) == 1) {
-        tReturns = returnTypes[0];
-      } else {
-        // the simple type system can't type a disjunctive range.
-        throw TypeError("Don't know how to type multiple returns.");
-      }
-
-      // apply any inferences from the body to the signature.
       return (tParams -> tReturns).apply(this.solution);
     }
 
     if (node is ASTLiteral)
       return this.system.literalType(node.value);
     
-    if (node is ASTNegation)
-      return this.principal(node[0]);
+    if (node is ASTNegation) {
+      let tArg = this.principal(node[0]);
+      // constrained correctly by the subtype
+      // system as arg <| (bool | void | undef)
+      this.constraints.push(tArg ~ bool);
+      return bool;
+    }
     
     if (node is ASTEquality) {
       let left = node[0], right = node[1];
@@ -410,14 +421,15 @@ class SimpleTypeState {
 
     // the ast closes over a variable out of its scope.
     // resolve it and type its value.
-    if (node is ASTUpvalue and node.uuid == nil) {
+    if (node is ASTExternalUpvalue) {
       let value = node.resolve();
       return this.type(value);
     }
 
     if (node is ASTVariable)
       return this.lookup(node);
-    
+
+    // punt: requires proper class typing.
     if (node is ASTPropertyAccess)
       return typeVar();
 
@@ -484,6 +496,18 @@ class SimpleTypeState {
   occurs(var: TVar, type: Type) => !(type is TVar) and var in type.fvs();
 
   unify(constraint: Constraint) => {
+    let unified = this._unify(constraint);
+
+    if (this.debug) {
+      print "  ----------- UNIFY -----------";
+      print "  " + constraint.str() + " = " + str(unified);
+      print "  ------------------------------";
+    }
+    return unified;
+  }
+
+  _unify(constraint: Constraint) => {
+
     let left = constraint.left,
         right = constraint.right;
     

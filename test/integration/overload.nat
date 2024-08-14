@@ -157,41 +157,25 @@ assert(f(1, (x: num) => x) == 1);
 assert(f(1, (x: string) => x) == undefined);
 assert(f(1, (x: bool) => x) == undefined);
 
-// overloads can dispatch on instantiated abstract types.
+// instantiated abstract types.
 
-let g: num -> bool = x => x == 1;
-let k: bool -> bool = x => !x;
-let h: (u -> v) -> ((v -> w) -> (u -> w)) = m k x => m(k(x));
+let f = (a: bool -> bool, b: bool) => a(b)
+      | (a: num, b: num -> num) => b(a);
 
-let fn = h(k)(g);
+let k: u -> (u -> u) = x y => !y;
+let g = k(true);
 
-assert(fn(0));
-assert(!fn(1));
-assert(fn(2));
+assert(f(g, true) == false);
+assert(f(g, false) == true);
 
-let fn = f(h, k)(g);
+let k: u -> (u -> u) = x y => y + 1;
+let g = k(1);
 
-assert(fn(0));
-assert(!fn(1));
-assert(fn(2));
+assert(f(1, g) == 2);
+assert(f(2, g) == 3);
 
-let fn = f(k, h)(g);
+// instantiated abstract overloads.
 
-assert(fn(0));
-assert(!fn(1));
-assert(fn(2));
-
-// let fn = f(g, f(h, k));
-
-// assert(fn(0));
-// assert(!fn(1));
-// assert(fn(2));
-
-// let fn = f(f(h, k), g);
-
-// assert(fn(0));
-// assert(!fn(1));
-// assert(fn(2));
 
 // overloads can dispatch on overloads.
 

@@ -473,7 +473,10 @@ InterpretResult initializeCore() {
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
-      (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
+      (vm.core.astExternalUpvalue = getGlobalClass(S_AST_EXTERNAL_UPVALUE)) ==
+          NULL ||
+      (vm.core.astInternalUpvalue = getGlobalClass(S_AST_INTERNAL_UPVALUE)) ==
+          NULL ||
       (vm.core.astLocal = getGlobalClass(S_AST_LOCAL)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.astMembership = getGlobalClass(S_AST_MEMBERSHIP)) == NULL ||

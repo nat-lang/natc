@@ -1,2 +1,6 @@
 
 let TypeSystem = PolyTypeSystem;
+let TypeState = () => PolyTypeState(TypeSystem, false);
+
+let infix unify = (x, y) => TypeSystem.newState().unify(x ~ y),
+    infix unifies = unify;

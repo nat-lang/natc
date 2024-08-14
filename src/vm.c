@@ -69,7 +69,8 @@ void initCore(Core* core) {
 
   core->astClosure = NULL;
   core->astMethod = NULL;
-  core->astUpvalue = NULL;
+  core->astExternalUpvalue = NULL;
+  core->astInternalUpvalue = NULL;
   core->astLocal = NULL;
   core->astOverload = NULL;
   core->astMembership = NULL;

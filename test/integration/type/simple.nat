@@ -5,6 +5,8 @@ let typefail = x => assert(
   SimpleTypeSystem.typecheck(x).failure()
 );
 
+// the simple type system types functions.
+// --------------------------------------------
 
 // no argument, implicit return.
 
@@ -83,23 +85,8 @@ typefail(() => {
   return f(false,true);
 });
 
-// declaration annotation.
-
-let f: num -> num = x => 1;
-
-assert(annotations(f)[0] == num -> num);
-
-let x: num = 1;
-let y: string = "string";
-
-typecheck(() => f(2));
-typecheck(() => f(x));
-
-typefail(() => f(y));
-typefail(() => f("a"));
-typefail(() => f(true));
-
 // parameter annotation.
+// --------------------------------------------
 
 // single base type param constrains the function type.
 
@@ -267,12 +254,24 @@ typefail(() => {
   let f: () -> num = () => true;
 });
 
+// negation.
+
+typecheck(() => !true);
+typecheck(() => !false);
+
+typefail(() => !1);
+typefail(() => !"string");
+typefail(() => !nil);
+typefail(() => !undefined);
+
 // classes.
 // --------------------------------------------
 
 // class instantiation.
 
 // zero parameter initializer.
+
+class A {}
 
 typecheck(() => A());
 
@@ -368,3 +367,31 @@ let t = type(x y z => f(x,y,z));
 
 assert(t == (num -> (num -> (num -> bool))));
 
+// infer the type of application.
+
+let infix unifies = (x, y) => SimpleTypeSystem.newState().unify(x ~ y);
+
+let a = Type(), b = Type(), c = Type();
+
+let f = g x => g(x);
+let t = type(f);
+
+assert(t unifies ((a -> b) -> (a -> b)));
+assert(t unifies ((b -> a) -> (b -> a)));
+
+assert(!(t unifies ((a -> a) -> (a -> b))));
+assert(!(t unifies ((b -> b) -> (a -> b))));
+
+assert(!(t unifies ((a -> b) -> (a -> a))));
+assert(!(t unifies ((a -> b) -> (b -> b))));
+
+assert(!(t unifies ((b -> a) -> (a -> b))));
+assert(!(t unifies ((a -> b) -> (b -> a))));
+
+// infer the type of composition.
+
+let @ = f g x => f(g(x));
+let t = type(@);
+
+assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
+assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));

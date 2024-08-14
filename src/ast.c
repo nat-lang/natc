@@ -9,9 +9,9 @@
 #include "value.h"
 #include "vm.h"
 
-bool astClosure(ObjClosure* closure);
+bool astClosure(Value* enclosing, ObjClosure* closure);
 bool astLocal(uint8_t slot);
-bool astOverload(ObjOverload* overload);
+bool astOverload(Value* enclosing, ObjOverload* overload);
 
 static bool executeMethod(char* method, int argCount) {
   return vmExecuteMethod(method, argCount, 1);
@@ -214,12 +214,12 @@ bool astFrame(Value root) {
       }
       case OP_OVERLOAD: {
         if (!vmOverload(frame)) return false;
-        if (!astOverload(AS_OVERLOAD(vmPeek(0)))) return false;
+        if (!astOverload(&root, AS_OVERLOAD(vmPeek(0)))) return false;
         break;
       }
       case OP_CLOSURE: {
         vmClosure(frame);
-        if (!astClosure(AS_CLOSURE(vmPeek(0)))) return false;
+        if (!astClosure(&root, AS_CLOSURE(vmPeek(0)))) return false;
         break;
       }
       case OP_CALL: {
@@ -331,36 +331,47 @@ bool astLocal(uint8_t slot) {
   return initInstance(vm.core.astLocal, 1);
 }
 
-bool astUpvalues(ObjClosure* closure) {
+bool astUpvalues(ObjClosure* closure, bool root) {
+  ObjClass* upvalue =
+      root ? vm.core.astExternalUpvalue : vm.core.astInternalUpvalue;
+
   for (int i = 0; i < closure->upvalueCount; i++) {
-    vmPush(OBJ_VAL(vm.core.astUpvalue));
+    vmPush(OBJ_VAL(upvalue));
     vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
     vmPush(OBJ_VAL(closure->upvalues[i]));
-    if (!initInstance(vm.core.astUpvalue, 3)) return false;
+
+    // if the closure is the root of the ast, any upvalues
+    // it closes over are resolvable, so we distinguish them.
+    if (!initInstance(upvalue, 3)) return false;
   }
   return vmTuplify(closure->upvalueCount, true);
 }
 
-bool astClosure(ObjClosure* closure) {
-  // we'll populate the frame's local slots as we build
-  // the tree, and exit the frame once we're done.
+bool astClosure(Value* enclosing, ObjClosure* closure) {
   vmInitFrame(closure, 0);
 
-  // the root of the tree is an [ASTClosure] instance that has
-  // two arguments.
+  // the root of the tree is an [ASTClosure] instance that
+  // has three arguments.
   vmPush(OBJ_VAL(vm.core.astClosure));
+  // (0) the enclosing function.
+  vmPush(enclosing == NULL ? NIL_VAL : *enclosing);
   // (1) the function itself.
   vmPush(OBJ_VAL(closure));
   // (2) the closure's upvalues.
-  if (!astUpvalues(closure)) return false;
+  if (!astUpvalues(closure, enclosing == NULL)) return false;
 
-  if (!initInstance(vm.core.astClosure, 2)) return false;
+  if (!initInstance(vm.core.astClosure, 3)) return false;
+  Value astClosure = vmPeek(0);
 
-  return astFrame(vmPeek(0));
+  // the function's arguments are undefined values.
+  // the [ASTClosure] instance occupies the reserved slot.
+  for (int i = 0; i < closure->function->arity; i++) vmPush(UNDEF_VAL);
+
+  return astFrame(astClosure);
 }
 
-bool astBoundFunction(ObjBoundFunction* obj) {
+bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   vmPop();
 
   if (obj->type == BOUND_NATIVE) {
@@ -381,12 +392,12 @@ bool astBoundFunction(ObjBoundFunction* obj) {
   vmPush(OBJ_VAL(obj));
   vmPush(obj->receiver);
   vmPush(OBJ_VAL(closure));
-  if (!astClosure(closure)) return false;
+  if (!astClosure(enclosing, closure)) return false;
 
   return initInstance(vm.core.astMethod, 4);
 }
 
-bool astOverload(ObjOverload* overload) {
+bool astOverload(Value* enclosing, ObjOverload* overload) {
   vmPop();
 
   vmPush(OBJ_VAL(vm.core.astOverload));
@@ -395,7 +406,7 @@ bool astOverload(ObjOverload* overload) {
 
   for (int i = 0; i < overload->cases; i++) {
     vmPush(OBJ_VAL(overload->closures[i]));
-    if (!astClosure(overload->closures[i])) return false;
+    if (!astClosure(enclosing, overload->closures[i])) return false;
   }
 
   if (!vmTuplify(overload->cases, true)) return false;
@@ -408,11 +419,11 @@ bool ast(Value value) {
     case VAL_OBJ: {
       switch (OBJ_TYPE(value)) {
         case OBJ_BOUND_FUNCTION:
-          return astBoundFunction(AS_BOUND_FUNCTION(value));
+          return astBoundFunction(NULL, AS_BOUND_FUNCTION(value));
         case OBJ_CLOSURE:
-          return astClosure(AS_CLOSURE(value));
+          return astClosure(NULL, AS_CLOSURE(value));
         case OBJ_OVERLOAD:
-          return astOverload(AS_OVERLOAD(value));
+          return astOverload(NULL, AS_OVERLOAD(value));
         default:
           vmRuntimeError("Undestructurable object.");
           return false;

@@ -3,7 +3,7 @@ class TOverload extends Type {
     if (len(cases) == 0)
       throw TypeError("TOverload requires at least one case.");
 
-    this.cases = cases;
+    this.cases = cases.map(TypeSystem.typify);
   }
 
   unit(type) => {

@@ -61,18 +61,18 @@ assert(f != (bool -> void <+> bool -> void));
 
 let f = (x: num) => nil | (x: bool) => nil;
 
-// (num -> void <+> bool -> void) < num -> w
+// (num -> void <+> bool -> void) <| num -> w
 typecheck((x: num) => f(x));
 
-// (num -> void <+> bool -> void) < bool -> w
+// (num -> void <+> bool -> void) <| bool -> w
 typecheck((x: bool) => f(x));
 
-// (num -> void <+> bool -> void) < (num || bool) -> w
-// (num -> void <+> bool -> void) < (num -> w <+> bool -> w)
+// (num -> void <+> bool -> void) <| (num || bool) -> w
+// (num -> void <+> bool -> void) <| (num -> w <+> bool -> w)
 typecheck((x: num || bool) => f(x));
 
-// (num -> void <+> bool -> void) < (num || bool || string) -> w
-// (num -> void <+> bool -> void) < (num -> w <+> bool -> w <+> string -> w)
+// (num -> void <+> bool -> void) <| (num || bool || string) -> w
+// (num -> void <+> bool -> void) <| (num -> w <+> bool -> w <+> string -> w)
 typefail((x: num || bool || string) => f(x));
 
 // order of the cases doesn't matter.
@@ -89,18 +89,18 @@ typefail((x: num || bool || string) => f(x));
 
 let f = (x: num) => true | (x: bool) => nil;
 
-// (num -> bool <+> bool -> void) < num -> w
+// (num -> bool <+> bool -> void) <| num -> w
 typecheck((x: num) => f(x));
 
-// (num -> bool <+> bool -> void) < bool -> w
+// (num -> bool <+> bool -> void) <| bool -> w
 typecheck((x: bool) => f(x));
 
-// (num -> bool <+> bool -> void) < (num || bool) -> w
-// (num -> bool <+> bool -> void) < (num -> w <+> bool -> w)
+// (num -> bool <+> bool -> void) <| (num || bool) -> w
+// (num -> bool <+> bool -> void) <| (num -> w <+> bool -> w)
 typecheck((x: bool || num) => f(x));
 
-// (num -> bool <+> bool -> void) < (num || bool || string) -> w
-// (num -> bool <+> bool -> void) < (num -> w <+> bool -> w <+> string -> w)
+// (num -> bool <+> bool -> void) <| (num || bool || string) -> w
+// (num -> bool <+> bool -> void) <| (num -> w <+> bool -> w <+> string -> w)
 typefail((x: num || bool || string) => f(x));
 
 // constraints on range.
@@ -139,7 +139,7 @@ typecheck((x: num) => j(f(x)));
 // fn is subtype of overload
 // --------------------------------------
 
-// g < f -> w
+// g <| f -> w
 
 // overload has uniform range.
 

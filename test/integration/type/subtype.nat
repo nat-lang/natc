@@ -91,6 +91,16 @@ typecheck((x: num || string, y: bool) => f(x,y));
 typecheck((x: string, y: num || bool) => f(x,y));
 typecheck((x: num, y: num || bool) => f(x,y));
 
+// negation.
+
+typecheck(() => !true);
+typecheck(() => !false);
+typecheck(() => !nil);
+typecheck(() => !undefined);
+
+typefail(() => !1);
+typefail(() => !"string");
+
 // classes.
 
 class A {}
@@ -121,7 +131,6 @@ typefail((x: B) => f(x));
 typefail((x: A) => f(x));
 
 // membership.
-// --------------------------------------------
 
 class A {}
 

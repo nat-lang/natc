@@ -40,7 +40,8 @@ typedef struct {
 
   ObjClass* astClosure;
   ObjClass* astMethod;
-  ObjClass* astUpvalue;
+  ObjClass* astExternalUpvalue;
+  ObjClass* astInternalUpvalue;
   ObjClass* astLocal;
   ObjClass* astOverload;
   ObjClass* astMembership;

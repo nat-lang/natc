@@ -35,16 +35,18 @@ class ASTNode extends Tree {
       if (node is ASTClosure) {
         let closureEnv = VarEnv(varEnv.upvalues);
 
-        for (param in node.signature().params) {
+        for (param in node.signature().params)
           rename(param, closureEnv.locals);
-        }
-
-        for (upvalue in node.upvalues) {
-          if (!closureEnv.upvalues[upvalue.id]) {
-            closureEnv.upvalues[upvalue.id] = varEnv.locals[upvalue.localId];
+        
+        node.upvalues.values().map(
+          (v: ASTExternalUpvalue) => rename(v, closureEnv.upvalues)
+        | (v: ASTInternalUpvalue) => {
+            if (!closureEnv.upvalues[v.id])
+              closureEnv.upvalues[v.id] = varEnv.locals[v.localId];
           }
-        }
-
+        | v => { throw Error("Unexpected upvalue type: " + str(v)); }
+        );
+ 
         return closureEnv;
       }
 
@@ -119,6 +121,7 @@ class ASTLocal extends ASTVariable {}
 class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
 }
+
 class ASTUpvalue extends ASTVariable {
   init(id, localId, upvalue) => {
     super.init(id);
@@ -127,6 +130,9 @@ class ASTUpvalue extends ASTVariable {
   }
   resolve() => resolveUpvalue(this.upvalue);
 }
+
+class ASTExternalUpvalue extends ASTUpvalue {}
+class ASTInternalUpvalue extends ASTUpvalue {}
 
 class ASTParameter extends ASTVariable {
   init(id, name, type) => {
@@ -184,10 +190,19 @@ class ASTSignature extends ASTNode {
 }
 
 class ASTClosure extends ASTExpr {
-  init(function, upvalues) => {
+  init(enclosing, function, upvalues) => {
     this.function = function;
-    this.upvalues = upvalues;
     this.children = [];
+
+    if (enclosing == nil)
+      this.upvalues = Map();
+    else
+      this.upvalues = enclosing.upvalues.copy();
+
+    for (val in upvalues) {
+      if (!this.upvalues[val.id])
+        this.upvalues[val.id] = val;
+    }
   }
 
   resolve() => this.function;
@@ -233,9 +248,9 @@ class ASTClosure extends ASTExpr {
   opLiteral(value) => ASTLiteral(value);
   opNot(value) => ASTNegation(value);
   opEqual(left, right) => ASTEquality(left, right);
-  opSequence(seq) => ASTSequence(..Sequential.fromRaw(seq));
+  opSequence(seq) => ASTSequence(..Sequence.fromRaw(seq));
   opGetGlobal(name) => ASTGlobal(name);
-  opGetUpvalue(address, localSlot, upvalue) => ASTUpvalue(address, localSlot, upvalue);
+  opGetUpvalue(address, localSlot, upvalue) => this.upvalues[address];
   opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
   opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));

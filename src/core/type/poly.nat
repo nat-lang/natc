@@ -1,9 +1,9 @@
 
 
 class TAbstract extends Type {
-  init(fn, arity) => {
+  init(fn) => {
     this.fn = fn;
-    this.arity = arity;
+    this.arity = fn.arity;
   }
 
   instantiate(nameSupply) => {
@@ -12,23 +12,6 @@ class TAbstract extends Type {
       tVars.push(nameSupply());
     return TypeSystem.typify(this.fn(..tVars));
   }
-
-  generalize(type: TFunction) => {
-    // instantiate any abstractions lower in the
-    // type so that we're always first order.
-    let normal = type.map(
-      (x: TAbstract) => x.instantiate(typeVar) | x => x
-    );
-    let fvs = normal.fvs();
-  
-    // simulate the function with type substitution.
-    return TAbstract((*args) => {
-      let s = Substitution(..zip(fvs.toSeq(), args));
-      return normal.apply(s);
-    }, len(fvs));
-  }
-
-  fromFn(fn: OFunction) => TAbstract(fn, fn.arity);
 
   str() => {
     let tVars = [
@@ -41,15 +24,42 @@ class TAbstract extends Type {
   pp() => { print this.str(); }
 }
 
+class TGeneralization extends TAbstract {
+  init(concrete) => {
+    this.concrete = concrete;
+    this.arity = len(concrete.fvs());
+  }
+
+  fvs() => this.concrete.fvs();
+
+  fn(*args) => {
+    // simulate the function with type substitution.
+    let sub = Substitution(..zip(this.fvs().toSeq(), args));
+    return this.concrete.apply(sub);
+  }
+}
+
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
-    let type = super.constrain(node);
+    if (node is ASTClosure) {
+      let tParams = this.constrainFnParams(node),
+          tReturns = this.constrainFnReturns(node);
 
-    if (node is ASTClosure and type.hasFvs()) {
-      return TAbstract.generalize(type);
+      tParams = tParams.apply(this.solution);
+      tReturns = tReturns.apply(this.solution);
+
+      if (tReturns is TGeneralization)
+        tReturns = tReturns.concrete;
+
+      let type = tParams -> tReturns;
+
+      if (type.hasFvs())
+        return TGeneralization(type);
+
+      return type;
     }
 
-    return type;
+    return super.constrain(node);
   }
 
   unify(constraint: Constraint) => {
@@ -62,7 +72,7 @@ class PolyTypeState extends AdhocTypeState {
     if (right is TAbstract and !(left is TVar))
       right = right.instantiate(typeVar);
     
-    return super.unify(this.system.ConstraintClass(left, right));
+    return super.unify(constraint.__class__(left, right));
   }
 
   // Calculate the type of [expr], inferring it if necessary.
@@ -84,7 +94,7 @@ class PolyTypeState extends AdhocTypeState {
 class PolyTypeSystem extends AdhocTypeSystem {
   typify(value) => {
     if (vType(value) == OFunction)
-      return TAbstract.fromFn(value);
+      return TAbstract(value);
 
     return super.typify(value);
   }

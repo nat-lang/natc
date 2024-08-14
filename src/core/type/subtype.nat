@@ -69,6 +69,12 @@ class SubtypeState extends SimpleTypeState {
       return bool;
     }
 
+    if (node is ASTNegation) {
+      let tArg = this.principal(node[0]);
+      this.constraints.push(tArg <| (bool || void || undef));
+      return bool;
+    }
+
     return super.constrain(node);
   }
 
@@ -83,6 +89,8 @@ class SubtypeState extends SimpleTypeState {
       // a -> b < c -> d iff a > c and b < d.
       } else if (left is TFunction and right is TFunction) {
         this.constraints.extend([
+          // fix me.
+          // right.domain <| left.domain,
           (right.domain <| left.domain),
           (left.range <| right.range)
         ]);
