@@ -208,7 +208,7 @@ let a = Type(), b = Type(), c = Type();
 
 let infix unifies = (x, y) => PolyTypeSystem.newState().unify(x ~ y);
 
-// first order succeeds.
+// the type of identity is inferrable.
 
 typecheck(() => {
   let id = x => x;
@@ -286,4 +286,28 @@ assert(t unifies ((b -> a, b) -> a) <+> ((b, b -> a) -> a));
 let f = (a: x -> y) => ((b: x) => a(b)) | (a: x) => ((b: x -> y) => b(a));
 
 let t = type(f);
+
+// the poly type system exposes an api for instantiating
+// the annotations of applied abstract functions.
+
+let instantiate = PolyTypeSystem.instantiate;
+
+let f: w -> (w -> w) = x y => y;
+let t = instantiate(f, 1);
+
+assert(t == num -> num);
+
+let f: w -> (w -> bool) = x y => true;
+let t = instantiate(f, 1);
+
+assert(t == num -> bool);
+
+let f: w -> (u -> (w -> u)) = x y z => y;
+let t = instantiate(f, 1);
+
+assert(t is TGeneralization);
+
+assert(t unifies (a -> (num -> a)));
+assert(!(t unifies (a -> (bool -> a))));
+assert(!(t unifies (a -> (num -> b))));
 
