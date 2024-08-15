@@ -62,6 +62,57 @@ class ASTNode extends Tree {
       return varEnv;
     }, VarEnv(Map()));
   }
+
+  // expressions.
+
+  opLiteral(value) => ASTLiteral(value);
+  opNot(value) => ASTNegation(value);
+  opEqual(left, right) => ASTEquality(left, right);
+  opSequence(seq) => ASTSequence(..Sequence.fromRaw(seq));
+  opGetGlobal(name) => ASTGlobal(name);
+  opGetUpvalue(address, localSlot, upvalue) => this.upvalues[address];
+  opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
+  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
+  opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
+  opVariable(var) => ASTPatternVariable(var);
+  opMember(element, collection) => ASTMembership(element, collection);
+
+  // statements.
+
+  opSignature(signature) => {
+    this.function.signature = signature;
+  }
+
+  opExprStatement(expr) => {
+    let node = ASTExprStatement(expr);
+    this.children.push(node);
+  }
+
+  opSetLocalValue(local, value) => {
+    let node = ASTLocalValueAssignment(local, value);
+    this.children.push(node);
+  }
+
+  opSetLocalType(local, type) => {
+    let node = ASTLocalTypeAssignment(local, type);
+    this.children.push(node);
+  }
+
+  opSetProperty(obj, name, value) => {
+    let literal = ASTLiteral(name);
+    let assignment = ASTPropertyAssignment(obj, literal, value);
+    this.children.push(assignment);
+  }
+
+  opReturn(expr) => {
+    let node = ASTReturn(expr);
+    this.children.push(node);
+  }
+
+  opImplicitReturn(expr) => {
+    let node = ASTImplicitReturn(expr);
+    this.children.push(node);
+  }
 }
 
 class ASTStatement extends ASTNode {}
@@ -241,57 +292,6 @@ class ASTClosure extends ASTExpr {
       this._signature = this.sign();
 
     return this._signature;
-  }
-
-  // expressions.
-
-  opLiteral(value) => ASTLiteral(value);
-  opNot(value) => ASTNegation(value);
-  opEqual(left, right) => ASTEquality(left, right);
-  opSequence(seq) => ASTSequence(..Sequence.fromRaw(seq));
-  opGetGlobal(name) => ASTGlobal(name);
-  opGetUpvalue(address, localSlot, upvalue) => this.upvalues[address];
-  opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
-  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
-  opInvoke(obj, key, *args) => ASTInvocation(obj, key, ASTArgumentSequence(..args));
-  opVariable(var) => ASTPatternVariable(var);
-  opMember(element, collection) => ASTMembership(element, collection);
-
-  // statements.
-
-  opSignature(signature) => {
-    this.function.signature = signature;
-  }
-
-  opExprStatement(expr) => {
-    let node = ASTExprStatement(expr);
-    this.children.push(node);
-  }
-
-  opSetLocalValue(local, value) => {
-    let node = ASTLocalValueAssignment(local, value);
-    this.children.push(node);
-  }
-
-  opSetLocalType(local, type) => {
-    let node = ASTLocalTypeAssignment(local, type);
-    this.children.push(node);
-  }
-
-  opSetProperty(obj, name, value) => {
-    let literal = ASTLiteral(name);
-    let assignment = ASTPropertyAssignment(obj, literal, value);
-    this.children.push(assignment);
-  }
-
-  opReturn(expr) => {
-    let node = ASTReturn(expr);
-    this.children.push(node);
-  }
-
-  opImplicitReturn(expr) => {
-    let node = ASTImplicitReturn(expr);
-    this.children.push(node);
   }
 }
 

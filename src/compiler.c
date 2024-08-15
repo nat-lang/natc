@@ -1550,9 +1550,9 @@ static int loopCondition(Compiler* cmp) {
   expression(cmp);
   consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop condition.");
 
-  // Jump out of the loop if the condition is false.
+  // jump out of the loop if the condition is false.
   int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
-  // Condition.
+  // condition.
   emitByte(cmp, OP_POP);
 
   return exitJump;
@@ -1573,7 +1573,7 @@ static int loopIncrement(Compiler* cmp, int loopStart) {
 
 static void forConditionStatement(Compiler* cmp) {
   if (match(cmp, TOKEN_SEMICOLON)) {
-    // No initializer.
+    // no initializer.
   } else if (match(cmp, TOKEN_LET)) {
     singleLetDeclaration(cmp);
   } else {
