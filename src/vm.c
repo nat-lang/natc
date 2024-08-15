@@ -929,7 +929,7 @@ InterpretResult vmExecute(int baseFrame) {
         Value args[argCount];
 
         // if the caller has type annotations then propagate
-        // them to its return value.
+        // them to its return value. first stash the args.
         bool propagate =
             IS_OBJ(caller) && AS_OBJ(caller)->annotations.count > 0;
         if (propagate) {
@@ -943,6 +943,7 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        // now instantiate the type.
         if (propagate && !propagateAnnotation(caller, argCount, args))
           return INTERPRET_RUNTIME_ERROR;
 

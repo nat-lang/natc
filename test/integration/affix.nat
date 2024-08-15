@@ -30,7 +30,7 @@ assert({1,2,3} & {4,5,6} == {1,2,3,4,5,6});
 // function operands.
 let infix @ = (f, g) => (x) => f(g(x));
 
-assert((((a) => a + 1) @ ((a) => a + 1))(0) == 2);
+assert(((a => a + 1) @ (a => a + 1))(0) == 2);
 
 // precedence.
 

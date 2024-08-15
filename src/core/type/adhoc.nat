@@ -50,7 +50,7 @@ class AdhocTypeState extends SubtypeState {
         left = TOverload.lift(left);
         right = TOverload.lift(right);
 
-        // ∀x in right. ∃y in left. y < x
+        // ∀x in right. ∃y in left. y <| x
         return right.cases.all(
           rCase => left.cases.some(
             lCase => {

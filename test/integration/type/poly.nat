@@ -204,6 +204,10 @@ typefail(() => f(f("x", g), h));
 
 // reconstruction.
 
+let a = Type(), b = Type(), c = Type();
+
+let infix unifies = (x, y) => PolyTypeSystem.newState().unify(x ~ y);
+
 // first order succeeds.
 
 typecheck(() => {
@@ -222,16 +226,7 @@ typefail(id => {
   id("string");
 });
 
-// the type of application is inferrable.
-
-class T' extends Type {
-  init(id) => { this.id = id; }
-  str() => str(this.id);
-}
-
-let a = T'("a"), b = T'("b"), c = T'("c");
-
-let infix unifies = (x, y) => PolyTypeSystem.newState().unify(x ~ y);
+// the type of forward application is inferrable.
 
 let f = g x => g(x);
 let t = type(f);
@@ -248,6 +243,23 @@ assert(!(t unifies ((b -> b) -> (a -> b))));
 assert(!(t unifies ((a -> b) -> (a -> a))));
 assert(!(t unifies ((a -> b) -> (b -> b))));
 
+// the type of backward application is inferrable.
+
+let f = x g => g(x);
+let t = type(f);
+
+assert(t unifies (a -> ((a -> b) -> b)));
+assert(t unifies (b -> ((b -> a) -> a)));
+
+assert(!(t unifies (b -> ((a -> b) -> b))));
+assert(!(t unifies (a -> ((b -> a) -> a))));
+
+assert(!(t unifies (a -> ((b -> a) -> b))));
+assert(!(t unifies (b -> ((a -> b) -> a))));
+
+assert(!(t unifies (a -> ((a -> b) -> a))));
+assert(!(t unifies (b -> ((b -> a) -> b))));
+
 // the type of composition is inferrable.
 
 let @ = f g x => f(g(x));
@@ -256,27 +268,22 @@ let t = type(@);
 assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
 assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
 
-let @ = (f, g, x) => f(g(x));
-
-// the type of backward application is inferrable.
-
- let infix <* = (arg, func) => func(arg);
-
-let t = type(<*);
-
 // the type of type driven application is inferrable.
 
-let infix <*> = (a: x -> y, b: x) => a(b)
-              | (a: x, b: x -> y) => b(a);
+let f = (a: x -> y, b: x) => a(b)
+      | (a: x, b: x -> y) => b(a);
 
+let t = type(f);
 
-let t = type(<*>);
+assert(t unifies ((a -> b, a) -> b) <+> ((a, a -> b) -> b));
+assert(t unifies ((b -> a, b) -> a) <+> ((b, b -> a) -> a));
+
+// fixme.
+// assert(!(t unifies ((a -> b, b) -> b) <+> ((a, a -> b) -> b)));
 
 // the type of curried type driven application is inferrable.
-// fixme!
 
-// let <*>' = (a: x -> y) => (b: x) => a(b)
-//          | (a: x) => (b: x -> y) => b(a);
+let f = (a: x -> y) => ((b: x) => a(b)) | (a: x) => ((b: x -> y) => b(a));
 
-// let t = type(<*>');
-// t.pp();
+let t = type(f);
+

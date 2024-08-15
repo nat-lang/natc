@@ -47,4 +47,4 @@ let f: u -> (u -> u) = a b => b;
 assert(annotations(f(1)) == [(num -> num)]);
 
 let f: u -> (v -> (u -> v)) = a b c => b;
-// assert(annotations(f(1)(true)) == [(num -> bool)]);
+assert(annotations(f(1)(true)) == [(num -> bool)]);
