@@ -662,8 +662,7 @@ bool propagateAnnotation(Value caller, int argCount, Value args[argCount]) {
 
 // Loop until we're back to [baseFrame] frames. Typically this
 // is just 0, but if we want to execute a single function in the
-// middle of interpretation without overflowing its scope, we can
-// let [baseFrame] = the current frame.
+// middle of execution we can let [baseFrame] = the current frame.
 InterpretResult vmExecute(int baseFrame) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 

@@ -133,21 +133,21 @@ class PolyTypeSystem extends AdhocTypeSystem {
 
   instantiate(func, *args) => {
     let state = this.newState();
-    let tFunc = state.type(func);
-
-    let tArgs;
-    if (len(args) == 0)
-      tArgs = void;
-    else if (len(args) == 1)
-      tArgs = state.type(args[0]);
-    else
-      tArgs = state.type(args);
-
+  
     let tApp = typeVar();
+    let tFunc = state.type(func);
+    let tArgs = args.map(state.type);
+  
+    if (len(tArgs) == 0)
+      tArgs = void;
+    else if (len(tArgs) == 1)
+      tArgs = tArgs[0];
+    else
+      tArgs = TProduct(tArgs);
 
     state.constraints.push(tFunc <| tArgs -> tApp);
     state.solve();
-
+  
     tApp = tApp.apply(state.solution);
 
     if (tApp.hasFvs())

@@ -315,3 +315,10 @@ assert(t unifies (a -> (num -> a)));
 assert(!(t unifies (a -> (bool -> a))));
 assert(!(t unifies (a -> (num -> b))));
 
+let f: (w,u) -> (u -> (w -> u)) = x y z => y;
+
+let t = instantiate(f, 1, 1);
+assert(t == num -> (num -> num));
+
+let t = instantiate(f, 1, true);
+assert(t == bool -> (num -> bool));
