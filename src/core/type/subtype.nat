@@ -9,12 +9,21 @@ class TSum extends Type {
     ..this.disjuncts.union(that.disjuncts).elements()
   );
 
+  substitute(c: Constraint) => {
+    let sum = TSum(
+      ..this.disjuncts.map(x => x.substitute(c))
+    );
+    if (len(sum) == 1) return sum.lower();
+    return sum;
+  }
+
   elements() => this.disjuncts.elements();
   subtypeOf(that: TSum) => this.disjuncts.subsetEq(that.disjuncts);
   lift(type) => {
     if (type is TSum) return type;
     return TSum(type);
   }
+  lower() => this.disjuncts.elements()[0];
 
   fvs() => bigUnion(..[x.fvs() | x in this]);
   str() => "TSum(" + join(this.elements().map(x => x.str()), ", ") + ")";
@@ -24,6 +33,7 @@ class TSum extends Type {
   __eq__(that) => this.disjuncts == that.disjuncts;
   __in__(element) => element in this.disjuncts;
   __iter__() => iter(this.disjuncts);
+  __len__() => len(this.disjuncts);
 }
 
 let infix(9) || = (a, b) => TSum.lift(a).union(TSum.lift(b));
@@ -58,8 +68,6 @@ class SubtypeState extends SimpleTypeState {
 
       this.constraints.push(tCollection <| TInstance(Base));
 
-      // this will become a predication against the type
-      // rather than the value once TInstance is a record.
       if (tCollection is TInstance and "__in__" in tCollection.klass) {
         let tIn = this.type(tCollection.klass.__in__);
 
@@ -73,6 +81,19 @@ class SubtypeState extends SimpleTypeState {
       let tArg = this.principal(node[0]);
       this.constraints.push(tArg <| (bool || void || undef));
       return bool;
+    }
+
+    if (node is ASTLocalTypeAssignment) {
+      let var = node[0];
+      let val = node[1];
+
+      let tVar = this.lookup(var);
+      let tVal = this.system.typify(val.resolve());
+
+      // value must be subtype of its annotation.
+      this.constraints.push(tVar <| tVal);
+
+      return void;
     }
 
     return super.constrain(node);
@@ -118,6 +139,11 @@ class SubtypeState extends SimpleTypeState {
 
     return super.unify(constraint);
   }
+
+  // Value must be subtype of its annotation.
+  constrainAnnotation(annotation, type) => this.constraints.push(
+    type <| this.system.typify(annotation)
+  );
 }
 
 class SubtypeSystem extends SimpleTypeSystem {}

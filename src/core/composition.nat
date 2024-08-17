@@ -30,7 +30,6 @@ class CompositionSystem {
 
     if (node.unary()) {
       let child = this.type(node[0]);
-
       return TypedTree(child.data, [child], child.type);
     }
 

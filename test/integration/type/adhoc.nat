@@ -1,13 +1,4 @@
 
-let type = AdhocTypeSystem.type;
-
-let typecheck = x => assert(
-  AdhocTypeSystem.typecheck(x).success()
-);
-let typefail = x => assert(
-  AdhocTypeSystem.typecheck(x).failure()
-);
-
 // the overload type derives from the signatures of its cases.
 
 let f = (x: num) => nil | (x: bool) => nil;
@@ -40,7 +31,7 @@ assert(string -> (void || bool) in f.cases);
 
 // concatenating overload types preserves the order of their cases.
 
-let f = TOverload(num -> void) <+> TOverload(bool -> void);
+let f = TOverload(num -> void) & TOverload(bool -> void);
 
 assert(f is TOverload);
 assert(len(f.cases) == 2);
@@ -49,10 +40,10 @@ assert(f.cases[1] == bool -> void);
 
 // equality of overloads is equality of their cases.
 
-assert(f == (num -> void <+> bool -> void));
-assert(f != (bool -> void <+> num -> void));
-assert(f != (num -> void <+> num -> void));
-assert(f != (bool -> void <+> bool -> void));
+assert(f == (num -> void & bool -> void));
+assert(f != (bool -> void & num -> void));
+assert(f != (num -> void & num -> void));
+assert(f != (bool -> void & bool -> void));
 
 // overload is subtype of function.
 // --------------------------------------
@@ -61,18 +52,18 @@ assert(f != (bool -> void <+> bool -> void));
 
 let f = (x: num) => nil | (x: bool) => nil;
 
-// (num -> void <+> bool -> void) <| num -> w
+// (num -> void & bool -> void) <| num -> w
 typecheck((x: num) => f(x));
 
-// (num -> void <+> bool -> void) <| bool -> w
+// (num -> void & bool -> void) <| bool -> w
 typecheck((x: bool) => f(x));
 
-// (num -> void <+> bool -> void) <| (num || bool) -> w
-// (num -> void <+> bool -> void) <| (num -> w <+> bool -> w)
+// (num -> void & bool -> void) <| (num || bool) -> w
+// (num -> void & bool -> void) <| (num -> w & bool -> w)
 typecheck((x: num || bool) => f(x));
 
-// (num -> void <+> bool -> void) <| (num || bool || string) -> w
-// (num -> void <+> bool -> void) <| (num -> w <+> bool -> w <+> string -> w)
+// (num -> void & bool -> void) <| (num || bool || string) -> w
+// (num -> void & bool -> void) <| (num -> w & bool -> w & string -> w)
 typefail((x: num || bool || string) => f(x));
 
 // order of the cases doesn't matter.
@@ -89,18 +80,18 @@ typefail((x: num || bool || string) => f(x));
 
 let f = (x: num) => true | (x: bool) => nil;
 
-// (num -> bool <+> bool -> void) <| num -> w
+// (num -> bool & bool -> void) <| num -> w
 typecheck((x: num) => f(x));
 
-// (num -> bool <+> bool -> void) <| bool -> w
+// (num -> bool & bool -> void) <| bool -> w
 typecheck((x: bool) => f(x));
 
-// (num -> bool <+> bool -> void) <| (num || bool) -> w
-// (num -> bool <+> bool -> void) <| (num -> w <+> bool -> w)
+// (num -> bool & bool -> void) <| (num || bool) -> w
+// (num -> bool & bool -> void) <| (num -> w & bool -> w)
 typecheck((x: bool || num) => f(x));
 
-// (num -> bool <+> bool -> void) <| (num || bool || string) -> w
-// (num -> bool <+> bool -> void) <| (num -> w <+> bool -> w <+> string -> w)
+// (num -> bool & bool -> void) <| (num || bool || string) -> w
+// (num -> bool & bool -> void) <| (num -> w & bool -> w & string -> w)
 typefail((x: num || bool || string) => f(x));
 
 // constraints on range.
@@ -143,7 +134,7 @@ typecheck((x: num) => j(f(x)));
 
 // overload has uniform range.
 
-let g : (num -> bool <+> string -> bool) -> void
+let g : (num -> bool & string -> bool) -> void
       = f => nil;
 
 typecheck((f: (num || string) -> bool) => g(f));
@@ -154,7 +145,7 @@ typefail((f: string -> bool) => g(f));
 
 // overload has heterogenous range.
 
-let g : (num -> bool <+> string -> string) -> void
+let g : (num -> bool & string -> string) -> void
       = f => nil;
 
 typefail((f: (num || string) -> (bool || string)) => g(f));
@@ -163,17 +154,17 @@ typefail((f: (num || string) -> (bool || string)) => g(f));
 // overload is subtype of overload.
 // --------------------------------------
 
-let g : (num -> bool <+> string -> bool) -> void
+let g : (num -> bool & string -> bool) -> void
       = f => nil;
 
-typecheck((f: num -> bool <+> string -> bool) => g(f));
-typecheck((f: string -> bool <+> num -> bool) => g(f));
+typecheck((f: num -> bool & string -> bool) => g(f));
+typecheck((f: string -> bool & num -> bool) => g(f));
 
-typefail((f: num -> void <+> string -> bool) => g(f));
-typefail((f: num -> bool <+> string -> void) => g(f));
+typefail((f: num -> void & string -> bool) => g(f));
+typefail((f: num -> bool & string -> void) => g(f));
 
-typecheck((f: string -> bool <+> num -> bool <+> bool -> bool) => g(f));
-typecheck((f: string -> bool <+> num -> bool <+> bool -> void) => g(f));
+typecheck((f: string -> bool & num -> bool & bool -> bool) => g(f));
+typecheck((f: string -> bool & num -> bool & bool -> void) => g(f));
 
 // an overload composes with itself when its signature allows.
 

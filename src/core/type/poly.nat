@@ -1,18 +1,28 @@
 
-
 class TAbstract extends Type {
   init(fn) => {
     this.fn = fn;
     this.arity = fn.arity;
+    this.variadic = fn.variadic;
   }
 
-  instantiate(nameSupply) => {
-    let tVars = [];
-    for (let i = 0; i < this.arity; i = i + 1)
-      tVars.push(nameSupply());
-    return TypeSystem.typify(this.fn(..tVars));
+  instantiateWith(varCount) => {
+    let tVars = [typeVar() | _ in range(0, varCount)];
+    let concrete = this.fn(..tVars);
+    return TypeSystem.typify(concrete);
   }
 
+  instantiate() => this.instantiateWith(this.arity);
+
+  pp() => { print str(this); }
+}
+
+class TGeneralization extends TAbstract {
+  init(concrete) => {
+    this.concrete = concrete;
+    this.arity = len(concrete.fvs());
+    this.variadic = false;
+  }
   str() => {
     let tVars = [
       ["u", "v", "w", "x", "y", "z"][i] | i in range(0, this.arity)
@@ -21,15 +31,6 @@ class TAbstract extends Type {
     let type = TypeSystem.typify(this.fn(..[PrettyTVar(v) | v in tVars]));
     return "(" + join([v | v in tVars], ",") + ") => " + type.str();
   }
-  pp() => { print this.str(); }
-}
-
-class TGeneralization extends TAbstract {
-  init(concrete) => {
-    this.concrete = concrete;
-    this.arity = len(concrete.fvs());
-  }
-
   fvs() => this.concrete.fvs();
 
   fn(*args) => {
@@ -37,13 +38,14 @@ class TGeneralization extends TAbstract {
     let sub = Substitution(..zip(this.fvs().toSeq(), args));
     return this.concrete.apply(sub);
   }
+  pp() => { print this.str(); }
 }
 
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
     if (node is ASTClosure) {
-      let tParams = this.constrainFnParams(node),
-          tReturns = this.constrainFnReturns(node);
+      let tParams = this.constrainFnDomain(node),
+          tReturns = this.constrainFnRange(node);
 
       tParams = tParams.apply(this.solution);
       tReturns = tReturns.apply(this.solution);
@@ -53,8 +55,9 @@ class PolyTypeState extends AdhocTypeState {
 
       let type = tParams -> tReturns;
 
-      if (type.hasFvs())
+      if (type.hasFvs()) {
         return TGeneralization(type);
+      }
 
       return type;
     }
@@ -66,37 +69,91 @@ class PolyTypeState extends AdhocTypeState {
     let left = constraint.left,
         right = constraint.right;
 
-    if (left is TAbstract and !(right is TVar))
-      left = left.instantiate(typeVar);
+    if (left is TAbstract) {
+      if (left.variadic and right is ->) {
+        left = left.instantiateWith(len(right.domain));
+      }
+      else if (!(right is TVar))
+        left = left.instantiate();
+    }
     
-    if (right is TAbstract and !(left is TVar))
-      right = right.instantiate(typeVar);
+    if (right is TAbstract) {
+      if (right.variadic and left is ->)
+        right = right.instantiateWith(len(left.domain));
+      else if (!(left is TVar))
+        right = right.instantiate();
+    }
     
     return super.unify(constraint.__class__(left, right));
   }
 
-  // Calculate the type of [expr], inferring it if necessary.
-  type(expr) => {
-    let type = this.system.literalType(expr);
+  // Calculate the type of [value], inferring it if necessary.
+  type(value) => {
+    let type = this.system.literalType(value);
     if (type) return type;
 
-    type = this.infer(expr);
+    type = this.infer(value);
 
-    // instantiate abstract types if we have
-    // annotations to incorporate.
-    if (len(annotations(expr)) > 0 and type is TAbstract)
-      type = type.instantiate(typeVar);
+    // instantiate abstract types.
+    if (type is TAbstract)
+      type = type.instantiate();
 
-    return this.unifyAnnotations(expr, type);
+    return this.unifyAnnotations(value, type);
   }
 }
 
 class PolyTypeSystem extends AdhocTypeSystem {
+  literalType(value) => {
+    if (value == Tuple)
+      return TAbstract((*types) => TProduct(types) -> TProduct(types));
+
+    if (value == Set) {
+      return TAbstract((*types) => {
+        let element;
+        if (len(types) == 0)
+          element = unit;
+        else if (len(types) == 1)
+          element = types[0];
+        else
+          element = TSum(..types);
+
+        return TProduct(types) -> TSet(element);
+      });
+    }
+    
+    return super.literalType(value);
+  }
+
   typify(value) => {
     if (vType(value) == OFunction)
       return TAbstract(value);
 
     return super.typify(value);
+  }
+
+  instantiate(func, *args) => {
+    let state = this.newState();
+    let tFunc = state.type(func);
+
+    let tArgs;
+    if (len(args) == 0)
+      tArgs = void;
+    else if (len(args) == 1)
+      tArgs = state.type(args[0]);
+    else
+      tArgs = state.type(args);
+
+    let tApp = typeVar();
+
+    state.constraints.push(tFunc <| tArgs -> tApp);
+    state.solve();
+
+    tApp = tApp.apply(state.solution);
+
+    if (tApp.hasFvs())
+      tApp = TGeneralization(tApp);
+
+    return tApp;
   }
 }
 

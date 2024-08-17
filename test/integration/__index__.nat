@@ -27,10 +27,7 @@ import test/integration/sequential
 import test/integration/set
 import test/integration/string
 import test/integration/tree
-import test/integration/type/simple
-import test/integration/type/subtype
-import test/integration/type/adhoc
-import test/integration/type/poly
+import test/integration/type/__index__
 import test/integration/overload
 
 conclude("integration");

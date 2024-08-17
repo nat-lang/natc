@@ -1,12 +1,5 @@
 
-let typecheck = x => assert(
-  SubtypeSystem.typecheck(x).success()
-);
-let typefail = x => assert(
-  SubtypeSystem.typecheck(x).failure()
-);
-
-// arguments must be subtypes.
+// argument must be subtype of parameter.
 
 let f: num -> void;
 let g: bool -> void;
@@ -25,10 +18,10 @@ typefail((x: bool || num) => f(x));
 typefail((x: string || num) => f(x));
 typefail((x: bool || string || num) => f(x));
 
-// the subtype relation for functions is contravariant in the domain
-// and covariant in the range.
+// the subtype relation for functions is contravariant
+// in the domain and covariant in the range.
 
-// contravariant domains:
+// contravariant domains.
 
 let f: (bool -> void) -> void = f => {};
 
@@ -46,7 +39,7 @@ typefail((x: string -> void) => f(x));
 typecheck((x: (bool || string) -> void) => f(x));
 typecheck((x: (bool || string || num) -> void) => f(x));
 
-// covariant ranges:
+// covariant ranges.
 
 let f: (() -> bool) -> void = g => {};
 
@@ -74,9 +67,9 @@ typefail((x: (string, num)) => f(x));
 
 let f: (num || string) -> void = x => {};
 
-let type = SubtypeSystem.type(x => f(x));
+let t = SubtypeSystem.type(x => f(x));
 
-assert(type == (num || string) -> void);
+assert(t == (num || string) -> void);
 
 // products of sums.
 
@@ -100,6 +93,13 @@ typecheck(() => !undefined);
 
 typefail(() => !1);
 typefail(() => !"string");
+
+typecheck((f: bool -> bool, x: bool) => !f(x));
+typecheck((f: bool -> undef, x: bool) => !f(x));
+typecheck((f: bool -> void, x: bool) => !f(x));
+
+typefail((f: bool -> num, x: bool) => !f(x));
+typefail((f: bool -> string, x: bool) => !f(x));
 
 // classes.
 
@@ -144,3 +144,53 @@ typecheck(x => x in B());
 typecheck(x => 1 in B());
 
 typefail(x => true in B());
+
+// value must be subtype of its annotation.
+
+class A {}
+class B extends A {}
+class C extends B {}
+
+typecheck(() => {
+  let x: Object = A();
+});
+
+typecheck(() => {
+  let x: A = A();
+});
+
+typecheck(() => {
+  let x: A = B();
+});
+
+typecheck(() => {
+  let x: A = C();
+});
+
+typecheck(() => {
+  let x: B = B();
+});
+
+typecheck(() => {
+  let x: B = C();
+});
+
+typecheck(() => {
+  let x: C = C();
+});
+
+typefail(() => {
+  let x: A = Object();
+});
+
+typefail(() => {
+  let x: B = A();
+});
+
+typefail(() => {
+  let x: C = B();
+});
+
+typefail(() => {
+  let x: C = A();
+});

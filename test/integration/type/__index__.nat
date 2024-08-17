@@ -1,0 +1,39 @@
+
+let _ts = TypeSystem;
+
+let type = x => TypeSystem.type(x);
+let typecheck = x => assert(TypeSystem.typecheck(x).success());
+let typefail = x => assert(TypeSystem.typecheck(x).failure());
+let infix unifies = (x, y) => TypeSystem.newState().unify(x ~ y);
+
+TypeSystem = SimpleTypeSystem;
+
+import test/integration/type/simple
+
+TypeSystem = SubtypeSystem;
+
+import test/integration/type/simple
+import test/integration/type/subtype
+
+TypeSystem = AdhocTypeSystem;
+
+import test/integration/type/simple
+import test/integration/type/subtype
+import test/integration/type/adhoc
+
+TypeSystem = PolyTypeSystem;
+
+import test/integration/type/simple
+import test/integration/type/subtype
+import test/integration/type/adhoc
+import test/integration/type/poly
+
+TypeSystem = DenotationalTypeSystem();
+
+import test/integration/type/simple
+import test/integration/type/subtype
+import test/integration/type/adhoc
+import test/integration/type/poly
+import test/integration/type/denotational
+
+TypeSystem = _ts;

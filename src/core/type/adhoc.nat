@@ -29,7 +29,7 @@ class TOverload extends Type {
   pp() => { print this.str(); }
 }
 
-let infix(7) <+> = (a, b) => TOverload.unit(a).concat(TOverload.unit(b));
+let infix(7) & = (a, b) => TOverload.unit(a).concat(TOverload.unit(b));
 
 class AdhocTypeState extends SubtypeState {
   constrain(node: ASTNode) => {
@@ -45,6 +45,9 @@ class AdhocTypeState extends SubtypeState {
     if (constraint is SubtypeConstraint) {
       let left = constraint.left,
           right = constraint.right;
+      
+      if (left is TVar or right is TVar)
+        return super.unify(constraint);
 
       if (left is TOverload or right is TOverload) {
         left = TOverload.lift(left);
@@ -55,11 +58,10 @@ class AdhocTypeState extends SubtypeState {
           rCase => left.cases.some(
             lCase => {
               // we only want to propagate information for a
-              // successful path, so typecheck in a local copy
+              // successful case, so typecheck in a local copy
               // of the state.
               let substate = this.copy();
-              let case = SubtypeConstraint(lCase, rCase);
-              let unified = substate.unify(case);
+              let unified = substate.unify(lCase <| rCase);
 
               if (unified)
                 this.solution = substate.solution;

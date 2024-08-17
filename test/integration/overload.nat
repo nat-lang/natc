@@ -212,8 +212,8 @@ assert(f(f(g,k), true) == undefined);
 
 // overloads can dispatch on overloads.
 
-let f = (g: num -> bool <+> string -> bool) => 1
-      | (g: num -> bool <+> bool -> bool) => 2;
+let f = (g: num -> bool & string -> bool) => 1
+      | (g: num -> bool & bool -> bool) => 2;
 
 assert(f((x: num) => true | (x: string) => false) == 1);
 assert(f((x: num) => true | (x: bool) => false) == 2);

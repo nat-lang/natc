@@ -1,9 +1,3 @@
-let typecheck = x => assert(
-  SimpleTypeSystem.typecheck(x).success()
-);
-let typefail = x => assert(
-  SimpleTypeSystem.typecheck(x).failure()
-);
 
 // the simple type system types functions.
 // --------------------------------------------
@@ -256,13 +250,23 @@ typefail(() => {
 
 // negation.
 
-typecheck(() => !true);
-typecheck(() => !false);
+let check = SimpleTypeSystem.typecheck(() => !true);
+assert(check.success());
 
-typefail(() => !1);
-typefail(() => !"string");
-typefail(() => !nil);
-typefail(() => !undefined);
+let check = SimpleTypeSystem.typecheck(() => !false);
+assert(check.success());
+
+let check = SimpleTypeSystem.typecheck(() => !1);
+assert(check.failure());
+
+let check = SimpleTypeSystem.typecheck(() => !"string");
+assert(check.failure());
+
+let check = SimpleTypeSystem.typecheck(() => !nil);
+assert(check.failure());
+
+let check = SimpleTypeSystem.typecheck(() => !undefined);
+assert(check.failure());
 
 // classes.
 // --------------------------------------------
@@ -297,10 +301,13 @@ typefail(() => C(true));
 
 typecheck(() => ((x: A) => {})(A()));
 typecheck(() => ((x: B) => {})(B(1)));
-typecheck(() => ((x: num -> C) => x(1))(C));
 
 typefail(() => ((x: B) => {})(A()));
 typefail(() => ((x: A) => {})(B(1)));
+
+// classes unify with the signatures of their initializers.
+
+typecheck(() => ((x: num -> C) => x(1))(C));
 typefail(() => ((x: bool -> C) => x(1))(C));
 
 // reconstruction.
@@ -317,8 +324,6 @@ typecheck(() => k(true));
 typecheck(() => k(nil));
 
 // infer the type of a function from its application.
-
-let type = SimpleTypeSystem.type;
 
 let t = type(h => h(1)).domain;
 
@@ -368,8 +373,6 @@ let t = type(x y z => f(x,y,z));
 assert(t == (num -> (num -> (num -> bool))));
 
 // infer the type of application.
-
-let infix unifies = (x, y) => SimpleTypeSystem.newState().unify(x ~ y);
 
 let a = Type(), b = Type(), c = Type();
 
