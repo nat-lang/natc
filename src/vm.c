@@ -639,27 +639,6 @@ ObjClosure* vmGetGlobalClosure(char* name) {
   return AS_CLOSURE(obj);
 }
 
-bool propagateAnnotation(Value caller, int argCount, Value args[argCount]) {
-  Value typeSystem;
-  if (!mapGet(&vm.globals, INTERN(S_TYPE_SYSTEM), &typeSystem)) {
-    vmRuntimeError("Couldn't find %s.", S_TYPE_SYSTEM);
-    return false;
-  }
-
-  vmPush(typeSystem);
-  vmPush(caller);
-  for (int i = 0; i < argCount; i++) vmPush(args[i]);
-
-  if (!vmExecuteMethod("instantiate", argCount + 1, 1)) return false;
-
-  Value annotation = vmPop();
-
-  if (IS_OBJ(vmPeek(0)))
-    writeValueArray(&AS_OBJ(vmPeek(0))->annotations, annotation);
-
-  return true;
-}
-
 // Loop until we're back to [baseFrame] frames. Typically this
 // is just 0, but if we want to execute a single function in the
 // middle of execution we can let [baseFrame] = the current frame.
@@ -926,15 +905,29 @@ InterpretResult vmExecute(int baseFrame) {
         int argCount = READ_BYTE();
         Value caller = vmPeek(argCount);
         Value args[argCount];
-
-        // if the caller has type annotations then propagate
-        // them to its return value. first stash the args.
-        bool propagate =
+        bool instantiate =
             IS_OBJ(caller) && AS_OBJ(caller)->annotations.count > 0;
-        if (propagate) {
-          for (int i = argCount; i > 0; i--) {
-            args[argCount - i] = vmPeek(i - 1);
+
+        // if the caller has a type annotation then calculate its range.
+        if (instantiate) {
+          for (int i = argCount; i > 0; i--) args[i - 1] = vmPop();
+          Value caller = vmPop();
+
+          Value typeSystem;
+          if (!mapGet(&vm.globals, INTERN(S_TYPE_SYSTEM), &typeSystem)) {
+            vmRuntimeError("Couldn't find %s.", S_TYPE_SYSTEM);
+            return false;
           }
+
+          vmPush(typeSystem);
+          vmPush(caller);
+          for (int i = 0; i < argCount; i++) vmPush(args[i]);
+          if (!vmExecuteMethod("instantiate", argCount + 1, 1)) return false;
+          frame = &vm.frames[vm.frameCount - 1];
+
+          // set up the call.
+          vmPush(caller);
+          for (int i = 0; i < argCount; i++) vmPush(args[i]);
         }
 
         if (!vmCallValue(caller, argCount) ||
@@ -942,9 +935,15 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
-        // now instantiate the type.
-        if (propagate && !propagateAnnotation(caller, argCount, args))
-          return INTERPRET_RUNTIME_ERROR;
+        if (instantiate) {
+          Value result = vmPeek(0);
+          Value annotation = vmPeek(1);
+          if (IS_OBJ(result))
+            writeValueArray(&AS_OBJ(result)->annotations, annotation);
+          vmPop();
+          vmPop();
+          vmPush(result);
+        }
 
         break;
       }
@@ -973,7 +972,6 @@ InterpretResult vmExecute(int baseFrame) {
         while (++i < argCount) vmPush(args[i]);
 
         if (!vmCallValue(postfix, argCount)) return INTERPRET_RUNTIME_ERROR;
-
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -983,9 +981,7 @@ InterpretResult vmExecute(int baseFrame) {
         ObjString* method = READ_STRING();
         int argCount = READ_BYTE();
 
-        if (!vmInvoke(method, argCount)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!vmInvoke(method, argCount)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
