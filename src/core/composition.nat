@@ -23,10 +23,8 @@ class CompositionSystem {
 
   // Map a Tree into a TypedTree.
   type(node: Tree) => {
-    if (node.leaf()) {
-      let data = node.data;
-      return TypedTree(() => data, [], TypeSystem.type(node.data));
-    }
+    if (node.leaf())
+      return TypedTree(node.data, [], TypeSystem.type(node.data));
 
     if (node.unary()) {
       let child = this.type(node[0]);
@@ -38,13 +36,10 @@ class CompositionSystem {
           right = this.type(node[1]);
 
       for (rule in this.binaryRules) {
-        let l = left.data, r = right.data, data = () => rule(l(), r());
+        let data = rule(left.data, right.data);
 
-        let type = TypeSystem.type(data);
-
-        if (type.range) {
-          return TypedTree(data, [left, right], type);
-        }
+        if (data != undefined)
+          return TypedTree(data, [left, right], TypeSystem.type(data));
       }
 
       return TypedTree(node.data, [left, right], nil);

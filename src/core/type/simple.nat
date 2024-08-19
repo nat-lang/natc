@@ -344,9 +344,9 @@ class SimpleTypeState {
     // track the types of the return values as we check the body.
     let returnTypes = node.children.reduce(
       (types, node) => {
-        let type = this.principal(node);
+        let tNode = this.principal(node);
 
-        if (node is ASTReturn) types.push(type);
+        if (node is ASTReturn) types.push(tNode);
 
         return types;
       }, []
@@ -535,15 +535,13 @@ class SimpleTypeState {
     // product types of equal length become pairwise sequences of constraints.
     if (left is TProduct and right is TProduct) {
       if (len(left) == len(right)) {
-
         this.constraints.extend(
           zip(left.elements, right.elements).map(x => x[0] ~ x[1])
         );
-
         return this.solve();
-      } else {
-        return false;
       }
+      
+      return false;
     }
 
     return left == right;
