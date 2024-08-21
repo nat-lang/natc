@@ -13,6 +13,7 @@ class Domain extends Type {
   str() => this.name;
 
   each(predicate) => this.elements.each(predicate);
+  some(predicate) => this.elements.some(predicate);
 
   __iter__() => iter(this.elements);
   // functions are not hashable atm. guard against them.

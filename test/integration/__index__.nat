@@ -29,5 +29,6 @@ import test/integration/string
 import test/integration/tree
 import test/integration/type/__index__
 import test/integration/overload
+import test/integration/composition
 
 conclude("integration");

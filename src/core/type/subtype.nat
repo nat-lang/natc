@@ -96,6 +96,18 @@ class SubtypeState extends SimpleTypeState {
       return void;
     }
 
+    if (node is ASTConditional) {
+      let condition = node[0],
+          consequent = node[1];
+      
+      let tCondition = this.principal(condition),
+          tConsequent = this.principal(consequent);
+
+      this.constraints.push(tCondition <| (bool || void || undef));
+      return void;
+    }
+
+
     return super.constrain(node);
   }
 

@@ -474,6 +474,11 @@ class SimpleTypeState {
 
     if (node is ASTReturn) 
       return this.principal(node[0]);
+    
+    if (node is ASTBlock) {
+      node.children.map(this.principal);
+      return void;
+    }
 
     throw TypeError("Unexpected syntax: " + str(node) + ".");
   }
