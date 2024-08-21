@@ -266,22 +266,6 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
 
       OK_IF(executeMethod("opCall", argCount + 1));
     }
-    case OP_INVOKE: {
-      ObjString* method = READ_STRING();
-      int argCount = READ_BYTE();
-
-      Value args[argCount];
-      int i = argCount;
-      while (i-- > 0) args[i] = vmPop();
-
-      Value receiver = vmPop();
-      vmPush(root);
-      vmPush(receiver);
-      vmPush(OBJ_VAL(method));
-      while (++i < argCount) vmPush(args[i]);
-
-      OK_IF(executeMethod("opInvoke", argCount + 2));
-    }
     case OP_MEMBER: {
       Value obj = vmPop();
       Value val = vmPop();

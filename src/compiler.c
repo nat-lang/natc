@@ -563,10 +563,6 @@ static void property(Compiler* cmp, bool canAssign) {
   if (canAssign && match(cmp, TOKEN_EQUAL)) {
     expression(cmp);
     emitConstInstr(cmp, OP_SET_PROPERTY, name);
-  } else if (match(cmp, TOKEN_LEFT_PAREN)) {
-    uint8_t argCount = argumentList(cmp);
-    emitConstInstr(cmp, OP_INVOKE, name);
-    emitByte(cmp, argCount);
   } else {
     emitConstInstr(cmp, OP_GET_PROPERTY, name);
   }
@@ -711,8 +707,8 @@ static int nativePostfix(Compiler* cmp, char* name, int argCount) {
 static void methodCall(Compiler* cmp, char* name, int argCount) {
   Value method = INTERN(name);
   uint16_t constant = makeConstant(cmp, method);
-  emitConstInstr(cmp, OP_INVOKE, constant);
-  emitByte(cmp, argCount);
+  emitConstInstr(cmp, OP_GET_PROPERTY, constant);
+  emitBytes(cmp, OP_CALL, argCount);
 }
 
 static void variable(Compiler* cmp, bool canAssign) {

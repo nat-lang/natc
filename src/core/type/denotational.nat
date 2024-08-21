@@ -12,6 +12,8 @@ class Domain extends Type {
   substitute(c) => this;
   str() => this.name;
 
+  each(predicate) => this.elements.each(predicate);
+
   __iter__() => iter(this.elements);
   // functions are not hashable atm. guard against them.
   __in__(value) => hashable(value) and value in this.elements;

@@ -977,16 +977,6 @@ InterpretResult vmExecute(int baseFrame) {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
-      // invocation is a composite instruction:
-      // property access followed by a call.
-      case OP_INVOKE: {
-        ObjString* method = READ_STRING();
-        int argCount = READ_BYTE();
-
-        if (!vmInvoke(method, argCount)) return INTERPRET_RUNTIME_ERROR;
-        frame = &vm.frames[vm.frameCount - 1];
-        break;
-      }
       case OP_CLOSURE: {
         vmClosure(frame);
         break;
