@@ -305,17 +305,21 @@ static void emitDefaultReturn(Compiler* cmp) {
     emitByte(cmp, OP_NIL);
   emitByte(cmp, OP_IMPLICIT_RETURN);
 }
+#if defined(DEBUG_PRINT_CODE)
+#define DEBUG_CHUNK()                                                        \
+  if (!parser.hadError) {                                                    \
+    disassembleChunk(&cmp->function->chunk, cmp->function->name != NULL      \
+                                                ? cmp->function->name->chars \
+                                                : "<script>");               \
+  }
+#else
+#define DEBUG_CHUNK()
+#endif
 
 static ObjFunction* endCompiler(Compiler* cmp) {
   emitDefaultReturn(cmp);
 
-#ifdef DEBUG_PRINT_CODE
-  if (!parser.hadError) {
-    disassembleChunk(&cmp->function->chunk, cmp->function->name != NULL
-                                                ? cmp->function->name->chars
-                                                : "<script>");
-  }
-#endif
+  DEBUG_CHUNK()
 
   vm.compiler = cmp->enclosing;
   return cmp->function;
@@ -366,6 +370,8 @@ static void signFunction(Compiler* cmp, Compiler* sigCmp, Compiler* enclosing) {
   closeUpvalues(function, cmp, enclosing);
 
   closeFunctionWithOp(sigCmp, enclosing, OP_SIGN);
+
+  DEBUG_CHUNK()
 }
 
 static void function(Compiler* enclosing, FunctionType type, Token name);
@@ -1144,8 +1150,9 @@ static void forInStatement(Compiler* cmp) {
   iterationEnd(cmp, iter, exitJump);
 }
 
-// Parse a comprehension, given the stack address [var] of the
-// sequence under construction and the type of [closingToken].
+// Parse a comprehension, given a [Parser] that points at the body,
+// the stack address [var] of the object under construction, and the
+// type of [closingToken].
 Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
                      TokenType closingToken) {
   Iterator iter;

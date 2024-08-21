@@ -45,6 +45,8 @@ typedef struct {
   ObjClass* astLocal;
   ObjClass* astOverload;
   ObjClass* astMembership;
+  ObjClass* astBlock;
+  ObjClass* astJumpIfFalse;
 
   ObjClass* vTypeUnit;
   ObjClass* vTypeBool;

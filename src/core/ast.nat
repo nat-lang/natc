@@ -113,6 +113,23 @@ class ASTNode extends Tree {
     let node = ASTImplicitReturn(expr);
     this.children.push(node);
   }
+
+  opJump(over) => {
+    let node = ASTJump(over);
+    this.children.push(node);
+  }
+
+  opJumpIfFalse(condition, over) => {
+    // print condition;
+    // print over;
+    let node = ASTJumpIfFalse(condition, over);
+    this.children.push(node);
+  }
+
+  opConditional(condition, consequence) => {
+    let node = ASTConditional(condition, consequence);
+    this.children.push(node);
+  }
 }
 
 class ASTStatement extends ASTNode {}
@@ -128,12 +145,32 @@ class ASTReturn extends ASTStatement {}
 class ASTImplicitReturn extends ASTReturn {}
 class ASTExprStatement extends ASTStatement {}
 
+class ASTBlock extends ASTNode {}
+
+class ASTJump extends ASTStatement {
+  init(over) => {
+    this.children = [over];
+  }
+}
+class ASTJumpIfFalse extends ASTStatement {
+  init(condition, over) => {
+    this.children = [condition, over];
+  }
+}
+
+class ASTConditional extends ASTStatement {
+  init(condition, consequence) => {
+    this.children = [condition, consequence];
+  }
+}
+
 class ASTLiteral extends ASTExpr {
   init(value) => {
     this.value = value;
     super.init();
   }
   resolve() => this.value;
+  __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
 }
 class ASTNegation extends ASTExpr {}
 

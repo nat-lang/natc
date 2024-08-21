@@ -74,6 +74,8 @@ void initCore(Core* core) {
   core->astLocal = NULL;
   core->astOverload = NULL;
   core->astMembership = NULL;
+  core->astBlock = NULL;
+  core->astJumpIfFalse = NULL;
 
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;

@@ -45,6 +45,8 @@
 #define S_AST_LOCAL "ASTLocal"
 #define S_AST_OVERLOAD "ASTOverload"
 #define S_AST_MEMBERSHIP "ASTMembership"
+#define S_AST_BLOCK "ASTBlock"
+#define S_AST_JUMP_IF_FALSE "ASTJumpIfFalse"
 
 #define S_CTYPE_UNIT "CUnit"
 #define S_CTYPE_BOOL "CBool"

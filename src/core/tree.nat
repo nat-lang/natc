@@ -79,6 +79,17 @@ class Tree extends Object {
   find(predicate) => this.depthFirst().find(predicate);
 
   collect(predicate) => [node | node in this, predicate(node)];
+
+  str() => str(this.__class__);
+
+  _pp(depth) => {
+    let indent = join([" " | _ in range(0, depth)], "");
+    print indent + this.str();
+    this.children.map(x => x._pp(depth + 1));
+  }
+  pp() => this._pp(0);
+
+  __eq__(that) => this.__class__ == that.__class__ and this.children == that.children;
 }
 
 // Functions for building tree literals during compilation.

@@ -33,11 +33,11 @@ debug:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 
 # Compile the interpreter with instruction and stack tracing enabled.
-debug-trace:
+debug-stack:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-trace SOURCE_DIR=src
 
-debug-print:
+debug-chunk:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-print SOURCE_DIR=src
 

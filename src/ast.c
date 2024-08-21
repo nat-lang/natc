@@ -12,7 +12,8 @@
 bool astClosure(Value* enclosing, ObjClosure* closure);
 bool astLocal(uint8_t slot);
 bool astOverload(Value* enclosing, ObjOverload* overload);
-bool astInstructions(CallFrame* frame, int offset, Value root);
+bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root);
+bool astBlock();
 
 static bool executeMethod(char* method, int argCount) {
   return vmExecuteMethod(method, argCount, 1);
@@ -35,6 +36,13 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
   return success ? AST_INSTRUCTION_OK : AST_INSTRUCTION_FAIL
 #define FAIL_UNLESS(success) \
   if (!success) return AST_INSTRUCTION_FAIL
+#define RETURN()                   \
+  do {                             \
+    Value value = vmPop();         \
+    vmCloseUpvalues(frame->slots); \
+    vmPush(root);                  \
+    vmPush(value);                 \
+  } while (0)
 
   switch (instruction) {
     case OP_UNDEFINED: {
@@ -82,31 +90,55 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPop();
       return AST_INSTRUCTION_OK;
     case OP_RETURN: {
-      Value value = vmPop();
-      vmCloseUpvalues(frame->slots);
-      vmPush(root);
-      vmPush(value);
+      RETURN();
 
       FAIL_UNLESS(executeMethod("opReturn", 1));
       vmPop();  // nil.
       return AST_INSTRUCTION_OK;
     }
     case OP_IMPLICIT_RETURN: {
-      Value value = vmPop();
-      vmCloseUpvalues(frame->slots);
-      vmPush(root);
-      vmPush(value);
+      RETURN();
 
-      if (!executeMethod("opImplicitReturn", 1)) return AST_INSTRUCTION_FAIL;
+      FAIL_UNLESS(executeMethod("opImplicitReturn", 1));
+      vmPop();  // nil.
+      return AST_INSTRUCTION_COMPLETE;
+    }
+    case OP_JUMP: {
+      uint16_t offset = READ_SHORT();
+      frame->ip += offset;
+
+      // translate until the last two instructions: the implicit
+      // return and its payload, which mark the end of the ast.
+      FAIL_UNLESS(astChunk(frame,
+                           frame->closure->function->chunk.code +
+                               frame->closure->function->chunk.count,
+                           root));
+
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_JUMP_IF_FALSE: {
+      uint16_t offset = READ_SHORT();
+      Value condition = vmPeek(0);
+      uint8_t* ip = frame->ip;
+
+      // we translate this instruction into an
+      // [ASTConditional] node with two children.
+      vmPush(root);
+      // 1) the condition itself.
+      vmPush(condition);
+      // 2) the branch if the condition is true.
+      FAIL_UNLESS(astBlock());
+      Value branch = vmPeek(0);
+      vmPush(condition);
+      FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
+      // push the conditional onto the tree.
+      FAIL_UNLESS(executeMethod("opConditional", 2));
       vmPop();  // nil.
 
-      // we've reached the end of the closure we're
-      // destructuring. replace it with its ast.
+      // now resume the negative branch on the root.
+      frame->ip = ip + offset;
 
-      vm.frameCount--;
-      vm.stackTop = frame->slots - 1;  // point at [closure] - 1.
-      vmPush(root);                    // leave the ast on the stack.
-      return AST_INSTRUCTION_COMPLETE;
+      return AST_INSTRUCTION_OK;
     }
     case OP_GET_GLOBAL: {
       ObjString* name = READ_STRING();
@@ -288,12 +320,25 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
   return AST_INSTRUCTION_FAIL;
 }
 
-// Translate a segment of the frame's instructions.
-bool astInstructions(CallFrame* frame, int offset, Value root) {
-#define INCOMPLETE \
-  (int)(frame->ip - frame->closure->function->chunk.code) < offset
+bool astBlock() {
+  vmPush(OBJ_VAL(vm.core.astBlock));
+  return initInstance(vm.core.astBlock, 0);
+}
 
-  while (INCOMPLETE) {
+// Append the segment of [frame]'s instructions
+// delimited by [ipEnd] to [root].
+bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
+  while (frame->ip <= ipEnd) {
+#ifdef DEBUG_TRACE_EXECUTION
+    printf("          ");
+    disassembleStack();
+    printf("\n");
+    printf("  (ast chunk) ");
+    printf("  ");
+    disassembleInstruction(
+        &frame->closure->function->chunk,
+        (int)(frame->ip - frame->closure->function->chunk.code));
+#endif
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
         break;
@@ -303,7 +348,7 @@ bool astInstructions(CallFrame* frame, int offset, Value root) {
         return true;
     }
   }
-  return false;
+  return true;
 }
 
 // Translate a [CallFrame] into an [ASTNode].
@@ -321,7 +366,7 @@ bool astFrame(Value root) {
     printf("          ");
     disassembleStack();
     printf("\n");
-    printf("  (destruct) ");
+    printf("  (ast frame) ");
     disassembleInstruction(
         &frame->closure->function->chunk,
         (int)(frame->ip - frame->closure->function->chunk.code));
@@ -332,8 +377,12 @@ bool astFrame(Value root) {
         break;
       case AST_INSTRUCTION_FAIL:
         return false;
-      case AST_INSTRUCTION_COMPLETE:
+      case AST_INSTRUCTION_COMPLETE: {
+        vm.frameCount--;
+        vm.stackTop = frame->slots - 1;  // point at [closure] - 1.
+        vmPush(root);                    // leave the ast on the stack.
         return true;
+      }
     }
   }
 
