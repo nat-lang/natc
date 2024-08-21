@@ -1,0 +1,53 @@
+
+TypeSystem = DenotationalTypeSystem();
+
+let type = TypeSystem.type;
+let typecheck = x => assert(TypeSystem.typecheck(x).success());
+let typefail = x => assert(TypeSystem.typecheck(x).failure());
+
+const a,b,c,d;
+
+dom e = {a,b,c,d};
+dom t = {true, false};
+
+// 
+
+assert(e is Domain);
+assert(t is Domain);
+
+assert(type(a) == e);
+assert(type(true) == t);
+
+typecheck((f: e -> t) => f(a));
+typecheck((f: t -> e) => f(true));
+
+typefail((f: t -> e) => f(a));
+typefail((f: e -> t) => f(true));
+
+typecheck((f: (e || t) -> e) => f(a));
+typecheck((f: (e || t) -> e) => f(true));
+
+typefail((f: (e || t) -> e) => f(nil));
+
+typecheck((f: e -> t, g: t -> e) => f(g(true)));
+
+//
+
+let f = (a: x -> y, b: x) => a(b)
+      | (a: x, b: x -> y) => b(a);
+
+let g: e -> t = x => x in {a,b};
+let k: e -> t = x => x in {c,d};
+let h: (e -> t) -> ((e -> t) -> (e -> t)) = m k x => m(k(x));
+
+typecheck(() => f(g, a));
+typecheck(() => f(a, g));
+
+typefail(() => f(g, 1));
+typefail(() => f(1, g));
+
+typecheck(() => f(h, g));
+typecheck(() => f(g, h));
+
+typefail(() => f(h, 1));
+typefail(() => f(1, h));
