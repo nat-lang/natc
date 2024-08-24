@@ -291,6 +291,19 @@ bool __clock__(int argCount, Value* args) {
   return true;
 }
 
+bool __address__(int argCount, Value* args) {
+  Value value = vmPop();
+  vmPop();  // native fn.
+  if (!IS_OBJ(value)) {
+    vmPush(NUMBER_VAL(0));
+
+  } else {
+    Obj* obj = AS_OBJ(value);
+    vmPush((NUMBER_VAL((uintptr_t)obj)));
+  }
+
+  return true;
+}
 bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
@@ -436,6 +449,7 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("random", 1, __randomNumber__);
   defineNativeFnGlobal("resolveUpvalue", 1, __resolveUpvalue__);
   defineNativeFnGlobal("stackTrace", 0, __stackTrace__);
+  defineNativeFnGlobal("address", 1, __address__);
   defineNativeFnGlobal("annotations", 1, __annotations__);
 
   defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);

@@ -924,7 +924,8 @@ InterpretResult vmExecute(int baseFrame) {
           vmPush(typeSystem);
           vmPush(caller);
           for (int i = 0; i < argCount; i++) vmPush(args[i]);
-          if (!vmExecuteMethod("instantiate", argCount + 1, 1)) return false;
+          if (!vmExecuteMethod("instantiate", argCount + 1, 1))
+            return INTERPRET_RUNTIME_ERROR;
           frame = &vm.frames[vm.frameCount - 1];
 
           // set up the call.

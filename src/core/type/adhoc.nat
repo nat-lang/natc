@@ -41,13 +41,13 @@ class AdhocTypeState extends SubtypeState {
     return super.constrain(node);
   }
 
-  unify(constraint: Constraint) => {
+  _unify(constraint: Constraint) => {
+    let left = constraint.left,
+        right = constraint.right;
+
     if (constraint is SubtypeConstraint) {
-      let left = constraint.left,
-          right = constraint.right;
-      
       if (left is TVar or right is TVar)
-        return super.unify(constraint);
+        return super._unify(constraint);
 
       if (left is TOverload or right is TOverload) {
         left = TOverload.lift(left);
@@ -55,13 +55,13 @@ class AdhocTypeState extends SubtypeState {
 
         // ∀x in right. ∃y in left. y <| x
         return right.cases.all(
-          rCase => left.cases.some(
-            lCase => {
+          x => left.cases.some(
+            y => {
               // we only want to propagate information for a
               // successful case, so typecheck in a local copy
               // of the state.
               let substate = this.copy();
-              let unified = substate.unify(lCase <| rCase);
+              let unified = substate.unify(y <| x);
 
               if (unified)
                 this.solution = substate.solution;
@@ -73,7 +73,20 @@ class AdhocTypeState extends SubtypeState {
       }
     }
 
-    return super.unify(constraint);
+    // left ~ right iff left <| right & right <| left
+    if (left is TOverload or right is TOverload) {
+      left = TOverload.lift(left);
+      right = TOverload.lift(right);
+
+      this.constraints.extend([
+        // fixme: remove parens.
+        (left <| right),
+        (right <| left)
+      ]);
+      return this.solve();
+    }
+
+    return super._unify(constraint);
   }
 
   type(expr) => {

@@ -256,28 +256,35 @@ let f = (a: x -> y, b: x) => a(b)
 
 let t = type(f);
 
-assert(t unifies ((a -> b, a) -> b) & ((a, a -> b) -> b));
-assert(t unifies ((b -> a, b) -> a) & ((b, b -> a) -> a));
+assert(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> b)));
+assert(t unifies (((a, a -> b) -> b) & ((a -> b, a) -> b)));
 
-// fixme.
-// assert(!(t unifies ((a -> b, b) -> b) & ((a, a -> b) -> b)));
+assert(!(t unifies (((c -> b, a) -> b) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> c, a) -> b) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> b, c) -> b) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> c) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((c, a -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((a, c -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((a, a -> c) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> c))));
 
 // the type of curried type driven application is inferrable.
 
 let f = (a: x -> y) => ((b: x) => a(b)) | (a: x) => ((b: x -> y) => b(a));
 let t = type(f);
 
-assert(t unifies ((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b)));
-assert(t unifies (a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b)));
+assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
+assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
 
-// fixme.
-// assert(!(t unifies ((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b))));
+assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 let f = (a: x) => ((b: x -> y) => b(a)) | (a: x -> y) => ((b: x) => a(b));
 let t = type(f);
 
-assert(t unifies ((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b)));
-assert(t unifies (a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b)));
+assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
+assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
+
+assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 // nested abstract types normalize to a single first order type.
 

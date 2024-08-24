@@ -111,13 +111,13 @@ class SubtypeState extends SimpleTypeState {
     return super.constrain(node);
   }
 
-  unify(constraint: Constraint) => {
+  _unify(constraint: Constraint) => {
     if (constraint is SubtypeConstraint) {
       let left = constraint.left,
           right = constraint.right;
     
       if (left is TVar or right is TVar) {
-        return super.unify(constraint);
+        return super._unify(constraint);
 
       // a -> b < c -> d iff a > c and b < d.
       } else if (left is TFunction and right is TFunction) {
@@ -149,7 +149,7 @@ class SubtypeState extends SimpleTypeState {
       }
     }
 
-    return super.unify(constraint);
+    return super._unify(constraint);
   }
 
   // Value must be subtype of its annotation.

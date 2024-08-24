@@ -65,14 +65,13 @@ class PolyTypeState extends AdhocTypeState {
     return super.constrain(node);
   }
 
-  unify(constraint: Constraint) => {
+  _unify(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
 
     if (left is TAbstract) {
-      if (left.variadic and right is ->) {
+      if (left.variadic and right is ->)
         left = left.instantiateWith(len(right.domain));
-      }
       else if (!(right is TVar))
         left = left.instantiate();
     }
@@ -84,7 +83,7 @@ class PolyTypeState extends AdhocTypeState {
         right = right.instantiate();
     }
     
-    return super.unify(constraint.__class__(left, right));
+    return super._unify(constraint.__class__(left, right));
   }
 
   // Calculate the type of [value], inferring it if necessary.

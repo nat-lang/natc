@@ -22,14 +22,14 @@ class Domain extends Type {
 }
 
 class DenotationalTypeState extends PolyTypeState {
-  unify(constraint: Constraint) => {
+  _unify(constraint: Constraint) => {
     if (constraint is SubtypeConstraint) {
       if (constraint.left is Domain and constraint.right is Domain) {
         return constraint.left.elements.subsetEq(constraint.right.elements);
       }
     }
 
-    return super.unify(constraint);
+    return super._unify(constraint);
   }
 }
 
