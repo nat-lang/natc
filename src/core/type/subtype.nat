@@ -1,12 +1,21 @@
 
 class TSum extends Type {
   init(*types) => {
-    this.disjuncts = (Set.fromSeq . fmap(TypeSystem.typify))(types);
+    let typified = types.map(TypeSystem.typify);
+    this.disjuncts = Set.fromSeq(typified);
   }
 
   union(that: TSum) => TSum(
     ..this.disjuncts.union(that.disjuncts).elements()
   );
+
+  substitute(c: Constraint) => {
+    let sum = TSum(
+      ..this.disjuncts.map(x => x.substitute(c))
+    );
+    if (len(sum) == 1) return sum.lower();
+    return sum;
+  }
 
   elements() => this.disjuncts.elements();
   subtypeOf(that: TSum) => this.disjuncts.subsetEq(that.disjuncts);
@@ -14,6 +23,7 @@ class TSum extends Type {
     if (type is TSum) return type;
     return TSum(type);
   }
+  lower() => this.disjuncts.elements()[0];
 
   fvs() => bigUnion(..[x.fvs() | x in this]);
   str() => "TSum(" + join(this.elements().map(x => x.str()), ", ") + ")";
@@ -23,13 +33,16 @@ class TSum extends Type {
   __eq__(that) => this.disjuncts == that.disjuncts;
   __in__(element) => element in this.disjuncts;
   __iter__() => iter(this.disjuncts);
+  __len__() => len(this.disjuncts);
 }
 
 let infix(9) || = (a, b) => TSum.lift(a).union(TSum.lift(b));
 
 class SubtypeConstraint extends Constraint {
-  str() => this.left.str() + " < " + this.right.str();
+  str() => this.left.str() + " <| " + this.right.str();
 }
+
+let infix(6) <| = SubtypeConstraint;
 
 class SubtypeState extends SimpleTypeState {
   constrain(node: ASTNode) => {
@@ -41,9 +54,7 @@ class SubtypeState extends SimpleTypeState {
       let tArgs = this.constrain(args);
       let tApp = typeVar();
       
-      this.constraints.push(
-        SubtypeConstraint(tFunc, tArgs -> tApp)
-      );
+      this.constraints.push(tFunc <| tArgs -> tApp);
       
       return tApp;
     }
@@ -55,39 +66,65 @@ class SubtypeState extends SimpleTypeState {
       let tElement = this.principal(element);
       let tCollection =  this.principal(collection);
 
-      this.constraints.push(
-        SubtypeConstraint(tCollection, TInstance(Base))
-      );
+      this.constraints.push(tCollection <| TInstance(Base));
 
-      // this will become a predication against the type
-      // rather than the value once TInstance is a record.
       if (tCollection is TInstance and "__in__" in tCollection.klass) {
         let tIn = this.type(tCollection.klass.__in__);
 
-        this.constraints.push(
-          SubtypeConstraint(tIn, tElement -> bool)
-        );
+        this.constraints.push(tIn <| tElement -> bool);
       }
 
       return bool;
     }
 
+    if (node is ASTNegation) {
+      let tArg = this.principal(node[0]);
+      this.constraints.push(tArg <| (bool || void || undef));
+      return bool;
+    }
+
+    if (node is ASTLocalTypeAssignment) {
+      let var = node[0];
+      let val = node[1];
+
+      let tVar = this.lookup(var);
+      let tVal = this.system.typify(val.resolve());
+
+      // value must be subtype of its annotation.
+      this.constraints.push(tVar <| tVal);
+
+      return void;
+    }
+
+    if (node is ASTConditional) {
+      let condition = node[0],
+          consequent = node[1];
+      
+      let tCondition = this.principal(condition),
+          tConsequent = this.principal(consequent);
+
+      this.constraints.push(tCondition <| (bool || void || undef));
+      return void;
+    }
+
+
     return super.constrain(node);
   }
 
-  unify(constraint: Constraint) => {
+  _unify(constraint: Constraint) => {
     if (constraint is SubtypeConstraint) {
       let left = constraint.left,
           right = constraint.right;
     
       if (left is TVar or right is TVar) {
-        return super.unify(constraint);
+        return super._unify(constraint);
 
       // a -> b < c -> d iff a > c and b < d.
       } else if (left is TFunction and right is TFunction) {
         this.constraints.extend([
-          SubtypeConstraint(right.domain, left.domain),
-          SubtypeConstraint(left.range, right.range)
+        // fixme: the compiler fails when these are unparenthesized.
+          (right.domain <| left.domain),
+          (left.range <| right.range)
         ]);
 
         return this.solve();
@@ -95,10 +132,11 @@ class SubtypeState extends SimpleTypeState {
       } else if (left is TProduct and right is TProduct) {
         if (len(left) == len(right)) {
           this.constraints.extend([
-            SubtypeConstraint(..x) | x in zip(left.elements, right.elements)
+            x[0] <| x[1] | x in zip(left.elements, right.elements)
           ]);
           return this.solve();
         }
+
         return false;
 
       } else if (left is TInstance and right is TInstance) {
@@ -111,8 +149,13 @@ class SubtypeState extends SimpleTypeState {
       }
     }
 
-    return super.unify(constraint);
+    return super._unify(constraint);
   }
+
+  // Value must be subtype of its annotation.
+  constrainAnnotation(annotation, type) => this.constraints.push(
+    type <| this.system.typify(annotation)
+  );
 }
 
 class SubtypeSystem extends SimpleTypeSystem {}

@@ -1,5 +1,5 @@
 
-// naked literals.
+// overloads can dispatch on naked literals.
 
 let f = 1 => true | 2 => false;
 
@@ -18,14 +18,21 @@ assert(f(nil));
 assert(f(undefined));
 assert(f(false) == false);
 
-// parenthesized literals.
+// overloads can dispatch on parenthesized literals.
 
 let f = (true) => false | (false) => true;
 
 assert(f(true) == false);
 assert(f(false) == true);
 
-// bound cases.
+// overloads can dispatch on multiple literals.
+
+let f = (0,1) => 2 | (1,0) => 3;
+
+assert(f(0,1) == 2);
+assert(f(1,0) == 3);
+
+// overloads can dispatch on variables, which act as wild cards.
 
 let f = 1 => true | 2 => false | x => x;
 
@@ -39,20 +46,16 @@ assert(f(1) == true);
 let f = x => true | y => false;
 assert(f(1) == true);
 
-// multiple arguments.
+// overloads can dispatch on multiple variables.
 
-let f = (0,1) => 2 | (1,0) => 3;
-
-assert(f(0,1) == 2);
-assert(f(1,0) == 3);
-
-let f = (0,1) => 2 | (1,0) => 3 | (x,y) => (x + y) * 2;
+let f = (0,1) => 2 | (x,y) => x + y;
 
 assert(f(0,1) == 2);
-assert(f(1,0) == 3);
-assert(f(1,1) == 4);
+assert(f(1,0) == 1);
+assert(f(1,1) == 2);
+assert(f(2,1) == 3);
 
-// blocks.
+// overloads can return blocks.
 
 let f = 1 => { return true; } | 2 => { return false; }; 
 
@@ -60,7 +63,7 @@ assert(f(1) == true);
 assert(f(2) == false);
 assert(f(3) == undefined);
 
-// literals & bound variables.
+// overload signatures can mix literals and variables.
 
 let f = (2,x) => x | (x,2) => x;
 
@@ -72,7 +75,7 @@ assert(f(1,2) == 1);
 assert(f(2,2) == 2);
 assert(f(3,2) == 3);
 
-// type patterns.
+// overloads can dispatch on type annotations.
 
 let f = (x: num) => true | (x: string) => false | (x: bool) => true;
 
@@ -80,7 +83,7 @@ assert(f(1) == true);
 assert(f("1") == false);
 assert(f(false) == true);
 
-// functional type patterns.
+// overloads can dispatch on type annotations with type constructors.
 
 let f = (x: num -> num) => x(1)
       | (x: string -> string) => x("1")
@@ -98,7 +101,7 @@ assert(f(g) == 1);
 assert(f(h) == "1");
 assert(f(k) == true);
 
-// class type patterns.
+// overloads can dispatch on type annotations with class types.
 
 class A {}
 class B {}
@@ -110,7 +113,7 @@ let a = A(), b = B();
 assert(f(a) == true);
 assert(f(b) == false);
 
-// matches subtypes.
+// dispatching on a class type matches subtypes.
 
 class C extends B {}
 
@@ -120,7 +123,7 @@ let c = C();
 
 assert(f(c) == true);
 
-// literals and type patterns.
+// overload signatures can mix literals and variables with type annotations.
 
 let f = (1, x: num) => true | (1, x: string) => false | (2, x: string) => true;
 
@@ -128,32 +131,27 @@ assert(f(1,1) == true);
 assert(f(1,"1") == false);
 assert(f(2,"1") == true);
 
-// type patterns with type variables.
+// overload signatures can have implicit type variables.
 
 let f = (a: num, b: num) => a | (a: x, b: x) => b;
-
-// literal types.
 
 assert(f(1,2) == 1);
 assert(f(true, false) == false);
 assert(f(nil, nil) == nil);
 assert(f(x => x, x => x * 2)(1) == 2);
 
-// annotated types.
-
 assert(f(1, true) == undefined);
 assert(f(true, 1) == undefined);
 assert(f((x: num) => x, (x: bool) => x) == undefined);
 
+// the type variables are bound at the left edge of the signature,
+// which means that they can constrain each other.
+
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-// literal types.
-
 assert(f(x => x, 1) == 1);
 assert(f(1, x => x) == 1);
-
-// annotated types.
 
 assert(f((x: num) => x, 1) == 1);
 assert(f((x: string) => x, 1) == undefined);
@@ -163,11 +161,56 @@ assert(f(1, (x: num) => x) == 1);
 assert(f(1, (x: string) => x) == undefined);
 assert(f(1, (x: bool) => x) == undefined);
 
+// overloads can dispatch on instantiated abstract types.
+
+let f = (a: bool -> bool, b: bool) => a(b)
+      | (a: num, b: num -> num) => b(a);
+
+let k: u -> (u -> u) = x y => !y;
+let g = k(true);
+
+assert(f(g, true) == false);
+assert(f(g, false) == true);
+
+assert(f(g, 1) == undefined);
+
+let k: u -> (u -> u) = x y => y + 1;
+let g = k(1);
+
+assert(f(1, g) == 2);
+assert(f(2, g) == 3);
+
+assert(f(true, g) == undefined);
+
 // overloads can dispatch on overloads.
 
-let f = (g: num -> bool <+> string -> bool) => 1
-      | (g: num -> bool <+> bool -> bool) => 2;
+let f = (g: num -> bool & string -> bool) => 1
+      | (g: num -> bool & bool -> bool) => 2;
 
 assert(f((x: num) => true | (x: string) => false) == 1);
 assert(f((x: num) => true | (x: bool) => false) == 2);
 assert(f((x: string) => true | (x: bool) => false) == undefined);
+
+// overloads can dispatch on instantiated abstract overloads.
+
+let f = (a: x -> y, b: x) => a(b)
+      | (a: x, b: x -> y) => b(a);
+
+let k: (num -> bool) -> (num -> bool) = f x => f(x);
+let g: num -> bool = x => x == 1;
+
+assert(f(1, f(k,g)) == true);
+assert(f(1, f(g,k)) == true);
+assert(f(f(k,g), 1) == true);
+assert(f(f(g,k), 1) == true);
+
+assert(f(2, f(k,g)) == false);
+assert(f(2, f(g,k)) == false);
+assert(f(f(k,g), 2) == false);
+assert(f(f(g,k), 2) == false);
+
+assert(f(true, f(k,g)) == undefined);
+assert(f(true, f(g,k)) == undefined);
+assert(f(f(k,g), true) == undefined);
+assert(f(f(g,k), true) == undefined);
+

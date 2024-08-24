@@ -40,10 +40,13 @@
 
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_METHOD "ASTMethod"
-#define S_AST_UPVALUE "ASTUpvalue"
+#define S_AST_EXTERNAL_UPVALUE "ASTExternalUpvalue"
+#define S_AST_INTERNAL_UPVALUE "ASTInternalUpvalue"
 #define S_AST_LOCAL "ASTLocal"
 #define S_AST_OVERLOAD "ASTOverload"
 #define S_AST_MEMBERSHIP "ASTMembership"
+#define S_AST_BLOCK "ASTBlock"
+#define S_AST_JUMP_IF_FALSE "ASTJumpIfFalse"
 
 #define S_CTYPE_UNIT "CUnit"
 #define S_CTYPE_BOOL "CBool"
@@ -60,6 +63,7 @@
 #define S_OTYPE_OVERLOAD "OOverload"
 #define S_OTYPE_SEQUENCE "OSequence"
 
+#define S_TYPE_SYSTEM "TypeSystem"
 #define S_UNIFY "unify"
 
 #endif

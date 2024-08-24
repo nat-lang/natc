@@ -1,16 +1,12 @@
 
-TypeSystem = DenotationalTypeSystem();
-
-let type = TypeSystem.type;
-let typecheck = x => assert(TypeSystem.typecheck(x).success());
-let typefail = x => assert(TypeSystem.typecheck(x).failure());
-
 const a,b,c,d;
 
 dom e = {a,b,c,d};
 dom t = {true, false};
 
-// 
+bool = t;
+
+// inference.
 
 assert(e is Domain);
 assert(t is Domain);
@@ -18,27 +14,30 @@ assert(t is Domain);
 assert(type(a) == e);
 assert(type(true) == t);
 
+// simple.
+
 typecheck((f: e -> t) => f(a));
 typecheck((f: t -> e) => f(true));
 
 typefail((f: t -> e) => f(a));
 typefail((f: e -> t) => f(true));
 
+typecheck((f: e -> t, g: t -> e) => f(g(true)));
+
+// subtype.
+
 typecheck((f: (e || t) -> e) => f(a));
 typecheck((f: (e || t) -> e) => f(true));
 
 typefail((f: (e || t) -> e) => f(nil));
 
-typecheck((f: e -> t, g: t -> e) => f(g(true)));
-
-//
+// poly adhoc.
 
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
 let g: e -> t = x => x in {a,b};
-let k: e -> t = x => x in {c,d};
-let h: (e -> t) -> ((e -> t) -> (e -> t)) = m k x => m(k(x));
+let h: (e -> t) -> (e -> t) = f x => f(x);
 
 typecheck(() => f(g, a));
 typecheck(() => f(a, g));

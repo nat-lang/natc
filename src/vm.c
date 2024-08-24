@@ -69,10 +69,13 @@ void initCore(Core* core) {
 
   core->astClosure = NULL;
   core->astMethod = NULL;
-  core->astUpvalue = NULL;
+  core->astExternalUpvalue = NULL;
+  core->astInternalUpvalue = NULL;
   core->astLocal = NULL;
   core->astOverload = NULL;
   core->astMembership = NULL;
+  core->astBlock = NULL;
+  core->astJumpIfFalse = NULL;
 
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
@@ -103,7 +106,6 @@ bool initVM() {
   vm.compiler = NULL;
 
   initMap(&vm.globals);
-  initMap(&vm.typeEnv);
   initMap(&vm.strings);
   initMap(&vm.infixes);
 
@@ -335,12 +337,11 @@ static bool variadify(ObjClosure* closure, int* argCount) {
   return true;
 }
 
-CallFrame* vmInitFrame(ObjClosure* closure, int offset) {
+void vmInitFrame(ObjClosure* closure, int offset) {
   CallFrame* frame = &vm.frames[vm.frameCount++];
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
   frame->slots = vm.stackTop - offset;
-  return frame;
 }
 
 static bool call(ObjClosure* closure, int argCount) {
@@ -369,7 +370,7 @@ static bool callNative(ObjNative* native, int argCount) {
   return (native->function)(argCount, vm.stackTop - argCount);
 }
 
-// Wrap the top [count] values in a tuple and put it
+// Wrap the top [count] values in a sequence and put it
 // on the stack, optionally leaving the values below it.
 bool vmTuplify(int count, bool replace) {
   int i = count;
@@ -423,13 +424,13 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
   return true;
 }
 
-bool vmCallValue(Value callee, int argCount) {
-  if (IS_OBJ(callee)) {
-    switch (OBJ_TYPE(callee)) {
+bool vmCallValue(Value caller, int argCount) {
+  if (IS_OBJ(caller)) {
+    switch (OBJ_TYPE(caller)) {
       case OBJ_BOUND_FUNCTION: {
-        ObjBoundFunction* obj = AS_BOUND_FUNCTION(callee);
+        ObjBoundFunction* obj = AS_BOUND_FUNCTION(caller);
         vm.stackTop[-argCount - 1] = obj->receiver;
-        switch (BOUND_FUNCTION_TYPE(callee)) {
+        switch (BOUND_FUNCTION_TYPE(caller)) {
           case BOUND_METHOD:
             return call(obj->bound.method, argCount);
           case BOUND_NATIVE:
@@ -440,25 +441,25 @@ bool vmCallValue(Value callee, int argCount) {
         }
       }
       case OBJ_CLASS: {
-        ObjClass* klass = AS_CLASS(callee);
+        ObjClass* klass = AS_CLASS(caller);
         vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
         return vmInstantiateClass(klass, argCount);
       }
       case OBJ_CLOSURE: {
-        ObjClosure* closure = AS_CLOSURE(callee);
+        ObjClosure* closure = AS_CLOSURE(caller);
 
         if (closure->function->patterned)
           return callCases(&closure, 1, argCount);
-        return call(AS_CLOSURE(callee), argCount);
+        return call(AS_CLOSURE(caller), argCount);
       }
       case OBJ_OVERLOAD: {
-        ObjOverload* overload = AS_OVERLOAD(callee);
+        ObjOverload* overload = AS_OVERLOAD(caller);
         return callCases(overload->closures, overload->cases, argCount);
       }
       case OBJ_NATIVE:
-        return callNative(AS_NATIVE(callee), argCount);
+        return callNative(AS_NATIVE(caller), argCount);
       case OBJ_INSTANCE: {
-        ObjInstance* instance = AS_INSTANCE(callee);
+        ObjInstance* instance = AS_INSTANCE(caller);
         Value callFn;
         if (mapGet(&instance->klass->fields, INTERN(S_CALL), &callFn)) {
           return call(AS_CLOSURE(callFn), argCount);
@@ -624,10 +625,25 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
   return true;
 }
 
+ObjClosure* vmGetGlobalClosure(char* name) {
+  Value obj;
+
+  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
+    vmRuntimeError("Couldn't find function '%s'.", name);
+    return NULL;
+  }
+
+  if (!IS_CLOSURE(obj)) {
+    vmRuntimeError("Not a closure: '%s'.", name);
+    return NULL;
+  }
+
+  return AS_CLOSURE(obj);
+}
+
 // Loop until we're back to [baseFrame] frames. Typically this
 // is just 0, but if we want to execute a single function in the
-// middle of interpretation without overflowing its scope, we can
-// let [baseFrame] = the current frame.
+// middle of execution we can let [baseFrame] = the current frame.
 InterpretResult vmExecute(int baseFrame) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
@@ -889,11 +905,49 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CALL: {
         int argCount = READ_BYTE();
-        if (!vmCallValue(vmPeek(argCount), argCount)) {
-          return INTERPRET_RUNTIME_ERROR;
+        Value caller = vmPeek(argCount);
+        Value args[argCount];
+        bool instantiate =
+            IS_OBJ(caller) && AS_OBJ(caller)->annotations.count > 0;
+
+        // if the caller has a type annotation then calculate its range.
+        if (instantiate) {
+          for (int i = argCount; i > 0; i--) args[i - 1] = vmPop();
+          Value caller = vmPop();
+
+          Value typeSystem;
+          if (!mapGet(&vm.globals, INTERN(S_TYPE_SYSTEM), &typeSystem)) {
+            vmRuntimeError("Couldn't find %s.", S_TYPE_SYSTEM);
+            return false;
+          }
+
+          vmPush(typeSystem);
+          vmPush(caller);
+          for (int i = 0; i < argCount; i++) vmPush(args[i]);
+          if (!vmExecuteMethod("instantiate", argCount + 1, 1))
+            return INTERPRET_RUNTIME_ERROR;
+          frame = &vm.frames[vm.frameCount - 1];
+
+          // set up the call.
+          vmPush(caller);
+          for (int i = 0; i < argCount; i++) vmPush(args[i]);
         }
 
+        if (!vmCallValue(caller, argCount) ||
+            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+          return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
+
+        if (instantiate) {
+          Value result = vmPeek(0);
+          Value annotation = vmPeek(1);
+          if (IS_OBJ(result))
+            writeValueArray(&AS_OBJ(result)->annotations, annotation);
+          vmPop();
+          vmPop();
+          vmPush(result);
+        }
+
         break;
       }
       case OP_CALL_INFIX: {
@@ -905,9 +959,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(left);
         vmPush(right);
 
-        if (!vmCallValue(infix, 2)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!vmCallValue(infix, 2)) return INTERPRET_RUNTIME_ERROR;
 
         frame = &vm.frames[vm.frameCount - 1];
         break;
@@ -922,22 +974,7 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(postfix);
         while (++i < argCount) vmPush(args[i]);
 
-        if (!vmCallValue(postfix, argCount)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
-        frame = &vm.frames[vm.frameCount - 1];
-        break;
-      }
-      // invocation is a composite instruction:
-      // property access followed by a call.
-      case OP_INVOKE: {
-        ObjString* method = READ_STRING();
-        int argCount = READ_BYTE();
-
-        if (!vmInvoke(method, argCount)) {
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        if (!vmCallValue(postfix, argCount)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1201,16 +1238,29 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_SET_TYPE_LOCAL: {
-        READ_SHORT();
+        uint8_t slot = READ_SHORT();
+        Value local = frame->slots[slot];
+
+        if (IS_OBJ(local)) {
+          Obj* obj = AS_OBJ(local);
+          writeValueArray(&obj->annotations, vmPeek(0));
+        }
+
         break;
       }
       case OP_SET_TYPE_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (!mapHas(&vm.globals, name)) {
+        Value global;
+        if (!mapGet(&vm.globals, name, &global)) {
           vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
-        mapSet(&vm.typeEnv, name, vmPeek(0));
+
+        if (IS_OBJ(global)) {
+          Obj* obj = AS_OBJ(global);
+          writeValueArray(&obj->annotations, vmPeek(0));
+        }
+
         break;
       }
       case OP_SPREAD: {

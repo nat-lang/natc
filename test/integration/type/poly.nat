@@ -1,27 +1,23 @@
-let typecheck = x => assert(
-  PolyTypeSystem.typecheck(x).success()
-);
-let typefail = x => assert(
-  PolyTypeSystem.typecheck(x).failure()
-);
 
-// type generalization, aka abstraction.
+
+// types with variables can be generalized into
+// abstract types, functions from types to types.
 
 let a = TVar("a"),
     b = TVar("b"),
     c = TVar("c"),
     d = TVar("d");
 
-let h = TAbstract.generalize(a);
+let h = TGeneralization(a);
 assert(h.fn(b) == b);
 
-let f = TAbstract.generalize(a -> b);
+let f = TGeneralization(a -> b);
 assert(f.fn(c,d) == c -> d);
 
-let g = TAbstract.generalize(TProduct([a,b]));
+let g = TGeneralization(TProduct([a,b]));
 assert(g.fn(c,d) == TProduct([c,d]));
 
-// the simple type system fails here.
+// the simple type system can't type the id function.
 
 let check = SimpleTypeSystem.typecheck(() => {
   let id = x => x;
@@ -33,11 +29,12 @@ let check = SimpleTypeSystem.typecheck(() => {
 
 assert(check.failure());
 
-// but the polymorphic type system succeeds.
+// but the polymorphic type system can, with the
+// aid of abstract types.
 
-// explicit abstraction.
+// with either explicit abstraction.
 
-typecheck(() => {
+let check = PolyTypeSystem.typecheck(() => {
   let id: (a => a -> a) = x => x;
 
   id(1);
@@ -53,18 +50,20 @@ typecheck(() => {
   id("string");
 });
 
-// implicit abstraction in let annotation.
+// or with implicit abstraction.
 
-// one parameter.
+// with either one type parameter.
 
-let f: w -> w = x => x;
-let t = globalTypeEnv()["f"];
+let id: w -> w = x => x;
 
-assert(vType(t) == OFunction);
+let abstract = annotations(id)[0];
+let concrete = abstract(num);
 
-assert(t(num) is TFunction);
-assert(t(num).domain == num);
-assert(t(num).range == num);
+assert(vType(abstract) == OFunction);
+
+assert(concrete is TFunction);
+assert(concrete.domain == num);
+assert(concrete.range == num);
 
 typecheck(() => {
   id(1);
@@ -80,18 +79,34 @@ typecheck(() => {
   id("string");
 });
 
-// two parameters.
+// or n + 1 type parameters.
 
-let f: x -> y = x => x;
-let t = globalTypeEnv()["f"];
+let f: x -> (y -> (y -> y)) = a b c => c;
 
-assert(vType(t) == OFunction);
+let abstract = annotations(f)[0];
+let concrete = abstract(num, string);
 
-assert(t(num, string) is TFunction);
-assert(t(num, string).domain == num);
-assert(t(num, string).range == string);
+assert(vType(abstract) == OFunction);
 
-// implicit abstraction in parameter annotation.
+assert(concrete is TFunction);
+assert(concrete.domain == num);
+assert(concrete.range is TFunction);
+assert(concrete.range.domain == string);
+assert(concrete.range.range is TFunction);
+assert(concrete.range.range.domain == string);
+assert(concrete.range.range.range == string);
+
+typecheck(() => {
+  f(1)(1)(1);
+  f(1)(true)(false);
+  f(1)("foo")("bar");
+});
+
+typefail(() => id(1)(1)(true));
+typefail(() => id(1)(true)("bar"));
+typefail(() => id(1)("foo")(1));
+
+// abstractions can be implicit in parameter annotations.
 
 let id = (x: w) => x;
 
@@ -109,34 +124,46 @@ typecheck(() => {
   id("string");
 });
 
-// identity between type variables is preserved.
+// implicit abstraction in parameter annotation
+// preserves identity between type variables.
 
 typecheck((x: w -> z, y: u) => y(x));
 typecheck((x: w -> z, y: w) => x(y));
 
 typefail((x: w -> z, y: w) => y(x));
 
-// reconstruction.
+// abstract types become concrete when saturated.
 
-// first order succeeds.
+// in declaration annotations.
 
-typecheck(() => {
-  let id = x => x;
+let f: w -> (w -> w) = x y => y;
 
-  id(1);
-  id(true);
-  id("string");
-});
+typecheck(() => f(1)(1));
+typecheck(() => f(true)(true));
 
-// second order fails.
+typefail(() => f(true)(1));
+typefail(() => f(1)(true));
 
-typefail((id) => {
-  id(1);
-  id(true);
-  id("string");
-});
+let infix @ : ((v -> w), (u -> v)) -> (u -> w)
+            = (f, g) => x => f(g(x));
 
-// poly adhoc.
+typecheck((f: bool -> num, g: num -> bool, x: num) => (f @ g)(x));
+
+typefail((f: num -> bool, g: bool -> num, x: num) => (f @ g)(x));
+
+typecheck(
+  (x: num, h: num -> bool, g: bool -> string, f: string -> num) => {
+    1 + ((f @ g) @ h)(x);
+    1 + (f @ (g @ h))(x);
+  }
+);
+
+// and in parameter annotations.
+
+// ...
+
+// the polymorphic type system types overloads
+// with implicit variables in their case signatures.
 
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
@@ -157,3 +184,148 @@ typefail(() => f(h, f("x", g)));
 typefail(() => f(h, f(g, "x")));
 typefail(() => f(f(g, "x"), h));
 typefail(() => f(f("x", g), h));
+
+// reconstruction.
+
+let a = Type(), b = Type(), c = Type();
+
+// the type of identity is inferrable in first order context.
+
+typecheck(() => {
+  let id = x => x;
+
+  id(1);
+  id(true);
+  id("string");
+});
+
+// but not in second order.
+
+typefail(id => {
+  id(1);
+  id(true);
+  id("string");
+});
+
+// the type of forward application is inferrable.
+
+let f = g x => g(x);
+let t = type(f);
+
+assert(t unifies ((a -> b) -> (a -> b)));
+assert(t unifies ((b -> a) -> (b -> a)));
+
+assert(!(t unifies ((a -> b) -> (b -> a))));
+assert(!(t unifies ((b -> a) -> (a -> b))));
+
+assert(!(t unifies ((a -> a) -> (a -> b))));
+assert(!(t unifies ((b -> b) -> (a -> b))));
+
+assert(!(t unifies ((a -> b) -> (a -> a))));
+assert(!(t unifies ((a -> b) -> (b -> b))));
+
+// the type of backward application is inferrable.
+
+let f = x g => g(x);
+let t = type(f);
+
+assert(t unifies (a -> ((a -> b) -> b)));
+assert(t unifies (b -> ((b -> a) -> a)));
+
+assert(!(t unifies (b -> ((a -> b) -> b))));
+assert(!(t unifies (a -> ((b -> a) -> a))));
+
+assert(!(t unifies (a -> ((b -> a) -> b))));
+assert(!(t unifies (b -> ((a -> b) -> a))));
+
+assert(!(t unifies (a -> ((a -> b) -> a))));
+assert(!(t unifies (b -> ((b -> a) -> b))));
+
+// the type of composition is inferrable.
+
+let @ = f g x => f(g(x));
+let t = type(@);
+
+assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
+assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
+
+// the type of type driven application is inferrable.
+
+let f = (a: x -> y, b: x) => a(b)
+      | (a: x, b: x -> y) => b(a);
+
+let t = type(f);
+
+assert(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> b)));
+assert(t unifies (((a, a -> b) -> b) & ((a -> b, a) -> b)));
+
+assert(!(t unifies (((c -> b, a) -> b) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> c, a) -> b) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> b, c) -> b) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> c) & ((a, a -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((c, a -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((a, c -> b) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((a, a -> c) -> b))));
+assert(!(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> c))));
+
+// the type of curried type driven application is inferrable.
+
+let f = (a: x -> y) => ((b: x) => a(b)) | (a: x) => ((b: x -> y) => b(a));
+let t = type(f);
+
+assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
+assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
+
+assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
+
+let f = (a: x) => ((b: x -> y) => b(a)) | (a: x -> y) => ((b: x) => a(b));
+let t = type(f);
+
+assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
+assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
+
+assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
+
+// nested abstract types normalize to a single first order type.
+
+let t = type(x y => y);
+
+assert(t unifies (a -> (a -> a)));
+assert(t unifies (a -> (b -> b)));
+assert(t unifies (b -> (a -> a)));
+assert(t unifies (b -> (b -> b)));
+
+assert(!(t unifies (a -> (b -> a))));
+assert(!(t unifies (a -> (a -> b))));
+
+// the poly type system exposes an api for instantiating
+// the annotations of applied abstract functions.
+
+let instantiate = PolyTypeSystem.instantiate;
+
+let f: w -> (w -> w) = x y => y;
+let t = instantiate(f, 1);
+
+assert(t == num -> num);
+
+let f: w -> (w -> bool) = x y => true;
+let t = instantiate(f, 1);
+
+assert(t == num -> bool);
+
+let f: w -> (u -> (w -> u)) = x y z => y;
+let t = instantiate(f, 1);
+
+assert(t is TGeneralization);
+
+assert(t unifies (a -> (num -> a)));
+assert(!(t unifies (a -> (bool -> a))));
+assert(!(t unifies (a -> (num -> b))));
+
+let f: (w,u) -> (u -> (w -> u)) = x y z => y;
+
+let t = instantiate(f, 1, 1);
+assert(t == num -> (num -> num));
+
+let t = instantiate(f, 1, true);
+assert(t == bool -> (num -> bool));

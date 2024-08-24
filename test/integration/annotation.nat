@@ -1,0 +1,50 @@
+
+// globals can be annotated.
+
+let f: 1 = () => 1;
+
+assert(annotations(f) == [1]);
+
+f: 2;
+
+assert(annotations(f) == [1,2]);
+
+// locals can be annotated.
+
+(() => {
+  let f: 1 = () => 1;
+
+  assert(annotations(f) == [1]);
+
+  f: 2;
+
+  assert(annotations(f) == [1,2]);
+})();
+
+// upvalues can be annotated.
+
+(() => {
+  let x: 2 = (() => {
+    let x: 1 = () => 1;
+    return x;
+  })();
+
+  assert(annotations(x) == [1, 2]);
+
+  x: 3;
+
+  assert(annotations(x) == [1, 2, 3]);
+})();
+
+// function annotations propagate to their return values.
+
+let f: num -> (num -> num) = a b => b;
+assert(annotations(f(1)) == [(num -> num)]);
+
+// abstract function annotations are instantiated when propagated.
+
+let f: u -> (u -> u) = a b => b;
+assert(annotations(f(1)) == [(num -> num)]);
+
+let f: u -> (v -> (u -> v)) = a b c => b;
+assert(annotations(f(1)(true)) == [(num -> bool)]);

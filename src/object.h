@@ -63,6 +63,7 @@ struct Obj {
   bool isMarked;
   uint32_t hash;
   struct Obj *next;
+  ValueArray annotations;
 };
 
 typedef struct {
@@ -119,10 +120,10 @@ typedef struct ObjUpvalue {
   Obj obj;
   Value *location;
   Value closed;
+  struct ObjUpvalue *next;
   // the address of the local that's closed over.
   // we stash this only to reconstruct the ast.
   uint8_t slot;
-  struct ObjUpvalue *next;
 } ObjUpvalue;
 
 typedef struct {

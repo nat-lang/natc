@@ -1,4 +1,6 @@
 
+class SimpleTypeError extends TypeError {}
+
 class Constraint {
   init(left, right) => {
     this.left = left;
@@ -8,16 +10,18 @@ class Constraint {
   str() => this.left.str() + " ~ " + this.right.str();
 }
 
+let infix(6) ~ = Constraint;
+
 class AppConstraint extends Constraint {}
 
 class Substitution extends Map {
-  entries() => super.entries().map(e => Constraint(..e));
+  entries() => super.entries().map(e => e[0] ~ e[1]);
 
   update(var: TVar, type: Type) => {
     this[var] = type;
 
     for (sub in this) {
-      this[sub.left] = sub.right.substitute(Constraint(var, type));
+      this[sub.left] = sub.right.substitute(var ~ type);
     }
   }
 
@@ -48,7 +52,7 @@ class Type extends Base {
 
   fvs() => Set();
   hasFvs() => len(this.fvs()) > 0;
-  hash() => hash(this.str());
+  hash() => hash(address(this));
   apply(solution) => solution.entries().reduce(
     (type, sub) => type.substitute(sub),
     this
@@ -56,6 +60,7 @@ class Type extends Base {
 
   str() => str(this);
   pp() => { print this.str(); }
+  map(fn) => fn(this);
 }
 
 class TFunction extends Type {
@@ -82,9 +87,9 @@ class TFunction extends Type {
     this.domain.substitute(sub),
     this.range.substitute(sub)
   );
-}
 
-class TBoundFunction extends TFunction {}
+  map(fn) => TFunction(this.domain.map(fn), this.range.map(fn));
+}
 
 class TVar extends Type {
   init(id) => {
@@ -122,9 +127,34 @@ class TString extends Type {
   str() => "string";
 }
 
-class TProduct extends Type {
+class TOverload extends Type {
+  init(functions) => {
+    this.functions = functions;
+  }
+  map(fn) => TOverload(this.functions.map(fn));
+}
+
+class TClassy extends Type {
+  init(klass) => {
+    this.klass = klass;
+  }
+  hash() => hash(this.klass);
+  __eq__(that) => this.klass == that.klass;
+}
+
+class TClass extends TClassy {
+  str() => "TClass(" + str(this.klass) + ")";
+  substitute(s) => this;
+}
+
+class TInstance extends TClassy {
+  str() => "TInstance(" + str(this.klass) + ")";
+}
+
+class TProduct extends TInstance {
   init(elements) => {
     this.elements = elements;
+    this.klass = Tuple;
   }
 
   fvs() => bigUnion(..[x.fvs() | x in this.elements]);
@@ -137,26 +167,19 @@ class TProduct extends Type {
   __iter__() => iter(this.elements);
   __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
+
+   map(fn) => TProduct(this.elements.map(fn));
 }
 
-class TOverload extends Type {
-  init(functions) => {
-    this.functions = functions;
+class TSet extends TInstance {
+  init(element) => {
+    this.element = element;
+    this.klass = Set;
   }
-}
-
-class TClass extends Type {
-  init(klass) => {
-    this.klass = klass;
+  str() => "TSet(" + this.element.str() + ")";
+  substitute(c: Constraint) => {
+    return TSet(this.element.substitute(c));
   }
-  str() => "TClass(" + str(this.klass) + ")";
-  substitute(s) => this;
-  hash() => hash(this.klass);
-  __eq__(that) => this.klass == that.klass;
-}
-
-class TInstance extends TClass {
-  str() => "TInstance(" + str(this.klass) + ")";
 }
 
 let unit = TUnit();
@@ -179,11 +202,13 @@ class SimpleTypeSystem {
     if (type == CNumber) return num;
     if (type == OString) return string; 
     if (type == OInstance) return TInstance(value.__class__);
-    if (type == OFunction) return TFunction;
-    if (type == OBoundFunction) return TBoundFunction;
+    // if it's a native we punt.
+    if (type == ONative) return typeVar() -> typeVar();
+    if (type == OFunction) return nil;
+    if (type == OBoundFunction) return nil;
+    if (type == OOverload) return nil;
     // we'll treat the type of a class as synonymous with
-    // its initializer for now; this'll need to be revised
-    // when we type property access.
+    // its initializer for now.
     if (type == OClass) {
       let domain = unit;
 
@@ -206,7 +231,7 @@ class SimpleTypeSystem {
       return unit;
     if (value == undefined)
       return typeVar();
-    if (value is Sequential)
+    if (value is Tuple)
       return TProduct(value.map(this.typify));
     if (vType(value) == OSequence)
       return this.typify(Sequence.fromRaw(value));
@@ -220,9 +245,9 @@ class SimpleTypeSystem {
 
   // Assemble and return the [TypeState] produced
   // by [expr].
-  typecheck(expr) => {
+  _typecheck(expr, debug) => {
     let node <- expr;
-    let state = this.TypeStateClass(this, false);
+    let state = this.TypeStateClass(this, debug);
 
     node = state.transform(node);
 
@@ -232,17 +257,16 @@ class SimpleTypeSystem {
     return state;
   }
 
+  typecheck(expr) => this._typecheck(expr, false);
+
   newState() => this.TypeStateClass(this, false);
+  dNewState() => this.TypeStateClass(this, true);
 
   type(expr) => {
     let state = this.newState();
   
     return state.type(expr);
   }
-
-  unify(a,b) => this.newState().unify(
-    this.ConstraintClass(a,b)
-  );
 }
 
 class SimpleTypeState {
@@ -274,7 +298,7 @@ class SimpleTypeState {
 
   // Look up the node in the [typeEnv]. If there's an entry,
   // apply the current solution. Otherwise mint a fresh type
-  // var.
+  // variable.
   lookup(node: ASTVariable) => {
     if (this.typeEnv[node])
       return this.typeEnv[node].apply(this.solution);
@@ -292,89 +316,89 @@ class SimpleTypeState {
       return type.apply(this.solution);
   }
 
-  // Give [node]'s variables unique identifiers. Map the
-  // global variables to their annotations if they exist.
+  // Give [node]'s variables unique identifiers.
   transform(node: ASTNode) => {
     node.uniquelyIdentifyVariables(this.uuids);
 
-    let annotations = globalTypeEnv();
-    node.each(node => {
-      if (node is ASTGlobal) {
-        if (node.id in annotations)
-          this.typeEnv[node] = this.system.typify(annotations[node.id]);
-      }
-    });
-
     return node;
   } 
+
+  constrainFnDomain(node: ASTClosure) => {
+    // map the parameter annotations into types.
+    let parameters = node.signature().params;
+    let paramTypes = parameters.map(p => this.system.typify(p.type));
+
+    // since the params and their types are keyed by uuid
+    // we can just update the global type env.
+    this.typeEnv.extend(Map(..zip(parameters, paramTypes)));
+
+    if (node.function.arity == 0)
+      return unit;
+    else if (node.function.arity == 1)
+      return paramTypes[0];
+    else
+      return TProduct(paramTypes);
+  }
+
+  constrainFnRange(node: ASTClosure) => {
+    // track the types of the return values as we check the body.
+    let returnTypes = node.children.reduce(
+      (types, node) => {
+        let tNode = this.principal(node);
+
+        if (node is ASTReturn) types.push(tNode);
+
+        return types;
+      }, []
+    );
+  
+    // there's always an implicit return. for now, if there are
+    // explicit returns as well, we'll just ignore the implicit
+    // one. once we have ast nodes for conditionals we can be
+    // more discriminating.
+    let tImplicitReturn = returnTypes.pop();
+
+    if (len(returnTypes) == 0)
+      return tImplicitReturn;
+    else if (len(returnTypes) == 1)
+      return returnTypes[0];
+    else
+      // the simple type system can't type a disjunctive range.
+      throw SimpleTypeError("Don't know how to type multiple returns.");
+  }
 
   constrain(node: ASTNode) => {
     if (node is ASTMethod)
       return this.constrain(node[0]);
 
     if (node is ASTClosure) {
-      let parameters = node.signature().params;
-      // map the parameter annotations into types.
-      let paramTypes = parameters.map(p => {
-        let type = p.type;
-        
-        // it's not an ASTNode when we're pattern matching.
-        if (type is ASTNode)
-          type = type.resolve();
+      let tDomain = this.constrainFnDomain(node),
+          tRange = this.constrainFnRange(node);
 
-        return this.system.typify(type);
-      });
-
-      // since the params and their types are keyed by uuid,
-      // we can just update the global type env when checking
-      // the body of a function.
-      this.typeEnv.extend(Map(..zip(parameters, paramTypes)));
-
-      // track the types of the return values as we check the body.
-      let returnTypes = node.children.reduce(
-        (types, node) => {
-          let type = this.principal(node);
-
-          if (node is ASTReturn)
-            types.push(type);
-
-          return types;
-        }, []
-      );
-
-      // now build the type of the function.
-      let tParams, tReturns;
-
-      if (node.function.arity == 0) {
-        tParams = unit;
-      } else if (node.function.arity == 1) {
-        tParams = paramTypes[0];
-      } else {
-        tParams = TProduct(paramTypes);
-      }
-
-      // there's always an implicit return. for now, if there are
-      // explicit returns as well, we'll just ignore the implicit
-      // one. once we have ast nodes for conditionals we can be
-      // more discriminating.
-      let tImplicitReturn = returnTypes.pop();
-
-      if (len(returnTypes) == 0) {
-        tReturns = tImplicitReturn;
-      } else if (len(returnTypes) == 1) {
-        tReturns = returnTypes[0];
-      } else {
-        tReturns = TProduct(returnTypes);
-      }
-
-      return (tParams -> tReturns).apply(this.solution);
+      return (tDomain -> tRange).apply(this.solution);
     }
 
     if (node is ASTLiteral)
       return this.system.literalType(node.value);
     
-    if (node is ASTNegation)
-      return this.principal(node[0]);
+    if (node is ASTNegation) {
+      let tArg = this.principal(node[0]);
+      // falsiness is constrained correctly by the
+      // subtype system as tArg <| (bool | void | undef)
+      this.constraints.push(tArg ~ bool);
+      return bool;
+    }
+    
+    if (node is ASTEquality) {
+      let left = node[0], right = node[1];
+
+      let tLeft = this.principal(left),
+          tRight = this.principal(right);
+
+      this.constraints.push(tLeft ~ tRight);
+
+      return bool;
+    }
 
     if (node is ASTGlobal) {
       let value = node.resolve();
@@ -383,14 +407,15 @@ class SimpleTypeState {
 
     // the ast closes over a variable out of its scope.
     // resolve it and type its value.
-    if (node is ASTUpvalue and node.uuid == nil) {
+    if (node is ASTExternalUpvalue) {
       let value = node.resolve();
       return this.type(value);
     }
 
     if (node is ASTVariable)
       return this.lookup(node);
-    
+
+    // punt: requires proper class typing.
     if (node is ASTPropertyAccess)
       return typeVar();
 
@@ -413,7 +438,7 @@ class SimpleTypeState {
       let tArgs = this.principal(args);
       let tApp = typeVar();
 
-      this.constraints.push(Constraint(tFunc, tArgs -> tApp));
+      this.constraints.push(tFunc ~ tArgs -> tApp);
 
       return tApp;
     }
@@ -425,7 +450,7 @@ class SimpleTypeState {
       let tVar = this.lookup(var);
       let tVal = this.system.typify(val.resolve());
 
-      this.constraints.push(Constraint(tVar, tVal));
+      this.constraints.push(tVar ~ tVal);
 
       return void;
     }
@@ -437,7 +462,7 @@ class SimpleTypeState {
       let tVar = this.lookup(var);
       let tVal = this.principal(val);
 
-      this.constraints.push(Constraint(tVar, tVal));
+      this.constraints.push(tVar ~ tVal);
 
       // this should eventually respect a possibly user
       // defined __set__ method that returns something.
@@ -449,6 +474,11 @@ class SimpleTypeState {
 
     if (node is ASTReturn) 
       return this.principal(node[0]);
+    
+    if (node is ASTBlock) {
+      node.children.map(this.principal);
+      return void;
+    }
 
     throw TypeError("Unexpected syntax: " + str(node) + ".");
   }
@@ -457,6 +487,17 @@ class SimpleTypeState {
   occurs(var: TVar, type: Type) => !(type is TVar) and var in type.fvs();
 
   unify(constraint: Constraint) => {
+    let unified = this._unify(constraint);
+
+    if (this.debug) {
+      print "  ----------- UNIFY -----------";
+      print "  " + constraint.str() + " = " + str(unified);
+      print "  ------------------------------";
+    }
+    return unified;
+  }
+
+  _unify(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
     
@@ -488,8 +529,9 @@ class SimpleTypeState {
     // function constraints become domain/domain range/range constraints.
     if (left is TFunction and right is TFunction) {
       this.constraints.extend([
-        Constraint(left.domain, right.domain),
-        Constraint(left.range, right.range)
+        // fixme: the compiler fails when these are unparenthesized.
+        (left.domain ~ right.domain),
+        (left.range ~ right.range)
       ]);
 
       return this.solve();
@@ -498,15 +540,13 @@ class SimpleTypeState {
     // product types of equal length become pairwise sequences of constraints.
     if (left is TProduct and right is TProduct) {
       if (len(left) == len(right)) {
-
         this.constraints.extend(
-          zip(left.elements, right.elements).map((x) => Constraint(..x))
+          zip(left.elements, right.elements).map(x => x[0] ~ x[1])
         );
-
         return this.solve();
-      } else {
-        return false;
       }
+      
+      return false;
     }
 
     return left == right;
@@ -557,25 +597,33 @@ class SimpleTypeState {
     return this.principal(node);
   }
 
-  // Calculate the type of [expr], inferring it if necessary.
-  type(expr) => {
-    // if it's a native we punt.
-    if (vType(expr) == ONative)
-      return typeVar() -> typeVar();
+  constrainAnnotation(annotation, type) => this.constraints.push(
+    this.system.typify(annotation) ~ type
+  );
 
-    // if it's not a function return its literal type.
-    let exprType = this.system.literalType(expr);
-    if (exprType != TFunction and exprType != TBoundFunction)
-      return exprType;
+  unifyAnnotations(expr, type) => {
+    let tAnnotations = annotations(expr);
 
-    // now check if it has a global type annotation.
-    // todo: constrain this annotation against the inferred type.
-    exprType = globalTypeEnv()[expr.name];
-    if (exprType and globals()[expr.name] == expr)
-      return this.system.typify(exprType);
+    if (len(tAnnotations) > 0) {
+      for (annotation in tAnnotations)
+        this.constrainAnnotation(annotation, type);
 
-    // otherwise infer it.
-    return this.infer(expr);
+      if (this.solve())
+        return type.apply(this.solution);
+    }
+
+    return type;
+  }
+
+  // Calculate the type of [value], inferring it if necessary.
+  type(value) => {
+    let type = this.system.literalType(value);
+    if (type) return type;
+
+    type = this.infer(value);
+    type = this.unifyAnnotations(value, type);
+
+    return type;
   }
 
   solved() => len(this.constraints) == 0 and len(this.insoluble) == 0;

@@ -1,70 +1,158 @@
+
 class TAbstract extends Type {
-  init(fn, arity) => {
+  init(fn) => {
     this.fn = fn;
-    this.arity = arity;
+    this.arity = fn.arity;
+    this.variadic = fn.variadic;
   }
 
-  instantiate(nameSupply) => {
-    let tVars = [];
-    for (let i = 0; i < this.arity; i = i + 1)
-      tVars.push(nameSupply());
-    return this.fn(..tVars);
+  instantiateWith(varCount) => {
+    let tVars = [typeVar() | _ in range(0, varCount)];
+    let concrete = this.fn(..tVars);
+    return TypeSystem.typify(concrete);
   }
 
-  generalize(type: TFunction) => {
-    let fvs = type.fvs();
+  instantiate() => this.instantiateWith(this.arity);
 
-    // simulate the function with type substitution.
-    return TAbstract((*args) => {
-      let s = Substitution(..zip(fvs.toSeq(), args));
-      return type.apply(s);
-    }, len(fvs));
+  pp() => { print str(this); }
+}
+
+class TGeneralization extends TAbstract {
+  init(concrete) => {
+    this.concrete = concrete;
+    this.arity = len(concrete.fvs());
+    this.variadic = false;
   }
-
-  fromFn(fn: OFunction) => TAbstract(fn, fn.arity);
-
   str() => {
     let tVars = [
       ["u", "v", "w", "x", "y", "z"][i] | i in range(0, this.arity)
     ];
     class PrettyTVar extends TVar { str() => this.id; }
-    let type = this.fn(..[PrettyTVar(v) | v in tVars]);
+    let type = TypeSystem.typify(this.fn(..[PrettyTVar(v) | v in tVars]));
     return "(" + join([v | v in tVars], ",") + ") => " + type.str();
+  }
+  fvs() => this.concrete.fvs();
+
+  fn(*args) => {
+    // simulate the function with type substitution.
+    let sub = Substitution(..zip(this.fvs().toSeq(), args));
+    return this.concrete.apply(sub);
   }
   pp() => { print this.str(); }
 }
 
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
-    let type = super.constrain(node);
+    if (node is ASTClosure) {
+      let tParams = this.constrainFnDomain(node),
+          tReturns = this.constrainFnRange(node);
 
-    if (node is ASTClosure and type.hasFvs()) {
-      return TAbstract.generalize(type);
+      tParams = tParams.apply(this.solution);
+      tReturns = tReturns.apply(this.solution);
+
+      if (tReturns is TGeneralization)
+        tReturns = tReturns.concrete;
+
+      let type = tParams -> tReturns;
+
+      if (type.hasFvs()) {
+        return TGeneralization(type);
+      }
+
+      return type;
     }
 
-    return type;
+    return super.constrain(node);
   }
 
-  unify(constraint: Constraint) => {
+  _unify(constraint: Constraint) => {
     let left = constraint.left,
         right = constraint.right;
 
-    if (left is TAbstract and !(right is TVar))
-      left = left.instantiate(typeVar);
+    if (left is TAbstract) {
+      if (left.variadic and right is ->)
+        left = left.instantiateWith(len(right.domain));
+      else if (!(right is TVar))
+        left = left.instantiate();
+    }
     
-    if (right is TAbstract and !(left is TVar))
-      right = right.instantiate(typeVar);
+    if (right is TAbstract) {
+      if (right.variadic and left is ->)
+        right = right.instantiateWith(len(left.domain));
+      else if (!(left is TVar))
+        right = right.instantiate();
+    }
     
-    return super.unify(PolyTypeSystem.ConstraintClass(left, right));
+    return super._unify(constraint.__class__(left, right));
+  }
+
+  // Calculate the type of [value], inferring it if necessary.
+  type(value) => {
+    let type = this.system.literalType(value);
+    if (type) return type;
+
+    type = this.infer(value);
+
+    // instantiate abstract types.
+    if (type is TAbstract)
+      type = type.instantiate();
+
+    return this.unifyAnnotations(value, type);
   }
 }
 
 class PolyTypeSystem extends AdhocTypeSystem {
+  literalType(value) => {
+    if (value == Tuple)
+      return TAbstract((*types) => TProduct(types) -> TProduct(types));
+
+    if (value == Set) {
+      return TAbstract((*types) => {
+        let element;
+        if (len(types) == 0)
+          element = unit;
+        else if (len(types) == 1)
+          element = types[0];
+        else
+          element = TSum(..types);
+
+        return TProduct(types) -> TSet(element);
+      });
+    }
+    
+    return super.literalType(value);
+  }
+
   typify(value) => {
     if (vType(value) == OFunction)
-      return TAbstract.fromFn(value);
+      return TAbstract(value);
 
     return super.typify(value);
+  }
+
+  instantiate(func, *args) => {
+    let state = this.newState();
+  
+    let tApp = typeVar();
+    let tFunc = state.type(func);
+    let tArgs = args.map(state.type);
+  
+    if (len(tArgs) == 0)
+      tArgs = void;
+    else if (len(tArgs) == 1)
+      tArgs = tArgs[0];
+    else
+      tArgs = TProduct(tArgs);
+
+    state.constraints.push(tFunc <| tArgs -> tApp);
+    state.solve();
+  
+    tApp = tApp.apply(state.solution);
+
+    if (tApp.hasFvs())
+      tApp = TGeneralization(tApp);
+
+    return tApp;
   }
 }
 

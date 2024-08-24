@@ -53,22 +53,6 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
-ObjClosure* getGlobalClosure(char* name) {
-  Value obj;
-
-  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
-    vmRuntimeError("Couldn't find function '%s'.", name);
-    return NULL;
-  }
-
-  if (!IS_CLOSURE(obj)) {
-    vmRuntimeError("Not a closure: '%s'.", name);
-    return NULL;
-  }
-
-  return AS_CLOSURE(obj);
-}
-
 ObjClass* getGlobalClass(char* name) {
   Value obj;
 
@@ -301,20 +285,25 @@ bool __globals__(int argCount, Value* args) {
   return true;
 }
 
-bool __globalTypeEnv__(int argCount, Value* args) {
-  vmPop();  // native fn.
-  vmPush(OBJ_VAL(newInstance(vm.core.map)));
-  vmInitInstance(vm.core.map, 0, 1);
-  mapAddAll(&vm.typeEnv, &AS_INSTANCE(vmPeek(0))->fields);
-  return true;
-}
-
 bool __clock__(int argCount, Value* args) {
   vmPop();  // native fn.
   vmPush(NUMBER_VAL((double)clock() / CLOCKS_PER_SEC));
   return true;
 }
 
+bool __address__(int argCount, Value* args) {
+  Value value = vmPop();
+  vmPop();  // native fn.
+  if (!IS_OBJ(value)) {
+    vmPush(NUMBER_VAL(0));
+
+  } else {
+    Obj* obj = AS_OBJ(value);
+    vmPush((NUMBER_VAL((uintptr_t)obj)));
+  }
+
+  return true;
+}
 bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
@@ -430,6 +419,23 @@ bool __stackTrace__(int argCount, Value* args) {
   return true;
 }
 
+bool __annotations__(int argCount, Value* args) {
+  Value value = vmPop();
+  vmPop();  // fn.
+
+  if (!IS_OBJ(value)) {
+    vmRuntimeError("Only objects have annotations.");
+    return false;
+  }
+
+  Obj* obj = AS_OBJ(value);
+  for (int i = 0; i < obj->annotations.count; i++)
+    vmPush(obj->annotations.values[i]);
+  vmTuplify(obj->annotations.count, true);
+
+  return true;
+}
+
 InterpretResult initializeCore() {
   // native functions.
 
@@ -439,11 +445,12 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("hashable", 1, __hashable__);
   defineNativeFnGlobal("vType", 1, __vType__);
   defineNativeFnGlobal("globals", 0, __globals__);
-  defineNativeFnGlobal("globalTypeEnv", 0, __globalTypeEnv__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
   defineNativeFnGlobal("resolveUpvalue", 1, __resolveUpvalue__);
   defineNativeFnGlobal("stackTrace", 0, __stackTrace__);
+  defineNativeFnGlobal("address", 1, __address__);
+  defineNativeFnGlobal("annotations", 1, __annotations__);
 
   defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
   defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
@@ -480,10 +487,15 @@ InterpretResult initializeCore() {
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
-      (vm.core.astUpvalue = getGlobalClass(S_AST_UPVALUE)) == NULL ||
+      (vm.core.astExternalUpvalue = getGlobalClass(S_AST_EXTERNAL_UPVALUE)) ==
+          NULL ||
+      (vm.core.astInternalUpvalue = getGlobalClass(S_AST_INTERNAL_UPVALUE)) ==
+          NULL ||
       (vm.core.astLocal = getGlobalClass(S_AST_LOCAL)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.astMembership = getGlobalClass(S_AST_MEMBERSHIP)) == NULL ||
+      (vm.core.astBlock = getGlobalClass(S_AST_BLOCK)) == NULL ||
+      (vm.core.astJumpIfFalse = getGlobalClass(S_AST_JUMP_IF_FALSE)) == NULL ||
       (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
@@ -500,7 +512,7 @@ InterpretResult initializeCore() {
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
       (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
 
-      (vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL)
+      (vm.core.unify = vmGetGlobalClosure(S_UNIFY)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   return INTERPRET_OK;

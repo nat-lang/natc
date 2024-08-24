@@ -21,7 +21,10 @@ ifeq ($(MODE),debug)
 	CFLAGS += -O0 -DDEBUG -g
 	BUILD_DIR := build/debug
 else ifeq ($(MODE),debug-trace)
-	CFLAGS += -O0 -DDEBUG -g -D DEBUG_PRINT_CODE -D DEBUG_TRACE_EXECUTION
+	CFLAGS += -O0 -DDEBUG -g -D DEBUG_TRACE_EXECUTION
+	BUILD_DIR := build/debug
+else ifeq ($(MODE),debug-print)
+	CFLAGS += -O0 -DDEBUG -g -D DEBUG_PRINT_CODE
 	BUILD_DIR := build/debug
 else ifeq ($(MODE),debug-log-gc)
 	CFLAGS += -O0 -DDEBUG -g -D DEBUG_LOG_GC

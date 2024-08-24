@@ -305,17 +305,21 @@ static void emitDefaultReturn(Compiler* cmp) {
     emitByte(cmp, OP_NIL);
   emitByte(cmp, OP_IMPLICIT_RETURN);
 }
+#if defined(DEBUG_PRINT_CODE)
+#define DEBUG_CHUNK()                                                        \
+  if (!parser.hadError) {                                                    \
+    disassembleChunk(&cmp->function->chunk, cmp->function->name != NULL      \
+                                                ? cmp->function->name->chars \
+                                                : "<script>");               \
+  }
+#else
+#define DEBUG_CHUNK()
+#endif
 
 static ObjFunction* endCompiler(Compiler* cmp) {
   emitDefaultReturn(cmp);
 
-#ifdef DEBUG_PRINT_CODE
-  if (!parser.hadError) {
-    disassembleChunk(&cmp->function->chunk, cmp->function->name != NULL
-                                                ? cmp->function->name->chars
-                                                : "<script>");
-  }
-#endif
+  DEBUG_CHUNK()
 
   vm.compiler = cmp->enclosing;
   return cmp->function;
@@ -366,6 +370,8 @@ static void signFunction(Compiler* cmp, Compiler* sigCmp, Compiler* enclosing) {
   closeUpvalues(function, cmp, enclosing);
 
   closeFunctionWithOp(sigCmp, enclosing, OP_SIGN);
+
+  DEBUG_CHUNK()
 }
 
 static void function(Compiler* enclosing, FunctionType type, Token name);
@@ -557,10 +563,6 @@ static void property(Compiler* cmp, bool canAssign) {
   if (canAssign && match(cmp, TOKEN_EQUAL)) {
     expression(cmp);
     emitConstInstr(cmp, OP_SET_PROPERTY, name);
-  } else if (match(cmp, TOKEN_LEFT_PAREN)) {
-    uint8_t argCount = argumentList(cmp);
-    emitConstInstr(cmp, OP_INVOKE, name);
-    emitByte(cmp, argCount);
   } else {
     emitConstInstr(cmp, OP_GET_PROPERTY, name);
   }
@@ -705,8 +707,8 @@ static int nativePostfix(Compiler* cmp, char* name, int argCount) {
 static void methodCall(Compiler* cmp, char* name, int argCount) {
   Value method = INTERN(name);
   uint16_t constant = makeConstant(cmp, method);
-  emitConstInstr(cmp, OP_INVOKE, constant);
-  emitByte(cmp, argCount);
+  emitConstInstr(cmp, OP_GET_PROPERTY, constant);
+  emitBytes(cmp, OP_CALL, argCount);
 }
 
 static void variable(Compiler* cmp, bool canAssign) {
@@ -1144,8 +1146,9 @@ static void forInStatement(Compiler* cmp) {
   iterationEnd(cmp, iter, exitJump);
 }
 
-// Parse a comprehension, given the stack address [var] of the
-// sequence under construction and the type of [closingToken].
+// Parse a comprehension, given a [Parser] that points at the body,
+// the stack address [var] of the object under construction, and the
+// type of [closingToken].
 Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
                      TokenType closingToken) {
   Iterator iter;
@@ -1466,13 +1469,11 @@ static void letDeclaration(Compiler* cmp) {
   emitByte(cmp, OP_UNDEFINED);
   defineVariable(cmp, var);
 
+  bool annotated = false;
   if (match(cmp, TOKEN_COLON)) {
     typeExpression(cmp);
-  } else {
-    emitByte(cmp, OP_UNDEFINED);
+    annotated = true;
   }
-  defineType(cmp, var);
-  emitByte(cmp, OP_POP);  // the type.
 
   if (match(cmp, TOKEN_EQUAL)) {
     boundExpression(cmp, name);
@@ -1484,17 +1485,19 @@ static void letDeclaration(Compiler* cmp) {
   }
 
   setVariable(cmp, var);
+  emitByte(cmp, OP_POP);
 
-  if (infixPrecedence != -1) {
-    if (cmp->scopeDepth == 0) {
-      Value name = cmp->function->chunk.constants.values[var];
-      mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
-    } else {
-      error(cmp, "Can only infix global.");
-    }
+  if (annotated) {
+    // after the value assignment so that we're setting
+    // the type of the value;
+    defineType(cmp, var);
+    emitByte(cmp, OP_POP);  // the type.
   }
 
-  emitByte(cmp, OP_POP);
+  if (infixPrecedence != -1) {
+    Value name = cmp->function->chunk.constants.values[var];
+    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
+  }
 }
 
 static void singleLetDeclaration(Compiler* cmp) {
@@ -1550,9 +1553,9 @@ static int loopCondition(Compiler* cmp) {
   expression(cmp);
   consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop condition.");
 
-  // Jump out of the loop if the condition is false.
+  // jump out of the loop if the condition is false.
   int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
-  // Condition.
+  // condition.
   emitByte(cmp, OP_POP);
 
   return exitJump;
@@ -1573,7 +1576,7 @@ static int loopIncrement(Compiler* cmp, int loopStart) {
 
 static void forConditionStatement(Compiler* cmp) {
   if (match(cmp, TOKEN_SEMICOLON)) {
-    // No initializer.
+    // no initializer.
   } else if (match(cmp, TOKEN_LET)) {
     singleLetDeclaration(cmp);
   } else {

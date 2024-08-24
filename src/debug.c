@@ -54,15 +54,6 @@ static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 3;
 }
 
-static int invokeInstruction(const char* name, Chunk* chunk, int offset) {
-  uint8_t constant = readShort(chunk, offset);
-  uint8_t argCount = chunk->code[offset + 3];
-  printf("%-16s (%d args) %4d '", name, argCount, constant);
-  printValue(chunk->constants.values[constant]);
-  printf("'\n");
-  return offset + 4;
-}
-
 static int closureInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t constant = readShort(chunk, offset);
   offset += 3;
@@ -144,8 +135,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_CALL_INFIX", offset);
     case OP_CALL_POSTFIX:
       return byteInstruction("OP_CALL_POSTFIX", chunk, offset);
-    case OP_INVOKE:
-      return invokeInstruction("OP_INVOKE", chunk, offset);
     case OP_SIGN:
       return closureInstruction("OP_SIGN", chunk, offset);
     case OP_CLOSURE:

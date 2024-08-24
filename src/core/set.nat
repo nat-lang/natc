@@ -1,27 +1,27 @@
 
 class Set extends Object {
   init(*elements) => {
-    this.map = Map();
+    this.inner = Map();
 
     for (let i = 0; i < len(elements); i = i + 1) {
-      this.map[elements[i]] = true;
+      this.inner[elements[i]] = true;
     }
   }
 
   // The elements of the set are the keys of the underlying map.
-  elements() => this.map.keys();
+  elements() => this.inner.keys();
 
   // Calling a set is shorthand for the membership predicate,
   // so that the set behaves like its characteristic function.
   call(element) => element in this;
 
   __set__(key, value) => {
-    this.map[key] = value;
+    this.inner[key] = value;
     return this;
   }
 
-  __get__(key) => this.map[key];
-  __in__(key) => key in this.map;
+  __get__(key) => this.inner[key];
+  __in__(key) => key in this.inner;
 
   // The compiler uses this method when building set comprehensions.
   add(element) => this.__set__(element, true);
@@ -124,7 +124,7 @@ class Set extends Object {
     return powerset;
   }
 
-  map(predicate) => this.elements().map(predicate);
+  map(fn) => this.elements().map(fn);
   reduce(fn, acc) => this.elements().reduce(fn, acc);
   all(predicate) => this.elements().all(predicate);
   each(predicate) => this.all(predicate);
