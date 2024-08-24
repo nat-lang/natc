@@ -10,8 +10,7 @@ default: clean dev
 
 # Remove all build outputs and intermediate files.
 clean:
-	@ rm -rf $(BUILD_DIR)/release
-	@ rm -rf $(BUILD_DIR)/debug
+	@ rm -rf $(BUILD_DIR)/release $(BUILD_DIR)/debug $(BUILD_DIR)/wasm 
 	@ rm -f $(BUILD_DIR)/nat $(BUILD_DIR)/nat.wasm $(BUILD_DIR)/lib.so $(BIN)/nat
 
 configure:
@@ -95,4 +94,5 @@ lib:
 
 wasm:
 	@ $(MAKE) lib
-	@ emcc $(BUILD_DIR)/lib.so -o ../online/src/wasm/nat.js -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap -s EXPORTED_FUNCTIONS=_interpretSource --embed-file src/core
+	@ mkdir -p $(BUILD_DIR)/wasm
+	@ emcc $(BUILD_DIR)/lib.so -o $(BUILD_DIR)/wasm/nat.js -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap -s EXPORTED_FUNCTIONS=_interpretSource --embed-file src/core
