@@ -95,4 +95,4 @@ lib:
 wasm:
 	@ $(MAKE) lib
 	@ mkdir -p $(BUILD_DIR)/wasm
-	@ emcc $(BUILD_DIR)/lib.so -o $(BUILD_DIR)/wasm/nat.js -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap -s EXPORTED_FUNCTIONS=_interpretSource --embed-file src/core
+	@ emcc $(BUILD_DIR)/lib.so -o $(BUILD_DIR)/wasm/nat.js -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap -s EXPORTED_FUNCTIONS=_interpretSource -s STACK_SIZE=5MB --embed-file src/core
