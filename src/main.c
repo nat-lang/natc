@@ -21,6 +21,14 @@ static void repl() {
   }
 }
 
+InterpretResult interpretSource(const char* path, const char* source) {
+  if (!initVM()) exit(2);
+
+  InterpretResult result = vmInterpret((char*)path, source);
+
+  return result;
+}
+
 int main(int argc, const char* argv[]) {
   if (!initVM()) exit(2);
 

@@ -10,9 +10,8 @@ default: clean dev
 
 # Remove all build outputs and intermediate files.
 clean:
-	@ rm -rf $(BUILD_DIR)/release
-	@ rm -rf $(BUILD_DIR)/debug
-	@ rm -f $(BUILD_DIR)/nat $(BIN)/nat
+	@ rm -rf $(BUILD_DIR)/release $(BUILD_DIR)/debug $(BUILD_DIR)/wasm 
+	@ rm -f $(BUILD_DIR)/nat $(BUILD_DIR)/nat.wasm $(BUILD_DIR)/lib.so $(BIN)/nat
 
 configure:
 	@ python $(BUILD_DIR)/configure.py
@@ -88,3 +87,12 @@ valgrind:
 linux:
 	@ docker build -t "linux" -f build/Dockerfile.linux .
 	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp -it linux sh
+
+lib:
+	@ $(MAKE) nat
+	@ $(MAKE) -f $(BUILD_DIR)/c.make $(BUILD_DIR)/lib.so NAME=nat MODE=release SOURCE_DIR=src
+
+wasm:
+	@ $(MAKE) lib
+	@ mkdir -p $(BUILD_DIR)/wasm
+	@ emcc $(BUILD_DIR)/lib.so -o $(BUILD_DIR)/wasm/nat.js -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap -s EXPORTED_FUNCTIONS=_interpretSource -s STACK_SIZE=5MB --embed-file src/core

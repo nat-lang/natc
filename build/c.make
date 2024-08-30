@@ -56,4 +56,7 @@ $(BUILD_DIR)/$(NAME)/%.o: $(SOURCE_DIR)/%.c $(HEADERS)
 	@ mkdir -p $(BUILD_DIR)/$(NAME)
 	@ $(CC) -c $(C_LANG) $(CFLAGS) -o $@ $<
 
+build/lib.so: $(OBJECTS)
+	@ $(CC) $(CFLAGS) -r -o $@ $^
+
 .PHONY: default
