@@ -28,7 +28,8 @@ typedef bool (*DelimitFn)();
 typedef struct {
   ParseFn prefix;
   ParseFn infix;
-  Precedence precedence;
+  Precedence leftPrec;
+  Precedence rightPrec;
 } ParseRule;
 
 Parser parser;
@@ -534,7 +535,7 @@ static uint8_t argumentList(Compiler* cmp) {
 static void binary(Compiler* cmp, bool canAssign) {
   TokenType operatorType = parser.previous.type;
   ParseRule* rule = getInfixableRule(cmp, parser.previous);
-  parsePrecedence(cmp, (Precedence)(rule->precedence + 1));
+  parsePrecedence(cmp, (Precedence)(rule->rightPrec));
 
   switch (operatorType) {
     case TOKEN_BANG_EQUAL:
@@ -732,7 +733,7 @@ static void infix(Compiler* cmp, bool canAssign) {
   variable(cmp, canAssign);
 
   if (penultWhite() && prevWhite()) {
-    parsePrecedence(cmp, (Precedence)(rule->precedence + 1));
+    parsePrecedence(cmp, (Precedence)(rule->rightPrec));
     emitByte(cmp, OP_CALL_INFIX);
   }
 }
@@ -1445,24 +1446,35 @@ static void classDeclaration(Compiler* cmp) {
   currentClass = currentClass->enclosing;
 }
 
-static void letDeclaration(Compiler* cmp) {
-  int infixPrecedence = -1;
+static int precedence(Compiler* cmp) {
+  int prec = 0;
+  if (cmp->scopeDepth > 0) error(cmp, "Can only infix globals.");
+  advance(cmp);
 
-  if (check(TOKEN_INFIX)) {
-    if (cmp->scopeDepth > 0) error(cmp, "Can only infix globals.");
+  if (check(TOKEN_LEFT_PAREN)) {
     advance(cmp);
+    consume(cmp, TOKEN_NUMBER, "Expect numeral precedence.");
 
-    if (check(TOKEN_LEFT_PAREN)) {
-      advance(cmp);
-      consume(cmp, TOKEN_NUMBER, "Expect numeral precedence.");
+    prec = strtod(parser.previous.start, NULL);
 
-      infixPrecedence = strtod(parser.previous.start, NULL);
+    if (prec == 0) error(cmp, "Precedence must be > 0.");
 
-      consume(cmp, TOKEN_RIGHT_PAREN, "Expect closing ')'.");
-    } else {
-      infixPrecedence = PREC_FACTOR;
-    }
+    consume(cmp, TOKEN_RIGHT_PAREN, "Expect closing ')'.");
+  } else {
+    prec = PREC_FACTOR;
   }
+  return prec;
+}
+
+static void letDeclaration(Compiler* cmp) {
+  int infixPrecedence = 0;
+
+  // infixation associativity defaults to left, so the infixl
+  // declaration is vacuous, but we support it for symmetry.
+  if (check(TOKEN_INFIX) || check(TOKEN_INFIX_LEFT))
+    infixPrecedence = precedence(cmp);
+  else if (check(TOKEN_INFIX_RIGHT))
+    infixPrecedence = precedence(cmp) * -1;
 
   uint16_t var = parseVariable(cmp, "Expect variable name.");
   Token name = parser.previous;
@@ -1489,12 +1501,12 @@ static void letDeclaration(Compiler* cmp) {
 
   if (annotated) {
     // after the value assignment so that we're setting
-    // the type of the value;
+    // the type of the value.
     defineType(cmp, var);
     emitByte(cmp, OP_POP);  // the type.
   }
 
-  if (infixPrecedence != -1) {
+  if (infixPrecedence != 0) {
     Value name = cmp->function->chunk.constants.values[var];
     mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
   }
@@ -1746,46 +1758,52 @@ static void statement(Compiler* cmp) {
   }
 }
 
+#define PREC_STEP 1
+
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = {parentheses, call, PREC_CALL},
-    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACE] = {braces, NULL, PREC_NONE},
-    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACKET] = {brackets, subscript, PREC_CALL},
-    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
-    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
-    [TOKEN_DOT] = {NULL, dot, PREC_CALL},
-    [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_BANG] = {unary, NULL, PREC_NONE},
-    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
-    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_IDENTIFIER] = {variable, infix, PREC_NONE},
-    [TOKEN_TYPE_VARIABLE] = {variable, infix, PREC_NONE},
-    [TOKEN_STRING] = {string, NULL, PREC_NONE},
-    [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
-    [TOKEN_AND] = {NULL, and_, PREC_AND},
-    [TOKEN_OR] = {NULL, or_, PREC_OR},
-    [TOKEN_UNDEFINED] = {undefined, NULL, PREC_NONE},
-    [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
-    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
-    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_IF] = {NULL, NULL, PREC_NONE},
-    [TOKEN_IN] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_NIL] = {literal, NULL, PREC_NONE},
-    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
-    [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SUPER] = {super_, NULL, PREC_NONE},
-    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
-    [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
-    [TOKEN_LET] = {NULL, NULL, PREC_NONE},
-    [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_PAREN] = {parentheses, call, PREC_CALL, PREC_NONE},
+    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {braces, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_LEFT_BRACKET] = {brackets, subscript, PREC_CALL, PREC_NONE},
+    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_DOT] = {NULL, dot, PREC_CALL, PREC_NONE},
+    [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_BANG] = {unary, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY,
+                          PREC_EQUALITY + PREC_STEP},
+    [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY,
+                           PREC_EQUALITY + PREC_STEP},
+    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TYPE_VARIABLE] = {variable, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_AND] = {NULL, and_, PREC_AND, PREC_NONE},
+    [TOKEN_OR] = {NULL, or_, PREC_OR, PREC_NONE},
+    [TOKEN_UNDEFINED] = {undefined, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_CLASS] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FALSE] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FOR] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_IF] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_IN] = {NULL, binary, PREC_COMPARISON, PREC_COMPARISON + PREC_STEP},
+    [TOKEN_NIL] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_RETURN] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_SUPER] = {super_, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_THIS] = {this_, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TRUE] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_LET] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_WHILE] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_ERROR] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_EOF] = {NULL, NULL, PREC_NONE, PREC_NONE},
 };
 
 static ParseRule* getRule(Token token) { return &rules[token.type]; }
+
+int sign(int x) { return (x > 0) - (x < 0); }
 
 // Look up the rule for the [token]'s type, unless the
 // [token] is an identifier, in which case check the vm's
@@ -1796,11 +1814,26 @@ static ParseRule* getInfixableRule(Compiler* cmp, Token token) {
     Value prec;
 
     if (mapGet(&vm.infixes, name, &prec)) {
+      // the sign indicates associativity: -1 right, 1 left; 0 reserved.
+      int nPrec = AS_NUMBER(prec);
+      switch (sign(nPrec)) {
+        case 1: {
+          rules[TOKEN_IDENTIFIER].leftPrec = nPrec;
+          rules[TOKEN_IDENTIFIER].rightPrec = nPrec + PREC_STEP;
+          break;
+        }
+        case -1:
+          rules[TOKEN_IDENTIFIER].leftPrec = rules[TOKEN_IDENTIFIER].rightPrec =
+              nPrec * -1;
+          break;
+        default:
+          error(cmp, "Unexpected precedence");
+      }
+
       rules[TOKEN_IDENTIFIER].infix = infix;
-      rules[TOKEN_IDENTIFIER].precedence = AS_NUMBER(prec);
     } else {
       rules[TOKEN_IDENTIFIER].infix = NULL;
-      rules[TOKEN_IDENTIFIER].precedence = PREC_NONE;
+      rules[TOKEN_IDENTIFIER].leftPrec = PREC_NONE;
     }
   }
 
@@ -1821,17 +1854,19 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   prefixRule(cmp, canAssign);
 
-  while (!(delimit != NULL && delimit()) &&
-         precedence <= getInfixableRule(cmp, parser.current)->precedence) {
-    advance(cmp);
-    ParseFn infixRule = getInfixableRule(cmp, parser.previous)->infix;
+  while (delimit == NULL || !delimit()) {
+    ParseRule* infixRule = getInfixableRule(cmp, parser.current);
 
-    if (infixRule == NULL) {
+    if (precedence > infixRule->leftPrec) break;
+
+    advance(cmp);
+
+    if (infixRule->infix == NULL) {
       error(cmp, "Expect expression.");
       return;
     }
 
-    infixRule(cmp, canAssign);
+    infixRule->infix(cmp, canAssign);
   }
 
   if (canAssign && match(cmp, TOKEN_EQUAL)) {

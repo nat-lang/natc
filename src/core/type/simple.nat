@@ -188,7 +188,7 @@ let void = TVoid();
 let bool = TBoolean();
 let num = TNumber();
 let string = TString();
-let infix(8) -> = TFunction;
+let infixr(8) -> = TFunction;
 
 class SimpleTypeSystem {
   // Map vm types to object language types.

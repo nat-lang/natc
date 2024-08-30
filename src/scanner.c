@@ -136,12 +136,15 @@ static TokenType checkpointKeyword(int start, int length, const char *rest,
 }
 
 static TokenType identifierType() {
-  switch (scanner.start[0]) {
+#define START scanner.start
+#define CURRENT scanner.current
+
+  switch (START[0]) {
     case 'a':
       return checkpointKeyword(1, 2, "nd", TOKEN_AND);
     case 'c': {
-      if (scanner.current - scanner.start > 1) {
-        switch (scanner.start[1]) {
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
           case 'o':
             return checkpointKeyword(2, 3, "nst", TOKEN_CONST);
           case 'l':
@@ -153,8 +156,8 @@ static TokenType identifierType() {
     case 'd':
       return checkpointKeyword(1, 2, "om", TOKEN_DOM);
     case 'e':
-      if (scanner.current - scanner.start > 1) {
-        switch (scanner.start[1]) {
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
           case 'l':
             return checkpointKeyword(2, 2, "se", TOKEN_ELSE);
           case 'x':
@@ -163,8 +166,8 @@ static TokenType identifierType() {
       }
       break;
     case 'f':
-      if (scanner.current - scanner.start > 1) {
-        switch (scanner.start[1]) {
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
           case 'a':
             return checkpointKeyword(2, 3, "lse", TOKEN_FALSE);
           case 'o':
@@ -173,17 +176,38 @@ static TokenType identifierType() {
       }
       break;
     case 'i':
-      if (scanner.current - scanner.start > 1) {
-        switch (scanner.start[1]) {
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
           case 'f':
             return checkpointKeyword(1, 1, "f", TOKEN_IF);
           case 'm':
             return checkpointKeyword(2, 4, "port", TOKEN_IMPORT);
           case 'n': {
-            if (scanner.current - scanner.start > 2) {
-              switch (scanner.start[2]) {
-                case 'f':
-                  return checkpointKeyword(3, 2, "ix", TOKEN_INFIX);
+            if (CURRENT - START > 2) {
+              switch (START[2]) {
+                case 'f': {
+                  if (CURRENT - START > 3) {
+                    switch (START[3]) {
+                      case 'i': {
+                        if (CURRENT - START > 4) {
+                          switch (START[4]) {
+                            case 'x': {
+                              if (CURRENT - START > 5) {
+                                switch (START[5]) {
+                                  case 'l':
+                                    return TOKEN_INFIX_LEFT;
+                                  case 'r':
+                                    return TOKEN_INFIX_RIGHT;
+                                }
+                              }
+                              return TOKEN_INFIX;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
             return checkpointKeyword(1, 1, "n", TOKEN_IN);
@@ -204,11 +228,11 @@ static TokenType identifierType() {
     case 's':
       return checkpointKeyword(1, 4, "uper", TOKEN_SUPER);
     case 't':
-      if (scanner.current - scanner.start > 1) {
-        switch (scanner.start[1]) {
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
           case 'h': {
-            if (scanner.current - scanner.start > 2) {
-              switch (scanner.start[2]) {
+            if (CURRENT - START > 2) {
+              switch (START[2]) {
                 case 'i':
                   return checkpointKeyword(2, 2, "is", TOKEN_THIS);
                 case 'r':

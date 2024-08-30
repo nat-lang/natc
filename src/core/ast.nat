@@ -168,6 +168,7 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
+  str () => { return str(this.value); }
   resolve() => this.value;
   __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
 }
