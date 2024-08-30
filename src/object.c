@@ -72,6 +72,7 @@ ObjOverload* newOverload(int cases) {
   ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
   overload->closures = closures;
   overload->cases = cases;
+  initMap(&overload->fields);
   return overload;
 }
 

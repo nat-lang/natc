@@ -565,16 +565,28 @@ void vmSign(CallFrame* frame) {
 
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
+  int arity = 0;
   ObjOverload* overload = newOverload(cases);
 
   for (int i = cases; i > 0; i--) {
+    ObjClosure** closures = overload->closures;
+
     if (!IS_CLOSURE(vmPeek(i - 1))) {
       vmRuntimeError("Overload operand must be a function.");
       return false;
     }
 
-    overload->closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+    closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+
+    if (i < cases && closures[cases - i]->function->arity != arity) {
+      vmRuntimeError("Overload operands must have uniform arity.");
+      return false;
+    }
+
+    arity = closures[cases - i]->function->arity;
   }
+
+  mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
 
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
@@ -784,7 +796,15 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
+          case OBJ_OVERLOAD: {
+            ObjOverload* overload = AS_OVERLOAD(vmPeek(0));
 
+            mapGet(&overload->fields, name, &value);
+
+            vmPop();  // overload.
+            vmPush(value);
+            break;
+          }
           default:
             vmRuntimeError(ERROR);
             return INTERPRET_RUNTIME_ERROR;

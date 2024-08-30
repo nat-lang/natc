@@ -115,6 +115,7 @@ static void blackenObject(Obj* object) {
       ObjOverload* overload = (ObjOverload*)object;
       for (int i = 0; i < overload->cases; i++)
         markObject((Obj*)overload->closures[i]);
+      markMap(&overload->fields);
       break;
     }
     case OBJ_INSTANCE: {
@@ -192,6 +193,7 @@ static void freeObject(Obj* object) {
     }
     case OBJ_OVERLOAD: {
       ObjOverload* overload = (ObjOverload*)object;
+      freeMap(&overload->fields);
       FREE_ARRAY(ObjOverload*, overload->closures, overload->cases);
       FREE(ObjOverload, object);
       break;
