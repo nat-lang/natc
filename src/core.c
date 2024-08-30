@@ -469,7 +469,6 @@ InterpretResult initializeCore() {
   // core classes.
 
   InterpretResult coreIntpt = interpretFile(NAT_CORE_LOC);
-
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
   if ((vm.core.object = getGlobalClass(S_OBJECT)) == NULL) return false;
@@ -510,9 +509,15 @@ InterpretResult initializeCore() {
       (vm.core.oTypeBoundFunction = getGlobalClass(S_OTYPE_BOUND_FUNCTION)) ==
           NULL ||
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
-      (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
+      (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL)
+    return INTERPRET_RUNTIME_ERROR;
 
-      (vm.core.unify = vmGetGlobalClosure(S_UNIFY)) == NULL)
+  // system objects and functions.
+
+  InterpretResult systemIntpt = interpretFile(NAT_SYSTEM_LOC);
+  if (systemIntpt != INTERPRET_OK) return systemIntpt;
+
+  if ((vm.core.unify = vmGetGlobalClosure(S_UNIFY)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   return INTERPRET_OK;

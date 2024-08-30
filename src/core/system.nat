@@ -1,0 +1,8 @@
+
+// The vm relies on a handful of objects to do its job.
+// Instantiate them here. Note that this module must be
+// executed after the rest of the core modules.
+
+import src/core/type/system
+import src/core/unification
+import src/core/composition

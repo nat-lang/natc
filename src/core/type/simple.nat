@@ -72,13 +72,12 @@ class TFunction extends Type {
   __eq__(that) => this.domain == that.domain and this.range == that.range;
 
   str() => {
-    let domain = this.domain.str(), range = this.range.str();
+    let domain = this.domain.str(),
+        range = this.range.str();
 
     if (this.domain is TFunction)
       domain = "(" + domain + ")";
-    if (this.range is TFunction)
-      range = "(" + range + ")";
-    
+
     return domain + " -> " + range;
   }
   fvs() => this.domain.fvs().union(this.range.fvs());
