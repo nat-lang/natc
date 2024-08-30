@@ -21,6 +21,14 @@ class CompositionSystem {
     this.typeShifters = typeShifters;
   }
 
+  addRule(rule) => {
+    let add = (rule: (x,y) -> z) => this.binaryRules.add(rule)
+            | (rule: x -> y) => this.typeShifters.add(rule)
+            | (rule: SyntacticRule) => this.unaryRules.add(rule);
+
+    add(rule);
+  }
+
   // Map a Tree into a TypedTree.
   type(node: Tree) => {
     if (node.leaf())
