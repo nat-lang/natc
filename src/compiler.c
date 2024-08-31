@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "debug.h"
+#include "io.h"
 #include "vm.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -306,6 +308,7 @@ static void emitDefaultReturn(Compiler* cmp) {
     emitByte(cmp, OP_NIL);
   emitByte(cmp, OP_IMPLICIT_RETURN);
 }
+
 #if defined(DEBUG_PRINT_CODE)
 #define DEBUG_CHUNK()                                                        \
   if (!parser.hadError) {                                                    \
@@ -382,6 +385,7 @@ static void boundExpression(Compiler* cmp, Token name);
 static void typeExpression(Compiler* cmp);
 static void statement(Compiler* cmp);
 static void declaration(Compiler* cmp);
+static void declarations(Compiler* cmp);
 static void classDeclaration(Compiler* cmp);
 static ParseRule* getRule(Token token);
 static ParseRule* getInfixableRule(Compiler* cmp, Token token);
@@ -650,11 +654,6 @@ static void number(Compiler* cmp, bool canAssign) {
 static void string(Compiler* cmp, bool canAssign) {
   loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
                                        parser.previous.length - 2)));
-}
-
-static void bareString(Compiler* cmp) {
-  loadConstant(
-      cmp, OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 }
 
 static void undefined(Compiler* cmp, bool canAssign) {
@@ -1640,8 +1639,32 @@ static void importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
   advance(cmp);
-  bareString(cmp);
-  emitByte(cmp, OP_IMPORT);
+
+  ObjString* path = copyString(parser.previous.start, parser.previous.length);
+  ObjString* dir = intern(NAT_BASE_DIR);
+  vmPush(OBJ_VAL(dir));
+  ObjString* uri = concatenateStrings(dir, path);
+  vmPop();
+  vmPush(OBJ_VAL(uri));
+  char* source = readPath(uri->chars);
+
+  Parser cur = saveParser();
+
+  Scanner sc = initScanner(source);
+  initParser(sc);
+  Compiler modCmp;
+  initCompiler(&modCmp, cmp, NULL, TYPE_SCRIPT, syntheticToken(path->chars));
+
+  declarations(&modCmp);
+
+  ObjFunction* function = endCompiler(&modCmp);
+  emitConstInstr(cmp, OP_CLOSURE, makeConstant(cmp, OBJ_VAL(function)));
+
+  emitBytes(cmp, OP_CALL, 0);
+  emitByte(cmp, OP_POP);
+
+  vmPop();
+  gotoParser(cur);
 }
 
 static void printStatement(Compiler* cmp) {
@@ -1873,6 +1896,12 @@ static void parsePrecedence(Compiler* cmp, Precedence precedence) {
   parseDelimitedPrecedence(cmp, precedence, NULL);
 }
 
+static void declarations(Compiler* cmp) {
+  while (!match(cmp, TOKEN_EOF)) {
+    declaration(cmp);
+  }
+}
+
 ObjFunction* compile(Compiler* root, const char* source, char* path) {
   Scanner sc = initScanner(source);
   initParser(sc);
@@ -1880,9 +1909,7 @@ ObjFunction* compile(Compiler* root, const char* source, char* path) {
   Compiler cmp;
   initCompiler(&cmp, root, NULL, TYPE_SCRIPT, syntheticToken(path));
 
-  while (!match(&cmp, TOKEN_EOF)) {
-    declaration(&cmp);
-  }
+  declarations(&cmp);
 
   ObjFunction* function = endCompiler(&cmp);
 
