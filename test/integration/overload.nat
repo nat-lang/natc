@@ -7,22 +7,16 @@ assert(f(1));
 assert(f(2) == false);
 assert(f(3) == undefined);
 
-assert(f.arity == 1);
-
 let f = nil => true;
 
 assert(f(nil));
 assert(f(2) == undefined);
-
-assert(f.arity == 1);
 
 let f = nil => true | undefined => true | false => false;
 
 assert(f(nil));
 assert(f(undefined));
 assert(f(false) == false);
-
-assert(f.arity == 1);
 
 // overloads can dispatch on parenthesized literals.
 
@@ -31,16 +25,12 @@ let f = (true) => false | (false) => true;
 assert(f(true) == false);
 assert(f(false) == true);
 
-assert(f.arity == 1);
-
 // overloads can dispatch on multiple literals.
 
 let f = (0,1) => 2 | (1,0) => 3;
 
 assert(f(0,1) == 2);
 assert(f(1,0) == 3);
-
-assert(f.arity == 2);
 
 // overloads can dispatch on variables, which act as wild cards.
 
@@ -50,17 +40,15 @@ assert(f(1));
 assert(f(2) == false);
 assert(f(3) == 3);
 
-assert(f.arity == 1);
-
 let f = x => true | 1 => false;
 
 assert(f(1) == true);
-assert(f.arity == 1);
+// assert(f.arity == 1);
 
 let f = x => true | y => false;
 
 assert(f(1) == true);
-assert(f.arity == 1);
+// assert(f.arity == 1);
 
 // overloads can dispatch on multiple variables.
 
@@ -71,8 +59,6 @@ assert(f(1,0) == 1);
 assert(f(1,1) == 2);
 assert(f(2,1) == 3);
 
-assert(f.arity == 2);
-
 // overloads can return blocks.
 
 let f = 1 => { return true; } | 2 => { return false; }; 
@@ -80,8 +66,6 @@ let f = 1 => { return true; } | 2 => { return false; };
 assert(f(1) == true);
 assert(f(2) == false);
 assert(f(3) == undefined);
-
-assert(f.arity == 1);
 
 // overload signatures can mix literals and variables.
 
@@ -94,8 +78,6 @@ assert(f(2,3) == 3);
 assert(f(1,2) == 1);
 assert(f(2,2) == 2);
 assert(f(3,2) == 3);
-
-assert(f.arity == 2);
 
 // overloads can dispatch on type annotations.
 

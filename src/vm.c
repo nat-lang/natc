@@ -590,7 +590,7 @@ bool vmOverload(CallFrame* frame) {
     arity = closures[cases - i]->function->arity;
   }
 
-  mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
+  // mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
 
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
@@ -781,15 +781,6 @@ InterpretResult vmExecute(int baseFrame) {
             mapGet(&closure->function->fields, name, &value);
 
             vmPop();  // closure.
-            vmPush(value);
-            break;
-          }
-          case OBJ_OVERLOAD: {
-            ObjOverload* overload = AS_OVERLOAD(vmPeek(0));
-
-            mapGet(&overload->fields, name, &value);
-
-            vmPop();  // overload.
             vmPush(value);
             break;
           }

@@ -1646,7 +1646,6 @@ void importStatement(Compiler* cmp) {
   advance(cmp);
 
   ObjString* path = copyString(parser.previous.start, parser.previous.length);
-  makeConstant(cmp, OBJ_VAL(path));
   char* uri = pathToUri(path->chars);
 
   Parser checkpoint = saveParser();

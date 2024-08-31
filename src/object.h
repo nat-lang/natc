@@ -140,7 +140,7 @@ typedef struct {
   Obj obj;
   int cases;
   ObjClosure **closures;
-  ObjMap fields;
+  // ObjMap fields;
 } ObjOverload;
 
 typedef struct ObjClass {
