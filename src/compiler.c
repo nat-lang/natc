@@ -354,7 +354,7 @@ static void closeUpvalues(ObjFunction* function, Compiler* cmp,
   }
 }
 
-static void closeFunctionWithOp(Compiler* cmp, Compiler* enclosing, OpCode op) {
+static void closeFunction(Compiler* cmp, Compiler* enclosing, OpCode op) {
   ObjFunction* function = endCompiler(cmp);
 
   emitConstInstr(enclosing, op, makeConstant(enclosing, OBJ_VAL(function)));
@@ -362,18 +362,14 @@ static void closeFunctionWithOp(Compiler* cmp, Compiler* enclosing, OpCode op) {
   closeUpvalues(function, cmp, enclosing);
 }
 
-static void closeFunction(Compiler* cmp, Compiler* enclosing) {
-  closeFunctionWithOp(cmp, enclosing, OP_CLOSURE);
-}
-
 static void signFunction(Compiler* cmp, Compiler* sigCmp, Compiler* enclosing) {
   emitDefaultReturn(cmp);
   ObjFunction* function = cmp->function;
   emitConstInstr(enclosing, OP_CLOSURE,
                  makeConstant(enclosing, OBJ_VAL(function)));
-  closeUpvalues(function, cmp, enclosing);
 
-  closeFunctionWithOp(sigCmp, enclosing, OP_SIGN);
+  closeUpvalues(function, cmp, enclosing);
+  closeFunction(sigCmp, enclosing, OP_SIGN);
 
   DEBUG_CHUNK()
 }
@@ -917,7 +913,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 
   if (cmp.function->arity > 0) {
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing);
+    closeFunction(&cmp, enclosing, OP_CLOSURE);
     return true;
   }
 
@@ -1234,7 +1230,7 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
 
     // return the comprehension and call the closure immediately.
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing);
+    closeFunction(&cmp, enclosing, OP_CLOSURE);
 
     emitBytes(enclosing, OP_CALL, 0);
 
@@ -1635,36 +1631,30 @@ static void ifStatement(Compiler* cmp) {
   patchJump(cmp, elseJump);
 }
 
-static void importStatement(Compiler* cmp) {
+void _importStatement(Compiler* cmp) {
+  advanceSlashedIdentifier(cmp);
+  consumeIdentifier(cmp, "Expect path to import.");
+  advance(cmp);
+  loadConstant(
+      cmp, OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
+  emitByte(cmp, OP_IMPORT);
+}
+
+void importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
   advance(cmp);
 
   ObjString* path = copyString(parser.previous.start, parser.previous.length);
-  ObjString* dir = intern(NAT_BASE_DIR);
-  vmPush(OBJ_VAL(dir));
-  ObjString* uri = concatenateStrings(dir, path);
-  vmPop();
-  vmPush(OBJ_VAL(uri));
-  char* source = readPath(uri->chars);
+  makeConstant(cmp, OBJ_VAL(path));
+  char* uri = pathToUri(path->chars);
 
-  Parser cur = saveParser();
+  Parser checkpoint = saveParser();
 
-  Scanner sc = initScanner(source);
-  initParser(sc);
-  Compiler modCmp;
-  initCompiler(&modCmp, cmp, NULL, TYPE_SCRIPT, syntheticToken(path->chars));
+  ObjModule* module = vmCompileModule(uri);
+  emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
 
-  declarations(&modCmp);
-
-  ObjFunction* function = endCompiler(&modCmp);
-  emitConstInstr(cmp, OP_CLOSURE, makeConstant(cmp, OBJ_VAL(function)));
-
-  emitBytes(cmp, OP_CALL, 0);
-  emitByte(cmp, OP_POP);
-
-  vmPop();
-  gotoParser(cur);
+  gotoParser(checkpoint);
 }
 
 static void printStatement(Compiler* cmp) {
@@ -1674,7 +1664,7 @@ static void printStatement(Compiler* cmp) {
 }
 
 static void returnStatement(Compiler* cmp) {
-  if (cmp->functionType == TYPE_SCRIPT) {
+  if (cmp->functionType == TYPE_MODULE) {
     error(cmp, "Can't return from top-level code.");
   }
   if (cmp->functionType == TYPE_INITIALIZER) {
@@ -1897,17 +1887,15 @@ static void parsePrecedence(Compiler* cmp, Precedence precedence) {
 }
 
 static void declarations(Compiler* cmp) {
-  while (!match(cmp, TOKEN_EOF)) {
-    declaration(cmp);
-  }
+  while (!match(cmp, TOKEN_EOF)) declaration(cmp);
 }
 
-ObjFunction* compile(Compiler* root, const char* source, char* path) {
+ObjFunction* compileFunction(Compiler* root, const char* source, char* path) {
   Scanner sc = initScanner(source);
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, root, NULL, TYPE_SCRIPT, syntheticToken(path));
+  initCompiler(&cmp, root, NULL, TYPE_MODULE, syntheticToken(path));
 
   declarations(&cmp);
 

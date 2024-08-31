@@ -15,6 +15,14 @@ char* qualifyPath(const char* path) {
   return buf;
 }
 
+char* pathToUri(const char* path) {
+  static char buf[256];
+
+  snprintf(buf, sizeof(buf), "%s%s", NAT_BASE_DIR, path);
+
+  return buf;
+}
+
 char* readFile(const char* path) {
   FILE* file = fopen(path, "rb");
   if (file == NULL) {
@@ -44,19 +52,8 @@ char* readFile(const char* path) {
   return buffer;
 }
 
-char* readPath(const char* path) {
+char* readSource(const char* path) {
   char* qualifiedPath = qualifyPath(path);
   char* source = readFile(qualifiedPath);
   return source;
-}
-
-// Load, compile, and execute module at [path].
-InterpretResult interpretFile(const char* path) {
-  char* qualifiedPath = qualifyPath(path);
-  char* source = readFile(qualifiedPath);
-
-  InterpretResult result = vmInterpret((char*)path, source);
-  free(source);
-
-  return result;
 }

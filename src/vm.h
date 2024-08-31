@@ -110,8 +110,8 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
-InterpretResult vmInterpretImport(char* path, const char* source);
-InterpretResult vmInterpret(char* path, const char* source);
+InterpretResult vmInterpretModule(char* path);
+ObjModule* vmCompileModule(char* path);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();

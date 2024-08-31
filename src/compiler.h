@@ -23,7 +23,7 @@ typedef enum {
   TYPE_IMPLICIT,
   TYPE_BOUND,
   TYPE_METHOD,
-  TYPE_SCRIPT,
+  TYPE_MODULE,
   TYPE_INITIALIZER,
 } FunctionType;
 
@@ -67,7 +67,7 @@ typedef enum {
   PREC_PRIMARY
 } Precedence;
 
-ObjFunction* compile(Compiler* root, const char* source, char* path);
+ObjFunction* compileFunction(Compiler* root, const char* source, char* path);
 void markCompilerRoots(Compiler* cmp);
 
 #endif

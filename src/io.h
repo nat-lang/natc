@@ -3,7 +3,7 @@
 
 #include "vm.h"
 
-char* readPath(const char* path);
-InterpretResult interpretFile(const char* path);
+char* readSource(const char* path);
+char* pathToUri(char* path);
 
 #endif

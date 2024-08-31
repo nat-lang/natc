@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ast.h"
@@ -1104,25 +1105,14 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_IMPORT: {
-        Value path = vmPop();
-        if (!IS_STRING(path)) {
-          vmRuntimeError("Import path must be a string.");
+        ObjModule* module = AS_MODULE(READ_CONSTANT());
+        vmPush(OBJ_VAL(module));
+
+        if (!call(module->closure, 0) ||
+            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
           return INTERPRET_RUNTIME_ERROR;
-        }
+        frame = &vm.frames[vm.frameCount - 1];
 
-        ObjString* baseDir = intern(NAT_BASE_DIR);
-        vmPush(OBJ_VAL(baseDir));
-        ObjString* importLoc = concatenateStrings(baseDir, AS_STRING(path));
-        vmPop();
-        vmPush(OBJ_VAL(importLoc));
-        InterpretResult result = interpretFile(importLoc->chars);
-
-        if (result != INTERPRET_OK) return result;
-        // pop the return value of the module's function.
-        // if/when import statements become selective, this'll
-        // probably stick around.
-        vmPop();
-        vmPop();  // pop the imported module's name.
         break;
       }
       case OP_THROW: {
@@ -1298,16 +1288,45 @@ InterpretResult vmExecute(int baseFrame) {
   }
 }
 
-InterpretResult vmInterpret(char* path, const char* source) {
-  ObjFunction* function = compile(vm.compiler, source, path);
+ObjClosure* vmCompileClosure(char* path, char* source) {
+  ObjFunction* function = compileFunction(vm.compiler, source, path);
 
-  if (function == NULL) return INTERPRET_COMPILE_ERROR;
+  if (function == NULL) return NULL;
 
   vmPush(OBJ_VAL(function));
   ObjClosure* closure = newClosure(function);
-  vmPop();
+  vmPop();  // function.
+
+  return closure;
+}
+
+ObjModule* vmCompileModule(char* path) {
+  char* source = readSource(path);
+
+  ObjString* objSource = intern(source);
+  vmPush(OBJ_VAL(objSource));
+
+  free(source);
+
+  ObjClosure* closure = vmCompileClosure(path, objSource->chars);
+  if (closure == NULL) return NULL;
+
   vmPush(OBJ_VAL(closure));
-  call(closure, 0);
+  ObjModule* module = newModule(closure, objSource);
+
+  vmPop();  // objSource.
+  vmPop();  // closure.
+
+  return module;
+}
+
+InterpretResult vmInterpretModule(char* path) {
+  ObjModule* module = vmCompileModule(path);
+
+  if (module == NULL) return INTERPRET_COMPILE_ERROR;
+
+  vmPush(OBJ_VAL(module));
+  call(module->closure, 0);
 
   return vmExecute(vm.frameCount - 1);
 }

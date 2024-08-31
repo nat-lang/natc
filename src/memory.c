@@ -156,6 +156,13 @@ static void blackenObject(Obj* object) {
       markValue(spread->value);
       break;
     }
+    case OBJ_MODULE: {
+      ObjModule* module = (ObjModule*)object;
+      // markObject((Obj*)module->path);
+      markObject((Obj*)module->source);
+      markObject((Obj*)module->closure);
+      break;
+    }
   }
 }
 
@@ -191,6 +198,12 @@ static void freeObject(Obj* object) {
       FREE(ObjFunction, object);
       break;
     }
+    case OBJ_INSTANCE: {
+      ObjInstance* instance = (ObjInstance*)object;
+      freeMap(&instance->fields);
+      FREE(ObjInstance, object);
+      break;
+    }
     case OBJ_OVERLOAD: {
       ObjOverload* overload = (ObjOverload*)object;
       freeMap(&overload->fields);
@@ -198,41 +211,38 @@ static void freeObject(Obj* object) {
       FREE(ObjOverload, object);
       break;
     }
-    case OBJ_VARIABLE: {
-      FREE(ObjVariable, object);
-      break;
-    }
-    case OBJ_INSTANCE: {
-      ObjInstance* instance = (ObjInstance*)object;
-      freeMap(&instance->fields);
-      FREE(ObjInstance, object);
-      break;
-    }
-    case OBJ_NATIVE:
-      FREE(ObjNative, object);
-      break;
     case OBJ_MAP: {
       ObjMap* map = (ObjMap*)object;
       freeMap(map);
       break;
     }
+    case OBJ_MODULE:
+      FREE(ObjModule, object);
+      break;
+    case OBJ_NATIVE:
+      FREE(ObjNative, object);
+      break;
     case OBJ_STRING: {
       ObjString* string = (ObjString*)object;
       FREE_ARRAY(char, string->chars, string->length + 1);
       FREE(ObjString, object);
       break;
     }
-    case OBJ_UPVALUE:
-      FREE(ObjUpvalue, object);
-      break;
     case OBJ_SEQUENCE: {
       ObjSequence* seq = (ObjSequence*)object;
       freeValueArray(&seq->values);
-      FREE(ObjSequence, seq);
+      FREE(ObjSequence, object);
       break;
     }
     case OBJ_SPREAD: {
       FREE(ObjSpread, object);
+      break;
+    }
+    case OBJ_UPVALUE:
+      FREE(ObjUpvalue, object);
+      break;
+    case OBJ_VARIABLE: {
+      FREE(ObjVariable, object);
       break;
     }
   }
