@@ -221,6 +221,7 @@ assert(f.children == [
   ASTConditional(
     ASTLiteral(true),
     ASTBlock(
+      f,
       ASTReturn(
         ASTLiteral(false)
       )
@@ -243,6 +244,7 @@ assert(f.children == [
   ASTConditional(
     ASTLiteral(true),
     ASTBlock(
+      f,
       ASTReturn(
         ASTLiteral(true)
       ),
@@ -273,6 +275,7 @@ assert(f.children == [
   ASTConditional(
     ASTLiteral(true),
     ASTBlock(
+      f,
       ASTExprStatement(
         ASTLiteral(1)
       ),
@@ -304,6 +307,7 @@ assert(f.children == [
   ASTConditional(
     ASTLiteral(true),
     ASTBlock(
+      f,
       ASTExprStatement(
         ASTLiteral(1)
       ),
@@ -331,6 +335,7 @@ assert(f.children == [
   ASTConditional(
     ASTLiteral(true),
     ASTBlock(
+      f,
       ASTExprStatement(
         ASTLiteral(1)
       ),
@@ -559,6 +564,60 @@ assert(m_up is ASTExternalUpvalue);
 assert(dot.resolve() == compose);
 assert(k_up.resolve() == undefined);
 assert(m_up.resolve() == m);
+
+// upvalues in conditional branches.
+
+let f <- up x => x and up;
+
+assert(f is ASTClosure);
+
+let g = f[0][0];
+
+assert(g.children == [
+  ASTConditional(
+    ASTLocal(1),
+    ASTBlock(
+      g,
+      ASTReturn(
+        // dummy params: the values change run to run
+        // and we're interested in the structure.
+        ASTInternalUpvalue(undefined,undefined,undefined)
+      )
+    )
+  ),
+  ASTReturn(
+    ASTLocal(1)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+]);
+
+let f = (() => {
+  let up = false;
+  let g <- x => x and up;
+  return g;
+})();
+
+assert(f is ASTClosure);
+
+assert(f.children == [
+  ASTConditional(
+    ASTLocal(1),
+    ASTBlock(
+      f,
+      ASTReturn(
+        ASTExternalUpvalue(undefined,undefined,undefined)
+      )
+    )
+  ),
+  ASTReturn(
+    ASTLocal(1)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+]);
 
 // overloaded functions.
 
