@@ -159,7 +159,7 @@ static void blackenObject(Obj* object) {
     case OBJ_MODULE: {
       ObjModule* module = (ObjModule*)object;
       // markObject((Obj*)module->path);
-      markObject((Obj*)module->source);
+      // markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
       break;
     }
@@ -263,6 +263,7 @@ static void markRoots() {
   markMap(&vm.globals);
   markMap(&vm.infixes);
 
+  markObject((Obj*)vm.core.sBaseDir);
   markObject((Obj*)vm.core.sName);
   markObject((Obj*)vm.core.sArity);
   markObject((Obj*)vm.core.sPatterned);

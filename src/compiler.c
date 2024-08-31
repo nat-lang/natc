@@ -1631,7 +1631,7 @@ static void ifStatement(Compiler* cmp) {
   patchJump(cmp, elseJump);
 }
 
-void _importStatement(Compiler* cmp) {
+static void importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
   advance(cmp);
@@ -1640,18 +1640,19 @@ void _importStatement(Compiler* cmp) {
   emitByte(cmp, OP_IMPORT);
 }
 
-void importStatement(Compiler* cmp) {
+void _importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
   advance(cmp);
 
   ObjString* path = copyString(parser.previous.start, parser.previous.length);
   makeConstant(cmp, OBJ_VAL(path));
-  char* uri = pathToUri(path->chars);
+  ObjString* uri = concatenateStrings(vm.core.sBaseDir, path);
+  makeConstant(cmp, OBJ_VAL(uri));
 
   Parser checkpoint = saveParser();
 
-  ObjModule* module = vmCompileModule(uri);
+  ObjModule* module = vmCompileModule(uri->chars);
   emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
 
   gotoParser(checkpoint);

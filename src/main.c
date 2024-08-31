@@ -26,7 +26,7 @@ static void repl() {
 InterpretResult interpretSource(const char* path, const char* source) {
   if (!initVM()) exit(2);
 
-  InterpretResult result = vmInterpretModule((char*)path);
+  InterpretResult result = interpretFile((char*)path);
 
   return result;
 }
@@ -37,7 +37,7 @@ int main(int argc, const char* argv[]) {
   if (argc == 1) {
     repl();
   } else if (argc == 2) {
-    InterpretResult result = vmInterpretModule((char*)argv[1]);
+    InterpretResult result = interpretFile((char*)argv[1]);
 
     if (result == INTERPRET_COMPILE_ERROR) exit(65);
     if (result == INTERPRET_RUNTIME_ERROR) exit(70);

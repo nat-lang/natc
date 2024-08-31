@@ -193,8 +193,7 @@ ObjFunction *newFunction();
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
-ObjModule *newModule(
-    /*ObjString *path,*/ ObjClosure *closure, ObjString *source);
+ObjModule *newModule(ObjClosure *closure);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();

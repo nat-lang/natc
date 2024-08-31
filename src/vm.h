@@ -23,6 +23,7 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjString* sBaseDir;
   ObjString* sName;
   ObjString* sArity;
   ObjString* sPatterned;
@@ -110,6 +111,7 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
+InterpretResult vmInterpret(char* path, const char* source);
 InterpretResult vmInterpretModule(char* path);
 ObjModule* vmCompileModule(char* path);
 InterpretResult vmExecute(int baseFrame);

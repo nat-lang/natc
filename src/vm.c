@@ -46,6 +46,7 @@ void vmRuntimeError(const char* format, ...) {
 }
 
 void initCore(Core* core) {
+  core->sBaseDir = NULL;
   core->sName = NULL;
   core->sArity = NULL;
   core->sPatterned = NULL;
@@ -53,6 +54,7 @@ void initCore(Core* core) {
   core->sValues = NULL;
   core->sSignature = NULL;
 
+  core->sBaseDir = intern(NAT_BASE_DIR);
   core->sName = intern("name");
   core->sArity = intern("arity");
   core->sPatterned = intern("patterned");
@@ -1104,6 +1106,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         break;
       }
+      /*
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         vmPush(OBJ_VAL(module));
@@ -1113,6 +1116,29 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        break;
+      }
+      */
+      case OP_IMPORT: {
+        Value path = vmPop();
+        if (!IS_STRING(path)) {
+          vmRuntimeError("Import path must be a string.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjString* baseDir = intern(NAT_BASE_DIR);
+        vmPush(OBJ_VAL(baseDir));
+        ObjString* importLoc = concatenateStrings(baseDir, AS_STRING(path));
+        vmPop();
+        vmPush(OBJ_VAL(importLoc));
+        InterpretResult result = interpretFile(importLoc->chars);
+
+        if (result != INTERPRET_OK) return result;
+        // pop the return value of the module's function.
+        // if/when import statements become selective, this'll
+        // probably stick around.
+        vmPop();
+        vmPop();  // pop the imported module's name.
         break;
       }
       case OP_THROW: {
@@ -1302,31 +1328,52 @@ ObjClosure* vmCompileClosure(char* path, char* source) {
 
 ObjModule* vmCompileModule(char* path) {
   char* source = readSource(path);
-
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
-
   free(source);
 
-  ObjClosure* closure = vmCompileClosure(path, objSource->chars);
+  ObjFunction* function = compileFunction(vm.compiler, objSource->chars, path);
+  if (function == NULL) return NULL;
+  vmPush(OBJ_VAL(function));
+
+  ObjClosure* closure = newClosure(function);
   if (closure == NULL) return NULL;
 
   vmPush(OBJ_VAL(closure));
-  ObjModule* module = newModule(closure, objSource);
+  ObjModule* module = newModule(closure);
 
-  vmPop();  // objSource.
   vmPop();  // closure.
+  vmPop();  // function.
+  // vmPop();  // objSource.
 
   return module;
 }
 
 InterpretResult vmInterpretModule(char* path) {
   ObjModule* module = vmCompileModule(path);
-
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
-
   vmPush(OBJ_VAL(module));
+
+  // vmPush(OBJ_VAL(module->closure));
   call(module->closure, 0);
+
+  int code = vmExecute(vm.frameCount - 1);
+
+  // vmPop();
+
+  return code;
+}
+
+InterpretResult vmInterpret(char* path, const char* source) {
+  ObjFunction* function = compileFunction(vm.compiler, source, path);
+
+  if (function == NULL) return INTERPRET_COMPILE_ERROR;
+
+  vmPush(OBJ_VAL(function));
+  ObjClosure* closure = newClosure(function);
+  vmPop();
+  vmPush(OBJ_VAL(closure));
+  call(closure, 0);
 
   return vmExecute(vm.frameCount - 1);
 }

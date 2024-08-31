@@ -57,3 +57,14 @@ char* readSource(const char* path) {
   char* source = readFile(qualifiedPath);
   return source;
 }
+
+// Load, compile, and execute module at [path].
+InterpretResult interpretFile(const char* path) {
+  char* qualifiedPath = qualifyPath(path);
+  char* source = readFile(qualifiedPath);
+
+  InterpretResult result = vmInterpret((char*)path, source);
+  free(source);
+
+  return result;
+}

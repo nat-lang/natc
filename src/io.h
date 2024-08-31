@@ -5,5 +5,5 @@
 
 char* readSource(const char* path);
 char* pathToUri(char* path);
-
+InterpretResult interpretFile(const char* path);
 #endif
