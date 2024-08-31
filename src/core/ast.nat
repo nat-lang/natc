@@ -70,7 +70,7 @@ class ASTNode extends Tree {
   opEqual(left, right) => ASTEquality(left, right);
   opSequence(seq) => ASTSequence(..Sequence.fromRaw(seq));
   opGetGlobal(name) => ASTGlobal(name);
-  opGetUpvalue(address, localSlot, upvalue) => this.upvalues[address];
+  opGetUpvalue(address) => this.upvalues[address];
   opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
   opVariable(var) => ASTPatternVariable(var);
@@ -113,18 +113,6 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
-  opJump(over) => {
-    let node = ASTJump(over);
-    this.children.push(node);
-  }
-
-  opJumpIfFalse(condition, over) => {
-    // print condition;
-    // print over;
-    let node = ASTJumpIfFalse(condition, over);
-    this.children.push(node);
-  }
-
   opConditional(condition, consequence) => {
     let node = ASTConditional(condition, consequence);
     this.children.push(node);
@@ -144,17 +132,12 @@ class ASTReturn extends ASTStatement {}
 class ASTImplicitReturn extends ASTReturn {}
 class ASTExprStatement extends ASTStatement {}
 
-class ASTBlock extends ASTNode {}
-
-class ASTJump extends ASTStatement {
-  init(over) => {
-    this.children = [over];
+class ASTBlock extends ASTNode {
+  init(enclosing: ASTClosure, *children) => {
+    this.enclosing = enclosing;
+    this.children = children;
   }
-}
-class ASTJumpIfFalse extends ASTStatement {
-  init(condition, over) => {
-    this.children = [condition, over];
-  }
+  opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
 }
 
 class ASTConditional extends ASTStatement {
@@ -168,7 +151,7 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
-  str () => { return str(this.value); }
+  str() => { return str(this.value); }
   resolve() => this.value;
   __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
 }
@@ -205,7 +188,9 @@ class ASTVariable extends ASTExpr {
   }
 }
 
-class ASTLocal extends ASTVariable {}
+class ASTLocal extends ASTVariable {
+  str() => { return "ASTLocal(" + str(this.id) + ")"; }
+}
 class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
 }
