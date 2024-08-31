@@ -590,10 +590,9 @@ bool vmOverload(CallFrame* frame) {
     arity = closures[cases - i]->function->arity;
   }
 
-  mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
-
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
+  mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
   return true;
 }
 
