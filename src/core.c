@@ -53,20 +53,42 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
+bool getGlobalObj(char* name, Value* obj, ObjType type) {
+  if (!mapGet(&vm.globals, INTERN(name), obj)) {
+    vmRuntimeError("Couldn't find global '%s'.", name);
+    return NULL;
+  }
+
+  if (!IS_OBJ(*obj)) {
+    vmRuntimeError("Global is not an object.");
+    return false;
+  }
+
+  if (OBJ_TYPE(*obj) != type) {
+    vmRuntimeError("Global has wrong type. Expected '%i' but got '%i.", type,
+                   obj->vType);
+    return false;
+  }
+
+  return true;
+}
+
 ObjClass* getGlobalClass(char* name) {
   Value obj;
+  if (getGlobalObj(name, &obj, OBJ_CLASS)) return AS_CLASS(obj);
+  return NULL;
+}
 
-  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
-    vmRuntimeError("Couldn't find class '%s'.", name);
-    return NULL;
-  }
+ObjInstance* getGlobalInstance(char* name) {
+  Value obj;
+  if (getGlobalObj(name, &obj, OBJ_INSTANCE)) return AS_INSTANCE(obj);
+  return NULL;
+}
 
-  if (!IS_CLASS(obj)) {
-    vmRuntimeError("Not a class: '%s'.", name);
-    return NULL;
-  }
-
-  return AS_CLASS(obj);
+ObjClosure* getGlobalClosure(char* name) {
+  Value obj;
+  if (getGlobalObj(name, &obj, OBJ_CLOSURE)) return AS_CLOSURE(obj);
+  return NULL;
 }
 
 ObjSequence* __sequentialInit__(int argCount) {
@@ -517,7 +539,9 @@ InterpretResult initializeCore() {
   InterpretResult systemIntpt = interpretFile(NAT_SYSTEM_LOC);
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
-  if ((vm.core.unify = vmGetGlobalClosure(S_UNIFY)) == NULL)
+  if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||
+      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL ||
+      (vm.core.grammar = getGlobalInstance(S_GRAMMAR)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   return INTERPRET_OK;

@@ -57,7 +57,14 @@ class CompositionSystem {
   }
 
   interpret(node: Tree) => this.type(node).data;
-  typecheck(node: Tree) => this.type(node).type != nil;
+  typecheck(node: Tree) => {
+    if (this.type(node).type == nil)
+      throw TypeError();
+  }
+  typefail(node: Tree) => {
+    if (this.type(node).type != nil)
+      throw TypeError();
+  }
 }
 
 // The global [Grammar] object.

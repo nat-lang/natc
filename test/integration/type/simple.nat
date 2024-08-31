@@ -250,23 +250,23 @@ typefail(() => {
 
 // negation.
 
-let check = SimpleTypeSystem.typecheck(() => !true);
-assert(check.success());
+let _check = SimpleTypeSystem.typecheck(() => !true);
+assert(_check.success());
 
-let check = SimpleTypeSystem.typecheck(() => !false);
-assert(check.success());
+let _check = SimpleTypeSystem.typecheck(() => !false);
+assert(_check.success());
 
-let check = SimpleTypeSystem.typecheck(() => !1);
-assert(check.failure());
+let _check = SimpleTypeSystem.typecheck(() => !1);
+assert(_check.failure());
 
-let check = SimpleTypeSystem.typecheck(() => !"string");
-assert(check.failure());
+let _check = SimpleTypeSystem.typecheck(() => !"string");
+assert(_check.failure());
 
-let check = SimpleTypeSystem.typecheck(() => !nil);
-assert(check.failure());
+let _check = SimpleTypeSystem.typecheck(() => !nil);
+assert(_check.failure());
 
-let check = SimpleTypeSystem.typecheck(() => !undefined);
-assert(check.failure());
+let _check = SimpleTypeSystem.typecheck(() => !undefined);
+assert(_check.failure());
 
 // classes.
 // --------------------------------------------

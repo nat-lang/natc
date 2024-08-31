@@ -705,13 +705,6 @@ static int nativePostfix(Compiler* cmp, char* name, int argCount) {
   return address;
 }
 
-static void methodCall(Compiler* cmp, char* name, int argCount) {
-  Value method = INTERN(name);
-  uint16_t constant = makeConstant(cmp, method);
-  emitConstInstr(cmp, OP_GET_PROPERTY, constant);
-  emitBytes(cmp, OP_CALL, argCount);
-}
-
 static void variable(Compiler* cmp, bool canAssign) {
   if (parser.previous.type == TOKEN_TYPE_VARIABLE &&
       cmp->functionType == TYPE_IMPLICIT) {
@@ -1117,7 +1110,8 @@ static Iterator iterator(Compiler* cmp) {
 static int iterationNext(Compiler* cmp, Iterator iter) {
   // more().
   emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  methodCall(cmp, "more", 0);
+  getProperty(cmp, "more");
+  emitBytes(cmp, OP_CALL, 0);
 
   // jump out of the loop if more() false.
   int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
@@ -1126,7 +1120,8 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
 
   // next().
   emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  methodCall(cmp, "next", 0);
+  getProperty(cmp, "next");
+  emitBytes(cmp, OP_CALL, 0);
   emitConstInstr(cmp, OP_SET_LOCAL, iter.var);
   emitByte(cmp, OP_POP);
 

@@ -117,52 +117,52 @@ Grammar.addRules(
 // examples.
 
 let ex0 = [Agnetha smiled];
-assert(Grammar.typecheck(ex0));
+Grammar.typecheck(ex0);
 
 let ex1 = [Agnetha [loves Bjorn]];
-assert(Grammar.typecheck(ex1));
+Grammar.typecheck(ex1);
 
 let ex2 = [Benny [[introduced Agnetha] [to Bjorn]]];
-assert(Grammar.typecheck(ex2));
+Grammar.typecheck(ex2);
 
 let ex3 = [Carlos [self1 shaves]];
-assert(Grammar.typecheck(ex3));
+Grammar.typecheck(ex3);
 
 let ex4 = [Carlos [[self2 introduced] Paco]];
-assert(Grammar.typecheck(ex4));
+Grammar.typecheck(ex4);
 
 let ex5 = [Carlos [[self3 introduced] Paco]];
-assert(Grammar.typecheck(ex5));
+Grammar.typecheck(ex5);
 
 let ex6 = [Bjorn [is' kind]];
-assert(Grammar.typecheck(ex6));
+Grammar.typecheck(ex6);
 
 let ex7 = [Frida [is' [with Benny]]];
-assert(Grammar.typecheck(ex7));
+Grammar.typecheck(ex7);
 
 let ex8 = [Benny [is' [proud [of Frida]]]];
-assert(Grammar.typecheck(ex8));
+Grammar.typecheck(ex8);
 
 let ex9 = [Agnetha [is' [a singer]]];
-assert(Grammar.typecheck(ex9));
+Grammar.typecheck(ex9);
 
 let ex10 = [Frida [is' [a [norwegian millionaire]]]];
-assert(!Grammar.typecheck(ex10));
+Grammar.typefail(ex10);
 
 let ex11 = [Bjorn [is' [not kind]]];
-assert(Grammar.typecheck(ex11));
+Grammar.typecheck(ex11);
 
 let ex12 = [[every singer] smiled];
-assert(Grammar.typecheck(ex12));
+Grammar.typecheck(ex12);
 
 let ex13 = [[a singer] smiled];
-assert(!Grammar.typecheck(ex13));
+Grammar.typefail(ex13);
 
 let ex14 = [everybody snores];
-assert(Grammar.typecheck(ex14));
+Grammar.typecheck(ex14);
 
 let ex15 = [somebody [hugged Ariel]];
-assert(Grammar.typecheck(ex15));
+Grammar.typecheck(ex15);
 
 let ex16 = [everybody [is' [afraid [of Ariel]]]];
-assert(Grammar.typecheck(ex16));
+Grammar.typecheck(ex16);

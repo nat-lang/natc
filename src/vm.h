@@ -64,6 +64,8 @@ typedef struct {
   ObjClass* oTypeSequence;
 
   ObjClosure* unify;
+  ObjInstance* typeSystem;
+  ObjInstance* grammar;
 } Core;
 
 typedef struct {
@@ -128,7 +130,6 @@ void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
-ObjClosure* vmGetGlobalClosure(char* name);
 ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
 
 #endif

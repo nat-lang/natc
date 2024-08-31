@@ -89,7 +89,10 @@ void initCore(Core* core) {
   core->oTypeBoundFunction = NULL;
   core->oTypeOverload = NULL;
   core->oTypeSequence = NULL;
+
   core->unify = NULL;
+  core->typeSystem = NULL;
+  core->grammar = NULL;
 }
 
 bool initVM() {
@@ -635,22 +638,6 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
                 mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
   return true;
-}
-
-ObjClosure* vmGetGlobalClosure(char* name) {
-  Value obj;
-
-  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
-    vmRuntimeError("Couldn't find function '%s'.", name);
-    return NULL;
-  }
-
-  if (!IS_CLOSURE(obj)) {
-    vmRuntimeError("Not a closure: '%s'.", name);
-    return NULL;
-  }
-
-  return AS_CLOSURE(obj);
 }
 
 // Loop until we're back to [baseFrame] frames. Typically this
