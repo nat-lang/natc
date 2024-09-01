@@ -1642,7 +1642,8 @@ void importStatement(Compiler* cmp) {
   Parser checkpoint = saveParser();
 
   ObjModule* module = vmCompileModule(uri);
-  emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
+  if (module != NULL)
+    emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
 
   gotoParser(checkpoint);
 }
