@@ -4,9 +4,6 @@ class Tree extends Object {
   init(data, children) => {
     this.data = data;
     this.children = children;
-
-    this.depth = -1;
-    this.breadth = -1;
   }
 
   // Subscript access is to children.
@@ -26,9 +23,42 @@ class Tree extends Object {
     return seq;
   }
 
+  levels() => {
+    let node = this, queue = [], levels = [];
+
+    queue.push([node]);
+
+    while(len(queue) > 0) {
+      let level = queue.pop();
+  
+      levels.push(level);
+
+      let next = [];
+      for (x in level)
+        next.extend(x.children);
+      if (len(next) > 0)
+        queue.push(next);
+    }
+
+    return levels;
+  }
+
+  breadthFirst() => [x | level in this.levels(), x in level];
+
   leaf() => len(this.children) == 0;
   unary() => len(this.children) == 1;
   binary() => len(this.children) == 2;
+
+  left() => {
+    if (len(this.children) > 0)
+      return this[0];
+    return nil;
+  }
+  right () => {
+    if (len(this.children) > 1)
+      return this[1];
+    return nil;
+  }
 
   leaves() => {
     if (this.leaf()) return [this.data];
@@ -55,7 +85,7 @@ class Tree extends Object {
     let tree = fn(this);
 
     for (child in this.children)
-      tree.children.push(child.map(fn));
+      tree.children = [x.map(fn) | x in this.children];
 
     return tree;
   }
@@ -80,14 +110,21 @@ class Tree extends Object {
 
   collect(predicate) => [node | node in this, predicate(node)];
 
-  str() => str(this.__class__);
+  str() => str(this.data);
 
   _pp(depth) => {
     let indent = join([" " | _ in range(0, depth)], "");
     print indent + this.str();
     this.children.map(x => x._pp(depth + 1));
   }
-  pp() => this._pp(0);
+  pp() => {
+    let tidy = this.tidy();
+
+    tidy.position();
+    tidy.pp();
+  }
+
+  tidy() => TidyTree(this.data, this.children.map(c => c.tidy()));
 
   __eq__(that) => this.__class__ == that.__class__ and this.children == that.children;
 }
@@ -106,3 +143,176 @@ let Node = value => {
     return value;
   return LeafNode(value);
 };
+
+let minsep = 3;
+
+let abs = x => {
+  if (x < 0)
+    return x * -1;
+  return x;
+};
+
+class TidySentinel {
+  init() => {
+    this.offset = 0;
+    this.address = nil;
+    this.level = 0;
+  }
+}
+
+class TidyTree extends Tree {
+  // Reingold & Tilford's 1981 "Tidy Tree"
+  // https://ieeexplore.ieee.org/document/1702828.
+
+  init(data, children) => {
+    this.x = nil;
+    this.y = nil;
+    this.offset = 0;
+    this.thread = false;
+
+    super.init(data, children);
+  }
+
+  pp() => {
+    for (level in this.levels()) {
+      let x = 0, s = "";
+
+      for (child in level) {
+        s = s + indent(child.x - x) + str(child.data);
+        x = child.x;
+      }
+      print "";
+      print s;
+    }
+  }
+
+  position() => {
+    this.calcRelative(0, TidySentinel(), TidySentinel());
+    this.calcAbsolute(8);
+  }
+
+  calcAbsolute(xpos) => {
+    this.x = xpos;
+
+    if (this.thread) {
+      this.thread = false;
+      this.children = [];
+    }
+
+    this.left() and this.left().calcAbsolute(xpos - this.offset);
+    this.right() and this.right().calcAbsolute(xpos + this.offset);
+  }
+
+  calcRelative(level: num, lMost: TidyTree, rMost: TidyTree) => {
+    let left, right;
+    let cursep, rootsep, lOffSum, rOffSum;
+    let lr = TidySentinel(), ll = TidySentinel(), rr = TidySentinel(), rl = TidySentinel();
+
+    this.y = level;
+    left = this.left();
+    right = this.right();
+
+    left and left.calcRelative(level + 1, lr, ll);
+    right and right.calcRelative(level + 1, rr, rl);
+
+    if (this.leaf()) {
+      rMost.address = this;
+      rMost.level = level;
+      rMost.offset = 0;
+
+      lMost.address = this;
+      lMost.level = level;
+      lMost.offset = 0;
+
+      this.offset = 0;
+
+      return;
+    }
+
+    // not a leaf.
+
+    cursep = minsep;
+    rootsep = minsep;
+    lOffSum = 0;
+    rOffSum = 0;
+
+    while (left and right) {
+      if (cursep < minsep) {
+        rootsep = rootsep + (minsep - cursep);
+        cursep = minsep;
+      }
+
+      // advance left.
+
+      if (left.left()) {
+        lOffSum = lOffSum + left.offset;
+        cursep = cursep - left.offset;
+        left = left.right();
+      } else {
+        lOffSum = lOffSum - left.offset;
+        cursep = cursep + left.offset;
+        left = left.left();
+      }
+
+      // advance right.
+
+      if (right.left()) {
+        rOffSum = rOffSum - right.offset;
+        cursep = cursep - right.offset;
+        right = right.left();
+      } else {
+        rOffSum = rOffSum + right.offset;
+        cursep = cursep + right.offset;
+        right = right.right();
+      }
+    }
+
+    // set the root offset and add it to the left
+    // and right offsets.
+
+    this.offset = (rootsep + 1) / 2;
+    lOffSum = lOffSum - this.offset;
+    rOffSum = rOffSum + this.offset;
+
+    // update the tails.
+
+    if (rl.level > ll.level or !this.left()) {
+      lMost = rl;
+      lMost.offset = lMost.offset + this.offset;
+    } else {
+      lMost = ll;
+      lMost.offset = lMost.offset - this.offset;
+    }
+    
+    if (lr.level > rr.level or !this.right()) {
+      rMost = lr;
+      rMost.offset = rMost.offset - this.offset;
+    } else {
+      rMost = rr;
+      rMost.offset = rMost.offset + this.offset;
+    }
+
+    // if subtrees of root are of uneven heights,
+    // check if threading is necessary. at most one
+    // thread needs to be inserted.
+
+    if (left and left != this.left()) {
+      rr.address.thread = true;
+      rr.address.offset = abs(rr.offset + this.offset - lOffSum);
+
+      if (lOffSum - this.offset <= rr.offset)
+        rr.address[0] = left;
+      else
+        rr.address[1] = left;
+
+    } else if (right and right != this.right()) {
+      ll.address.thread = true;
+      ll.address.offset = abs(ll.offset - this.offset - rOffSum);
+
+      if (rOffSum + this.offset >= ll.offset)
+        ll.address[1] = right;
+      else
+        ll.address[0] = right;
+    }
+  }
+}
