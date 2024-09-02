@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "debug.h"
+#include "io.h"
 #include "vm.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -306,6 +308,7 @@ static void emitDefaultReturn(Compiler* cmp) {
     emitByte(cmp, OP_NIL);
   emitByte(cmp, OP_IMPLICIT_RETURN);
 }
+
 #if defined(DEBUG_PRINT_CODE)
 #define DEBUG_CHUNK()                                                        \
   if (!parser.hadError) {                                                    \
@@ -351,7 +354,7 @@ static void closeUpvalues(ObjFunction* function, Compiler* cmp,
   }
 }
 
-static void closeFunctionWithOp(Compiler* cmp, Compiler* enclosing, OpCode op) {
+static void closeFunction(Compiler* cmp, Compiler* enclosing, OpCode op) {
   ObjFunction* function = endCompiler(cmp);
 
   emitConstInstr(enclosing, op, makeConstant(enclosing, OBJ_VAL(function)));
@@ -359,18 +362,14 @@ static void closeFunctionWithOp(Compiler* cmp, Compiler* enclosing, OpCode op) {
   closeUpvalues(function, cmp, enclosing);
 }
 
-static void closeFunction(Compiler* cmp, Compiler* enclosing) {
-  closeFunctionWithOp(cmp, enclosing, OP_CLOSURE);
-}
-
 static void signFunction(Compiler* cmp, Compiler* sigCmp, Compiler* enclosing) {
   emitDefaultReturn(cmp);
   ObjFunction* function = cmp->function;
   emitConstInstr(enclosing, OP_CLOSURE,
                  makeConstant(enclosing, OBJ_VAL(function)));
-  closeUpvalues(function, cmp, enclosing);
 
-  closeFunctionWithOp(sigCmp, enclosing, OP_SIGN);
+  closeUpvalues(function, cmp, enclosing);
+  closeFunction(sigCmp, enclosing, OP_SIGN);
 
   DEBUG_CHUNK()
 }
@@ -382,6 +381,7 @@ static void boundExpression(Compiler* cmp, Token name);
 static void typeExpression(Compiler* cmp);
 static void statement(Compiler* cmp);
 static void declaration(Compiler* cmp);
+static void declarations(Compiler* cmp);
 static void classDeclaration(Compiler* cmp);
 static ParseRule* getRule(Token token);
 static ParseRule* getInfixableRule(Compiler* cmp, Token token);
@@ -652,11 +652,6 @@ static void string(Compiler* cmp, bool canAssign) {
                                        parser.previous.length - 2)));
 }
 
-static void bareString(Compiler* cmp) {
-  loadConstant(
-      cmp, OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
-}
-
 static void undefined(Compiler* cmp, bool canAssign) {
   emitByte(cmp, OP_UNDEFINED);
 }
@@ -703,13 +698,6 @@ static int nativePostfix(Compiler* cmp, char* name, int argCount) {
   int address = getGlobalConstant(cmp, name);
   emitBytes(cmp, OP_CALL_POSTFIX, argCount);
   return address;
-}
-
-static void methodCall(Compiler* cmp, char* name, int argCount) {
-  Value method = INTERN(name);
-  uint16_t constant = makeConstant(cmp, method);
-  emitConstInstr(cmp, OP_GET_PROPERTY, constant);
-  emitBytes(cmp, OP_CALL, argCount);
 }
 
 static void variable(Compiler* cmp, bool canAssign) {
@@ -925,7 +913,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 
   if (cmp.function->arity > 0) {
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing);
+    closeFunction(&cmp, enclosing, OP_CLOSURE);
     return true;
   }
 
@@ -1117,7 +1105,8 @@ static Iterator iterator(Compiler* cmp) {
 static int iterationNext(Compiler* cmp, Iterator iter) {
   // more().
   emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  methodCall(cmp, "more", 0);
+  getProperty(cmp, "more");
+  emitBytes(cmp, OP_CALL, 0);
 
   // jump out of the loop if more() false.
   int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
@@ -1126,7 +1115,8 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
 
   // next().
   emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  methodCall(cmp, "next", 0);
+  getProperty(cmp, "next");
+  emitBytes(cmp, OP_CALL, 0);
   emitConstInstr(cmp, OP_SET_LOCAL, iter.var);
   emitByte(cmp, OP_POP);
 
@@ -1240,7 +1230,7 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
 
     // return the comprehension and call the closure immediately.
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing);
+    closeFunction(&cmp, enclosing, OP_CLOSURE);
 
     emitBytes(enclosing, OP_CALL, 0);
 
@@ -1641,12 +1631,30 @@ static void ifStatement(Compiler* cmp) {
   patchJump(cmp, elseJump);
 }
 
-static void importStatement(Compiler* cmp) {
+void _importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
   advance(cmp);
-  bareString(cmp);
+  loadConstant(
+      cmp, OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
   emitByte(cmp, OP_IMPORT);
+}
+
+void importStatement(Compiler* cmp) {
+  advanceSlashedIdentifier(cmp);
+  consumeIdentifier(cmp, "Expect path to import.");
+  advance(cmp);
+
+  ObjString* path = copyString(parser.previous.start, parser.previous.length);
+  makeConstant(cmp, OBJ_VAL(path));
+  char* uri = pathToUri(path->chars);
+
+  Parser checkpoint = saveParser();
+
+  ObjModule* module = vmCompileModule(uri);
+  emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
+
+  gotoParser(checkpoint);
 }
 
 static void printStatement(Compiler* cmp) {
@@ -1656,7 +1664,7 @@ static void printStatement(Compiler* cmp) {
 }
 
 static void returnStatement(Compiler* cmp) {
-  if (cmp->functionType == TYPE_SCRIPT) {
+  if (cmp->functionType == TYPE_MODULE) {
     error(cmp, "Can't return from top-level code.");
   }
   if (cmp->functionType == TYPE_INITIALIZER) {
@@ -1878,16 +1886,18 @@ static void parsePrecedence(Compiler* cmp, Precedence precedence) {
   parseDelimitedPrecedence(cmp, precedence, NULL);
 }
 
-ObjFunction* compile(Compiler* root, const char* source, char* path) {
+static void declarations(Compiler* cmp) {
+  while (!match(cmp, TOKEN_EOF)) declaration(cmp);
+}
+
+ObjFunction* compileFunction(Compiler* root, const char* source, char* path) {
   Scanner sc = initScanner(source);
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, root, NULL, TYPE_SCRIPT, syntheticToken(path));
+  initCompiler(&cmp, root, NULL, TYPE_MODULE, syntheticToken(path));
 
-  while (!match(&cmp, TOKEN_EOF)) {
-    declaration(&cmp);
-  }
+  declarations(&cmp);
 
   ObjFunction* function = endCompiler(&cmp);
 

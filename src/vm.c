@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ast.h"
@@ -89,7 +90,10 @@ void initCore(Core* core) {
   core->oTypeBoundFunction = NULL;
   core->oTypeOverload = NULL;
   core->oTypeSequence = NULL;
+
   core->unify = NULL;
+  core->typeSystem = NULL;
+  core->grammar = NULL;
 }
 
 bool initVM() {
@@ -565,19 +569,30 @@ void vmSign(CallFrame* frame) {
 
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
+  int arity = 0;
   ObjOverload* overload = newOverload(cases);
 
   for (int i = cases; i > 0; i--) {
+    ObjClosure** closures = overload->closures;
+
     if (!IS_CLOSURE(vmPeek(i - 1))) {
       vmRuntimeError("Overload operand must be a function.");
       return false;
     }
 
-    overload->closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+    closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
+
+    if (i < cases && closures[cases - i]->function->arity != arity) {
+      vmRuntimeError("Overload operands must have uniform arity.");
+      return false;
+    }
+
+    arity = closures[cases - i]->function->arity;
   }
 
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
+  mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
   return true;
 }
 
@@ -623,22 +638,6 @@ static bool vmInstanceHas(ObjInstance* instance, Value value) {
                 mapHasHash(&instance->klass->fields, value, hash);
   vmPush(BOOL_VAL(hasKey));
   return true;
-}
-
-ObjClosure* vmGetGlobalClosure(char* name) {
-  Value obj;
-
-  if (!mapGet(&vm.globals, INTERN(name), &obj)) {
-    vmRuntimeError("Couldn't find function '%s'.", name);
-    return NULL;
-  }
-
-  if (!IS_CLOSURE(obj)) {
-    vmRuntimeError("Not a closure: '%s'.", name);
-    return NULL;
-  }
-
-  return AS_CLOSURE(obj);
 }
 
 // Loop until we're back to [baseFrame] frames. Typically this
@@ -784,7 +783,15 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
+          case OBJ_OVERLOAD: {
+            ObjOverload* overload = AS_OVERLOAD(vmPeek(0));
 
+            mapGet(&overload->fields, name, &value);
+
+            vmPop();  // overload.
+            vmPush(value);
+            break;
+          }
           default:
             vmRuntimeError(ERROR);
             return INTERPRET_RUNTIME_ERROR;
@@ -1097,25 +1104,14 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_IMPORT: {
-        Value path = vmPop();
-        if (!IS_STRING(path)) {
-          vmRuntimeError("Import path must be a string.");
+        ObjModule* module = AS_MODULE(READ_CONSTANT());
+        vmPush(OBJ_VAL(module));
+
+        if (!call(module->closure, 0) ||
+            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
           return INTERPRET_RUNTIME_ERROR;
-        }
+        frame = &vm.frames[vm.frameCount - 1];
 
-        ObjString* baseDir = intern(NAT_BASE_DIR);
-        vmPush(OBJ_VAL(baseDir));
-        ObjString* importLoc = concatenateStrings(baseDir, AS_STRING(path));
-        vmPop();
-        vmPush(OBJ_VAL(importLoc));
-        InterpretResult result = interpretFile(importLoc->chars);
-
-        if (result != INTERPRET_OK) return result;
-        // pop the return value of the module's function.
-        // if/when import statements become selective, this'll
-        // probably stick around.
-        vmPop();
-        vmPop();  // pop the imported module's name.
         break;
       }
       case OP_THROW: {
@@ -1291,16 +1287,66 @@ InterpretResult vmExecute(int baseFrame) {
   }
 }
 
-InterpretResult vmInterpret(char* path, const char* source) {
-  ObjFunction* function = compile(vm.compiler, source, path);
+// Compilation routines that use the stack.
 
-  if (function == NULL) return INTERPRET_COMPILE_ERROR;
+ObjClosure* vmCompileClosure(char* path, char* source) {
+  ObjFunction* function = compileFunction(vm.compiler, source, path);
+
+  if (function == NULL) return NULL;
 
   vmPush(OBJ_VAL(function));
   ObjClosure* closure = newClosure(function);
-  vmPop();
+  vmPop();  // function.
+
+  return closure;
+}
+
+ObjModule* vmCompileModule(char* path) {
+  char* source = readSource(path);
+
+  ObjString* objSource = intern(source);
+  vmPush(OBJ_VAL(objSource));
+
+  free(source);
+
+  ObjClosure* closure = vmCompileClosure(path, objSource->chars);
+  if (closure == NULL) return NULL;
+
+  vmPush(OBJ_VAL(closure));
+  ObjModule* module = newModule(closure, objSource);
+
+  vmPop();  // objSource.
+  vmPop();  // closure.
+
+  return module;
+}
+
+// Entrypoints.
+
+InterpretResult vmInterpretExpr(char* path, char* expr) {
+  ObjClosure* closure = vmCompileClosure(path, expr);
+
+  if (closure == NULL) return INTERPRET_COMPILE_ERROR;
+
   vmPush(OBJ_VAL(closure));
   call(closure, 0);
+
+  return vmExecute(vm.frameCount - 1);
+}
+
+InterpretResult vmInterpretSource(char* path, char* source) {
+  if (!initVM()) exit(2);
+
+  return vmInterpretExpr(path, source);
+}
+
+InterpretResult vmInterpretModule(char* path) {
+  ObjModule* module = vmCompileModule(path);
+
+  if (module == NULL) return INTERPRET_COMPILE_ERROR;
+
+  vmPush(OBJ_VAL(module));
+  call(module->closure, 0);
 
   return vmExecute(vm.frameCount - 1);
 }

@@ -19,7 +19,7 @@ assert(g.fn(c,d) == TProduct([c,d]));
 
 // the simple type system can't type the id function.
 
-let check = SimpleTypeSystem.typecheck(() => {
+let _check = SimpleTypeSystem.typecheck(() => {
   let id = x => x;
 
   id(1);
@@ -27,14 +27,14 @@ let check = SimpleTypeSystem.typecheck(() => {
   id("string");
 });
 
-assert(check.failure());
+assert(_check.failure());
 
 // but the polymorphic type system can, with the
 // aid of abstract types.
 
 // with either explicit abstraction.
 
-let check = PolyTypeSystem.typecheck(() => {
+typecheck(() => {
   let id: (a => a -> a) = x => x;
 
   id(1);

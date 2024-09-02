@@ -1,32 +1,32 @@
 
+class CompositionError extends Error {}
+
 class TypedTree extends Tree {
   init(data, children, type: Type) => {
     super.init(data, children);
     this.type = type;
   }
-  str() => {
-    let s = "[";
-    s = s + this.type.str();
-    for (x in this.children)
-      s = s + " " + x.str();
-    s = s + "]";
-    return s;
-  }
+  str() => this.type.str();
 }
 
 class CompositionSystem {
-  init(binaryRules, unaryRules, typeShifters) => {
-    this.binaryRules = binaryRules;
-    this.unaryRules = unaryRules;
-    this.typeShifters = typeShifters;
+  init() => {
+    this.binaryRules = [];
+    this.unaryRules = [];
   }
 
   addRule(rule) => {
-    let add = (rule: (x,y) -> z) => this.binaryRules.add(rule)
-            | (rule: x -> y) => this.typeShifters.add(rule)
-            | (rule: SyntacticRule) => this.unaryRules.add(rule);
+    if (rule.arity == 1)
+      this.unaryRules.add(rule);
+    else if (rule.arity == 2)
+      this.binaryRules.add(rule);
+    else
+      throw CompositionError("Rule must be unary or binary.");
+  }
 
-    add(rule);
+  addRules(*rules) => {
+    for (rule in rules)
+      this.addRule(rule);
   }
 
   // Map a Tree into a TypedTree.
@@ -57,5 +57,15 @@ class CompositionSystem {
   }
 
   interpret(node: Tree) => this.type(node).data;
-  typecheck(node: Tree) => this.type(node).type != nil;
+  typecheck(node: Tree) => {
+    if (this.type(node).type == nil)
+      throw TypeError();
+  }
+  typefail(node: Tree) => {
+    if (this.type(node).type != nil)
+      throw TypeError();
+  }
 }
+
+// The global [Grammar] object.
+let Grammar = CompositionSystem();

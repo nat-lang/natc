@@ -63,6 +63,7 @@
 #define S_OTYPE_OVERLOAD "OOverload"
 #define S_OTYPE_SEQUENCE "OSequence"
 
+#define S_GRAMMAR "Grammar"
 #define S_TYPE_SYSTEM "TypeSystem"
 #define S_UNIFY "unify"
 

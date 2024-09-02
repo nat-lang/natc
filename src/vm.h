@@ -64,6 +64,8 @@ typedef struct {
   ObjClass* oTypeSequence;
 
   ObjClosure* unify;
+  ObjInstance* typeSystem;
+  ObjInstance* grammar;
 } Core;
 
 typedef struct {
@@ -108,8 +110,10 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
-InterpretResult vmInterpretImport(char* path, const char* source);
-InterpretResult vmInterpret(char* path, const char* source);
+InterpretResult vmInterpretExpr(char* path, char* expr);
+InterpretResult vmInterpreSource(char* path, char* source);
+InterpretResult vmInterpretModule(char* path);
+ObjModule* vmCompileModule(char* path);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
@@ -123,12 +127,10 @@ bool vmCallValue(Value value, int argCount);
 void vmCloseUpvalues(Value* last);
 void vmClosure(CallFrame* frame);
 bool vmOverload(CallFrame* frame);
-void vmSequence(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
-ObjClosure* vmGetGlobalClosure(char* name);
 ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
 
 #endif

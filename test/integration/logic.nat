@@ -10,8 +10,3 @@ assert(true or true);
 assert(false or true);
 assert(true or false);
 assert(!(false or false));
-
-assert(false implies true);
-assert(true implies true);
-assert(false implies false);
-assert(!(true implies false));

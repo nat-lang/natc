@@ -21,6 +21,7 @@
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
 #define IS_SPREAD(value) isObjType(value, OBJ_SPREAD)
 #define IS_UPVALUE(value) isObjType(value, OBJ_UPVALUE)
+#define IS_MODULE(value) isObjType(value, OBJ_MODULE)
 
 #define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
@@ -37,6 +38,7 @@
 #define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
 #define AS_SPREAD(value) (((ObjSpread *)AS_OBJ(value)))
 #define AS_UPVALUE(value) (((ObjUpvalue *)AS_OBJ(value)))
+#define AS_MODULE(value) (((ObjModule *)AS_OBJ(value)))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 
@@ -56,6 +58,7 @@ typedef enum {
   OBJ_UPVALUE,
   OBJ_SPREAD,
   OBJ_VARIABLE,
+  OBJ_MODULE,
 } ObjType;
 
 struct Obj {
@@ -137,6 +140,7 @@ typedef struct {
   Obj obj;
   int cases;
   ObjClosure **closures;
+  ObjMap fields;
 } ObjOverload;
 
 typedef struct ObjClass {
@@ -166,6 +170,13 @@ typedef struct {
 
 typedef struct {
   Obj obj;
+  // ObjString *path;
+  ObjString *source;
+  ObjClosure *closure;
+} ObjModule;
+
+typedef struct {
+  Obj obj;
   ValueArray values;
 } ObjSequence;
 
@@ -182,6 +193,8 @@ ObjFunction *newFunction();
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
+ObjModule *newModule(
+    /*ObjString *path,*/ ObjClosure *closure, ObjString *source);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();

@@ -1,2 +1,0 @@
-
-let infix(5) implies = (x, y) => !x or y;

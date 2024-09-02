@@ -65,6 +65,13 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
+ObjModule* newModule(ObjClosure* closure, ObjString* source) {
+  ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
+  module->source = source;
+  module->closure = closure;
+  return module;
+}
+
 ObjOverload* newOverload(int cases) {
   ObjClosure** closures = ALLOCATE(ObjClosure*, cases);
   for (int i = 0; i < cases; i++) closures[i] = NULL;
@@ -72,6 +79,7 @@ ObjOverload* newOverload(int cases) {
   ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
   overload->closures = closures;
   overload->cases = cases;
+  initMap(&overload->fields);
   return overload;
 }
 
@@ -419,11 +427,11 @@ void printObject(Value value) {
       printf("<class %s>", AS_CLASS(value)->name->chars);
       break;
     case OBJ_CLOSURE:
-      printf("<fn %s at %p>", AS_CLOSURE(value)->function->name->chars,
+      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
              AS_CLOSURE(value));
       break;
     case OBJ_FUNCTION:
-      printf("<raw fn %s at %p>", AS_FUNCTION(value)->name->chars,
+      printf("<function %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
     case OBJ_OVERLOAD:
@@ -439,14 +447,11 @@ void printObject(Value value) {
     case OBJ_MAP:
       printMap(AS_MAP(value));
       break;
+    case OBJ_MODULE:
+      printf("<module %s>", AS_MODULE(value)->closure->function->name->chars);
+      break;
     case OBJ_NATIVE:
       printf("<native %s>", AS_NATIVE(value)->name->chars);
-      break;
-    case OBJ_STRING:
-      printf("%s", AS_CSTRING(value));
-      break;
-    case OBJ_UPVALUE:
-      printf("<upvalue at %p>", AS_UPVALUE(value));
       break;
     case OBJ_SEQUENCE:
       printValueArray(&AS_SEQUENCE(value)->values);
@@ -457,5 +462,11 @@ void printObject(Value value) {
       printf(">");
       break;
     }
+    case OBJ_STRING:
+      printf("%s", AS_CSTRING(value));
+      break;
+    case OBJ_UPVALUE:
+      printf("<upvalue at %p>", AS_UPVALUE(value));
+      break;
   }
 }
