@@ -8,7 +8,6 @@
 #include "vm.h"
 
 static void repl() {
-  /*
   char line[1024];
   for (;;) {
     printf("> ");
@@ -18,17 +17,8 @@ static void repl() {
       break;
     }
 
-    vmInterpret(line, "repl");
+    vmInterpretExpr("repl", line);
   }
-  */
-}
-
-InterpretResult interpretSource(const char* path, const char* source) {
-  if (!initVM()) exit(2);
-
-  InterpretResult result = vmInterpretModule((char*)path);
-
-  return result;
 }
 
 int main(int argc, const char* argv[]) {

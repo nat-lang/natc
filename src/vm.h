@@ -110,6 +110,8 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
+InterpretResult vmInterpretExpr(char* path, char* expr);
+InterpretResult vmInterpreSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
 ObjModule* vmCompileModule(char* path);
 InterpretResult vmExecute(int baseFrame);
@@ -125,7 +127,6 @@ bool vmCallValue(Value value, int argCount);
 void vmCloseUpvalues(Value* last);
 void vmClosure(CallFrame* frame);
 bool vmOverload(CallFrame* frame);
-void vmSequence(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);

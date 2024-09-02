@@ -1287,6 +1287,8 @@ InterpretResult vmExecute(int baseFrame) {
   }
 }
 
+// Compilation routines that use the stack.
+
 ObjClosure* vmCompileClosure(char* path, char* source) {
   ObjFunction* function = compileFunction(vm.compiler, source, path);
 
@@ -1317,6 +1319,25 @@ ObjModule* vmCompileModule(char* path) {
   vmPop();  // closure.
 
   return module;
+}
+
+// Entrypoints.
+
+InterpretResult vmInterpretExpr(char* path, char* expr) {
+  ObjClosure* closure = vmCompileClosure(path, expr);
+
+  if (closure == NULL) return INTERPRET_COMPILE_ERROR;
+
+  vmPush(OBJ_VAL(closure));
+  call(closure, 0);
+
+  return vmExecute(vm.frameCount - 1);
+}
+
+InterpretResult vmInterpretSource(char* path, char* source) {
+  if (!initVM()) exit(2);
+
+  return vmInterpretExpr(path, source);
 }
 
 InterpretResult vmInterpretModule(char* path) {
