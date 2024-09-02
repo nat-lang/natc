@@ -158,7 +158,6 @@ static void blackenObject(Obj* object) {
     }
     case OBJ_MODULE: {
       ObjModule* module = (ObjModule*)object;
-      // markObject((Obj*)module->path);
       markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
       break;
