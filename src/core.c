@@ -112,6 +112,140 @@ bool __sequenceInit__(int argCount, Value* args) {
   return true;
 }
 
+bool __stringInit__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(1));
+
+  if (!IS_STRING(vmPeek(0))) {
+    vmRuntimeError("Expecting string");
+    return false;
+  }
+
+  mapSet(&obj->fields, OBJ_VAL(vm.core.sValues), vmPeek(0));
+  vmPop();
+
+  return true;
+}
+
+bool __stringEq__(int argCount, Value* args) {
+  Value a = vmPeek(0);
+  Value b = vmPeek(1);
+
+  Value aString;
+  if (!vmStringValueField(a, &aString)) return false;
+  Value bString;
+  if (!vmStringValueField(b, &bString)) return false;
+
+  vmPop();
+  vmPop();
+  bool eq = objectsEqual((Obj*)AS_STRING(aString), (Obj*)AS_STRING(bString));
+  vmPush(BOOL_VAL(eq));
+
+  return true;
+}
+
+bool __stringSeq__(int argCount, Value* args) {
+  Value obj = vmPeek(0);
+
+  Value vString;
+  if (!vmStringValueField(obj, &vString)) return false;
+  ObjString* string = AS_STRING(vString);
+
+  for (int i = 0; i < string->length; i++) {
+    ObjString* character = copyString(string->chars + i, 1);
+    vmPush(OBJ_VAL(vm.core.string));
+    vmPush(OBJ_VAL(character));
+    if (!vmInitInstance(vm.core.string, 1, 1)) return false;
+  }
+
+  if (!vmTuplify(string->length, true)) return false;
+
+  Value seq = vmPop();
+  vmPop();
+  vmPush(seq);
+
+  return true;
+}
+
+bool __stringSet__(int argCount, Value* args) {
+  Value obj = vmPeek(2);
+  Value key = vmPeek(1);
+  Value val = vmPeek(0);
+
+  Value objString;
+  if (!vmStringValueField(obj, &objString)) return false;
+  Value valString;
+  if (!vmStringValueField(val, &valString)) return false;
+
+  if (AS_STRING(valString)->length != 1) {
+    vmRuntimeError("Expecting single character.");
+    return false;
+  }
+
+  if (!IS_NUMBER(key)) {
+    vmRuntimeError("String index must be number.");
+    return false;
+  }
+
+  char* objChars = AS_STRING(objString)->chars;
+  char* valChars = AS_STRING(valString)->chars;
+  int idx = AS_NUMBER(key);
+
+  if (idx >= AS_STRING(objString)->length) {
+    vmRuntimeError("String index out of bounds.");
+    return false;
+  }
+
+  *(objChars + idx) = *valChars;
+
+  vmPop();  // val.
+  vmPop();  // key.
+  vmPop();  // obj.
+
+  vmPush(NIL_VAL);
+  return true;
+}
+
+bool __stringGet__(int argCount, Value* args) {
+  Value obj = vmPeek(1);
+  Value key = vmPeek(0);
+
+  Value objString;
+  if (!vmStringValueField(obj, &objString)) return false;
+  if (!IS_NUMBER(key)) {
+    vmRuntimeError("String index must be number.");
+    return false;
+  }
+
+  char* objChars = AS_STRING(objString)->chars;
+  int idx = AS_NUMBER(key);
+
+  if (idx >= AS_STRING(objString)->length) {
+    vmRuntimeError("String index out of bounds.");
+    return false;
+  }
+
+  ObjString* objChar = copyString(objChars + idx, 1);
+
+  vmPop();  // key.
+  vmPop();  // obj.
+
+  vmPush(OBJ_VAL(vm.core.string));
+  vmPush(OBJ_VAL(objChar));
+  return vmInitInstance(vm.core.string, 1, 1);
+}
+
+bool __stringLength__(int argCount, Value* args) {
+  Value obj = vmPeek(0);
+
+  Value string;
+  if (!vmStringValueField(obj, &string)) return false;
+
+  vmPop();
+  vmPush(NUMBER_VAL(AS_STRING(string)->length));
+
+  return true;
+}
+
 bool __sequencePush__(int argCount, Value* args) {
   Value val = vmPeek(0);
   ObjInstance* obj = AS_INSTANCE(vmPeek(1));
@@ -326,6 +460,7 @@ bool __address__(int argCount, Value* args) {
 
   return true;
 }
+
 bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
@@ -383,9 +518,10 @@ bool __str__(int argCount, Value* args) {
 
   vmPop();
   vmPop();  // native fn.
+  vmPush(OBJ_VAL(vm.core.string));
   vmPush(OBJ_VAL(string));
 
-  return true;
+  return vmInitInstance(vm.core.string, 1, 1);
 }
 
 BINARY_NATIVE(gt__, BOOL_VAL, >);
@@ -503,6 +639,16 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.core.sequence);
   defineNativeFnMethod(S_ADD, 1, false, __sequencePush__, vm.core.sequence);
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.core.sequence);
+
+  if ((vm.core.string = getGlobalClass(S_STRING)) == NULL) return false;
+  defineNativeFnMethod(S_INIT, 1, false, __stringInit__, vm.core.string);
+  defineNativeFnMethod(S_EQ, 1, false, __stringEq__, vm.core.string);
+  defineNativeFnMethod(S_LEN, 0, false, __stringLength__, vm.core.string);
+  defineNativeFnMethod(S_SEQ, 0, false, __stringSeq__, vm.core.string);
+  defineNativeFnMethod(S_SUBSCRIPT_GET, 1, false, __stringGet__,
+                       vm.core.string);
+  defineNativeFnMethod(S_SUBSCRIPT_SET, 2, false, __stringSet__,
+                       vm.core.string);
 
   if ((vm.core.map = getGlobalClass(S_MAP)) == NULL ||
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||

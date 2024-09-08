@@ -33,6 +33,7 @@
 #define S_OBJECT "Object"
 #define S_SEQUENCE "Sequence"
 #define S_TUPLE "Tuple"
+#define S_STRING "String"
 #define S_MAP "Map"
 #define S_SET "Set"
 #define S_TREE "Tree"

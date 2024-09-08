@@ -34,6 +34,7 @@ typedef struct {
   ObjClass* object;
   ObjClass* tuple;
   ObjClass* sequence;
+  ObjClass* string;
   ObjClass* map;
   ObjClass* set;
   ObjClass* iterator;
