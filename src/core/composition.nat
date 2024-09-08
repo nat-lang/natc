@@ -59,11 +59,11 @@ class CompositionSystem {
   interpret(node: Tree) => this.type(node).data;
   typecheck(node: Tree) => {
     if (this.type(node).type == nil)
-      throw TypeError();
+      throw TypeError("Expected to succeed but failed.");
   }
   typefail(node: Tree) => {
     if (this.type(node).type != nil)
-      throw TypeError();
+      throw TypeError("Expected to fail but succeeded.");
   }
 }
 
