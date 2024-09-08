@@ -143,6 +143,16 @@ bool __stringEq__(int argCount, Value* args) {
   return true;
 }
 
+bool __stringHash__(int argCount, Value* args) {
+  Value obj = vmPeek(0);
+
+  Value vString;
+  if (!vmStringValueField(obj, &vString)) return false;
+  vmPush(NUMBER_VAL(AS_STRING(vString)->hash));
+
+  return true;
+}
+
 bool __stringSeq__(int argCount, Value* args) {
   Value obj = vmPeek(0);
 
@@ -645,6 +655,7 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_EQ, 1, false, __stringEq__, vm.core.string);
   defineNativeFnMethod(S_LEN, 0, false, __stringLength__, vm.core.string);
   defineNativeFnMethod(S_SEQ, 0, false, __stringSeq__, vm.core.string);
+  defineNativeFnMethod(S_HASH, 0, false, __stringHash__, vm.core.string);
   defineNativeFnMethod(S_SUBSCRIPT_GET, 1, false, __stringGet__,
                        vm.core.string);
   defineNativeFnMethod(S_SUBSCRIPT_SET, 2, false, __stringSet__,

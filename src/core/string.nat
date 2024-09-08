@@ -14,3 +14,8 @@ let join = (seq: Sequential, sep: string) => {
 };
 
 let indent = (x: num) => join([" " | _ in range(0, x)], "");
+
+class String extends Sequence {
+  infix +(that) => String(this.values + that.values);
+  __iter__() => iter(this.seq());
+}

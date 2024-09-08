@@ -130,6 +130,7 @@ void vmClosure(CallFrame* frame);
 bool vmOverload(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
+bool vmStringValueField(Value obj, Value* string);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
 ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);

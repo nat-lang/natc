@@ -649,8 +649,16 @@ static void number(Compiler* cmp, bool canAssign) {
 }
 
 static void string(Compiler* cmp, bool canAssign) {
-  loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
-                                       parser.previous.length - 2)));
+  if (checkStr("'")) {
+    loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
+                                         parser.previous.length - 2)));
+    advance(cmp);
+  } else {
+    getGlobalConstant(cmp, "String");
+    loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
+                                         parser.previous.length - 2)));
+    emitBytes(cmp, OP_CALL, 1);
+  }
 }
 
 static void undefined(Compiler* cmp, bool canAssign) {

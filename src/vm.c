@@ -615,6 +615,23 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   return true;
 }
 
+bool vmStringValueField(Value obj, Value* string) {
+  if (!IS_INSTANCE(obj)) {
+    vmRuntimeError("Expecting string instance.");
+    return false;
+  }
+
+  if (!mapGet(&AS_INSTANCE(obj)->fields, OBJ_VAL(vm.core.sValues), string)) {
+    vmRuntimeError("String instance missing its value!");
+    return false;
+  }
+  if (!IS_STRING(*string)) {
+    vmRuntimeError("Expecting primitive string.");
+    return false;
+  }
+  return true;
+}
+
 bool vmSequenceValueField(ObjInstance* obj, Value* seq) {
   if (!mapGet(&obj->fields, OBJ_VAL(vm.core.sValues), seq)) {
     vmRuntimeError("Sequence instance missing its values!");
@@ -627,13 +644,9 @@ bool vmSequenceValueField(ObjInstance* obj, Value* seq) {
   return true;
 }
 
-static bool vmInstanceHas(ObjInstance* instance, Value value) {
-  uint32_t hash;
-  if (!vmHashValue(value, &hash)) return false;
-
-  bool hasKey = mapHasHash(&instance->fields, value, hash) ||
-                mapHasHash(&instance->klass->fields, value, hash);
-  vmPush(BOOL_VAL(hasKey));
+bool unwrapString(Value* val) {
+  if (IS_INSTANCE(*val) && AS_INSTANCE(*val)->klass == vm.core.string)
+    if (!vmStringValueField(*val, val)) return false;
   return true;
 }
 
@@ -1092,6 +1105,8 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
+        unwrapString(&val);
+
         switch (OBJ_TYPE(obj)) {
           case OBJ_INSTANCE: {
             ObjInstance* instance = AS_INSTANCE(obj);
@@ -1108,7 +1123,12 @@ InterpretResult vmExecute(int baseFrame) {
               break;
             }
 
-            if (!vmInstanceHas(instance, val)) return INTERPRET_RUNTIME_ERROR;
+            uint32_t hash;
+            if (!vmHashValue(val, &hash)) return INTERPRET_RUNTIME_ERROR;
+
+            bool hasKey = mapHasHash(&instance->fields, val, hash) ||
+                          mapHasHash(&instance->klass->fields, val, hash);
+            vmPush(BOOL_VAL(hasKey));
             break;
           }
           case OBJ_CLASS: {
@@ -1154,13 +1174,11 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        if (!IS_STRING(msg)) {
-          vmRuntimeError("Error 'message' must be a string.");
-          return INTERPRET_RUNTIME_ERROR;
-        }
+        Value sMsg;
+        if (!vmStringValueField(msg, &sMsg)) return INTERPRET_RUNTIME_ERROR;
 
         vmRuntimeError("%s: %s", AS_INSTANCE(value)->klass->name->chars,
-                       AS_STRING(msg)->chars);
+                       AS_STRING(sMsg)->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
 
@@ -1199,6 +1217,8 @@ InterpretResult vmExecute(int baseFrame) {
         }
 
         // otherwise fall back to property access.
+        unwrapString(&key);
+
         uint32_t hash;
         if (!vmHashValue(key, &hash)) return INTERPRET_RUNTIME_ERROR;
 
@@ -1245,10 +1265,12 @@ InterpretResult vmExecute(int baseFrame) {
         }
 
         // otherwise fall back to property access.
+        Value key = vmPeek(1);
+        unwrapString(&key);
         uint32_t hash;
-        if (!vmHashValue(vmPeek(1), &hash)) return INTERPRET_RUNTIME_ERROR;
+        if (!vmHashValue(key, &hash)) return INTERPRET_RUNTIME_ERROR;
 
-        mapSetHash(&instance->fields, vmPeek(1), vmPeek(0), hash);
+        mapSetHash(&instance->fields, key, vmPeek(0), hash);
         // leave the object on the stack.
         vmPop();  // val.
         vmPop();  // key.

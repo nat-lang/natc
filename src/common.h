@@ -28,6 +28,7 @@
 #define S_PUSH "push"
 #define S_POP "pop"
 #define S_HASH "hash"
+#define S_SEQ "seq"
 
 #define S_BASE "Base"
 #define S_OBJECT "Object"
