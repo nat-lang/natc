@@ -13,7 +13,7 @@ bool astClosure(Value* enclosing, ObjClosure* closure);
 bool astLocal(uint8_t slot);
 bool astOverload(Value* enclosing, ObjOverload* overload);
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root);
-bool astBlock();
+bool astBlock(Value* enclosing);
 
 static bool executeMethod(char* method, int argCount) {
   return vmExecuteMethod(method, argCount, 1);
@@ -127,7 +127,8 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       // 1) the condition itself.
       vmPush(condition);
       // 2) the branch if the condition is true.
-      FAIL_UNLESS(astBlock());
+      FAIL_UNLESS(astBlock(&root));
+
       Value branch = vmPeek(0);
       vmPush(condition);
       FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
@@ -168,10 +169,8 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
 
       vmPush(root);
       vmPush(NUMBER_VAL((uintptr_t)upvalue));
-      vmPush(NUMBER_VAL(upvalue->slot));
-      vmPush(OBJ_VAL(upvalue));
 
-      OK_IF(executeMethod("opGetUpvalue", 3));
+      OK_IF(executeMethod("opGetUpvalue", 1));
     }
     case OP_GET_PROPERTY: {
       Value key = READ_CONSTANT();
@@ -304,9 +303,10 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
   return AST_INSTRUCTION_FAIL;
 }
 
-bool astBlock() {
+bool astBlock(Value* enclosing) {
   vmPush(OBJ_VAL(vm.core.astBlock));
-  return initInstance(vm.core.astBlock, 0);
+  vmPush(enclosing == NULL ? NIL_VAL : *enclosing);
+  return initInstance(vm.core.astBlock, 1);
 }
 
 // Append the segment of [frame]'s instructions
@@ -381,6 +381,8 @@ bool astLocal(uint8_t slot) {
 }
 
 bool astUpvalues(ObjClosure* closure, bool root) {
+  // if the closure is the root of the ast, any upvalues
+  // it closes over are resolvable, so we distinguish them.
   ObjClass* upvalue =
       root ? vm.core.astExternalUpvalue : vm.core.astInternalUpvalue;
 
@@ -390,8 +392,6 @@ bool astUpvalues(ObjClosure* closure, bool root) {
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
     vmPush(OBJ_VAL(closure->upvalues[i]));
 
-    // if the closure is the root of the ast, any upvalues
-    // it closes over are resolvable, so we distinguish them.
     if (!initInstance(upvalue, 3)) return AST_INSTRUCTION_FAIL;
   }
   return vmTuplify(closure->upvalueCount, true);
