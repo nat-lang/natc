@@ -301,7 +301,7 @@ bool __globals__(int argCount, Value* args) {
   vmPop();  // native fn.
 
   vmPush(OBJ_VAL(vm.core.map));
-  vmInitInstance(vm.core.map, 0, 1);
+  vmInitInstance(vm.core.map, 0);
   mapAddAll(&vm.globals, &AS_INSTANCE(vmPeek(0))->fields);
 
   return true;

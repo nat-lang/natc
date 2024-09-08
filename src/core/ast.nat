@@ -37,16 +37,18 @@ class ASTNode extends Tree {
 
         for (param in node.signature().params)
           rename(param, closureEnv.locals);
-        
-        node.upvalues.values().map(
-          (v: ASTExternalUpvalue) => rename(v, closureEnv.upvalues)
-        | (v: ASTInternalUpvalue) => {
+
+        for (v in node.upvalues.values()) {
+          if (v is ASTExternalUpvalue) {
+            rename(v, closureEnv.upvalues);
+          } else if (v is ASTInternalUpvalue) {
             if (!closureEnv.upvalues[v.id])
               closureEnv.upvalues[v.id] = varEnv.locals[v.localId];
+          } else {
+            throw Error("Unexpected upvalue type: " + str(v));
           }
-        | v => { throw Error("Unexpected upvalue type: " + str(v)); }
-        );
- 
+        }
+
         return closureEnv;
       }
 
