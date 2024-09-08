@@ -139,40 +139,21 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
-static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
-  Value method;
-  if (!mapGet(&klass->fields, OBJ_VAL(name), &method)) {
-    vmRuntimeError("Undefined property '%s' for class '%s'.", name->chars,
-                   klass->name->chars);
-    return false;
-  }
-
-  return vmCallValue(method, argCount);
-}
-
-bool vmInvoke(ObjString* name, int argCount) {
+bool vmGetMethod(ObjString* name, int argCount, Value* method) {
   Value receiver = vmPeek(argCount);
-
-  if (IS_INSTANCE(receiver)) {
-    ObjInstance* instance = AS_INSTANCE(receiver);
-    Value field;
-    if (mapGet(&instance->fields, OBJ_VAL(name), &field)) {
-      vm.stackTop[-argCount - 1] = receiver;
-      return vmCallValue(field, argCount);
-    }
-
-    return invokeFromClass(instance->klass, name, argCount);
-  }
 
   char* error = "Only instances and classes have methods.";
 
-  if (!IS_OBJ(receiver)) {
-    vmRuntimeError(error);
-    return false;
-  }
-
   ObjMap* fields;
   switch (OBJ_TYPE(receiver)) {
+    case OBJ_INSTANCE: {
+      ObjInstance* instance = AS_INSTANCE(receiver);
+
+      if (mapGet(&instance->fields, OBJ_VAL(name), method))
+        return true;
+      else
+        return mapGet(&instance->klass->fields, OBJ_VAL(name), method);
+    }
     case OBJ_CLASS:
       fields = &AS_CLASS(receiver)->fields;
       break;
@@ -184,15 +165,29 @@ bool vmInvoke(ObjString* name, int argCount) {
       return false;
   }
 
-  Value field = NIL_VAL;
-  mapGet(fields, OBJ_VAL(name), &field);
-  vm.stackTop[-argCount - 1] = receiver;
-  return vmCallValue(field, argCount);
+  return mapGet(fields, OBJ_VAL(name), method);
 }
 
-bool vmExecuteMethod(char* method, int argCount, int frames) {
-  return (vmInvoke(intern(method), argCount)) &&
-         (vmExecute(vm.frameCount - frames) == INTERPRET_OK);
+bool vmInvoke(ObjString* name, int argCount) {
+  Value receiver = vmPeek(argCount);
+  Value method = NIL_VAL;
+
+  if (!vmGetMethod(name, argCount, &method)) return false;
+
+  vm.stackTop[-argCount - 1] = receiver;
+  return vmCallValue(method, argCount);
+}
+
+bool vmExecuteMethod(char* name, int argCount) {
+  Value receiver = vmPeek(argCount);
+  Value method = NIL_VAL;
+  if (!vmGetMethod(intern(name), argCount, &method)) return false;
+  vm.stackTop[-argCount - 1] = receiver;
+  if (!vmCallValue(method, argCount)) return false;
+
+  int frames = IS_NATIVE(method) ? 0 : 1;
+
+  return (vmExecute(vm.frameCount - frames) == INTERPRET_OK);
 }
 
 // If [value] is natively hashable, then hash it. Otherwise, if it's
@@ -212,7 +207,7 @@ bool vmHashValue(Value value, uint32_t* hash) {
   }
 
   vmPush(value);
-  if (!vmExecuteMethod(S_HASH, 0, 1)) return false;
+  if (!vmExecuteMethod(S_HASH, 0)) return false;
 
   if (!IS_NUMBER(vmPeek(0)) || AS_NUMBER(vmPeek(0)) < 0) {
     vmRuntimeError("'%s' function must return a natural number.", S_HASH);
@@ -247,10 +242,12 @@ static bool vmInstantiateClass(ObjClass* klass, int argCount) {
   return true;
 }
 
-bool vmInitInstance(ObjClass* klass, int argCount, int frames) {
+bool vmInitInstance(ObjClass* klass, int argCount) {
   if (!vmCallValue(OBJ_VAL(klass), argCount)) return false;
 
-  if (mapHas(&klass->fields, INTERN(S_INIT))) {
+  Value method;
+  if (mapGet(&klass->fields, INTERN(S_INIT), &method)) {
+    int frames = IS_NATIVE(method) ? 0 : 1;
     if (vmExecute(vm.frameCount - frames) != INTERPRET_OK) return false;
   }
 
@@ -931,7 +928,7 @@ InterpretResult vmExecute(int baseFrame) {
           vmPush(typeSystem);
           vmPush(caller);
           for (int i = 0; i < argCount; i++) vmPush(args[i]);
-          if (!vmExecuteMethod("instantiate", argCount + 1, 1))
+          if (!vmExecuteMethod("instantiate", argCount + 1))
             return INTERPRET_RUNTIME_ERROR;
           frame = &vm.frames[vm.frameCount - 1];
 

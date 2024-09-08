@@ -52,7 +52,7 @@ class Type extends Base {
 
   fvs() => Set();
   hasFvs() => len(this.fvs()) > 0;
-  hash() => hash(address(this));
+  hash() => (hash . address)(this);
   apply(solution) => solution.entries().reduce(
     (type, sub) => type.substitute(sub),
     this

@@ -15,14 +15,6 @@ bool astOverload(Value* enclosing, ObjOverload* overload);
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root);
 bool astBlock(Value* enclosing);
 
-static bool executeMethod(char* method, int argCount) {
-  return vmExecuteMethod(method, argCount, 1);
-}
-
-static bool initInstance(ObjClass* klass, int argCount) {
-  return vmInitInstance(klass, argCount, 1);
-}
-
 typedef enum {
   AST_INSTRUCTION_OK,
   AST_INSTRUCTION_FAIL,
@@ -49,40 +41,40 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(root);
       vmPush(UNDEF_VAL);
 
-      OK_IF(executeMethod("opLiteral", 1));
+      OK_IF(vmExecuteMethod("opLiteral", 1));
     }
     case OP_CONSTANT: {
       vmPush(root);
       vmPush(READ_CONSTANT());
-      OK_IF(executeMethod("opLiteral", 1));
+      OK_IF(vmExecuteMethod("opLiteral", 1));
     }
     case OP_NIL: {
       vmPush(root);
       vmPush(NIL_VAL);
-      OK_IF(executeMethod("opLiteral", 1));
+      OK_IF(vmExecuteMethod("opLiteral", 1));
     }
     case OP_TRUE: {
       vmPush(root);
       vmPush(BOOL_VAL(true));
-      OK_IF(executeMethod("opLiteral", 1));
+      OK_IF(vmExecuteMethod("opLiteral", 1));
     }
     case OP_FALSE: {
       vmPush(root);
       vmPush(BOOL_VAL(false));
-      OK_IF(executeMethod("opLiteral", 1));
+      OK_IF(vmExecuteMethod("opLiteral", 1));
     }
     case OP_NOT: {
       Value value = vmPop();
       vmPush(root);
       vmPush(value);
-      OK_IF(executeMethod("opNot", 1));
+      OK_IF(vmExecuteMethod("opNot", 1));
     }
     case OP_EXPR_STATEMENT: {
       Value value = vmPop();
       vmPush(root);
       vmPush(value);
 
-      FAIL_UNLESS(executeMethod("opExprStatement", 1));
+      FAIL_UNLESS(vmExecuteMethod("opExprStatement", 1));
       vmPop();  // nil.
       return AST_INSTRUCTION_OK;
     }
@@ -92,14 +84,14 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     case OP_RETURN: {
       RETURN();
 
-      FAIL_UNLESS(executeMethod("opReturn", 1));
+      FAIL_UNLESS(vmExecuteMethod("opReturn", 1));
       vmPop();  // nil.
       return AST_INSTRUCTION_OK;
     }
     case OP_IMPLICIT_RETURN: {
       RETURN();
 
-      FAIL_UNLESS(executeMethod("opImplicitReturn", 1));
+      FAIL_UNLESS(vmExecuteMethod("opImplicitReturn", 1));
       vmPop();  // nil.
       return AST_INSTRUCTION_COMPLETE;
     }
@@ -133,7 +125,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(condition);
       FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
       // push the conditional onto the tree.
-      FAIL_UNLESS(executeMethod("opConditional", 2));
+      FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
       vmPop();  // nil.
 
       // now resume the negative branch on the root.
@@ -146,7 +138,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(root);
       vmPush(OBJ_VAL(name));
 
-      OK_IF(executeMethod("opGetGlobal", 1));
+      OK_IF(vmExecuteMethod("opGetGlobal", 1));
     }
     case OP_GET_LOCAL:
       OK_IF(astLocal(READ_SHORT()));
@@ -159,7 +151,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       if (!astLocal(slot)) return AST_INSTRUCTION_FAIL;
       vmPush(value);
 
-      FAIL_UNLESS(executeMethod("opSetLocalValue", 2));
+      FAIL_UNLESS(vmExecuteMethod("opSetLocalValue", 2));
       vmPop();  // nil.
       return AST_INSTRUCTION_OK;
     }
@@ -170,7 +162,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(root);
       vmPush(NUMBER_VAL((uintptr_t)upvalue));
 
-      OK_IF(executeMethod("opGetUpvalue", 1));
+      OK_IF(vmExecuteMethod("opGetUpvalue", 1));
     }
     case OP_GET_PROPERTY: {
       Value key = READ_CONSTANT();
@@ -179,7 +171,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(root);
       vmPush(obj);
       vmPush(key);
-      OK_IF(executeMethod("opGetProperty", 2));
+      OK_IF(vmExecuteMethod("opGetProperty", 2));
     }
     case OP_SET_PROPERTY: {
       Value key = READ_CONSTANT();
@@ -192,7 +184,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(key);
       vmPush(value);
 
-      FAIL_UNLESS(executeMethod("opSetProperty", 3));
+      FAIL_UNLESS(vmExecuteMethod("opSetProperty", 3));
       vmPush(object);
       return AST_INSTRUCTION_OK;
     }
@@ -204,17 +196,17 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(left);
       vmPush(right);
 
-      OK_IF(executeMethod("opEqual", 2));
+      OK_IF(vmExecuteMethod("opEqual", 2));
     }
     case OP_VARIABLE: {
       vmPush(root);
       vmVariable(frame);
-      OK_IF(executeMethod("opVariable", 1));
+      OK_IF(vmExecuteMethod("opVariable", 1));
     }
     case OP_SIGN: {
       vmClosure(frame);
       Value closure = vmPeek(1);
-      FAIL_UNLESS(executeMethod("opSignature", 1));
+      FAIL_UNLESS(vmExecuteMethod("opSignature", 1));
       // pop the signature and leave the signed
       // function's ast on the stack.
       vmPop();
@@ -236,7 +228,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(fn);
       for (int i = argCount - 1; i >= 0; i--) vmPush(args[i]);
 
-      OK_IF(executeMethod("opCall", argCount + 1));
+      OK_IF(vmExecuteMethod("opCall", argCount + 1));
     }
     case OP_CALL_INFIX: {
       READ_SHORT();
@@ -249,7 +241,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(left);
       vmPush(right);
 
-      OK_IF(executeMethod("opCall", 3));
+      OK_IF(vmExecuteMethod("opCall", 3));
     }
     case OP_CALL_POSTFIX: {
       int argCount = READ_BYTE();
@@ -264,7 +256,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(postfix);
       while (++i < argCount) vmPush(args[i]);
 
-      OK_IF(executeMethod("opCall", argCount + 1));
+      OK_IF(vmExecuteMethod("opCall", argCount + 1));
     }
     case OP_MEMBER: {
       Value obj = vmPop();
@@ -273,7 +265,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(root);
       vmPush(val);
       vmPush(obj);
-      OK_IF(executeMethod("opMember", 2));
+      OK_IF(vmExecuteMethod("opMember", 2));
     }
 
     case OP_SET_TYPE_LOCAL: {
@@ -284,7 +276,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       if (!astLocal(slot)) return AST_INSTRUCTION_FAIL;
       vmPush(type);
 
-      FAIL_UNLESS(executeMethod("opSetLocalType", 2));
+      FAIL_UNLESS(vmExecuteMethod("opSetLocalType", 2));
       vmPop();  // nil.
       return AST_INSTRUCTION_OK;
     }
@@ -293,7 +285,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     case OP_UNIT: {
       vmPush(root);
       vmPush(UNIT_VAL);
-      OK_IF(executeMethod("opLiteral", 1));
+      OK_IF(vmExecuteMethod("opLiteral", 1));
     }
     default: {
       vmRuntimeError("Unhandled destructured opcode (%i).", instruction);
@@ -307,7 +299,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
 bool astBlock(Value* enclosing) {
   vmPush(OBJ_VAL(vm.core.astBlock));
   vmPush(enclosing == NULL ? NIL_VAL : *enclosing);
-  return initInstance(vm.core.astBlock, 1);
+  return vmInitInstance(vm.core.astBlock, 1);
 }
 
 // Append the segment of [frame]'s instructions
@@ -378,7 +370,7 @@ bool astFrame(Value root) {
 bool astLocal(uint8_t slot) {
   vmPush(OBJ_VAL(vm.core.astLocal));
   vmPush(NUMBER_VAL(slot));
-  return initInstance(vm.core.astLocal, 1);
+  return vmInitInstance(vm.core.astLocal, 1);
 }
 
 bool astUpvalues(ObjClosure* closure, bool root) {
@@ -393,7 +385,7 @@ bool astUpvalues(ObjClosure* closure, bool root) {
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
     vmPush(OBJ_VAL(closure->upvalues[i]));
 
-    if (!initInstance(upvalue, 3)) return AST_INSTRUCTION_FAIL;
+    if (!vmInitInstance(upvalue, 3)) return AST_INSTRUCTION_FAIL;
   }
   return vmTuplify(closure->upvalueCount, true);
 }
@@ -411,7 +403,7 @@ bool astClosure(Value* enclosing, ObjClosure* closure) {
   // (2) the closure's upvalues.
   if (!astUpvalues(closure, enclosing == NULL)) return AST_INSTRUCTION_FAIL;
 
-  if (!initInstance(vm.core.astClosure, 3)) return AST_INSTRUCTION_FAIL;
+  if (!vmInitInstance(vm.core.astClosure, 3)) return AST_INSTRUCTION_FAIL;
   Value astClosure = vmPeek(0);
 
   // the function's arguments are undefined values.
@@ -444,7 +436,7 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   vmPush(OBJ_VAL(closure));
   if (!astClosure(enclosing, closure)) return AST_INSTRUCTION_FAIL;
 
-  return initInstance(vm.core.astMethod, 4);
+  return vmInitInstance(vm.core.astMethod, 4);
 }
 
 bool astOverload(Value* enclosing, ObjOverload* overload) {
@@ -462,7 +454,7 @@ bool astOverload(Value* enclosing, ObjOverload* overload) {
 
   if (!vmTuplify(overload->cases, true)) return AST_INSTRUCTION_FAIL;
 
-  return initInstance(vm.core.astOverload, 3);
+  return vmInitInstance(vm.core.astOverload, 3);
 }
 
 bool ast(Value value) {
