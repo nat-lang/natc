@@ -577,9 +577,9 @@ static void property(Compiler* cmp, bool canAssign) {
 // may as well enforce the symmetry.
 static void dot(Compiler* cmp, bool canAssign) {
   if (penultWhite() && prevWhite()) {
-    getGlobalConstant(cmp, "compose");
+    uint16_t name = getGlobalConstant(cmp, "compose");
     expression(cmp);
-    emitByte(cmp, OP_CALL_INFIX);
+    emitConstInstr(cmp, OP_CALL_INFIX, name);
   } else {
     property(cmp, canAssign);
   }
@@ -720,12 +720,12 @@ static void variable(Compiler* cmp, bool canAssign) {
 
 static void infix(Compiler* cmp, bool canAssign) {
   ParseRule* rule = getInfixableRule(cmp, parser.previous);
-
+  uint16_t name = identifierConstant(cmp, &parser.previous);
   variable(cmp, canAssign);
 
   if (penultWhite() && prevWhite()) {
     parsePrecedence(cmp, (Precedence)(rule->rightPrec));
-    emitByte(cmp, OP_CALL_INFIX);
+    emitConstInstr(cmp, OP_CALL_INFIX, name);
   }
 }
 
@@ -1081,7 +1081,7 @@ static void method(Compiler* cmp) {
 
   if (infixPrec != 0) {
     Value name = cmp->function->chunk.constants.values[var];
-    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrec));
+    mapSet(&vm.methodInfixes, name, NUMBER_VAL(infixPrec));
   }
 }
 
@@ -1817,6 +1817,22 @@ static ParseRule* getRule(Token token) { return &rules[token.type]; }
 
 int sign(int x) { return (x > 0) - (x < 0); }
 
+static void setPrecedence(Compiler* cmp, ParseRule* rule, int prec) {
+  // the sign indicates associativity: -1 right, 1 left. 0 is not allowed.
+  switch (sign(prec)) {
+    case 1: {
+      rule->leftPrec = prec;
+      rule->rightPrec = prec + PREC_STEP;
+      break;
+    }
+    case -1:
+      rule->leftPrec = rule->rightPrec = prec * -1;
+      break;
+    default:
+      error(cmp, "Unexpected precedence");
+  }
+}
+
 // Look up the rule for the [token]'s type, unless the
 // [token] is an identifier, in which case check the vm's
 // infix table for a user-defined infixation precedence.
@@ -1825,23 +1841,9 @@ static ParseRule* getInfixableRule(Compiler* cmp, Token token) {
     Value name = identifierToken(token);
     Value prec;
 
-    if (mapGet(&vm.infixes, name, &prec)) {
-      // the sign indicates associativity: -1 right, 1 left; 0 reserved.
-      int nPrec = AS_NUMBER(prec);
-      switch (sign(nPrec)) {
-        case 1: {
-          rules[TOKEN_IDENTIFIER].leftPrec = nPrec;
-          rules[TOKEN_IDENTIFIER].rightPrec = nPrec + PREC_STEP;
-          break;
-        }
-        case -1:
-          rules[TOKEN_IDENTIFIER].leftPrec = rules[TOKEN_IDENTIFIER].rightPrec =
-              nPrec * -1;
-          break;
-        default:
-          error(cmp, "Unexpected precedence");
-      }
-
+    if (mapGet(&vm.infixes, name, &prec) ||
+        mapGet(&vm.methodInfixes, name, &prec)) {
+      setPrecedence(cmp, &rules[TOKEN_IDENTIFIER], AS_NUMBER(prec));
       rules[TOKEN_IDENTIFIER].infix = infix;
     } else {
       rules[TOKEN_IDENTIFIER].infix = NULL;

@@ -5,8 +5,8 @@ class TSum extends Type {
     this.disjuncts = Set.fromSeq(typified);
   }
 
-  union(that: TSum) => TSum(
-    ..this.disjuncts.union(that.disjuncts).elements()
+  infix &(that: TSum) => TSum(
+    ..(this.disjuncts & that.disjuncts).elements()
   );
 
   substitute(c: Constraint) => {
@@ -36,7 +36,7 @@ class TSum extends Type {
   __len__() => len(this.disjuncts);
 }
 
-let infix(9) || = (a, b) => TSum.lift(a).union(TSum.lift(b));
+let infix(9) || = (a, b) => TSum.lift(a) & TSum.lift(b);
 
 class SubtypeConstraint extends Constraint {
   str() => this.left.str() + " <| " + this.right.str();

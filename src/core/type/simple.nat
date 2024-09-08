@@ -80,7 +80,7 @@ class TFunction extends Type {
 
     return domain + " -> " + range;
   }
-  fvs() => this.domain.fvs().union(this.range.fvs());
+  fvs() => this.domain.fvs() & this.range.fvs();
 
   substitute(sub) => TFunction(
     this.domain.substitute(sub),
