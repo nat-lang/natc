@@ -239,7 +239,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       OK_IF(executeMethod("opCall", argCount + 1));
     }
     case OP_CALL_INFIX: {
-      READ_CONSTANT();
+      READ_SHORT();
       Value right = vmPop();
       Value infix = vmPop();
       Value left = vmPop();
