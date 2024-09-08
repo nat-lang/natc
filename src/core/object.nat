@@ -4,7 +4,11 @@ let private = () => [
 ];
 
 class Object extends Base {
-  keys() => super.keys().filter(x => x in private());
+  keys() => {
+    let f = x => x in private();
+    let g = super.keys();
+    return g.filter(f);
+  }
   values() => [this[key] | key in this.keys()];
   entries() => [(key, this[key]) | key in this.keys()];
 

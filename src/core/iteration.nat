@@ -19,8 +19,9 @@ class Iterator {
 }
 
 let iter = object => {
-  if (object is Sequential)
+  if (object is Sequential) {
     return Iterator(object, 0, len(object));
+  }
 
   if (vType(object) != OInstance)
     throw IterationProtocolError("Only objects can be iterated over.");

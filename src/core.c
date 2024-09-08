@@ -115,8 +115,10 @@ bool __sequenceInit__(int argCount, Value* args) {
 bool __stringInit__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(1));
 
+  disassembleStack();
+  printf("\n");
   if (!IS_STRING(vmPeek(0))) {
-    vmRuntimeError("Expecting string");
+    vmRuntimeError("Expecting string.");
     return false;
   }
 
@@ -164,7 +166,7 @@ bool __stringSeq__(int argCount, Value* args) {
     ObjString* character = copyString(string->chars + i, 1);
     vmPush(OBJ_VAL(vm.core.string));
     vmPush(OBJ_VAL(character));
-    if (!vmInitInstance(vm.core.string, 1, 1)) return false;
+    if (!vmInitInstance(vm.core.string, 1)) return false;
   }
 
   if (!vmTuplify(string->length, true)) return false;
@@ -241,7 +243,7 @@ bool __stringGet__(int argCount, Value* args) {
 
   vmPush(OBJ_VAL(vm.core.string));
   vmPush(OBJ_VAL(objChar));
-  return vmInitInstance(vm.core.string, 1, 1);
+  return vmInitInstance(vm.core.string, 1);
 }
 
 bool __stringLength__(int argCount, Value* args) {
@@ -297,7 +299,13 @@ bool __objKeys__(int argCount, Value* args) {
 
     // add to sequence. seq's 'push' method
     // leaves itself on the stack for us.
-    vmPush(entry->key);
+    if (IS_STRING(entry->key)) {
+      vmPush(OBJ_VAL(vm.core.string));
+      vmPush(entry->key);
+      if (!vmInitInstance(vm.core.string, 1)) return false;
+    } else {
+      vmPush(entry->key);
+    }
     if (!vmInvoke(intern("push"), 1)) return false;
   }
 
@@ -531,7 +539,7 @@ bool __str__(int argCount, Value* args) {
   vmPush(OBJ_VAL(vm.core.string));
   vmPush(OBJ_VAL(string));
 
-  return vmInitInstance(vm.core.string, 1, 1);
+  return vmInitInstance(vm.core.string, 1);
 }
 
 BINARY_NATIVE(gt__, BOOL_VAL, >);

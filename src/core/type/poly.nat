@@ -131,6 +131,8 @@ class PolyTypeSystem extends AdhocTypeSystem {
   }
 
   instantiate(func, *args) => {
+    print func;
+
     let state = this.newState();
   
     let tApp = typeVar();

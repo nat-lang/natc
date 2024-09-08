@@ -16,8 +16,11 @@ class Sequential extends Object {
   }
 
   __in__(value) => {
-    for (x in this)
+    for (x in this) {
+      print x;
+      print value;
       if (value == x) return true;
+    }
 
     return false;
   }

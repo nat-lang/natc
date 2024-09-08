@@ -387,6 +387,7 @@ bool astUpvalues(ObjClosure* closure, bool root) {
 
     if (!vmInitInstance(upvalue, 3)) return AST_INSTRUCTION_FAIL;
   }
+
   return vmTuplify(closure->upvalueCount, true);
 }
 

@@ -1105,8 +1105,6 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        unwrapString(&val);
-
         switch (OBJ_TYPE(obj)) {
           case OBJ_INSTANCE: {
             ObjInstance* instance = AS_INSTANCE(obj);
@@ -1124,6 +1122,7 @@ InterpretResult vmExecute(int baseFrame) {
             }
 
             uint32_t hash;
+            if (!unwrapString(&val)) return INTERPRET_RUNTIME_ERROR;
             if (!vmHashValue(val, &hash)) return INTERPRET_RUNTIME_ERROR;
 
             bool hasKey = mapHasHash(&instance->fields, val, hash) ||
@@ -1134,6 +1133,7 @@ InterpretResult vmExecute(int baseFrame) {
           case OBJ_CLASS: {
             ObjClass* klass = AS_CLASS(obj);
             uint32_t hash;
+            if (!unwrapString(&val)) return INTERPRET_RUNTIME_ERROR;
             if (!vmHashValue(val, &hash)) return false;
 
             bool hasKey = mapHasHash(&klass->fields, val, hash);
