@@ -374,6 +374,7 @@ static void signFunction(Compiler* cmp, Compiler* sigCmp, Compiler* enclosing) {
   DEBUG_CHUNK()
 }
 
+static int infixPrecedence(Compiler* cmp);
 static void function(Compiler* enclosing, FunctionType type, Token name);
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name);
 static void expression(Compiler* cmp);
@@ -656,7 +657,7 @@ static void undefined(Compiler* cmp, bool canAssign) {
   emitByte(cmp, OP_UNDEFINED);
 }
 
-static void namedVariable(Compiler* cmp, Token name, bool canAssign) {
+static int namedVariable(Compiler* cmp, Token name, bool canAssign) {
   uint8_t getOp, setOp;
 
   int arg = resolveLocal(cmp, &name);
@@ -686,6 +687,8 @@ static void namedVariable(Compiler* cmp, Token name, bool canAssign) {
   } else {
     emitConstInstr(cmp, getOp, arg);
   }
+
+  return arg;
 }
 
 static int nativeCall(Compiler* cmp, char* name) {
@@ -1057,8 +1060,10 @@ static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
 }
 
 static void method(Compiler* cmp) {
+  int infixPrec = infixPrecedence(cmp->enclosing);
+
   consumeIdentifier(cmp, "Expect method name.");
-  uint16_t constant = identifierConstant(cmp, &parser.previous);
+  uint16_t var = identifierConstant(cmp, &parser.previous);
   FunctionType type = TYPE_METHOD;
 
   if (parser.previous.length == 4 &&
@@ -1067,11 +1072,16 @@ static void method(Compiler* cmp) {
   }
 
   function(cmp, type, parser.previous);
-  emitConstInstr(cmp, OP_METHOD, constant);
+  emitConstInstr(cmp, OP_METHOD, var);
 
   if (!prev(TOKEN_RIGHT_BRACE)) {
     consume(cmp, TOKEN_SEMICOLON,
             "Expect ';' after method with expression body.");
+  }
+
+  if (infixPrec != 0) {
+    Value name = cmp->function->chunk.constants.values[var];
+    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrec));
   }
 }
 
@@ -1436,13 +1446,22 @@ static void classDeclaration(Compiler* cmp) {
   currentClass = currentClass->enclosing;
 }
 
-static int precedence(Compiler* cmp) {
+static int infixPrecedence(Compiler* cmp) {
   int prec = 0;
-  if (cmp->scopeDepth > 0) error(cmp, "Can only infix globals.");
-  advance(cmp);
+  int sign;
 
-  if (check(TOKEN_LEFT_PAREN)) {
-    advance(cmp);
+  // infix associativity defaults to left, so the infixl
+  // declaration is vacuous, but we support it for symmetry.
+  if (match(cmp, TOKEN_INFIX) || match(cmp, TOKEN_INFIX_LEFT))
+    sign = 1;
+  else if (match(cmp, TOKEN_INFIX_RIGHT))
+    sign = -1;
+  else
+    return prec;
+
+  if (cmp->scopeDepth > 0) error(cmp, "Can only infix globals.");
+
+  if (match(cmp, TOKEN_LEFT_PAREN)) {
     consume(cmp, TOKEN_NUMBER, "Expect numeral precedence.");
 
     prec = strtod(parser.previous.start, NULL);
@@ -1453,18 +1472,12 @@ static int precedence(Compiler* cmp) {
   } else {
     prec = PREC_FACTOR;
   }
-  return prec;
+
+  return prec * sign;
 }
 
 static void letDeclaration(Compiler* cmp) {
-  int infixPrecedence = 0;
-
-  // infixation associativity defaults to left, so the infixl
-  // declaration is vacuous, but we support it for symmetry.
-  if (check(TOKEN_INFIX) || check(TOKEN_INFIX_LEFT))
-    infixPrecedence = precedence(cmp);
-  else if (check(TOKEN_INFIX_RIGHT))
-    infixPrecedence = precedence(cmp) * -1;
+  int infixPrec = infixPrecedence(cmp);
 
   uint16_t var = parseVariable(cmp, "Expect variable name.");
   Token name = parser.previous;
@@ -1496,9 +1509,9 @@ static void letDeclaration(Compiler* cmp) {
     emitByte(cmp, OP_POP);  // the type.
   }
 
-  if (infixPrecedence != 0) {
+  if (infixPrec != 0) {
     Value name = cmp->function->chunk.constants.values[var];
-    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrecedence));
+    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrec));
   }
 }
 
