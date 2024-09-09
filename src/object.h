@@ -55,6 +55,7 @@ typedef enum {
   OBJ_NATIVE,
   OBJ_SEQUENCE,
   OBJ_STRING,
+  // OBJ_INTERPOLATION,
   OBJ_UPVALUE,
   OBJ_SPREAD,
   OBJ_VARIABLE,
@@ -116,7 +117,6 @@ struct ObjString {
   Obj obj;
   int length;
   char *chars;
-  uint32_t hash;
 };
 
 typedef struct ObjUpvalue {
@@ -221,10 +221,10 @@ bool mapSet(ObjMap *map, Value key, Value value);
 bool mapSetHash(ObjMap *map, Value key, Value value, uint32_t hash);
 bool mapDelete(ObjMap *map, Value key);
 void mapAddAll(ObjMap *from, ObjMap *to);
+void setStringChar(ObjString *string, ObjString *character, int idx);
 ObjString *mapFindString(ObjMap *map, const char *chars, int length,
                          uint32_t hash);
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
 bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
-bool objectsEqual(Obj *a, Obj *b);
 #endif

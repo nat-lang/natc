@@ -131,7 +131,7 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;
-  string->hash = hash;
+  string->obj.hash = hash;
 
   vmPush(OBJ_VAL(string));
   mapSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
@@ -178,6 +178,14 @@ ObjString* concatenateStrings(ObjString* a, ObjString* b) {
   chars[length] = '\0';
 
   return takeString(chars, length);
+}
+
+void setStringChar(ObjString* string, ObjString* character, int idx) {
+  *(string->chars + idx) = *character->chars;
+
+  uint32_t hash = hashString(string->chars, string->length);
+
+  string->obj.hash = hash;
 }
 
 ObjString* intern(const char* chars) {
@@ -344,7 +352,7 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
       if (IS_NIL(entry->value)) return NULL;
     } else if (IS_STRING(entry->key) &&
                AS_STRING(entry->key)->length == length &&
-               AS_STRING(entry->key)->hash == hash &&
+               AS_STRING(entry->key)->obj.hash == hash &&
                memcmp(AS_STRING(entry->key)->chars, chars, length) == 0) {
       // We found it.
       return AS_STRING(entry->key);
@@ -397,12 +405,6 @@ bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
   }
 
   return false;
-}
-
-bool objectsEqual(Obj* a, Obj* b) {
-  if (a->hash != 0 && b->hash != 0) return a->hash == b->hash;
-
-  return a == b;
 }
 
 void printObject(Value value) {
