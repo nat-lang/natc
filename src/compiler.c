@@ -50,6 +50,8 @@ static void gotoParser(Parser checkpoint) {
   parser = checkpoint;
 }
 
+static void rewindParser() { rewindScanner(parser.current); }
+
 static void errorAt(Compiler* cmp, Token* token, const char* message) {
   if (parser.panicMode)
     return;
@@ -109,6 +111,11 @@ static void advance(Compiler* cmp) {
   shiftParser();
   parser.next = scanToken();
   checkError(cmp);
+}
+
+static void advanceVirtual(Compiler* cmp, char c) {
+  parser.next = virtualToken(c);
+  advance(cmp);
 }
 
 static void advanceSlashedIdentifier(Compiler* cmp) {
@@ -176,12 +183,10 @@ bool advanceTo(Compiler* cmp, TokenType token, TokenType closing,
     if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
         check(TOKEN_RIGHT_PAREN))
       depth--;
-
     // found one.
     if (check(token) && depth == initialDepth) return true;
     // found none.
     if (check(closing) && depth == 0) return false;
-
     advance(cmp);
   }
 }
@@ -649,8 +654,41 @@ static void number(Compiler* cmp, bool canAssign) {
 }
 
 static void string(Compiler* cmp, bool canAssign) {
+  ObjString* str =
+      copyString(parser.previous.start + 1, parser.previous.length - 2);
+  loadConstant(cmp, OBJ_VAL(str));
+}
+
+static void interpolation(Compiler* cmp, bool canAssign) {
+  getGlobalConstant(cmp, "+");
+  getGlobalConstant(cmp, "+");
   loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
-                                       parser.previous.length - 2)));
+                                       parser.previous.length - 1)));
+
+  consume(cmp, TOKEN_LEFT_BRACE, "Expecting '{'.");
+
+  getGlobalConstant(cmp, "str");
+  expression(cmp);
+
+  emitBytes(cmp, OP_CALL, 1);
+  emitBytes(cmp, OP_CALL, 2);
+
+  if (check(TOKEN_RIGHT_BRACE)) {
+    // unparse and reparse the next token.
+    rewindParser();
+    advanceVirtual(cmp, '"');
+
+    if (match(cmp, TOKEN_STRING))
+      string(cmp, canAssign);
+    else if (match(cmp, TOKEN_INTERPOLATION))
+      interpolation(cmp, canAssign);
+    else
+      return;
+
+    emitBytes(cmp, OP_CALL, 2);
+  } else {
+    error(cmp, "Expecting '}'.");
+  }
 }
 
 static void undefined(Compiler* cmp, bool canAssign) {
@@ -809,8 +847,9 @@ static SignatureType peekSignatureType(Compiler* cmp) {
     if (!check(TOKEN_RIGHT_PAREN)) {
       do {
         if (!matchParamOrPattern(cmp)) return SIG_NOT;
-        if (check(TOKEN_COLON))
+        if (check(TOKEN_COLON)) {
           advanceTo(cmp, TOKEN_COMMA, TOKEN_RIGHT_PAREN, 1);
+        }
 
       } while (match(cmp, TOKEN_COMMA));
     }
@@ -1791,6 +1830,7 @@ ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {variable, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_INTERPOLATION] = {interpolation, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_AND] = {NULL, and_, PREC_AND, PREC_NONE},
     [TOKEN_OR] = {NULL, or_, PREC_OR, PREC_NONE},

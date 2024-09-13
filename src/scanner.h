@@ -29,6 +29,7 @@ typedef enum {
   TOKEN_IDENTIFIER,
   TOKEN_TYPE_VARIABLE,
   TOKEN_STRING,
+  TOKEN_INTERPOLATION,
   TOKEN_NUMBER,
   // Keywords.
   TOKEN_AND,
@@ -76,7 +77,9 @@ Scanner initScanner(const char* source);
 Scanner saveScanner();
 void initToken(Token* token);
 Token syntheticToken(const char* start);
+Token virtualToken(char c);
 void gotoScanner(Scanner scanner);
+void rewindScanner(Token token);
 void printScanner(Scanner sc);
 void skipWhitespace();
 Token scanToken();

@@ -38,6 +38,10 @@ Scanner saveScanner() {
 
 void gotoScanner(Scanner checkpoint) { scanner = checkpoint; }
 
+void rewindScanner(Token token) {
+  scanner.current = scanner.start = token.start;
+}
+
 static bool isAlpha(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
@@ -290,6 +294,8 @@ static Token number() {
 
 static Token string() {
   while (peek() != '"' && !isAtEnd()) {
+    if (peek() == '{') return makeToken(TOKEN_INTERPOLATION);
+
     if (peek() == '\n') scanner.line++;
     advance();
   }
@@ -301,14 +307,7 @@ static Token string() {
   return makeToken(TOKEN_STRING);
 }
 
-Token scanToken() {
-  skipWhitespace();
-  scanner.start = scanner.current;
-
-  if (isAtEnd()) return makeToken(TOKEN_EOF);
-
-  char c = advance();
-
+Token consumeToken(char c) {
   switch (c) {
     case '(':
       return makeToken(TOKEN_LEFT_PAREN);
@@ -362,4 +361,21 @@ Token scanToken() {
   if (isDigit(c)) return number();
 
   return errorToken("Unexpected character.");
+}
+
+Token virtualToken(char c) {
+  if (isAtEnd()) return makeToken(TOKEN_EOF);
+
+  return consumeToken(c);
+}
+
+Token scanToken() {
+  skipWhitespace();
+  scanner.start = scanner.current;
+
+  if (isAtEnd()) return makeToken(TOKEN_EOF);
+
+  char c = advance();
+
+  return consumeToken(c);
 }

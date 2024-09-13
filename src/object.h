@@ -55,7 +55,6 @@ typedef enum {
   OBJ_NATIVE,
   OBJ_SEQUENCE,
   OBJ_STRING,
-  // OBJ_INTERPOLATION,
   OBJ_UPVALUE,
   OBJ_SPREAD,
   OBJ_VARIABLE,
@@ -81,6 +80,12 @@ typedef struct {
   int capacity;
   MapEntry *entries;
 } ObjMap;
+
+typedef struct {
+  Obj obj;
+  int length;
+  char *chars;
+} ObjString;
 
 typedef struct {
   Obj obj;
@@ -112,12 +117,6 @@ typedef struct {
   ObjString *name;
   NativeFn function;
 } ObjNative;
-
-struct ObjString {
-  Obj obj;
-  int length;
-  char *chars;
-};
 
 typedef struct ObjUpvalue {
   Obj obj;
