@@ -83,6 +83,12 @@ typedef struct {
 
 typedef struct {
   Obj obj;
+  int length;
+  char *chars;
+} ObjString;
+
+typedef struct {
+  Obj obj;
   ObjString *name;
 } ObjVariable;
 
@@ -111,13 +117,6 @@ typedef struct {
   ObjString *name;
   NativeFn function;
 } ObjNative;
-
-struct ObjString {
-  Obj obj;
-  int length;
-  char *chars;
-  uint32_t hash;
-};
 
 typedef struct ObjUpvalue {
   Obj obj;
@@ -221,10 +220,10 @@ bool mapSet(ObjMap *map, Value key, Value value);
 bool mapSetHash(ObjMap *map, Value key, Value value, uint32_t hash);
 bool mapDelete(ObjMap *map, Value key);
 void mapAddAll(ObjMap *from, ObjMap *to);
+void setStringChar(ObjString *string, ObjString *character, int idx);
 ObjString *mapFindString(ObjMap *map, const char *chars, int length,
                          uint32_t hash);
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
 bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
-bool objectsEqual(Obj *a, Obj *b);
 #endif

@@ -598,16 +598,32 @@ static bool isFalsey(Value value) {
          (IS_BOOL(value) && !AS_BOOL(value));
 }
 
-static bool validateSeqIdx(ObjSequence* seq, Value idx) {
-  if (!IS_INTEGER(idx)) {
-    vmRuntimeError("Sequences must be indexed by integer.");
+static bool assertInt(Value value, char* msg) {
+  if (!IS_INTEGER(value)) {
+    vmRuntimeError(msg);
+    return false;
+  }
+  return true;
+}
+
+static bool validateStrIdx(ObjString* str, Value idx) {
+  if (!assertInt(idx, "Strings must be indexed by integer.")) return false;
+  int intIdx = AS_NUMBER(idx);
+  if (intIdx > str->length - 1 || intIdx < 0) {
+    vmRuntimeError("Index %i out of bounds for string of length %i.", intIdx,
+                   str->length);
     return false;
   }
 
+  return true;
+}
+
+static bool validateSeqIdx(ObjSequence* seq, Value idx) {
+  if (!assertInt(idx, "Sequences must be indexed by integer.")) return false;
   int intIdx = AS_NUMBER(idx);
 
   if (intIdx > seq->values.count - 1 || intIdx < 0) {
-    vmRuntimeError("Index %i out of bounds for sequence (length %i).", intIdx,
+    vmRuntimeError("Index %i out of bounds for sequence of length %i.", intIdx,
                    seq->values.count);
     return false;
   }
@@ -1163,95 +1179,137 @@ InterpretResult vmExecute(int baseFrame) {
                        AS_STRING(msg)->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
-
       case OP_SUBSCRIPT_GET: {
         Value key = vmPop();
         Value obj = vmPop();
 
-        // indexed access to sequences.
-        if (IS_SEQUENCE(obj)) {
-          ObjSequence* seq = AS_SEQUENCE(obj);
-          if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
-          int idx = AS_NUMBER(key);
-          vmPush(seq->values.values[idx]);
-          break;
-        }
-
-        if (!IS_INSTANCE(obj)) {
-          vmRuntimeError(
-              "Only objects, sequences, and instances with a '%s' method "
-              "support access by subscript.",
-              S_SUBSCRIPT_GET);
+        if (!IS_OBJ(obj)) {
+          vmRuntimeError("Only objects support subscription.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        // classes may define their own subscript access operator.
-        ObjInstance* instance = AS_INSTANCE(obj);
-        Value getFn;
-        if (mapGet(&instance->klass->fields, INTERN(S_SUBSCRIPT_GET), &getFn)) {
-          // set up the context for the function call.
-          vmPush(obj);  // receiver.
-          vmPush(key);
+        switch (OBJ_TYPE(obj)) {
+          case OBJ_SEQUENCE: {
+            ObjSequence* seq = AS_SEQUENCE(obj);
+            if (!validateSeqIdx(seq, key)) return INTERPRET_RUNTIME_ERROR;
+            int idx = AS_NUMBER(key);
+            vmPush(seq->values.values[idx]);
+            break;
+          }
+          case OBJ_STRING: {
+            ObjString* string = AS_STRING(obj);
+            if (!validateStrIdx(string, key)) return INTERPRET_RUNTIME_ERROR;
+            int idx = AS_NUMBER(key);
+            ObjString* character = copyString(string->chars + idx, 1);
+            vmPush(OBJ_VAL(character));
+            break;
+          }
+          case OBJ_INSTANCE: {
+            // classes may define their own subscript access operator.
+            ObjInstance* instance = AS_INSTANCE(obj);
+            Value getFn;
+            if (mapGet(&instance->klass->fields, INTERN(S_SUBSCRIPT_GET),
+                       &getFn)) {
+              // set up the context for the function call.
+              vmPush(obj);  // receiver.
+              vmPush(key);
 
-          if (!vmCallValue(getFn, 1)) return INTERPRET_RUNTIME_ERROR;
-          frame = &vm.frames[vm.frameCount - 1];
-          break;
-        }
+              if (!vmCallValue(getFn, 1)) return INTERPRET_RUNTIME_ERROR;
+              frame = &vm.frames[vm.frameCount - 1];
+              break;
+            }
 
-        // otherwise fall back to property access.
-        uint32_t hash;
-        if (!vmHashValue(key, &hash)) return INTERPRET_RUNTIME_ERROR;
+            // otherwise fall back to property access.
+            uint32_t hash;
+            if (!vmHashValue(key, &hash)) return INTERPRET_RUNTIME_ERROR;
 
-        Value value;
-        if (mapGetHash(&instance->fields, key, &value, hash)) {
-          vmPush(value);
-        } else {
-          // we don't throw an error if the property doesn't exist.
-          vmPush(NIL_VAL);
+            Value value;
+            if (mapGetHash(&instance->fields, key, &value, hash)) {
+              vmPush(value);
+            } else {
+              // we don't throw an error if the property doesn't exist.
+              vmPush(NIL_VAL);
+            }
+            break;
+          }
+          default: {
+            vmRuntimeError(
+                "Only objects, sequences, and instances with a '%s' method "
+                "support access by subscript.",
+                S_SUBSCRIPT_GET);
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
         break;
       }
       case OP_SUBSCRIPT_SET: {
-        // indexed assignment to sequences.
-        if (IS_SEQUENCE(vmPeek(2))) {
-          ObjSequence* seq = AS_SEQUENCE(vmPeek(2));
-
-          if (!validateSeqIdx(seq, vmPeek(1))) return INTERPRET_RUNTIME_ERROR;
-          int idx = AS_NUMBER(vmPeek(1));
-          seq->values.values[idx] = vmPeek(0);
-
-          // leave the sequence on the stack.
-          vmPop();  // val.
-          vmPop();  // key.
-          break;
-        }
-
-        if (!IS_INSTANCE(vmPeek(2))) {
-          vmRuntimeError(
-              "Only objects, sequences, and instances with a '%s' method "
-              "support assignment by subscript.",
-              S_SUBSCRIPT_SET);
+        if (!IS_OBJ(vmPeek(2))) {
+          vmRuntimeError("Only objects support subscription.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        // classes may define their own subscript setting operator.
-        ObjInstance* instance = AS_INSTANCE(vmPeek(2));
-        Value setFn;
-        if (mapGet(&instance->klass->fields, INTERN(S_SUBSCRIPT_SET), &setFn)) {
-          // the stack is already ready for the function call.
-          if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
-          frame = &vm.frames[vm.frameCount - 1];
-          break;
+        switch (OBJ_TYPE(vmPeek(2))) {
+          case OBJ_SEQUENCE: {
+            ObjSequence* seq = AS_SEQUENCE(vmPeek(2));
+
+            if (!validateSeqIdx(seq, vmPeek(1))) return INTERPRET_RUNTIME_ERROR;
+            int idx = AS_NUMBER(vmPeek(1));
+            seq->values.values[idx] = vmPeek(0);
+
+            // leave the sequence on the stack.
+            vmPop();  // val.
+            vmPop();  // key.
+            break;
+          }
+          case OBJ_STRING: {
+            ObjString* string = AS_STRING(vmPeek(2));
+            if (!validateStrIdx(string, vmPeek(1)))
+              return INTERPRET_RUNTIME_ERROR;
+            int idx = AS_NUMBER(vmPeek(1));
+
+            if (!IS_STRING(vmPeek(0)) && AS_STRING(vmPeek(0))->length == 1) {
+              vmRuntimeError("Must be character.");
+              return false;
+            }
+
+            ObjString* character = AS_STRING(vmPeek(0));
+            setStringChar(string, character, idx);
+            // leave the string on the stack.
+            vmPop();  // val.
+            vmPop();  // key.
+            break;
+          }
+          case OBJ_INSTANCE: {
+            // classes may define their own subscript setting operator.
+            ObjInstance* instance = AS_INSTANCE(vmPeek(2));
+            Value setFn;
+            if (mapGet(&instance->klass->fields, INTERN(S_SUBSCRIPT_SET),
+                       &setFn)) {
+              // the stack is already ready for the function call.
+              if (!vmCallValue(setFn, 2)) return INTERPRET_RUNTIME_ERROR;
+              frame = &vm.frames[vm.frameCount - 1];
+              break;
+            }
+
+            // otherwise fall back to property access.
+            uint32_t hash;
+            if (!vmHashValue(vmPeek(1), &hash)) return INTERPRET_RUNTIME_ERROR;
+
+            mapSetHash(&instance->fields, vmPeek(1), vmPeek(0), hash);
+            // leave the object on the stack.
+            vmPop();  // val.
+            vmPop();  // key.
+            break;
+          }
+          default: {
+            vmRuntimeError(
+                "Only objects, sequences, and instances with a '%s' method "
+                "support assignment by subscript.",
+                S_SUBSCRIPT_SET);
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
 
-        // otherwise fall back to property access.
-        uint32_t hash;
-        if (!vmHashValue(vmPeek(1), &hash)) return INTERPRET_RUNTIME_ERROR;
-
-        mapSetHash(&instance->fields, vmPeek(1), vmPeek(0), hash);
-        // leave the object on the stack.
-        vmPop();  // val.
-        vmPop();  // key.
         break;
       }
       case OP_DESTRUCTURE: {

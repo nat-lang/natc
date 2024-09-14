@@ -179,38 +179,37 @@ bool __randomNumber__(int argCount, Value* args) {
 }
 
 bool __length__(int argCount, Value* args) {
-  if (IS_SEQUENCE(vmPeek(0))) {
-    ObjSequence* seq = AS_SEQUENCE(vmPeek(0));
-    vmPop();
-    vmPop();  // native fn.
-    vmPush(NUMBER_VAL(seq->values.count));
-    return true;
-  }
-
-  // use the object's length method if defined.
-  if (!IS_INSTANCE(vmPeek(0))) {
-    vmRuntimeError("Only sequences and objects with a '%s' method have length.",
-                   S_LEN);
-    vmPop();
-    vmPop();  // native fn.
-    return false;
-  }
-
-  ObjInstance* instance = AS_INSTANCE(vmPeek(0));
-  Value method;
-  if (mapGet(&instance->klass->fields, INTERN(S_LEN), &method)) {
-    // set up the context for the function call.
-    vmPop();
-    vmPop();                    // native fn.
-    vmPush(OBJ_VAL(instance));  // receiver.
-    return vmCallValue(method, 0);
-  }
-
-  // otherwise default to the instance's field count.
-  vmPop();
+  Value obj = vmPop();
   vmPop();  // native fn.
-  vmPush(NUMBER_VAL(instance->fields.count));
-  return true;
+  switch (OBJ_TYPE(obj)) {
+    case OBJ_SEQUENCE: {
+      ObjSequence* seq = AS_SEQUENCE(obj);
+      vmPush(NUMBER_VAL(seq->values.count));
+      return true;
+    }
+    case OBJ_INSTANCE: {
+      ObjInstance* instance = AS_INSTANCE(obj);
+      Value method;
+      if (mapGet(&instance->klass->fields, INTERN(S_LEN), &method)) {
+        vmPush(OBJ_VAL(instance));  // receiver.
+        return vmCallValue(method, 0);
+      }
+
+      // otherwise default to the instance's field count.
+      vmPush(NUMBER_VAL(instance->fields.count));
+      return true;
+    }
+    case OBJ_STRING: {
+      ObjString* string = AS_STRING(obj);
+      vmPush(NUMBER_VAL(string->length));
+      return true;
+    }
+    default: {
+      vmRuntimeError(
+          "Only sequences and objects with a '%s' method have length.", S_LEN);
+      return false;
+    }
+  }
 }
 
 bool __hash__(int argCount, Value* args) {

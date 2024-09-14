@@ -9,11 +9,47 @@ assert(a != b);
 
 assert(a + b == "ab");
 
-
 let x = str(1) + str(2);
 
 assert(x == "12");
 
-class A {}
+// length.
 
-assert(str(A) == "A");
+assert(len("a") == 1);
+assert(len("ab") == 2);
+
+// indexed access.
+
+assert("abc"[0] == "a");
+assert("abc"[1] == "b");
+assert("abc"[2] == "c");
+
+// indexed assignment.
+
+let x = "abc";
+
+x[0] = "c";
+x[2] = "a";
+
+assert(x == "cba");
+
+// interpolation.
+
+assert("{"a"}" == "a");
+
+assert("a {"b"} c" == "a b c");
+
+assert("a {"b"} {"c"} d" == "a b c d");
+
+assert("a {"{"b"}"} c" == "a b c");
+
+assert("a {"{"{"b"} c {"d"}"}"} e" == "a b c d e");
+
+assert("a {1} c" == "a 1 c");
+
+class b {}
+assert("a {b} c" == "a b c");
+
+assert("a {(() => "b")()} c" == "a b c");
+
+assert("a {(() => "{(() => "b")()}")()} c" == "a b c");

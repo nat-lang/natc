@@ -74,6 +74,7 @@ void printValueArray(ValueArray* array) {
 
 bool valuesEqual(Value a, Value b) {
   if (a.vType != b.vType) return false;
+
   switch (a.vType) {
     case VAL_UNDEF:
     case VAL_UNIT:
@@ -83,8 +84,15 @@ bool valuesEqual(Value a, Value b) {
       return AS_BOOL(a) == AS_BOOL(b);
     case VAL_NUMBER:
       return AS_NUMBER(a) == AS_NUMBER(b);
-    case VAL_OBJ:
-      return objectsEqual(AS_OBJ(a), AS_OBJ(b));
+    case VAL_OBJ: {
+      Obj* aObj = AS_OBJ(a);
+      Obj* bObj = AS_OBJ(b);
+
+      if (aObj->hash != 0 && bObj->hash != 0) return aObj->hash == bObj->hash;
+
+      // do they point to the same place on the heap?
+      return aObj == bObj;
+    }
     default:
       return false;  // Unreachable.
   }
@@ -144,8 +152,6 @@ uint32_t hashValue(Value value) {
     case VAL_OBJ: {
       Obj* object = AS_OBJ(value);
       switch (object->oType) {
-        case OBJ_STRING:
-          return ((ObjString*)object)->hash;
         case OBJ_CLASS:
           return hashNumber((uintptr_t)object);
         default:
