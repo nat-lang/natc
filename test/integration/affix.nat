@@ -63,3 +63,13 @@ assert(tree = [[1 0] 1]);
 
 let tree = 1 right 0 left 1;
 assert(tree = [1 [0 1]]);
+
+// methods.
+
+class A {
+  init(v) => { this.v = v; }
+  infix *(that) => A(this.v * that.v);
+  __eq__(that) => this.v == that.v;
+}
+
+assert(A(1) * A(3) == A(3));

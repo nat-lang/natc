@@ -111,6 +111,7 @@ bool initVM() {
   initMap(&vm.globals);
   initMap(&vm.strings);
   initMap(&vm.infixes);
+  initMap(&vm.methodInfixes);
 
   initCore(&vm.core);
 
@@ -954,9 +955,37 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_CALL_INFIX: {
-        Value right = vmPop();
-        Value infix = vmPop();
-        Value left = vmPop();
+        Value name = READ_CONSTANT();
+
+        Value right = vmPeek(0);
+        Value infix = vmPeek(1);
+        Value left = vmPeek(2);
+
+        if (IS_INSTANCE(left) && IS_INSTANCE(right)) {
+          ObjClass lca;
+          if (leastCommonAncestor(AS_INSTANCE(left)->klass,
+                                  AS_INSTANCE(right)->klass, &lca)) {
+            Value method;
+            if (mapGet(&lca.fields, name, &method)) {
+              vmPop();
+              vmPop();
+              vmPush(right);
+              if (!vmCallValue(method, 1)) return INTERPRET_RUNTIME_ERROR;
+
+              frame = &vm.frames[vm.frameCount - 1];
+              break;
+            }
+          }
+        }
+
+        if (IS_UNDEF(infix)) {
+          vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        vmPop();
+        vmPop();
+        vmPop();
 
         vmPush(infix);
         vmPush(left);
@@ -1108,6 +1137,7 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        vmPop();
         break;
       }
       case OP_THROW: {

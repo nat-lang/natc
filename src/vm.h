@@ -78,6 +78,7 @@ typedef struct {
   ObjMap globals;
   ObjMap typeEnv;
   ObjMap infixes;
+  ObjMap methodInfixes;
 
   Obj* objects;
   ObjUpvalue* openUpvalues;
