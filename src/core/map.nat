@@ -9,7 +9,7 @@ class Map extends Object {
   // Does each key in [this] map to the same value in [that]?
   subMap(that) => {
     for (key in this.keys()) {
-      if (!(key in that)) return false;
+      if (key not in that) return false;
       if (that[key] != this[key]) return false;
     }
     return true;

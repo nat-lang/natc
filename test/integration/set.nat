@@ -14,7 +14,7 @@ assert(set.union(set) == set);
 assert(set.intersection(set) == set);
 assert(set.complement(set) == set);
 
-assert(!(1 in set));
+assert(1 not in set);
 assert(!set(1));
 
 // num set.
@@ -26,8 +26,8 @@ assert(set(1));
 assert(1 in set);
 assert(2 in set);
 assert(3 in set);
-assert(!(4 in set));
-  
+assert(4 not in set);
+
 assert(set.subset({1,2,3,4}));
 assert(set.subsetEq({1,2,3,4}));
 
@@ -52,7 +52,7 @@ assert(set("a"));
 assert("a" in set);
 assert("b" in set);
 assert("c" in set);
-assert(!("d" in set));
+assert("d" not in set);
 
 assert(set.subset({"a","b","c","d"}));
 assert(set.subsetEq({"a","b","c","d"}));

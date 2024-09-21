@@ -483,7 +483,7 @@ class SimpleTypeState {
   }
 
   // The occurs check.
-  occurs(var: TVar, type: Type) => !(type is TVar) and var in type.fvs();
+  occurs(var: TVar, type: Type) => type is not TVar and var in type.fvs();
 
   unify(constraint: Constraint) => {
     let unified = this._unify(constraint);

@@ -72,14 +72,14 @@ class PolyTypeState extends AdhocTypeState {
     if (left is TAbstract) {
       if (left.variadic and right is ->)
         left = left.instantiateWith(len(right.domain));
-      else if (!(right is TVar))
+      else if (right is not TVar)
         left = left.instantiate();
     }
     
     if (right is TAbstract) {
       if (right.variadic and left is ->)
         right = right.instantiateWith(len(left.domain));
-      else if (!(left is TVar))
+      else if (left is not TVar)
         right = right.instantiate();
     }
     
