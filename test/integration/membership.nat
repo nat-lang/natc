@@ -5,7 +5,7 @@ let seq = [1,2,3];
 assert(1 in seq);
 assert(2 in seq);
 assert(3 in seq);
-assert(!(4 in seq));
+assert(4 not in seq);
 
 // extensible membership.
 

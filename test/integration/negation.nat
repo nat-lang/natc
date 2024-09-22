@@ -1,0 +1,27 @@
+
+//
+
+assert(0 not in [1,2]);
+assert(1 in [1,2]);
+assert(2 in [1,2]);
+assert(3 not in [1,2]);
+
+//
+
+let z = [x | x in [1,2], x not in [1]];
+
+assert(z == [2]);
+
+let z = [x | x in [1,2], x not in [2]];
+
+assert(z == [1]);
+
+//
+
+class A {}
+class B {}
+
+assert(A() is A);
+assert(A() is not B);
+assert(B() is not A);
+assert(B() is B);

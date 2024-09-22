@@ -135,6 +135,7 @@ static bool checkVariable() {
 // Keyword symbols that are also valid identifiers
 // aren't tokenized, so we need to check for the
 // bare string.
+
 static bool checkStr(char* str) {
   return strncmp(parser.current.start, str, strlen(str)) == 0;
 }
@@ -390,7 +391,7 @@ static void declaration(Compiler* cmp);
 static void declarations(Compiler* cmp);
 static void classDeclaration(Compiler* cmp);
 static ParseRule* getRule(Token token);
-static ParseRule* getInfixableRule(Compiler* cmp, Token token);
+static ParseRule* getInfixRule(Compiler* cmp, Token token);
 static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
                                      DelimitFn fn);
 static void parsePrecedence(Compiler* cmp, Precedence precedence);
@@ -540,7 +541,7 @@ static uint8_t argumentList(Compiler* cmp) {
 
 static void binary(Compiler* cmp, bool canAssign) {
   TokenType operatorType = parser.previous.type;
-  ParseRule* rule = getInfixableRule(cmp, parser.previous);
+  ParseRule* rule = getInfixRule(cmp, parser.previous);
   parsePrecedence(cmp, (Precedence)(rule->rightPrec));
 
   switch (operatorType) {
@@ -757,7 +758,7 @@ static void variable(Compiler* cmp, bool canAssign) {
 }
 
 static void infix(Compiler* cmp, bool canAssign) {
-  ParseRule* rule = getInfixableRule(cmp, parser.previous);
+  ParseRule* rule = getInfixRule(cmp, parser.previous);
   uint16_t name = identifierConstant(cmp, &parser.previous);
   variable(cmp, canAssign);
 
@@ -804,6 +805,30 @@ static void unary(Compiler* cmp, bool canAssign) {
       break;
     default:
       return;  // Unreachable.
+  }
+}
+
+static void prefixNot(Compiler* cmp, bool canAssign) {
+  ParseRule* penultRule = getInfixRule(cmp, parser.penult);
+  if (penultRule->infix != NULL && penultRule->infix != call) {
+    getGlobalConstant(cmp, "negate");
+    emitBytes(cmp, OP_CALL_POSTFIX, 1);
+    parsePrecedence(cmp, penultRule->rightPrec);
+  } else {
+    error(cmp, "'not' must compose with an infix.");
+  }
+}
+
+static void infixNot(Compiler* cmp, bool canAssign) {
+  ParseRule* currentRule = getInfixRule(cmp, parser.current);
+
+  // negation takes scope over infixes.
+  if (currentRule->infix != NULL) {
+    advance(cmp);
+    binary(cmp, canAssign);
+    emitByte(cmp, OP_NOT);
+  } else {
+    error(cmp, "'not' must compose with an infix.");
   }
 }
 
@@ -1842,6 +1867,7 @@ ParseRule rules[] = {
     [TOKEN_IF] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_IN] = {NULL, binary, PREC_COMPARISON, PREC_COMPARISON + PREC_STEP},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_NOT] = {prefixNot, infixNot, PREC_CALL, PREC_CALL},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SUPER] = {super_, NULL, PREC_NONE, PREC_NONE},
@@ -1876,7 +1902,7 @@ static void setPrecedence(Compiler* cmp, ParseRule* rule, int prec) {
 // Look up the rule for the [token]'s type, unless the
 // [token] is an identifier, in which case check the vm's
 // infix table for a user-defined infixation precedence.
-static ParseRule* getInfixableRule(Compiler* cmp, Token token) {
+static ParseRule* getInfixRule(Compiler* cmp, Token token) {
   if (token.type == TOKEN_IDENTIFIER) {
     Value name = identifierToken(token);
     Value prec;
@@ -1899,7 +1925,6 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
   advance(cmp);
 
   ParseFn prefixRule = getRule(parser.previous)->prefix;
-
   if (prefixRule == NULL) {
     error(cmp, "Expect expression.");
     return;
@@ -1909,7 +1934,7 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
   prefixRule(cmp, canAssign);
 
   while (delimit == NULL || !delimit()) {
-    ParseRule* infixRule = getInfixableRule(cmp, parser.current);
+    ParseRule* infixRule = getInfixRule(cmp, parser.current);
 
     if (precedence > infixRule->leftPrec) break;
 

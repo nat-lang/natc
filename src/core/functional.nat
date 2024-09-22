@@ -1,7 +1,7 @@
 
 let compose = (f, g) => x => f(g(x));
 
-let fmap = f seq => seq.map(f);
+let negate = f => (x, y) => !f(x, y);
 
 let zip = (x, y) => {
   if (len(x) != len(y))
