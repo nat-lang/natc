@@ -1,0 +1,11 @@
+
+import src/core/tex
+
+
+let t0 = [43 235 23];
+let t1 = [1 2 3 4];
+let t2 = [33 [23 3444] [3 4]];
+
+let doc = TreeDocument([t0,t1,t2]);
+
+print doc.render();

@@ -67,3 +67,7 @@ tree = tree.dmap((data) => {
 let sum = tree.reduce(+, 0);
 
 assert(sum == 28);
+
+//
+
+print tree.tex();
