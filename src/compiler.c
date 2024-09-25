@@ -280,13 +280,17 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->signature = NULL;
   cmp->signature = signature;
   cmp->function = NULL;
+<<<<<<< HEAD
   cmp->function = newFunction(currentModule);
+=======
+  cmp->function =
+      newFunction(copyString(name.start, name.length), currentModule);
+>>>>>>> feb6435 (wip)
   cmp->functionType = functionType;
   cmp->localCount = 0;
   cmp->scopeDepth = 0;
 
   vm.compiler = cmp;
-  cmp->function->name = copyString(name.start, name.length);
 
   for (int i = 0; i < UINT8_COUNT; i++) {
     cmp->locals[i].depth = 0;
@@ -848,7 +852,6 @@ static void defineVariable(Compiler* cmp, uint16_t var) {
     markInitialized(cmp);
     return;
   }
-
   emitConstInstr(cmp, OP_DEFINE_GLOBAL, var);
 }
 
@@ -1964,7 +1967,7 @@ static void declarations(Compiler* cmp) {
   while (!match(cmp, TOKEN_EOF)) declaration(cmp);
 }
 
-ObjFunction* compileModule(Compiler* root, const char* source, char* path,
+ObjFunction* compileModule(Compiler* enclosing, const char* source, char* path,
                            ObjModule* module) {
   currentModule = module;
 
@@ -1972,7 +1975,7 @@ ObjFunction* compileModule(Compiler* root, const char* source, char* path,
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, root, NULL, TYPE_MODULE, syntheticToken(path));
+  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, syntheticToken(path));
 
   declarations(&cmp);
 

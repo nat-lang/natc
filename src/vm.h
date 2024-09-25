@@ -68,12 +68,14 @@ typedef struct {
 } Core;
 
 typedef struct {
+  // stack.
   Value stack[STACK_MAX];
   Value* stackTop;
 
   CallFrame frames[FRAMES_MAX];
   int frameCount;
 
+  // heap.
   ObjMap strings;
   ObjMap globals;
   ObjMap typeEnv;
@@ -94,6 +96,7 @@ typedef struct {
   size_t bytesAllocated;
   size_t nextGC;
 
+  // root compiler.
   Compiler* compiler;
 } VM;
 
@@ -111,7 +114,7 @@ void freeVM();
 void vmRuntimeError(const char* format, ...);
 
 InterpretResult vmInterpretExpr(char* path, char* expr);
-InterpretResult vmInterpreSource(char* path, char* source);
+InterpretResult vmInterpretSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
 ObjModule* vmCompileModule(char* path);
 InterpretResult vmExecute(int baseFrame);
