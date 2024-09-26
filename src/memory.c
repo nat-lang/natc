@@ -132,6 +132,7 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)function->name);
       markMap(&function->fields);
       markArray(&function->chunk.constants);
+      markObject((Obj*)function->module);
       break;
     }
     case OBJ_VARIABLE: {
