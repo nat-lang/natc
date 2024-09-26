@@ -757,10 +757,10 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-#define ERROR "Can only get property of object, class, or function."
+        char* error = "Can only get property of object, class, or function.";
 
         if (!IS_OBJ(vmPeek(0))) {
-          vmRuntimeError(ERROR);
+          vmRuntimeError(error);
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -827,7 +827,7 @@ InterpretResult vmExecute(int baseFrame) {
             break;
           }
           default:
-            vmRuntimeError(ERROR);
+            vmRuntimeError(error);
             return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -1167,17 +1167,19 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        vmPush(OBJ_VAL(module));
 
-        ObjModule* enclosingModule = vm.module;
+        ObjModule* enclosing = vm.module;
+        vmPush(OBJ_VAL(module));  // imported.
+
         if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
         mapAddAll(&vm.module->namespace, &vm.globals);
-        vm.module = enclosingModule;
 
-        vmPop();
+        vmPop();  // imported.
+        vm.module = enclosing;
+
         break;
       }
       case OP_THROW: {
@@ -1429,8 +1431,8 @@ ObjModule* vmCompileModule(char* path, ModuleType type) {
   module->closure = closure;
 
   vmPop();  // module.
-  vmPop();  // objSource.
   vmPop();  // objPath.
+  vmPop();  // objSource.
 
   return module;
 }
