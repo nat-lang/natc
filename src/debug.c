@@ -158,7 +158,19 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_MEMBER:
       return simpleInstruction("OP_MEMBER", offset);
     case OP_IMPORT:
-      return simpleInstruction("OP_IMPORT", offset);
+      return constantInstruction("OP_IMPORT", chunk, offset);
+    case OP_IMPORT_AS: {
+      uint16_t module = readShort(chunk, offset);
+      uint16_t alias = readShort(chunk, offset);
+
+      printf("OP_IMPORT_AS %d '", module);
+      printValue(chunk->constants.values[module]);
+      printf(" '");
+      printValue(chunk->constants.values[alias]);
+      printf("'\n");
+      return offset + 6;
+    }
+
     case OP_THROW:
       return simpleInstruction("OP_THROW", offset);
     case OP_SUBSCRIPT_GET:

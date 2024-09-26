@@ -64,6 +64,7 @@ void initCore(Core* core) {
 
   core->base = NULL;
   core->object = NULL;
+  core->module = NULL;
   core->tuple = NULL;
   core->sequence = NULL;
   core->map = NULL;
@@ -1177,6 +1178,33 @@ InterpretResult vmExecute(int baseFrame) {
 
         vm.module = enclosing;
         vmPop();  // imported.
+        break;
+      }
+      case OP_IMPORT_AS: {
+        ObjModule* module = AS_MODULE(READ_CONSTANT());
+        Value alias = READ_CONSTANT();
+
+        ObjModule* enclosing = vm.module;
+
+        vmPush(OBJ_VAL(module));  // imported.
+        vm.module = module;
+
+        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+          return INTERPRET_RUNTIME_ERROR;
+        frame = &vm.frames[vm.frameCount - 1];
+
+        vmPush(OBJ_VAL(vm.core.module));
+        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
+
+        mapAddAll(&module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
+
+        vm.module = enclosing;
+        Value objModule = vmPop();
+        vmPop();  // imported.
+        vmPush(objModule);
+
+        mapSet(&vm.globals, alias, objModule);
+
         break;
       }
       case OP_THROW: {

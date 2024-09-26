@@ -22,6 +22,7 @@ import test/integration/membership
 import test/integration/native
 import test/integration/negation
 import test/integration/object
+import test/integration/module
 import test/integration/recursion
 import test/integration/return
 import test/integration/sequential

@@ -1,0 +1,3 @@
+import src/core/module as modulemodule
+
+assert(modulemodule is Module);

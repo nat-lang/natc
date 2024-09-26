@@ -506,6 +506,7 @@ InterpretResult initializeCore() {
 
   if ((vm.core.map = getGlobalClass(S_MAP)) == NULL ||
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
+      (vm.core.module = getGlobalClass(S_MODULE)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
       (vm.core.astExternalUpvalue = getGlobalClass(S_AST_EXTERNAL_UPVALUE)) ==

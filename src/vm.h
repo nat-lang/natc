@@ -32,6 +32,7 @@ typedef struct {
 
   ObjClass* base;
   ObjClass* object;
+  ObjClass* module;
   ObjClass* tuple;
   ObjClass* sequence;
   ObjClass* map;

@@ -31,6 +31,7 @@
 
 #define S_BASE "Base"
 #define S_OBJECT "Object"
+#define S_MODULE "Module"
 #define S_SEQUENCE "Sequence"
 #define S_TUPLE "Tuple"
 #define S_MAP "Map"
