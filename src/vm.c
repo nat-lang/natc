@@ -1387,7 +1387,7 @@ ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
   return closure;
 }
 
-ObjModule* vmCompileModule(char* path) {
+ObjModule* vmCompileModule(char* path, ModuleType type) {
   char* source = readSource(path);
 
   ObjString* objSource = intern(source);
@@ -1398,7 +1398,7 @@ ObjModule* vmCompileModule(char* path) {
   ObjString* objPath = intern(path);
   vmPush(OBJ_VAL(objPath));
 
-  ObjModule* module = newModule(objPath, objSource);
+  ObjModule* module = newModule(objPath, objSource, type);
   vmPush(OBJ_VAL(module));
 
   ObjClosure* closure = vmCompileClosure(path, objSource->chars, module);
@@ -1433,7 +1433,7 @@ InterpretResult vmInterpretSource(char* path, char* source) {
 }
 
 InterpretResult vmInterpretModule(char* path) {
-  ObjModule* module = vmCompileModule(path);
+  ObjModule* module = vmCompileModule(path, MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 

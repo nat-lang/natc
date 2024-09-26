@@ -1721,7 +1721,7 @@ void importStatement(Compiler* cmp) {
 
   Parser checkpoint = saveParser();
 
-  ObjModule* module = vmCompileModule(uri);
+  ObjModule* module = vmCompileModule(uri, MODULE_IMPORT);
   gotoParser(checkpoint);
 
   if (module != NULL)
