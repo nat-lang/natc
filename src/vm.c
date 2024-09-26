@@ -109,6 +109,7 @@ bool initVM() {
   vm.grayStack = NULL;
 
   vm.compiler = NULL;
+  vm.module = NULL;
 
   initMap(&vm.globals);
   initMap(&vm.strings);

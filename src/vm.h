@@ -68,20 +68,20 @@ typedef struct {
 } Core;
 
 typedef struct {
+  // stack.
   Value stack[STACK_MAX];
   Value* stackTop;
-
   CallFrame frames[FRAMES_MAX];
   int frameCount;
 
+  // heap.
+  Obj* objects;
+  ObjUpvalue* openUpvalues;
   ObjMap strings;
   ObjMap globals;
   ObjMap typeEnv;
   ObjMap infixes;
   ObjMap methodInfixes;
-
-  Obj* objects;
-  ObjUpvalue* openUpvalues;
 
   // core defs.
   Core core;
@@ -90,11 +90,14 @@ typedef struct {
   int grayCount;
   int grayCapacity;
   Obj** grayStack;
-
   size_t bytesAllocated;
   size_t nextGC;
 
+  // root compiler.
   Compiler* compiler;
+
+  // currently executing module.
+  ObjModule* module;
 } VM;
 
 typedef enum {
