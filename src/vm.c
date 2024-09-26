@@ -1393,14 +1393,18 @@ ObjModule* vmCompileModule(char* path) {
 
   free(source);
 
+  ObjString* objPath = intern(path);
+  vmPush(OBJ_VAL(objPath));
+
   ObjClosure* closure = vmCompileClosure(path, objSource->chars);
   if (closure == NULL) return NULL;
 
   vmPush(OBJ_VAL(closure));
-  ObjModule* module = newModule(closure, objSource);
+  ObjModule* module = newModule(objPath, closure, objSource);
 
-  vmPop();  // objSource.
   vmPop();  // closure.
+  vmPop();  // objSource.
+  vmPop();  // objPath.
 
   return module;
 }

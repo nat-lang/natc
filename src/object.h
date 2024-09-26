@@ -169,7 +169,7 @@ typedef struct {
 
 typedef struct {
   Obj obj;
-  // ObjString *path;
+  ObjString *path;
   ObjString *source;
   ObjClosure *closure;
 } ObjModule;
@@ -192,8 +192,7 @@ ObjFunction *newFunction();
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
-ObjModule *newModule(
-    /*ObjString *path,*/ ObjClosure *closure, ObjString *source);
+ObjModule *newModule(ObjString *path, ObjClosure *closure, ObjString *source);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();
