@@ -280,12 +280,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->signature = NULL;
   cmp->signature = signature;
   cmp->function = NULL;
-<<<<<<< HEAD
   cmp->function = newFunction(currentModule);
-=======
-  cmp->function =
-      newFunction(copyString(name.start, name.length), currentModule);
->>>>>>> feb6435 (wip)
   cmp->functionType = functionType;
   cmp->localCount = 0;
   cmp->scopeDepth = 0;

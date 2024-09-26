@@ -2,8 +2,12 @@
 let TypeSystem = DenotationalTypeSystem();
 let TypeState = () => DenotationalTypeState(TypeSystem, false);
 
+let type = x => TypeSystem.type(x);
+let typecheck = x => assert(TypeSystem.typecheck(x).success());
+let typefail = x => assert(TypeSystem.typecheck(x).failure());
+
 let typify = TypeSystem.typify;
-let infix unify = (x, y) => TypeSystem.newState().unify(
+let unify = (x, y) => TypeSystem.newState().unify(
   typify(x) ~ typify(y)
 );
 

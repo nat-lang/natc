@@ -65,8 +65,9 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
-ObjModule* newModule(ObjString* path, ObjString* source) {
+ObjModule* newModule(ObjString* path, ObjString* source, ModuleType type) {
   ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
+  module->type = type;
   module->path = path;
   module->source = source;
   module->closure = NULL;

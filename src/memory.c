@@ -162,6 +162,7 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)module->path);
       markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
+      markMap(&module->namespace);
       break;
     }
   }

@@ -109,6 +109,7 @@ bool initVM() {
   vm.grayStack = NULL;
 
   vm.compiler = NULL;
+  vm.module = NULL;
 
   initMap(&vm.globals);
   initMap(&vm.strings);
@@ -372,6 +373,10 @@ static bool callModule(ObjModule* module) {
   }
 
   vmInitFrame(module->closure, 1);
+  vm.module = module;
+
+  printf("Executing %s (%s)\n", module->path->chars,
+         module->type == MODULE_IMPORT ? "import" : "entrypoint");
 
   return true;
 }
@@ -722,7 +727,8 @@ InterpretResult vmExecute(int baseFrame) {
         ObjString* name = READ_STRING();
 
         Value value;
-        if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
+        if (!mapGet(&vm.module->namespace, OBJ_VAL(name), &value) &&
+            !mapGet(&vm.globals, OBJ_VAL(name), &value)) {
           vmRuntimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -732,17 +738,28 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.globals, name, vmPeek(0));
+        if (vm.module->type == MODULE_IMPORT) {
+          mapSet(&vm.module->namespace, name, vmPeek(0));
+        } else {
+          mapSet(&vm.globals, name, vmPeek(0));
+        }
+        printf("  global %s for %s\n", AS_STRING(name)->chars,
+               vm.module->path->chars);
         vmPop();
         break;
       }
       case OP_SET_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (mapSet(&vm.globals, name, vmPeek(0))) {
-          mapDelete(&vm.globals, name);
-          vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
-          return INTERPRET_RUNTIME_ERROR;
+
+        if (mapSet(&vm.module->namespace, name, vmPeek(0))) {
+          mapDelete(&vm.module->namespace, name);
+          if (mapSet(&vm.globals, name, vmPeek(0))) {
+            mapDelete(&vm.globals, name);
+            vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
+
         break;
       }
       case OP_GET_PROPERTY: {
@@ -1165,6 +1182,10 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        disassembleStack();
+        printf("\n");
+        mapAddAll(&vm.module->namespace, &vm.globals);
+
         vmPop();
         break;
       }
@@ -1343,7 +1364,8 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_SET_TYPE_GLOBAL: {
         Value name = READ_CONSTANT();
         Value global;
-        if (!mapGet(&vm.globals, name, &global)) {
+        if (!mapGet(&vm.module->namespace, name, &global) &&
+            !mapGet(&vm.globals, name, &global)) {
           vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -1397,7 +1419,7 @@ ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
   return closure;
 }
 
-ObjModule* vmCompileModule(char* path) {
+ObjModule* vmCompileModule(char* path, ModuleType type) {
   char* source = readSource(path);
 
   ObjString* objSource = intern(source);
@@ -1407,7 +1429,7 @@ ObjModule* vmCompileModule(char* path) {
   ObjString* objPath = intern(path);
   vmPush(OBJ_VAL(objPath));
 
-  ObjModule* module = newModule(objPath, objSource);
+  ObjModule* module = newModule(objPath, objSource, type);
   vmPush(OBJ_VAL(module));
 
   ObjClosure* closure = vmCompileClosure(path, objSource->chars, module);
@@ -1450,7 +1472,7 @@ char* vmTypesetSource(char* path, char* source) {
 */
 
 InterpretResult vmInterpretModule(char* path) {
-  ObjModule* module = vmCompileModule(path);
+  ObjModule* module = vmCompileModule(path, MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 

@@ -170,11 +170,15 @@ typedef struct {
   } bound;
 } ObjBoundFunction;
 
+typedef enum { MODULE_IMPORT, MODULE_ENTRYPOINT } ModuleType;
+
 struct ObjModule {
   Obj obj;
+  ModuleType type;
   ObjString *path;
   ObjString *source;
   ObjClosure *closure;
+  ObjMap namespace;
 };
 
 typedef struct {
@@ -195,7 +199,7 @@ ObjFunction *newFunction(ObjModule *module);
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
-ObjModule *newModule(ObjString *path, ObjString *source);
+ObjModule *newModule(ObjString *path, ObjString *source, ModuleType type);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();

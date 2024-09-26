@@ -98,6 +98,9 @@ typedef struct {
 
   // root compiler.
   Compiler* compiler;
+
+  // current module.
+  ObjModule* module;
 } VM;
 
 typedef enum {
@@ -116,7 +119,7 @@ void vmRuntimeError(const char* format, ...);
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
-ObjModule* vmCompileModule(char* path);
+ObjModule* vmCompileModule(char* path, ModuleType type);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
