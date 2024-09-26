@@ -1714,18 +1714,30 @@ static void ifStatement(Compiler* cmp) {
 void importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
-  advance(cmp);
 
+  advance(cmp);
   ObjString* path = copyString(parser.previous.start, parser.previous.length);
   char* uri = pathToUri(path->chars);
+
+  int alias = -1;
+  if (match(cmp, TOKEN_AS)) {
+    consumeIdentifier(cmp, "Expect identifier alias.");
+    alias = identifierConstant(cmp, &parser.previous);
+  }
 
   Parser checkpoint = saveParser();
 
   ObjModule* module = vmCompileModule(uri, MODULE_IMPORT);
   gotoParser(checkpoint);
 
-  if (module != NULL)
-    emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
+  if (module != NULL) {
+    if (alias == -1) {
+      emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
+    } else {
+      emitConstInstr(cmp, OP_IMPORT_AS, makeConstant(cmp, OBJ_VAL(module)));
+      emitConstant(cmp, alias);
+    }
+  }
 }
 
 static void printStatement(Compiler* cmp) {

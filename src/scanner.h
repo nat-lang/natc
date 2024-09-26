@@ -33,6 +33,7 @@ typedef enum {
   TOKEN_NUMBER,
   // Keywords.
   TOKEN_AND,
+  TOKEN_AS,
   TOKEN_CLASS,
   TOKEN_CONST,
   TOKEN_DOM,
