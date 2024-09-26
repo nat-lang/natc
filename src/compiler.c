@@ -286,6 +286,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->scopeDepth = 0;
 
   vm.compiler = cmp;
+  cmp->function->name = copyString(name.start, name.length);
 
   for (int i = 0; i < UINT8_COUNT; i++) {
     cmp->locals[i].depth = 0;
