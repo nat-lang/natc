@@ -375,9 +375,6 @@ static bool callModule(ObjModule* module) {
   vmInitFrame(module->closure, 1);
   vm.module = module;
 
-  printf("Executing %s (%s)\n", module->path->chars,
-         module->type == MODULE_IMPORT ? "import" : "entrypoint");
-
   return true;
 }
 
@@ -738,13 +735,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (vm.module->type == MODULE_IMPORT) {
-          mapSet(&vm.module->namespace, name, vmPeek(0));
-        } else {
-          mapSet(&vm.globals, name, vmPeek(0));
-        }
-        printf("  global %s for %s\n", AS_STRING(name)->chars,
-               vm.module->path->chars);
+        mapSet(&vm.module->namespace, name, vmPeek(0));
         vmPop();
         break;
       }
@@ -1178,13 +1169,13 @@ InterpretResult vmExecute(int baseFrame) {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         vmPush(OBJ_VAL(module));
 
+        ObjModule* enclosingModule = vm.module;
         if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
-        disassembleStack();
-        printf("\n");
         mapAddAll(&vm.module->namespace, &vm.globals);
+        vm.module = enclosingModule;
 
         vmPop();
         break;

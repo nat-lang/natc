@@ -302,6 +302,7 @@ bool __globals__(int argCount, Value* args) {
   vmPush(OBJ_VAL(vm.core.map));
   vmInitInstance(vm.core.map, 0);
   mapAddAll(&vm.globals, &AS_INSTANCE(vmPeek(0))->fields);
+  mapAddAll(&vm.module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
 
   return true;
 }
