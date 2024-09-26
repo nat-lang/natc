@@ -1373,8 +1373,8 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
-ObjClosure* vmCompileClosure(char* path, char* source) {
-  ObjFunction* function = compileFunction(vm.compiler, source, path);
+ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
+  ObjFunction* function = compileModule(vm.compiler, source, path, module);
 
   if (function == NULL) return NULL;
 
@@ -1396,13 +1396,15 @@ ObjModule* vmCompileModule(char* path) {
   ObjString* objPath = intern(path);
   vmPush(OBJ_VAL(objPath));
 
-  ObjClosure* closure = vmCompileClosure(path, objSource->chars);
+  ObjModule* module = newModule(objPath, objSource);
+  vmPush(OBJ_VAL(module));
+
+  ObjClosure* closure = vmCompileClosure(path, objSource->chars, module);
   if (closure == NULL) return NULL;
 
-  vmPush(OBJ_VAL(closure));
-  ObjModule* module = newModule(objPath, closure, objSource);
+  module->closure = closure;
 
-  vmPop();  // closure.
+  vmPop();  // module.
   vmPop();  // objSource.
   vmPop();  // objPath.
 
@@ -1412,7 +1414,7 @@ ObjModule* vmCompileModule(char* path) {
 // Entrypoints.
 
 InterpretResult vmInterpretExpr(char* path, char* expr) {
-  ObjClosure* closure = vmCompileClosure(path, expr);
+  ObjClosure* closure = vmCompileClosure(path, expr, NULL);
 
   if (closure == NULL) return INTERPRET_COMPILE_ERROR;
 

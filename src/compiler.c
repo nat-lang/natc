@@ -36,6 +36,7 @@ typedef struct {
 
 Parser parser;
 ClassCompiler* currentClass = NULL;
+ObjModule* currentModule = NULL;
 
 static Parser saveParser() {
   Parser checkpoint = parser;
@@ -279,7 +280,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->signature = NULL;
   cmp->signature = signature;
   cmp->function = NULL;
-  cmp->function = newFunction();
+  cmp->function = newFunction(currentModule);
   cmp->functionType = functionType;
   cmp->localCount = 0;
   cmp->scopeDepth = 0;
@@ -1963,7 +1964,10 @@ static void declarations(Compiler* cmp) {
   while (!match(cmp, TOKEN_EOF)) declaration(cmp);
 }
 
-ObjFunction* compileFunction(Compiler* root, const char* source, char* path) {
+ObjFunction* compileModule(Compiler* root, const char* source, char* path,
+                           ObjModule* module) {
+  currentModule = module;
+
   Scanner sc = initScanner(source);
   initParser(sc);
 

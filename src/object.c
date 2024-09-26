@@ -65,11 +65,11 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
-ObjModule* newModule(ObjString* path, ObjClosure* closure, ObjString* source) {
+ObjModule* newModule(ObjString* path, ObjString* source) {
   ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
   module->path = path;
   module->source = source;
-  module->closure = closure;
+  module->closure = NULL;
   return module;
 }
 
@@ -90,7 +90,7 @@ ObjVariable* newVariable(ObjString* name) {
   return variable;
 }
 
-ObjFunction* newFunction() {
+ObjFunction* newFunction(ObjModule* module) {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
 
   function->arity = 0;
@@ -98,7 +98,8 @@ ObjFunction* newFunction() {
   function->patterned = false;
   function->upvalueCount = 0;
   function->name = NULL;
-
+  function->module = NULL;
+  function->module = module;
   initMap(&function->fields);
   initChunk(&function->chunk);
   initMap(&function->constants);

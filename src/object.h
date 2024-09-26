@@ -61,6 +61,8 @@ typedef enum {
   OBJ_MODULE,
 } ObjType;
 
+typedef struct ObjModule ObjModule;
+
 struct Obj {
   ObjType oType;
   bool isMarked;
@@ -103,6 +105,7 @@ typedef struct {
 
   Chunk chunk;
   ObjString *name;
+  ObjModule *module;
   // cache from values to constant indices
   // in the function's chunk.constants.
   ObjMap constants;
@@ -167,12 +170,12 @@ typedef struct {
   } bound;
 } ObjBoundFunction;
 
-typedef struct {
+struct ObjModule {
   Obj obj;
   ObjString *path;
   ObjString *source;
   ObjClosure *closure;
-} ObjModule;
+};
 
 typedef struct {
   Obj obj;
@@ -188,11 +191,11 @@ ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
 ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
-ObjFunction *newFunction();
+ObjFunction *newFunction(ObjModule *module);
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
-ObjModule *newModule(ObjString *path, ObjClosure *closure, ObjString *source);
+ObjModule *newModule(ObjString *path, ObjString *source);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();

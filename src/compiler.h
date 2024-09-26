@@ -67,7 +67,8 @@ typedef enum {
   PREC_PRIMARY
 } Precedence;
 
-ObjFunction* compileFunction(Compiler* root, const char* source, char* path);
+ObjFunction* compileModule(Compiler* root, const char* source, char* path,
+                           ObjModule* module);
 void markCompilerRoots(Compiler* cmp);
 
 #endif
