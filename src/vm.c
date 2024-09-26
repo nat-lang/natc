@@ -348,7 +348,7 @@ void vmInitFrame(ObjClosure* closure, int offset) {
   frame->slots = vm.stackTop - offset;
 }
 
-static bool call(ObjClosure* closure, int argCount) {
+static bool callClosure(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
   if (closure->function->variadic)
@@ -362,6 +362,17 @@ static bool call(ObjClosure* closure, int argCount) {
   }
 
   vmInitFrame(closure, argCount + 1);
+
+  return true;
+}
+
+static bool callModule(ObjModule* module) {
+  if (vm.frameCount == FRAMES_MAX) {
+    vmRuntimeError("Stack overflow.");
+    return false;
+  }
+
+  vmInitFrame(module->closure, 1);
 
   return true;
 }
@@ -415,7 +426,7 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
 
       vm.stackTop[-1 - argCount] = OBJ_VAL(cases[i]);
 
-      return call(cases[i], argCount);
+      return callClosure(cases[i], argCount);
     }
   }
 
@@ -436,7 +447,7 @@ bool vmCallValue(Value caller, int argCount) {
         vm.stackTop[-argCount - 1] = obj->receiver;
         switch (BOUND_FUNCTION_TYPE(caller)) {
           case BOUND_METHOD:
-            return call(obj->bound.method, argCount);
+            return callClosure(obj->bound.method, argCount);
           case BOUND_NATIVE:
             return callNative(obj->bound.native, argCount);
           default:
@@ -454,7 +465,7 @@ bool vmCallValue(Value caller, int argCount) {
 
         if (closure->function->patterned)
           return callCases(&closure, 1, argCount);
-        return call(AS_CLOSURE(caller), argCount);
+        return callClosure(AS_CLOSURE(caller), argCount);
       }
       case OBJ_OVERLOAD: {
         ObjOverload* overload = AS_OVERLOAD(caller);
@@ -466,7 +477,7 @@ bool vmCallValue(Value caller, int argCount) {
         ObjInstance* instance = AS_INSTANCE(caller);
         Value callFn;
         if (mapGet(&instance->klass->fields, INTERN(S_CALL), &callFn)) {
-          return call(AS_CLOSURE(callFn), argCount);
+          return callClosure(AS_CLOSURE(callFn), argCount);
         } else {
           vmRuntimeError("Objects require a '%s' method to be called.", S_CALL);
           return false;
@@ -1149,14 +1160,17 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        vmPush(OBJ_VAL(module));
+        ObjModule* enclosing = vm.module;
 
-        if (!call(module->closure, 0) ||
-            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+        vmPush(OBJ_VAL(module));  // imported.
+        vm.module = module;
+
+        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
-        vmPop();
+        vm.module = enclosing;
+        vmPop();  // imported.
         break;
       }
       case OP_THROW: {
@@ -1422,7 +1436,7 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
   if (closure == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(closure));
-  call(closure, 0);
+  callClosure(closure, 0);
 
   return vmExecute(vm.frameCount - 1);
 }
@@ -1439,7 +1453,9 @@ InterpretResult vmInterpretModule(char* path) {
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(module));
-  call(module->closure, 0);
+  vm.module = module;
+
+  callModule(module);
 
   return vmExecute(vm.frameCount - 1);
 }
