@@ -666,6 +666,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
                                        parser.previous.length - 1)));
 
+  advance(cmp);  // consume the '#'.
   consume(cmp, TOKEN_LEFT_BRACE, "Expecting '{'.");
 
   getGlobalConstant(cmp, "str");

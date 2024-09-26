@@ -302,7 +302,8 @@ static Token number() {
 
 static Token string() {
   while (peek() != '"' && !isAtEnd()) {
-    if (peek() == '{') return makeToken(TOKEN_INTERPOLATION);
+    if (peek() == '#' && peekNext() == '{')
+      return makeToken(TOKEN_INTERPOLATION);
 
     if (peek() == '\n') scanner.line++;
     advance();
