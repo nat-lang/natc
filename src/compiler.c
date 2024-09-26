@@ -1964,7 +1964,7 @@ static void declarations(Compiler* cmp) {
   while (!match(cmp, TOKEN_EOF)) declaration(cmp);
 }
 
-ObjFunction* compileModule(Compiler* root, const char* source, char* path,
+ObjFunction* compileModule(Compiler* enclosing, const char* source, char* path,
                            ObjModule* module) {
   currentModule = module;
 
@@ -1972,7 +1972,7 @@ ObjFunction* compileModule(Compiler* root, const char* source, char* path,
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, root, NULL, TYPE_MODULE, syntheticToken(path));
+  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, syntheticToken(path));
 
   declarations(&cmp);
 
