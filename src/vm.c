@@ -723,7 +723,8 @@ InterpretResult vmExecute(int baseFrame) {
         ObjString* name = READ_STRING();
 
         Value value;
-        if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
+        if (!mapGet(&vm.module->namespace, OBJ_VAL(name), &value) &&
+            !mapGet(&vm.globals, OBJ_VAL(name), &value)) {
           vmRuntimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -733,16 +734,19 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.globals, name, vmPeek(0));
+        mapSet(&vm.module->namespace, name, vmPeek(0));
         vmPop();
         break;
       }
       case OP_SET_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (mapSet(&vm.globals, name, vmPeek(0))) {
-          mapDelete(&vm.globals, name);
-          vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
-          return INTERPRET_RUNTIME_ERROR;
+        if (mapSet(&vm.module->namespace, name, vmPeek(0))) {
+          mapDelete(&vm.module->namespace, name);
+          if (mapSet(&vm.globals, name, vmPeek(0))) {
+            mapDelete(&vm.globals, name);
+            vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
         break;
       }
@@ -1169,6 +1173,8 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        mapAddAll(&vm.module->namespace, &vm.globals);
+
         vm.module = enclosing;
         vmPop();  // imported.
         break;
@@ -1348,7 +1354,8 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_SET_TYPE_GLOBAL: {
         Value name = READ_CONSTANT();
         Value global;
-        if (!mapGet(&vm.globals, name, &global)) {
+        if (!mapGet(&vm.module->namespace, name, &global) &&
+            !mapGet(&vm.globals, name, &global)) {
           vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
