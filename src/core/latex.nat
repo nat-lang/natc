@@ -1,0 +1,42 @@
+
+class Document {
+
+}
+
+class TexDocument {
+  init(documentClass, packages, blocks) => {
+    this.packages = packages;
+    this.documentClass = documentClass;
+    this.blocks = blocks;
+  }
+
+  add(block) => this.blocks.push(block);
+
+  renderPreamble() => "\documentclass{#{this.documentClass}}
+\usepackage{#{join(this.packages, ",")}}
+  ";
+
+  renderBlocks() => {
+    let blocks = [];
+
+    for (block in this.blocks)
+      blocks.push("\tikz{{\Tree#{block.tex()}}}");
+
+    return join(blocks, " ");
+  }
+
+  renderBody() => "\begin{document}
+  #{this.renderBlocks()}
+\end{document}
+  ";
+
+  render() => "#{this.renderPreamble()}
+#{this.renderBody()}
+  ";
+}
+
+class TreeDocument extends TexDocument {
+  init(blocks) => {
+    super.init("standalone", ["tikz", "tikz-qtree"], blocks);
+  }
+}

@@ -90,6 +90,20 @@ class Tree extends Object {
   pp() => this._pp(0);
 
   __eq__(that) => this.__class__ == that.__class__ and this.children == that.children;
+
+  tex() => {
+    if (this.leaf()) return str(this.data);
+
+    let children = join(this.children.map(n => n.tex()), " ");
+
+    let datum;
+    if (this.data == nil)
+      datum = "{}";
+    else
+      datum = str(this.data);
+
+    return "[.#{datum} #{children} ]";
+  }
 }
 
 // Functions for building tree literals during compilation.
