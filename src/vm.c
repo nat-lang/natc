@@ -32,14 +32,16 @@ void vmRuntimeError(const char* format, ...) {
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame* frame = &vm.frames[i];
-    ObjFunction* function = frame->closure->function;
+    ObjClosure* closure = frame->closure;
+    ObjFunction* function = closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
-    fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
-    if (function->name == NULL) {
-      fprintf(stderr, "script\n");
-    } else {
-      fprintf(stderr, "%s\n", function->name->chars);
-    }
+    fprintf(stderr, "  [line %d] in %s", function->chunk.lines[instruction],
+            function->name->chars);
+
+    if (function->module->closure == closure)
+      fprintf(stderr, "\n");
+    else
+      fprintf(stderr, " (%s)\n", function->module->path->chars);
   }
 
   resetStack();
