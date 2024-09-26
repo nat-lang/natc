@@ -178,6 +178,7 @@ struct ObjModule {
   ObjString *path;
   ObjString *source;
   ObjClosure *closure;
+  ObjMap namespace;
 };
 
 typedef struct {

@@ -71,6 +71,7 @@ ObjModule* newModule(ObjString* path, ObjString* source, ModuleType type) {
   module->path = path;
   module->source = source;
   module->closure = NULL;
+  initMap(&module->namespace);
   return module;
 }
 

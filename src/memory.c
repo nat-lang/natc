@@ -160,6 +160,7 @@ static void blackenObject(Obj* object) {
       ObjModule* module = (ObjModule*)object;
       markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
+      markMap(&module->namespace);
       break;
     }
   }
