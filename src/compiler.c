@@ -1124,7 +1124,7 @@ static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
 }
 
 static void method(Compiler* cmp) {
-  int infixPrec = infixPrecedence(cmp->enclosing);
+  int infixPrec = infixPrecedence(cmp);
 
   consumeIdentifier(cmp, "Expect method name.");
   uint16_t var = identifierConstant(cmp, &parser.previous);
@@ -1523,7 +1523,8 @@ static int infixPrecedence(Compiler* cmp) {
   else
     return prec;
 
-  if (cmp->scopeDepth > 0) error(cmp, "Can only infix globals.");
+  if (currentClass == NULL && cmp->scopeDepth > 0)
+    error(cmp, "Can only infix globals.");
 
   if (match(cmp, TOKEN_LEFT_PAREN)) {
     consume(cmp, TOKEN_NUMBER, "Expect numeral precedence.");
