@@ -332,8 +332,18 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPop();  // nil.
       return AST_INSTRUCTION_OK;
     }
-    case OP_SET_TYPE_GLOBAL:
+    case OP_SET_TYPE_GLOBAL: {
+      ObjString* name = READ_STRING();
+      Value type = vmPeek(0);
+
+      vmPush(root);
+      if (!astGlobal(name)) return AST_INSTRUCTION_FAIL;
+      vmPush(type);
+
+      FAIL_UNLESS(vmExecuteMethod("opSetGlobalType", 2));
+      vmPop();  // nil.
       return AST_INSTRUCTION_OK;
+    }
     case OP_UNIT: {
       vmPush(root);
       vmPush(UNIT_VAL);
@@ -383,12 +393,6 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
 // Translate a [CallFrame] into an [ASTNode].
 bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
-
-#ifdef DEBUG_TRACE_EXECUTION
-  disassembleChunk(&frame->closure->function->chunk,
-                   frame->closure->function->name->chars);
-  printf("\n");
-#endif
 
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
