@@ -61,6 +61,7 @@ void initCore(Core* core) {
   core->sVariadic = intern("variadic");
   core->sValues = intern("values");
   core->sSignature = intern("signature");
+  core->sFunction = intern("function");
 
   core->base = NULL;
   core->object = NULL;

@@ -29,6 +29,7 @@ typedef struct {
   ObjString* sVariadic;
   ObjString* sValues;
   ObjString* sSignature;
+  ObjString* sFunction;
 
   ObjClass* base;
   ObjClass* object;

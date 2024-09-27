@@ -12,7 +12,7 @@
 bool astClosure(Value* enclosing, ObjClosure* closure);
 bool astLocal(uint8_t slot);
 bool astGlobal(ObjString* name);
-bool astOverload(Value* enclosing, ObjOverload* overload);
+bool astOverload(ObjOverload* overload);
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root);
 bool astBlock(Value* enclosing);
 
@@ -228,8 +228,45 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(closure);
       return AST_INSTRUCTION_OK;
     }
-    case OP_OVERLOAD:
-      OK_IF(vmOverload(frame) && astOverload(&root, AS_OVERLOAD(vmPeek(0))));
+    case OP_OVERLOAD: {
+      int i = *frame->ip;
+      int count = i;
+
+      // we have a stack of ASTClosure instances that need
+      // to turn into an ObjOverload. extract the raw closures
+      // and put them on the stack for vmOverload.
+
+      Value closures[count];
+      while (--i >= 0) {
+        Value closureAst = vmPeek(i);
+
+        if (!IS_INSTANCE(closureAst) ||
+            AS_INSTANCE(closureAst)->klass != vm.core.astClosure) {
+          vmRuntimeError("Expecting ASTClosure instance.");
+          return AST_INSTRUCTION_FAIL;
+        }
+        Value rawClosure;
+        if (!mapGet(&AS_INSTANCE(closureAst)->fields,
+                    OBJ_VAL(vm.core.sFunction), &rawClosure))
+          return AST_INSTRUCTION_FAIL;
+
+        closures[count - i - 1] = rawClosure;
+      }
+
+      while (++i < count) vmPush(closures[i]);
+
+      FAIL_UNLESS(vmOverload(frame));
+
+      // now put it beneath the stack of closures.
+      Value overload = vmPop();
+      Value astClosures[count];
+      while (--i >= 0) astClosures[i] = vmPop();
+      vmPush(overload);
+      while (++i < count) vmPush(astClosures[i]);
+
+      // finally create the ast overload object.
+      OK_IF(astOverload(AS_OVERLOAD(overload)));
+    }
     case OP_CLOSURE:
       vmClosure(frame);
       OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0))));
@@ -460,20 +497,15 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   return vmInitInstance(vm.core.astMethod, 4);
 }
 
-bool astOverload(Value* enclosing, ObjOverload* overload) {
-  vmPop();
+bool astOverload(ObjOverload* overload) {
+  if (!vmTuplify(overload->cases, true)) return false;
+  Value cases = vmPop();
+  vmPop();  // the overload;
 
   vmPush(OBJ_VAL(vm.core.astOverload));
   vmPush(OBJ_VAL(overload));
   vmPush(NUMBER_VAL(overload->cases));
-
-  for (int i = 0; i < overload->cases; i++) {
-    vmPush(OBJ_VAL(overload->closures[i]));
-    if (!astClosure(enclosing, overload->closures[i]))
-      return AST_INSTRUCTION_FAIL;
-  }
-
-  if (!vmTuplify(overload->cases, true)) return AST_INSTRUCTION_FAIL;
+  vmPush(cases);
 
   return vmInitInstance(vm.core.astOverload, 3);
 }
@@ -486,19 +518,28 @@ bool ast(Value value) {
           return astBoundFunction(NULL, AS_BOUND_FUNCTION(value));
         case OBJ_CLOSURE:
           return astClosure(NULL, AS_CLOSURE(value));
-        case OBJ_OVERLOAD:
-          return astOverload(NULL, AS_OVERLOAD(value));
+        case OBJ_OVERLOAD: {
+          ObjOverload* overload = AS_OVERLOAD(vmPeek(0));
+
+          // wrap the cases in ast.
+          for (int i = 0; i < overload->cases; i++) {
+            vmPush(OBJ_VAL(overload->closures[i]));
+            if (!astClosure(NULL, overload->closures[i])) return false;
+          }
+
+          return astOverload(AS_OVERLOAD(value));
+        }
         default:
           vmRuntimeError("Undestructurable object.");
-          return AST_INSTRUCTION_FAIL;
+          return false;
       }
       break;
     }
     default:
       vmRuntimeError("Undestructurable value.");
-      return AST_INSTRUCTION_FAIL;
+      return false;
   }
 
   vmRuntimeError("This should be unreachable.");
-  return AST_INSTRUCTION_FAIL;  // unreachable.
+  return false;  // unreachable.
 }
