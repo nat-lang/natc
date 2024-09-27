@@ -217,9 +217,12 @@ static void freeObject(Obj* object) {
       freeMap(map);
       break;
     }
-    case OBJ_MODULE:
+    case OBJ_MODULE: {
+      ObjModule* module = (ObjModule*)object;
+      freeMap(&module->namespace);
       FREE(ObjModule, object);
       break;
+    }
     case OBJ_NATIVE:
       FREE(ObjNative, object);
       break;
