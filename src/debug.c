@@ -132,11 +132,11 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_CALL:
       return byteInstruction("OP_CALL", chunk, offset);
     case OP_CALL_INFIX:
-      return simpleInstruction("OP_CALL_INFIX", offset);
+      return constantInstruction("OP_CALL_INFIX", chunk, offset);
     case OP_CALL_POSTFIX:
       return byteInstruction("OP_CALL_POSTFIX", chunk, offset);
     case OP_SIGN:
-      return closureInstruction("OP_SIGN", chunk, offset);
+      return constantInstruction("OP_SIGN", chunk, offset);
     case OP_CLOSURE:
       return closureInstruction("OP_CLOSURE", chunk, offset);
     case OP_VARIABLE:
