@@ -11,6 +11,7 @@
 
 bool astClosure(Value* enclosing, ObjClosure* closure);
 bool astLocal(uint8_t slot);
+bool astGlobal(ObjString* name);
 bool astOverload(Value* enclosing, ObjOverload* overload);
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root);
 bool astBlock(Value* enclosing);
@@ -139,6 +140,20 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(OBJ_VAL(name));
 
       OK_IF(vmExecuteMethod("opGetGlobal", 1));
+    }
+    case OP_DEFINE_GLOBAL:
+    case OP_SET_GLOBAL: {
+      ObjString* name = READ_STRING();
+      Value value = vmPeek(0);
+
+      vmPush(root);
+
+      if (!astGlobal(name)) return AST_INSTRUCTION_FAIL;
+      vmPush(value);
+
+      FAIL_UNLESS(vmExecuteMethod("opSetGlobalValue", 2));
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
     }
     case OP_GET_LOCAL:
       OK_IF(astLocal(READ_SHORT()));
@@ -371,6 +386,12 @@ bool astLocal(uint8_t slot) {
   vmPush(OBJ_VAL(vm.core.astLocal));
   vmPush(NUMBER_VAL(slot));
   return vmInitInstance(vm.core.astLocal, 1);
+}
+
+bool astGlobal(ObjString* name) {
+  vmPush(OBJ_VAL(vm.core.astGlobal));
+  vmPush(OBJ_VAL(name));
+  return vmInitInstance(vm.core.astGlobal, 1);
 }
 
 bool astUpvalues(ObjClosure* closure, bool root) {

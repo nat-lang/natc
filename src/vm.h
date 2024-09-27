@@ -44,6 +44,7 @@ typedef struct {
   ObjClass* astExternalUpvalue;
   ObjClass* astInternalUpvalue;
   ObjClass* astLocal;
+  ObjClass* astGlobal;
   ObjClass* astOverload;
   ObjClass* astMembership;
   ObjClass* astBlock;
