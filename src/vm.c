@@ -757,10 +757,10 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-#define ERROR "Can only get property of object, class, or function."
+        char* error = "Can only get property of object, class, or function.";
 
         if (!IS_OBJ(vmPeek(0))) {
-          vmRuntimeError(ERROR);
+          vmRuntimeError(error);
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -827,7 +827,7 @@ InterpretResult vmExecute(int baseFrame) {
             break;
           }
           default:
-            vmRuntimeError(ERROR);
+            vmRuntimeError(error);
             return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -1209,6 +1209,7 @@ InterpretResult vmExecute(int baseFrame) {
 
         mapSet(&vm.globals, alias, objModule);
 
+        vmPop();  // objModule.
         break;
       }
       case OP_THROW: {
