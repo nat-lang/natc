@@ -76,6 +76,7 @@ void initCore(Core* core) {
   core->astExternalUpvalue = NULL;
   core->astInternalUpvalue = NULL;
   core->astLocal = NULL;
+  core->astGlobal = NULL;
   core->astOverload = NULL;
   core->astMembership = NULL;
   core->astBlock = NULL;
@@ -1197,6 +1198,8 @@ InterpretResult vmExecute(int baseFrame) {
         if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
 
         mapAddAll(&module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
+        mapSet(&AS_INSTANCE(vmPeek(0))->fields, INTERN("function"),
+               OBJ_VAL(module->closure));
 
         vm.module = enclosing;
         Value objModule = vmPop();

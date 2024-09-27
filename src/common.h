@@ -44,6 +44,7 @@
 #define S_AST_EXTERNAL_UPVALUE "ASTExternalUpvalue"
 #define S_AST_INTERNAL_UPVALUE "ASTInternalUpvalue"
 #define S_AST_LOCAL "ASTLocal"
+#define S_AST_GLOBAL "ASTGlobal"
 #define S_AST_OVERLOAD "ASTOverload"
 #define S_AST_MEMBERSHIP "ASTMembership"
 #define S_AST_BLOCK "ASTBlock"

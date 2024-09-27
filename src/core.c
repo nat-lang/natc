@@ -514,6 +514,7 @@ InterpretResult initializeCore() {
       (vm.core.astInternalUpvalue = getGlobalClass(S_AST_INTERNAL_UPVALUE)) ==
           NULL ||
       (vm.core.astLocal = getGlobalClass(S_AST_LOCAL)) == NULL ||
+      (vm.core.astGlobal = getGlobalClass(S_AST_GLOBAL)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.astMembership = getGlobalClass(S_AST_MEMBERSHIP)) == NULL ||
       (vm.core.astBlock = getGlobalClass(S_AST_BLOCK)) == NULL ||
