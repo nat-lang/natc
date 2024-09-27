@@ -341,7 +341,11 @@ bool __str__(int argCount, Value* args) {
       break;
     }
     case VAL_NIL: {
-      string = copyString("nil", 4);
+      string = copyString("nil", 3);
+      break;
+    }
+    case VAL_UNDEF: {
+      string = copyString("undefined", 9);
       break;
     }
     case VAL_BOOL: {
@@ -375,10 +379,9 @@ bool __str__(int argCount, Value* args) {
       }
       break;
     }
-    default: {
+    default:
       vmRuntimeError("Can't turn value into a string.");
       return false;
-    }
   }
 
   vmPop();
