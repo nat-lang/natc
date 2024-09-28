@@ -89,13 +89,24 @@ class Tree extends Object {
   __eq__(that) => this.__class__ == that.__class__ and this.children == that.children;
 
   bracket() => {
-    if (this.leaf()) return str(this.data);
+    let datum = () => {
+      let string = "";
+      if (vType(this.data) == OFunction) {
+        let ast <- this.data;
+        string = "$#{ast.tex()}$";
+      } else {
+        string = this.data or string;
+      }
+
+      return "{#{string}}";
+    };
+
+    if (this.leaf()) return datum();
 
     let children = join(this.children.map(n => n.bracket()), " ");
-    let datum = str(this.data or "{}");
-
-    return "[.#{datum} #{children} ]";
+    return "[.#{datum()} #{children} ]";
   }
+
   tex() => "\tikz{{\Tree#{this.bracket()}}}";
 }
 

@@ -20,6 +20,8 @@ class ASTNode extends Tree {
     this.children = children;
   }
 
+  tex() => { throw NotImplemented(); }
+
   // Give the tree's variables uuids. Identify upvalues
   // with the locals they close over. 
   uniquelyIdentifyVariables(uuids) => {
@@ -143,8 +145,12 @@ class ASTLocalTypeAssignment extends ASTTypeAssignment {}
 class ASTGlobalValueAssignment extends ASTAssignment {}
 class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
 
-class ASTReturn extends ASTStatement {}
-class ASTImplicitReturn extends ASTReturn {}
+class ASTReturn extends ASTStatement {
+  tex() => join([n.tex() | n in this.children], " ");
+}
+class ASTImplicitReturn extends ASTReturn {
+  tex() => "";
+}
 class ASTExprStatement extends ASTStatement {}
 
 class ASTBlock extends ASTNode {
@@ -166,11 +172,16 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
-  str() => { return str(this.value); }
+  str() => str(this.value);
+  tex() => this.str();
   resolve() => this.value;
-  __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
+  __eq__(that) => this.__class__ == that.__class__ and
+                  this.value == that.value;
 }
-class ASTNegation extends ASTExpr {}
+
+class ASTNegation extends ASTExpr {
+  tex() => "\neg #{this[0].tex()}";
+}
 
 class ASTEquality extends ASTExpr {
   init(left, right) => {
@@ -209,9 +220,11 @@ class ASTLocal extends ASTVariable {
     super.init(id);
   }
   str() => { return "ASTLocal(" + str(this.id) + ")"; }
+  tex() => "#{this.id}";
 }
 class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
+  tex() => str(this.id);
 }
 
 class ASTUpvalue extends ASTVariable {
@@ -222,6 +235,7 @@ class ASTUpvalue extends ASTVariable {
     this.upvalue = upvalue;
   }
   resolve() => resolveUpvalue(this.upvalue);
+  tex() => str(this.localId);
 }
 
 class ASTExternalUpvalue extends ASTUpvalue {}
@@ -235,10 +249,21 @@ class ASTParameter extends ASTVariable {
     this.var = var;
     this.type = type;
   }
+
+  tex() => {
+    let tex = "\lambda #{this.name}";
+
+    if (this.type != undefined)
+      tex = tex + "_{#{this.type}}";
+
+    return tex;
+  }
 }
 
 class ASTArgumentSequence extends ASTExpr {
   resolve() => this.children.map(node => node.resolve());
+
+  tex() => join([arg.tex() | arg in this.children], ", ");
 }
 
 class ASTApp extends ASTExprStatement {
@@ -252,6 +277,8 @@ class ASTApp extends ASTExprStatement {
   }
 
   resolve() => this.evaluate();
+
+  tex() => "#{this[0].tex()}(#{this[1].tex()})";
 }
 
 class ASTAppInfix extends ASTApp {}
@@ -261,18 +288,22 @@ class ASTPropertyAccess extends ASTExpr {
     this.children = [obj, key];
   }
   resolve() => this[0].resolve()[this[1].resolve()];
+  tex() => "#{this[0].tex()}.#{this[1].tex()}";
 }
 
 class ASTMembership extends ASTExpr {
   init(element, collection) => {
     this.children = [element, collection];
   }
+  tex() => "#{this[0].tex()} \in #{this[1].tex()}";
 }
 
 class ASTSignature extends ASTNode {
   init(params) => {
     this.params = params;
   }
+
+  tex() => join([p.tex() | p in this.params], "");
 }
 
 class ASTClosure extends ASTExpr {
@@ -289,6 +320,16 @@ class ASTClosure extends ASTExpr {
       if (!this.upvalues[val.id])
         this.upvalues[val.id] = val;
     }
+  }
+
+  tex() => {
+    let signature = this.signature().tex();
+
+    // the first explicit return of a naked function.
+    let explReturn = this.children[0],
+        body = explReturn.tex();
+
+    return "#{signature}. #{body}";
   }
 
   resolve() => this.function;

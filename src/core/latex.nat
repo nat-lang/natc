@@ -1,7 +1,8 @@
 
-class Document {
+class Document {}
 
-}
+let newline = "
+";
 
 class TexDocument {
   init(documentClass, packages, blocks) => {
@@ -16,14 +17,7 @@ class TexDocument {
 \usepackage{#{join(this.packages, ",")}}
   ";
 
-  renderBlocks() => {
-    let blocks = [];
-
-    for (block in this.blocks)
-      blocks.push("\tikz{{\Tree#{block.tex()}}}");
-
-    return join(blocks, " ");
-  }
+  renderBlocks() => join([block.tex() | block in this.blocks], newline + newline);
 
   renderBody() => "\begin{document}
   #{this.renderBlocks()}

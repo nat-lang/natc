@@ -377,6 +377,9 @@ bool __str__(int argCount, Value* args) {
     }
     case VAL_OBJ: {
       switch (OBJ_TYPE(value)) {
+        case OBJ_VARIABLE:
+          string = AS_VARIABLE(value)->name;
+          break;
         case OBJ_CLASS: {
           string = AS_CLASS(value)->name;
           break;
