@@ -1,0 +1,19 @@
+
+import test/integration/composition as composition
+
+composition.__import__();
+
+print composition.module;
+
+let moduleAst <- composition.function;
+
+for (x in composition.keys())
+  print x;
+
+for (node in moduleAst.children) {
+  if (node is ASTGlobalValueAssignment) {
+    let value = node[1].resolve();
+    if (value is Tree)
+      print value.tex();
+  }
+}

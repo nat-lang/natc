@@ -390,11 +390,22 @@ bool __str__(int argCount, Value* args) {
           string = copyString(buffer, length);
           break;
         }
+        case OBJ_CLOSURE: {
+          ObjClosure* closure = AS_CLOSURE(value);
+          char buffer[closure->function->name->length + 11];
+          int length =
+              sprintf(buffer, "<function %s>", closure->function->name->chars);
+
+          string = copyString(buffer, length);
+          break;
+        }
         case OBJ_STRING: {
           string = AS_STRING(value);
           break;
         }
         default: {
+          printValue(value);
+          printf("\n");
           vmRuntimeError("Can't turn object into a string.");
           return false;
         }
