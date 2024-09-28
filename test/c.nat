@@ -1,19 +1,17 @@
 
 import test/integration/composition as composition
+import src/core/latex
 
 composition.__import__();
 
-print composition.module;
-
 let moduleAst <- composition.function;
 
-for (x in composition.keys())
-  print x;
+let doc = TexDocument(
+  "article",
+  ["tikz, tikz-qtree"],
+  [node[1].resolve() | node in moduleAst.children,
+                       node is ASTGlobalValueAssignment,
+                       node[1].resolve() is Tree]
+);
 
-for (node in moduleAst.children) {
-  if (node is ASTGlobalValueAssignment) {
-    let value = node[1].resolve();
-    if (value is Tree)
-      print value.tex();
-  }
-}
+print doc.render();
