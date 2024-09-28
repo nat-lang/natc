@@ -79,7 +79,9 @@ class Sequential extends Object {
   }
 }
 
-class Tuple extends Sequential {}
+class Tuple extends Sequential {
+  tex(args: ASTArgumentSequence) => "(#{args.tex()})";
+}
 
 class Sequence extends Sequential {
   extend(elements) => {
