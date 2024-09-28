@@ -233,9 +233,10 @@ class ASTUpvalue extends ASTVariable {
     this.name = name;
     this.localId = localId;
     this.upvalue = upvalue;
+    this.name = name;
   }
   resolve() => resolveUpvalue(this.upvalue);
-  tex() => str(this.localId);
+  tex() => this.name;
 }
 
 class ASTExternalUpvalue extends ASTUpvalue {}
