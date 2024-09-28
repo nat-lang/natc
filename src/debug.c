@@ -34,7 +34,7 @@ static uint16_t readShort(Chunk* chunk, int offset) {
 
 static int shortInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t slot = readShort(chunk, offset);
-  printf("%-16s %d\n", name, slot);
+  printf("%-16s %4d\n", name, slot);
   return offset + 3;
 }
 
@@ -48,7 +48,7 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk,
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t constant = readShort(chunk, offset);
 
-  printf("%-16s %d '", name, constant);
+  printf("%-16s %4d '", name, constant);
   printValue(chunk->constants.values[constant]);
   printf("'\n");
   return offset + 3;

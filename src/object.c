@@ -75,11 +75,12 @@ ObjModule* newModule(ObjString* path, ObjString* source, ModuleType type) {
   return module;
 }
 
-ObjOverload* newOverload(int cases) {
+ObjOverload* newOverload(int cases, ObjString* name) {
   ObjClosure** closures = ALLOCATE(ObjClosure*, cases);
   for (int i = 0; i < cases; i++) closures[i] = NULL;
 
   ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
+  overload->name = name;
   overload->closures = closures;
   overload->cases = cases;
   initMap(&overload->fields);
@@ -442,7 +443,8 @@ void printObject(Value value) {
              AS_FUNCTION(value));
       break;
     case OBJ_OVERLOAD:
-      printf("<overload at %p>", AS_OVERLOAD(value));
+      printf("<overload %s at %p>", AS_OVERLOAD(value)->name->chars,
+             AS_OVERLOAD(value));
       break;
     case OBJ_VARIABLE:
       printf("<var %s>", AS_VARIABLE(value)->name->chars);

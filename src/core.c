@@ -399,6 +399,14 @@ bool __str__(int argCount, Value* args) {
           string = copyString(buffer, length);
           break;
         }
+        case OBJ_OVERLOAD: {
+          ObjOverload* overload = AS_OVERLOAD(value);
+          char buffer[overload->name->length + 11];
+          int length = sprintf(buffer, "<overload %s>", overload->name->chars);
+
+          string = copyString(buffer, length);
+          break;
+        }
         case OBJ_STRING: {
           string = AS_STRING(value);
           break;

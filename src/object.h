@@ -144,6 +144,7 @@ typedef struct {
 
 typedef struct {
   Obj obj;
+  ObjString *name;
   int cases;
   ObjClosure **closures;
   ObjMap fields;
@@ -200,7 +201,7 @@ ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction(ObjModule *module);
-ObjOverload *newOverload(int cases);
+ObjOverload *newOverload(int cases, ObjString *name);
 ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
 ObjModule *newModule(ObjString *path, ObjString *source, ModuleType type);

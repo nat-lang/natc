@@ -601,7 +601,7 @@ bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
   Value name = READ_CONSTANT();
   int arity = 0;
-  ObjOverload* overload = newOverload(cases);
+  ObjOverload* overload = newOverload(cases, AS_STRING(name));
 
   for (int i = cases; i > 0; i--) {
     ObjClosure** closures = overload->closures;

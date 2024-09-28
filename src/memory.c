@@ -115,6 +115,7 @@ static void blackenObject(Obj* object) {
       ObjOverload* overload = (ObjOverload*)object;
       for (int i = 0; i < overload->cases; i++)
         markObject((Obj*)overload->closures[i]);
+      markObject((Obj*)overload->name);
       markMap(&overload->fields);
       break;
     }
