@@ -276,6 +276,7 @@ static void markRoots() {
   markObject((Obj*)vm.core.sVariadic);
   markObject((Obj*)vm.core.sValues);
   markObject((Obj*)vm.core.sSignature);
+  markObject((Obj*)vm.core.sFunction);
 
   markCompilerRoots(vm.compiler);
 }

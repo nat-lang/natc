@@ -247,8 +247,10 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
         }
         Value rawClosure;
         if (!mapGet(&AS_INSTANCE(closureAst)->fields,
-                    OBJ_VAL(vm.core.sFunction), &rawClosure))
+                    OBJ_VAL(vm.core.sFunction), &rawClosure)) {
+          vmRuntimeError("ASTClosure missing its 'function' field.");
           return AST_INSTRUCTION_FAIL;
+        }
 
         closures[count - i - 1] = rawClosure;
       }
