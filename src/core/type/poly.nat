@@ -7,6 +7,8 @@ class TAbstract extends Type {
   }
 
   instantiateWith(varCount) => {
+    print "instantiating #{this.__class__} with #{varCount}";
+
     let tVars = [typeVar() | _ in range(0, varCount)];
     let concrete = this.fn(..tVars);
     return TypeSystem.typify(concrete);
@@ -56,8 +58,9 @@ class PolyTypeState extends AdhocTypeState {
 
       let type = tParams -> tReturns;
 
-      if (type.hasFvs())
+      if (type.hasFvs()) {
         return TGeneralization(type);
+      }
 
       return type;
     }
@@ -83,14 +86,14 @@ class PolyTypeState extends AdhocTypeState {
         right = constraint.right;
 
     if (left is TAbstract) {
-      if (left.variadic and right is ->)
+      if (left.variadic and right is -> and right.domain is TProduct)
         left = left.instantiateWith(len(right.domain));
       else if (right is not TVar)
         left = left.instantiate();
     }
     
     if (right is TAbstract) {
-      if (right.variadic and left is ->)
+      if (right.variadic and left is -> and left.domain is TProduct)
         right = right.instantiateWith(len(left.domain));
       else if (left is not TVar)
         right = right.instantiate();
