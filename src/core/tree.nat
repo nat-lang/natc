@@ -90,15 +90,16 @@ class Tree extends Object {
 
   bracket() => {
     let datum = () => {
-      let string = "";
+      if (this.data == nil) return "{}";
+
+      let type = TypeSystem.type(this.data);
+
       if (vType(this.data) == OFunction) {
         let ast <- this.data;
-        string = "$#{ast.tex()}$";
-      } else {
-        string = this.data or string;
+        return "{#{this.data.name} \\ $#{ast.tex()}$ \\ $#{type.tex()}$}";
       }
 
-      return "{#{string}}";
+      return "{#{this.data} \\ $#{type.tex()}$}";
     };
 
     if (this.leaf()) return datum();

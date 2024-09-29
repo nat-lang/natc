@@ -27,6 +27,7 @@ class TOverload extends Type {
 
   str() => "TOverload(" + join([x.str() | x in this.cases], ", ") + ")";
   pp() => { print this.str(); }
+  tex() => join([case.tex() | case in this.cases], " \mid ");
 }
 
 let infix(7) & = (a, b) => TOverload.unit(a).concat(TOverload.unit(b));

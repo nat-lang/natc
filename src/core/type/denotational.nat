@@ -17,6 +17,8 @@ class Domain extends Type {
   // functions are not hashable atm. guard against them.
   __in__(value) => hashable(value) and value in this.elements;
   __eq__(that) => this.elements == that.elements;
+
+  tex() => this.str();
 }
 
 class DenotationalTypeState extends PolyTypeState {

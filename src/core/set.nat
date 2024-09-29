@@ -140,7 +140,7 @@ class Set extends Object {
   fromSeq(seq: Sequential) => Set(..seq);
 }
 
-let bigUnion = (*sets) => sets.reduce(
+let union = (*sets) => sets.reduce(
   (big, set) => big & set,
   {}
 );
