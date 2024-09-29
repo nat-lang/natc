@@ -144,8 +144,17 @@ static TokenType identifierType() {
 #define CURRENT scanner.current
 
   switch (START[0]) {
-    case 'a':
-      return checkpointKeyword(1, 2, "nd", TOKEN_AND);
+    case 'a': {
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
+          case 'n':
+            return checkpointKeyword(2, 1, "d", TOKEN_AND);
+          case 's':
+            return checkpointKeyword(1, 1, "s", TOKEN_AS);
+        }
+      }
+      break;
+    }
     case 'c': {
       if (CURRENT - START > 1) {
         switch (START[1]) {
@@ -302,7 +311,8 @@ static Token number() {
 
 static Token string() {
   while (peek() != '"' && !isAtEnd()) {
-    if (peek() == '{') return makeToken(TOKEN_INTERPOLATION);
+    if (peek() == '#' && peekNext() == '{')
+      return makeToken(TOKEN_INTERPOLATION);
 
     if (peek() == '\n') scanner.line++;
     advance();

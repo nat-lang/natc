@@ -1,6 +1,7 @@
 import src/core/error
 import src/core/type/vm
 import src/core/object
+import src/core/module
 import src/core/iteration
 import src/core/sequential
 import src/core/map

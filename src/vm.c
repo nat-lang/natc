@@ -32,14 +32,16 @@ void vmRuntimeError(const char* format, ...) {
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame* frame = &vm.frames[i];
-    ObjFunction* function = frame->closure->function;
+    ObjClosure* closure = frame->closure;
+    ObjFunction* function = closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
-    fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
-    if (function->name == NULL) {
-      fprintf(stderr, "script\n");
-    } else {
-      fprintf(stderr, "%s\n", function->name->chars);
-    }
+    fprintf(stderr, "  [line %d] in %s", function->chunk.lines[instruction],
+            function->name->chars);
+
+    if (function->module->closure == closure)
+      fprintf(stderr, "\n");
+    else
+      fprintf(stderr, " (%s)\n", function->module->path->chars);
   }
 
   resetStack();
@@ -59,9 +61,11 @@ void initCore(Core* core) {
   core->sVariadic = intern("variadic");
   core->sValues = intern("values");
   core->sSignature = intern("signature");
+  core->sFunction = intern("function");
 
   core->base = NULL;
   core->object = NULL;
+  core->module = NULL;
   core->tuple = NULL;
   core->sequence = NULL;
   core->map = NULL;
@@ -73,6 +77,7 @@ void initCore(Core* core) {
   core->astExternalUpvalue = NULL;
   core->astInternalUpvalue = NULL;
   core->astLocal = NULL;
+  core->astGlobal = NULL;
   core->astOverload = NULL;
   core->astMembership = NULL;
   core->astBlock = NULL;
@@ -107,6 +112,7 @@ bool initVM() {
   vm.grayStack = NULL;
 
   vm.compiler = NULL;
+  vm.module = NULL;
 
   initMap(&vm.globals);
   initMap(&vm.strings);
@@ -345,7 +351,7 @@ void vmInitFrame(ObjClosure* closure, int offset) {
   frame->slots = vm.stackTop - offset;
 }
 
-static bool call(ObjClosure* closure, int argCount) {
+static bool callClosure(ObjClosure* closure, int argCount) {
   if (!spread(&argCount)) return false;
 
   if (closure->function->variadic)
@@ -359,6 +365,17 @@ static bool call(ObjClosure* closure, int argCount) {
   }
 
   vmInitFrame(closure, argCount + 1);
+
+  return true;
+}
+
+static bool callModule(ObjModule* module) {
+  if (vm.frameCount == FRAMES_MAX) {
+    vmRuntimeError("Stack overflow.");
+    return false;
+  }
+
+  vmInitFrame(module->closure, 1);
 
   return true;
 }
@@ -412,7 +429,7 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
 
       vm.stackTop[-1 - argCount] = OBJ_VAL(cases[i]);
 
-      return call(cases[i], argCount);
+      return callClosure(cases[i], argCount);
     }
   }
 
@@ -433,7 +450,7 @@ bool vmCallValue(Value caller, int argCount) {
         vm.stackTop[-argCount - 1] = obj->receiver;
         switch (BOUND_FUNCTION_TYPE(caller)) {
           case BOUND_METHOD:
-            return call(obj->bound.method, argCount);
+            return callClosure(obj->bound.method, argCount);
           case BOUND_NATIVE:
             return callNative(obj->bound.native, argCount);
           default:
@@ -451,7 +468,7 @@ bool vmCallValue(Value caller, int argCount) {
 
         if (closure->function->patterned)
           return callCases(&closure, 1, argCount);
-        return call(AS_CLOSURE(caller), argCount);
+        return callClosure(AS_CLOSURE(caller), argCount);
       }
       case OBJ_OVERLOAD: {
         ObjOverload* overload = AS_OVERLOAD(caller);
@@ -463,7 +480,7 @@ bool vmCallValue(Value caller, int argCount) {
         ObjInstance* instance = AS_INSTANCE(caller);
         Value callFn;
         if (mapGet(&instance->klass->fields, INTERN(S_CALL), &callFn)) {
-          return call(AS_CLOSURE(callFn), argCount);
+          return callClosure(AS_CLOSURE(callFn), argCount);
         } else {
           vmRuntimeError("Objects require a '%s' method to be called.", S_CALL);
           return false;
@@ -709,7 +726,8 @@ InterpretResult vmExecute(int baseFrame) {
         ObjString* name = READ_STRING();
 
         Value value;
-        if (!mapGet(&vm.globals, OBJ_VAL(name), &value)) {
+        if (!mapGet(&vm.module->namespace, OBJ_VAL(name), &value) &&
+            !mapGet(&vm.globals, OBJ_VAL(name), &value)) {
           vmRuntimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -719,16 +737,19 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.globals, name, vmPeek(0));
+        mapSet(&vm.module->namespace, name, vmPeek(0));
         vmPop();
         break;
       }
       case OP_SET_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (mapSet(&vm.globals, name, vmPeek(0))) {
-          mapDelete(&vm.globals, name);
-          vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
-          return INTERPRET_RUNTIME_ERROR;
+        if (mapSet(&vm.module->namespace, name, vmPeek(0))) {
+          mapDelete(&vm.module->namespace, name);
+          if (mapSet(&vm.globals, name, vmPeek(0))) {
+            mapDelete(&vm.globals, name);
+            vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
+            return INTERPRET_RUNTIME_ERROR;
+          }
         }
         break;
       }
@@ -736,10 +757,10 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-#define ERROR "Can only get property of object, class, or function."
+        char* error = "Can only get property of object, class, or function.";
 
         if (!IS_OBJ(vmPeek(0))) {
-          vmRuntimeError(ERROR);
+          vmRuntimeError(error);
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -806,7 +827,7 @@ InterpretResult vmExecute(int baseFrame) {
             break;
           }
           default:
-            vmRuntimeError(ERROR);
+            vmRuntimeError(error);
             return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -1146,14 +1167,49 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        vmPush(OBJ_VAL(module));
+        ObjModule* enclosing = vm.module;
 
-        if (!call(module->closure, 0) ||
-            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+        vmPush(OBJ_VAL(module));  // imported.
+        vm.module = module;
+
+        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
-        vmPop();
+        mapAddAll(&vm.module->namespace, &vm.globals);
+
+        vm.module = enclosing;
+        vmPop();  // imported.
+        break;
+      }
+      case OP_IMPORT_AS: {
+        ObjModule* module = AS_MODULE(READ_CONSTANT());
+        Value alias = READ_CONSTANT();
+
+        ObjModule* enclosing = vm.module;
+
+        vmPush(OBJ_VAL(module));  // imported.
+        vm.module = module;
+
+        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+          return INTERPRET_RUNTIME_ERROR;
+        frame = &vm.frames[vm.frameCount - 1];
+
+        vmPush(OBJ_VAL(vm.core.module));
+        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
+
+        mapAddAll(&module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
+        mapSet(&AS_INSTANCE(vmPeek(0))->fields, INTERN("function"),
+               OBJ_VAL(module->closure));
+
+        vm.module = enclosing;
+        Value objModule = vmPop();
+        vmPop();  // imported.
+        vmPush(objModule);
+
+        mapSet(&vm.globals, alias, objModule);
+
+        vmPop();  // objModule.
         break;
       }
       case OP_THROW: {
@@ -1331,7 +1387,8 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_SET_TYPE_GLOBAL: {
         Value name = READ_CONSTANT();
         Value global;
-        if (!mapGet(&vm.globals, name, &global)) {
+        if (!mapGet(&vm.module->namespace, name, &global) &&
+            !mapGet(&vm.globals, name, &global)) {
           vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
@@ -1373,8 +1430,8 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
-ObjClosure* vmCompileClosure(char* path, char* source) {
-  ObjFunction* function = compileFunction(vm.compiler, source, path);
+ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
+  ObjFunction* function = compileModule(vm.compiler, source, path, module);
 
   if (function == NULL) return NULL;
 
@@ -1385,7 +1442,7 @@ ObjClosure* vmCompileClosure(char* path, char* source) {
   return closure;
 }
 
-ObjModule* vmCompileModule(char* path) {
+ObjModule* vmCompileModule(char* path, ModuleType type) {
   char* source = readSource(path);
 
   ObjString* objSource = intern(source);
@@ -1393,14 +1450,20 @@ ObjModule* vmCompileModule(char* path) {
 
   free(source);
 
-  ObjClosure* closure = vmCompileClosure(path, objSource->chars);
+  ObjString* objPath = intern(path);
+  vmPush(OBJ_VAL(objPath));
+
+  ObjModule* module = newModule(objPath, objSource, type);
+  vmPush(OBJ_VAL(module));
+
+  ObjClosure* closure = vmCompileClosure(path, objSource->chars, module);
   if (closure == NULL) return NULL;
 
-  vmPush(OBJ_VAL(closure));
-  ObjModule* module = newModule(closure, objSource);
+  module->closure = closure;
 
+  vmPop();  // module.
   vmPop();  // objSource.
-  vmPop();  // closure.
+  vmPop();  // objPath.
 
   return module;
 }
@@ -1408,12 +1471,12 @@ ObjModule* vmCompileModule(char* path) {
 // Entrypoints.
 
 InterpretResult vmInterpretExpr(char* path, char* expr) {
-  ObjClosure* closure = vmCompileClosure(path, expr);
+  ObjClosure* closure = vmCompileClosure(path, expr, NULL);
 
   if (closure == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(closure));
-  call(closure, 0);
+  callClosure(closure, 0);
 
   return vmExecute(vm.frameCount - 1);
 }
@@ -1425,12 +1488,14 @@ InterpretResult vmInterpretSource(char* path, char* source) {
 }
 
 InterpretResult vmInterpretModule(char* path) {
-  ObjModule* module = vmCompileModule(path);
+  ObjModule* module = vmCompileModule(path, MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(module));
-  call(module->closure, 0);
+  vm.module = module;
+
+  callModule(module);
 
   return vmExecute(vm.frameCount - 1);
 }

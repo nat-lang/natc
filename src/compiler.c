@@ -36,6 +36,7 @@ typedef struct {
 
 Parser parser;
 ClassCompiler* currentClass = NULL;
+ObjModule* currentModule = NULL;
 
 static Parser saveParser() {
   Parser checkpoint = parser;
@@ -279,7 +280,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->signature = NULL;
   cmp->signature = signature;
   cmp->function = NULL;
-  cmp->function = newFunction();
+  cmp->function = newFunction(currentModule);
   cmp->functionType = functionType;
   cmp->localCount = 0;
   cmp->scopeDepth = 0;
@@ -666,6 +667,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
                                        parser.previous.length - 1)));
 
+  advance(cmp);  // consume the '#'.
   consume(cmp, TOKEN_LEFT_BRACE, "Expecting '{'.");
 
   getGlobalConstant(cmp, "str");
@@ -1124,7 +1126,7 @@ static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
 }
 
 static void method(Compiler* cmp) {
-  int infixPrec = infixPrecedence(cmp->enclosing);
+  int infixPrec = infixPrecedence(cmp);
 
   consumeIdentifier(cmp, "Expect method name.");
   uint16_t var = identifierConstant(cmp, &parser.previous);
@@ -1523,7 +1525,8 @@ static int infixPrecedence(Compiler* cmp) {
   else
     return prec;
 
-  if (cmp->scopeDepth > 0) error(cmp, "Can only infix globals.");
+  if (currentClass == NULL && cmp->scopeDepth > 0)
+    error(cmp, "Can only infix globals.");
 
   if (match(cmp, TOKEN_LEFT_PAREN)) {
     consume(cmp, TOKEN_NUMBER, "Expect numeral precedence.");
@@ -1711,18 +1714,30 @@ static void ifStatement(Compiler* cmp) {
 void importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
-  advance(cmp);
 
+  advance(cmp);
   ObjString* path = copyString(parser.previous.start, parser.previous.length);
   char* uri = pathToUri(path->chars);
 
+  int alias = -1;
+  if (match(cmp, TOKEN_AS)) {
+    consumeIdentifier(cmp, "Expect identifier alias.");
+    alias = identifierConstant(cmp, &parser.previous);
+  }
+
   Parser checkpoint = saveParser();
 
-  ObjModule* module = vmCompileModule(uri);
-  if (module != NULL)
-    emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
-
+  ObjModule* module = vmCompileModule(uri, MODULE_IMPORT);
   gotoParser(checkpoint);
+
+  if (module != NULL) {
+    if (alias == -1) {
+      emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
+    } else {
+      emitConstInstr(cmp, OP_IMPORT_AS, makeConstant(cmp, OBJ_VAL(module)));
+      emitConstant(cmp, alias);
+    }
+  }
 }
 
 static void printStatement(Compiler* cmp) {
@@ -1961,12 +1976,15 @@ static void declarations(Compiler* cmp) {
   while (!match(cmp, TOKEN_EOF)) declaration(cmp);
 }
 
-ObjFunction* compileFunction(Compiler* root, const char* source, char* path) {
+ObjFunction* compileModule(Compiler* enclosing, const char* source, char* path,
+                           ObjModule* module) {
+  currentModule = module;
+
   Scanner sc = initScanner(source);
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, root, NULL, TYPE_MODULE, syntheticToken(path));
+  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, syntheticToken(path));
 
   declarations(&cmp);
 

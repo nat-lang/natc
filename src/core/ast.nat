@@ -89,6 +89,16 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
+  opSetGlobalValue(local, value) => {
+    let node = ASTGlobalValueAssignment(local, value);
+    this.children.push(node);
+  }
+
+  opSetGlobalType(local, type) => {
+    let node = ASTGlobalTypeAssignment(local, type);
+    this.children.push(node);
+  }
+
   opSetLocalValue(local, value) => {
     let node = ASTLocalValueAssignment(local, value);
     this.children.push(node);
@@ -126,10 +136,12 @@ class ASTExpr extends ASTNode {}
 
 class ASTAssignment extends ASTStatement {}
 class ASTPropertyAssignment extends ASTAssignment {}
-class ASTLocalValueAssignment extends ASTAssignment {}
 class ASTTypeAssignment extends ASTStatement {}
-class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
+class ASTLocalValueAssignment extends ASTAssignment {}
 class ASTLocalTypeAssignment extends ASTTypeAssignment {}
+class ASTGlobalValueAssignment extends ASTAssignment {}
+class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
+
 class ASTReturn extends ASTStatement {}
 class ASTImplicitReturn extends ASTReturn {}
 class ASTExprStatement extends ASTStatement {}
@@ -238,6 +250,7 @@ class ASTPropertyAccess extends ASTExpr {
   init(obj, key) => {
     this.children = [obj, key];
   }
+  resolve() => this[0].resolve()[this[1].resolve()];
 }
 
 class ASTMembership extends ASTExpr {
@@ -322,5 +335,6 @@ class ASTOverload extends ASTExpr {
     this.count = count;
     this.children = closures;
   }
+  resolve() => this.overload;
 }
 

@@ -302,6 +302,7 @@ bool __globals__(int argCount, Value* args) {
   vmPush(OBJ_VAL(vm.core.map));
   vmInitInstance(vm.core.map, 0);
   mapAddAll(&vm.globals, &AS_INSTANCE(vmPeek(0))->fields);
+  mapAddAll(&vm.module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
 
   return true;
 }
@@ -340,7 +341,11 @@ bool __str__(int argCount, Value* args) {
       break;
     }
     case VAL_NIL: {
-      string = copyString("nil", 4);
+      string = copyString("nil", 3);
+      break;
+    }
+    case VAL_UNDEF: {
+      string = copyString("undefined", 9);
       break;
     }
     case VAL_BOOL: {
@@ -374,10 +379,9 @@ bool __str__(int argCount, Value* args) {
       }
       break;
     }
-    default: {
+    default:
       vmRuntimeError("Can't turn value into a string.");
       return false;
-    }
   }
 
   vmPop();
@@ -505,6 +509,7 @@ InterpretResult initializeCore() {
 
   if ((vm.core.map = getGlobalClass(S_MAP)) == NULL ||
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
+      (vm.core.module = getGlobalClass(S_MODULE)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
       (vm.core.astExternalUpvalue = getGlobalClass(S_AST_EXTERNAL_UPVALUE)) ==
@@ -512,6 +517,7 @@ InterpretResult initializeCore() {
       (vm.core.astInternalUpvalue = getGlobalClass(S_AST_INTERNAL_UPVALUE)) ==
           NULL ||
       (vm.core.astLocal = getGlobalClass(S_AST_LOCAL)) == NULL ||
+      (vm.core.astGlobal = getGlobalClass(S_AST_GLOBAL)) == NULL ||
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.astMembership = getGlobalClass(S_AST_MEMBERSHIP)) == NULL ||
       (vm.core.astBlock = getGlobalClass(S_AST_BLOCK)) == NULL ||

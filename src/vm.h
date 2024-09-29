@@ -29,9 +29,11 @@ typedef struct {
   ObjString* sVariadic;
   ObjString* sValues;
   ObjString* sSignature;
+  ObjString* sFunction;
 
   ObjClass* base;
   ObjClass* object;
+  ObjClass* module;
   ObjClass* tuple;
   ObjClass* sequence;
   ObjClass* map;
@@ -43,6 +45,7 @@ typedef struct {
   ObjClass* astExternalUpvalue;
   ObjClass* astInternalUpvalue;
   ObjClass* astLocal;
+  ObjClass* astGlobal;
   ObjClass* astOverload;
   ObjClass* astMembership;
   ObjClass* astBlock;
@@ -68,20 +71,20 @@ typedef struct {
 } Core;
 
 typedef struct {
+  // stack.
   Value stack[STACK_MAX];
   Value* stackTop;
-
   CallFrame frames[FRAMES_MAX];
   int frameCount;
 
+  // heap.
+  Obj* objects;
+  ObjUpvalue* openUpvalues;
   ObjMap strings;
   ObjMap globals;
   ObjMap typeEnv;
   ObjMap infixes;
   ObjMap methodInfixes;
-
-  Obj* objects;
-  ObjUpvalue* openUpvalues;
 
   // core defs.
   Core core;
@@ -90,11 +93,14 @@ typedef struct {
   int grayCount;
   int grayCapacity;
   Obj** grayStack;
-
   size_t bytesAllocated;
   size_t nextGC;
 
+  // root compiler.
   Compiler* compiler;
+
+  // currently executing module.
+  ObjModule* module;
 } VM;
 
 typedef enum {
@@ -113,7 +119,7 @@ void vmRuntimeError(const char* format, ...);
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpreSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
-ObjModule* vmCompileModule(char* path);
+ObjModule* vmCompileModule(char* path, ModuleType type);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();

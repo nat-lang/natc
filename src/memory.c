@@ -132,6 +132,7 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)function->name);
       markMap(&function->fields);
       markArray(&function->chunk.constants);
+      markObject((Obj*)function->module);
       break;
     }
     case OBJ_VARIABLE: {
@@ -160,6 +161,7 @@ static void blackenObject(Obj* object) {
       ObjModule* module = (ObjModule*)object;
       markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
+      markMap(&module->namespace);
       break;
     }
   }
@@ -215,9 +217,12 @@ static void freeObject(Obj* object) {
       freeMap(map);
       break;
     }
-    case OBJ_MODULE:
+    case OBJ_MODULE: {
+      ObjModule* module = (ObjModule*)object;
+      freeMap(&module->namespace);
       FREE(ObjModule, object);
       break;
+    }
     case OBJ_NATIVE:
       FREE(ObjNative, object);
       break;
@@ -263,12 +268,15 @@ static void markRoots() {
   markMap(&vm.infixes);
   markMap(&vm.methodInfixes);
 
+  markObject((Obj*)vm.module);
+
   markObject((Obj*)vm.core.sName);
   markObject((Obj*)vm.core.sArity);
   markObject((Obj*)vm.core.sPatterned);
   markObject((Obj*)vm.core.sVariadic);
   markObject((Obj*)vm.core.sValues);
   markObject((Obj*)vm.core.sSignature);
+  markObject((Obj*)vm.core.sFunction);
 
   markCompilerRoots(vm.compiler);
 }
