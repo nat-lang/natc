@@ -134,6 +134,12 @@ static bool checkStr(char* str) {
   return strncmp(parser.current.start, str, strlen(str)) == 0;
 }
 
+static bool matchStr(Compiler* cmp, char* str) {
+  if (!checkStr(str)) return false;
+  advance(cmp);
+  return true;
+}
+
 static void consume(Compiler* cmp, TokenType type, const char* message) {
   if (parser.current.type == type)
     advance(cmp);
@@ -808,7 +814,7 @@ static void prefixNot(Compiler* cmp, bool canAssign) {
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
     parsePrecedence(cmp, penultRule->rightPrec);
   } else {
-    error(cmp, "'not' must compose with an infix.");
+    emitByte(cmp, OP_NOT);
   }
 }
 
@@ -1176,7 +1182,7 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
   getProperty(cmp, "more");
   emitBytes(cmp, OP_CALL, 0);
 
-  // jump out of the loop if more() false.
+  // jump out of the loop if more() is false.
   int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
   // condition.
   emitByte(cmp, OP_POP);
@@ -1191,6 +1197,13 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
   return exitJump;
 }
 
+static int iterationStart(Compiler* cmp, Iterator* iter) {
+  *iter = iterator(cmp);
+  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
+  int exitJump = iterationNext(cmp, *iter);
+  return exitJump;
+}
+
 static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
   emitLoop(cmp, iter.loopStart);
   patchJump(cmp, exitJump);
@@ -1199,9 +1212,8 @@ static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
 }
 
 static void forInStatement(Compiler* cmp) {
-  Iterator iter = iterator(cmp);
-  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
-  int exitJump = iterationNext(cmp, iter);
+  Iterator iter;
+  int exitJump = iterationStart(cmp, &iter);
   statement(cmp);
   iterationEnd(cmp, iter, exitJump);
 }
@@ -1708,8 +1720,71 @@ static void forConditionStatement(Compiler* cmp) {
   }
 }
 
+static void forSome(Compiler* cmp) {
+  consume(cmp, TOKEN_LEFT_PAREN, "Expecting '('.");
+
+  beginScope(cmp);
+  Iterator iter;
+  int exitJump = iterationStart(cmp, &iter);
+
+  expression(cmp);
+  emitByte(cmp, OP_NOT);
+  int successJump = emitJump(cmp, OP_JUMP_IF_FALSE);
+  emitByte(cmp, OP_POP);  // predication.
+
+  // if we reach the end, then the existential is false.
+  iterationEnd(cmp, iter, exitJump);
+  endScope(cmp);
+  emitByte(cmp, OP_FALSE);
+
+  // and we have to jump over the success instruction.
+  int failureJump = emitJump(cmp, OP_JUMP);
+  patchJump(cmp, successJump);
+  emitByte(cmp, OP_POP);  // the predication.
+  emitByte(cmp, OP_POP);  // the iterator.
+  endScope(cmp);
+  emitByte(cmp, OP_TRUE);
+  patchJump(cmp, failureJump);
+}
+
+static void forAll(Compiler* cmp) {
+  consume(cmp, TOKEN_LEFT_PAREN, "Expecting '('.");
+
+  beginScope(cmp);
+  Iterator iter;
+  int exitJump = iterationStart(cmp, &iter);
+
+  expression(cmp);
+  int failureJump = emitJump(cmp, OP_JUMP_IF_FALSE);
+  emitByte(cmp, OP_POP);  // predication.
+
+  // if we reach the end, then the universal is true.
+  iterationEnd(cmp, iter, exitJump);
+  endScope(cmp);
+  emitByte(cmp, OP_TRUE);
+
+  // and we have to jump over the failure instruction.
+  int successJump = emitJump(cmp, OP_JUMP);
+  // otherwise:
+  patchJump(cmp, failureJump);
+  emitByte(cmp, OP_POP);  // the predication.
+  emitByte(cmp, OP_POP);  // the iterator.
+  endScope(cmp);
+  emitByte(cmp, OP_FALSE);
+  patchJump(cmp, successJump);
+}
+
+static void forQuantification(Compiler* cmp, bool canAssign) {
+  if (matchStr(cmp, "some")) return forSome(cmp);
+  if (matchStr(cmp, "all")) return forAll(cmp);
+
+  advance(cmp);
+  error(cmp, "Expecting 'some' or 'all'.");
+}
+
 static void forStatement(Compiler* cmp) {
   beginScope(cmp);
+
   consume(cmp, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
   if (checkVariable()) {
@@ -1970,7 +2045,9 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
 
   ParseFn prefixRule = getRule(parser.previous)->prefix;
   if (prefixRule == NULL) {
-    error(cmp, "Expect expression.");
+    printf("%s\n",
+           copyString(parser.previous.start, parser.previous.length)->chars);
+    error(cmp, "Expect expression (0).");
     return;
   }
 

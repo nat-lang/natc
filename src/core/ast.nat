@@ -98,12 +98,12 @@ class ASTNode extends Tree {
   }
 
   opSetGlobalType(global, type) => {
-    let node = ASTGlobalTypeAssignment(local, type);
+    let node = ASTGlobalTypeAssignment(global, type);
     this.children.push(node);
   }
 
-  opSetLocalValue(local, value) => {
-    let node = ASTLocalValueAssignment(local, value);
+  opSetLocalValue(global, value) => {
+    let node = ASTLocalValueAssignment(global, value);
     this.children.push(node);
   }
 
