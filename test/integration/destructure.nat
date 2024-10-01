@@ -828,3 +828,12 @@ assert(f == ASTClosureMock(
   )
 ));
 
+let f <- () => for all (x in {1,2,3}) x not in {4,5,6};
+let q = f[0][0];
+
+assert(q.resolve());
+
+let f <- () => for no (x in {1,2,3}) x in {1};
+let q = f[0][0];
+
+assert(!q.resolve());

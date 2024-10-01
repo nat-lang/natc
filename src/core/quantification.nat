@@ -1,6 +1,6 @@
 
-class Quantification {
-  all(r, b) => r.all(b);
-  some(r, b) => r.some(b);
-  no(r, b) => !r.some(b);
-}
+let Quantification = Object();
+
+Quantification.all = (r, b) => r.all(b);
+Quantification.some = (r, b) => r.some(b);
+Quantification.no = (r, b) => !r.some(b);
