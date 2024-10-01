@@ -351,6 +351,19 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(UNIT_VAL);
       OK_IF(vmExecuteMethod("opLiteral", 1));
     }
+    case OP_QUANTIFY: {
+      Value body = vmPop();
+      Value restriction = vmPop();
+      Value quantifier = vmPop();
+
+      vmPush(OBJ_VAL(vm.core.astLocal));
+
+      vmPush(quantifier);
+      vmPush(restriction);
+      vmPush(body);
+
+      OK_IF(vmInitInstance(vm.core.astQuantification, 3));
+    }
     default: {
       vmRuntimeError("Unhandled destructured opcode (%i).", instruction);
       return AST_INSTRUCTION_FAIL;

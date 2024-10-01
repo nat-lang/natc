@@ -521,6 +521,8 @@ InterpretResult initializeCore() {
       (vm.core.astOverload = getGlobalClass(S_AST_OVERLOAD)) == NULL ||
       (vm.core.astMembership = getGlobalClass(S_AST_MEMBERSHIP)) == NULL ||
       (vm.core.astBlock = getGlobalClass(S_AST_BLOCK)) == NULL ||
+      (vm.core.astQuantification = getGlobalClass(S_AST_QUANTIFICATION)) ==
+          NULL ||
       (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
       (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
