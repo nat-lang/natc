@@ -1,0 +1,6 @@
+
+class Quantification {
+  all(r, b) => r.all(b);
+  some(r, b) => r.some(b);
+  no(r, b) => !r.some(b);
+}

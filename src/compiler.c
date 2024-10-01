@@ -1205,12 +1205,53 @@ static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
   // condition.
   emitByte(cmp, OP_POP);
 }
+
 static void forInStatement(Compiler* cmp) {
   Iterator iter = iterator(cmp);
   consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
   int exitJump = iterationNext(cmp, iter);
   statement(cmp);
   iterationEnd(cmp, iter, exitJump);
+}
+
+static void forQuantification(Compiler* enclosing, bool canAssign) {
+  getGlobalConstant(enclosing, "Quantification");
+  consumeIdentifier(enclosing, "Expect quantifier.");
+  uint16_t name = identifierConstant(enclosing, &parser.previous);
+  emitConstInstr(enclosing, OP_GET_PROPERTY, name);
+
+  Token qToken = syntheticToken("quantifier");
+  Compiler cmp;
+  initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS, qToken);
+  beginScope(&cmp);
+
+  consume(enclosing, TOKEN_LEFT_PAREN, "Expect '(' after quantifier.");
+  if (!check(TOKEN_IN)) {
+    do {
+      cmp.function->arity++;
+      if (cmp.function->arity > 255) {
+        errorAtCurrent(&cmp, "Can't have more than 255 parameters.");
+      }
+
+      advance(enclosing);
+      declareVariable(&cmp);
+      markInitialized(&cmp);
+    } while (match(enclosing, TOKEN_COMMA));
+  }
+
+  consume(enclosing, TOKEN_IN, "Expect restriction.");
+  expression(enclosing);
+  consume(enclosing, TOKEN_RIGHT_PAREN, "Expect ')' after restriction.");
+
+  blockOrExpression(&cmp);
+
+  emitDefaultReturn(&cmp);
+  ObjFunction* function = cmp.function;
+  emitConstInstr(enclosing, OP_CLOSURE,
+                 makeConstant(enclosing, OBJ_VAL(function)));
+  closeUpvalues(function, &cmp, enclosing);
+
+  emitByte(enclosing, OP_QUANTIFY);
 }
 
 // Parse a comprehension, given a [Parser] that points at the body,
@@ -1878,7 +1919,7 @@ ParseRule rules[] = {
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_FOR] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FOR] = {forQuantification, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_IN] = {NULL, binary, PREC_COMPARISON, PREC_COMPARISON + PREC_STEP},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE, PREC_NONE},
