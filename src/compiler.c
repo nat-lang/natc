@@ -1002,32 +1002,40 @@ static void typeExpression(Compiler* cmp) {
   parsePrecedence(cmp, PREC_TYPE_ASSIGNMENT);
 }
 
+static void variableParameter(Compiler* cmp, Compiler* sigCmp) {
+  advance(cmp);
+  declareVariable(cmp);
+  markInitialized(cmp);
+
+  // put the param in the signature's constant table.
+  uint16_t constant = identifierConstant(sigCmp, &parser.previous);
+  emitConstInstr(sigCmp, OP_VARIABLE, constant);
+  // parse an optional type.
+  if (match(sigCmp, TOKEN_COLON))
+    expression(sigCmp);
+  else
+    emitByte(sigCmp, OP_UNDEFINED);
+}
+
+static void patternParameter(Compiler* cmp, Compiler* sigCmp) {
+  cmp->function->patterned = true;
+  // include the literal in the signature.
+  parsePrecedence(sigCmp, PREC_ASSIGNMENT);
+  // type defaults downstream to a tvar.
+  emitByte(sigCmp, OP_UNDEFINED);
+  // offset the local stack so that the literal
+  // can be passed to the function as an argument
+  // even if it's not bound.
+  addLocal(cmp, syntheticToken("#pattern"));
+}
+
 static void parameter(Compiler* cmp, Compiler* sigCmp) {
   getGlobalConstant(sigCmp, "PatternElement");
 
   if (checkVariable()) {
-    advance(cmp);
-    declareVariable(cmp);
-    markInitialized(cmp);
-
-    // include the param in the signature.
-    uint16_t constant = identifierConstant(sigCmp, &parser.previous);
-    emitConstInstr(sigCmp, OP_VARIABLE, constant);
-    // type.
-    if (match(sigCmp, TOKEN_COLON))
-      expression(sigCmp);
-    else
-      emitByte(sigCmp, OP_UNDEFINED);
+    variableParameter(cmp, sigCmp);
   } else {
-    cmp->function->patterned = true;
-    // include the literal in the signature.
-    parsePrecedence(sigCmp, PREC_ASSIGNMENT);
-    // type defaults downstream to a tvar.
-    emitByte(sigCmp, OP_UNDEFINED);
-    // offset the local stack so that the literal
-    // can be passed to the function as an argument
-    // even if it's not bound.
-    addLocal(cmp, syntheticToken("#pattern"));
+    patternParameter(cmp, sigCmp);
   }
 
   emitBytes(sigCmp, OP_CALL, 2);
@@ -1212,28 +1220,28 @@ static void forQuantification(Compiler* enclosing, bool canAssign) {
   uint16_t quantifier = identifierConstant(enclosing, &parser.previous);
   emitConstInstr(enclosing, OP_GET_PROPERTY, quantifier);
 
-  Token name = syntheticToken("#quantifierBody");
-
   Compiler cmp, sigCmp;
+  Token name = syntheticToken("#quantifierBody");
   openFunction(enclosing, &cmp, &sigCmp, TYPE_ANONYMOUS, name);
 
   consume(enclosing, TOKEN_LEFT_PAREN, "Expect '(' after quantifier.");
+  openSignature(&sigCmp);
   if (!check(TOKEN_IN)) {
     do {
       cmp.function->arity++;
-      if (cmp.function->arity > 255) {
+      if (cmp.function->arity > 255)
         errorAtCurrent(&cmp, "Can't have more than 255 parameters.");
-      }
 
-      advance(enclosing);
-      declareVariable(&cmp);
-      markInitialized(&cmp);
+      getGlobalConstant(&sigCmp, "PatternElement");
+      variableParameter(&cmp, &sigCmp);
+      emitBytes(&sigCmp, OP_CALL, 2);
     } while (match(enclosing, TOKEN_COMMA));
   }
 
   consume(enclosing, TOKEN_IN, "Expect restriction.");
   expression(enclosing);
   consume(enclosing, TOKEN_RIGHT_PAREN, "Expect ')' after restriction.");
+  closeSignature(&cmp, &sigCmp);
 
   blockOrExpression(&cmp);
   signFunction(&cmp, &sigCmp, enclosing);
@@ -1758,7 +1766,9 @@ void importStatement(Compiler* cmp) {
   ObjModule* module = vmCompileModule(uri, MODULE_IMPORT);
   gotoParser(checkpoint);
 
-  if (module != NULL) {
+  if (module == NULL) {
+    error(cmp, "Failed to compile import.");
+  } else {
     if (alias == -1) {
       emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
     } else {

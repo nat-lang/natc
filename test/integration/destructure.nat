@@ -833,7 +833,24 @@ let q = f[0][0];
 
 assert(q.resolve());
 
+assert(q.body is ASTClosure);
+assert(vType(q.body.function.signature) == OFunction);
+assert(q.body.sign() is ASTSignature);
+
 let f <- () => for no (x in {1,2,3}) x in {1};
 let q = f[0][0];
 
 assert(!q.resolve());
+
+assert(q.body is ASTClosure);
+assert(vType(q.body.function.signature) == OFunction);
+assert(q.body.sign() is ASTSignature);
+
+let f <- () => for some (x in {1,2,3}) x == 1;
+let q = f[0][0];
+
+assert(q.resolve());
+
+assert(q.body is ASTClosure);
+assert(vType(q.body.function.signature) == OFunction);
+assert(q.body.sign() is ASTSignature);
