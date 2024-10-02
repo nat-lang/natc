@@ -1146,6 +1146,7 @@ InterpretResult vmExecute(int baseFrame) {
               break;
             }
 
+            // otherwise check the fields.
             if (!vmInstanceHas(instance, val)) return INTERPRET_RUNTIME_ERROR;
             break;
           }

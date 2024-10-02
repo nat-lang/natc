@@ -250,10 +250,7 @@ class ASTPropertyAccess extends ASTExpr {
   init(obj, key) => {
     this.children = [obj, key];
   }
-  resolve() => {
-
-    return this[0].resolve()[this[1].resolve()];
-  }
+  resolve() => this[0].resolve()[this[1].resolve()];
 }
 
 class ASTMembership extends ASTExpr {

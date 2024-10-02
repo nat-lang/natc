@@ -50,3 +50,16 @@ typecheck(() => f(g, h));
 
 typefail(() => f(h, 1));
 typefail(() => f(1, h));
+
+// quantification.
+
+typecheck(() => for all (x in e) x in {a,b});
+typecheck(() => for some (x in t) x);
+
+typefail(() => for no (x in e) x);
+
+typecheck(() => ((p: e -> t) => for some (x in e) p(x) or !p(x))(x => x in {c,d}));
+typecheck(() => ((p: e -> t) => for some (x in e) p(x) and !p(x))(x => x in {c,d}));
+
+typefail(() => ((p: e -> t) => for some (x in t) p(x) or !p(x))(x => x in {c,d}));
+typefail(() => ((p: e -> t) => for some (x in e) p(x) and !p(x))(x => x in {true,false}));

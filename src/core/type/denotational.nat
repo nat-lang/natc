@@ -10,7 +10,7 @@ class Domain extends Type {
   substitute(c) => this;
   str() => this.name;
 
-  each(predicate) => this.elements.each(predicate);
+  all(predicate) => this.elements.all(predicate);
   some(predicate) => this.elements.some(predicate);
 
   __iter__() => iter(this.elements);
@@ -50,6 +50,8 @@ class DenotationalTypeSystem extends PolyTypeSystem {
   literalType(value) => {
     if (hashable(value) and value in this.literals)
       return this.domains[this.literals[value]];
+    if (value is Domain)
+      return TSet(value);
 
     return super.literalType(value);
   }

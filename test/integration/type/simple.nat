@@ -358,7 +358,7 @@ assert(t == num -> bool);
 let f: (num, num) -> num = (x,y) => 1;
 let t = type((x,y) => f(x,y));
 
-assert(t == TProduct([num, num]) -> num);
+assert(t == TProduct(num, num) -> num);
 
 // with constraints on upvalues.
 

@@ -50,16 +50,29 @@ class PolyTypeState extends AdhocTypeState {
       tParams = tParams.apply(this.solution);
       tReturns = tReturns.apply(this.solution);
 
+      // push abstractions to the left edge.
       if (tReturns is TGeneralization)
         tReturns = tReturns.concrete;
 
       let type = tParams -> tReturns;
 
-      if (type.hasFvs()) {
+      if (type.hasFvs())
         return TGeneralization(type);
-      }
 
       return type;
+    }
+
+    if (node is ASTQuantification) {
+      let tQ = this.principal(node.quantifier);
+      let tR = this.principal(node.restriction);
+      let tB = this.principal(node.body);
+      let tV = typeVar();
+
+      this.constraints.push(tR ~ TSet(tV));
+      this.constraints.push(tQ <| TProduct(tR, tB) -> bool);
+      this.constraints.push(tB <| tV -> bool);
+
+      return bool;
     }
 
     return super.constrain(node);
@@ -104,7 +117,7 @@ class PolyTypeState extends AdhocTypeState {
 class PolyTypeSystem extends AdhocTypeSystem {
   literalType(value) => {
     if (value == Tuple)
-      return TAbstract((*types) => TProduct(types) -> TProduct(types));
+      return TAbstract((*types) => TProduct(..types) -> TProduct(..types));
 
     if (value == Set) {
       return TAbstract((*types) => {
@@ -116,7 +129,7 @@ class PolyTypeSystem extends AdhocTypeSystem {
         else
           element = TSum(..types);
 
-        return TProduct(types) -> TSet(element);
+        return TProduct(..types) -> TSet(element);
       });
     }
     
@@ -142,7 +155,7 @@ class PolyTypeSystem extends AdhocTypeSystem {
     else if (len(tArgs) == 1)
       tArgs = tArgs[0];
     else
-      tArgs = TProduct(tArgs);
+      tArgs = TProduct(..tArgs);
 
     state.constraints.push(tFunc <| tArgs -> tApp);
     state.solve();
