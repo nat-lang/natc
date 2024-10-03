@@ -7,8 +7,6 @@ class TAbstract extends Type {
   }
 
   instantiateWith(varCount) => {
-    print "instantiating #{this.__class__} with #{varCount}";
-
     let tVars = [typeVar() | _ in range(0, varCount)];
     let concrete = this.fn(..tVars);
     return TypeSystem.typify(concrete);

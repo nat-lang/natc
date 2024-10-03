@@ -134,12 +134,6 @@ static bool checkStr(char* str) {
   return strncmp(parser.current.start, str, strlen(str)) == 0;
 }
 
-static bool matchStr(Compiler* cmp, char* str) {
-  if (!checkStr(str)) return false;
-  advance(cmp);
-  return true;
-}
-
 static void consume(Compiler* cmp, TokenType type, const char* message) {
   if (parser.current.type == type)
     advance(cmp);
@@ -1718,68 +1712,6 @@ static void forConditionStatement(Compiler* cmp) {
     // Condition.
     emitByte(cmp, OP_POP);
   }
-}
-
-static void forSome(Compiler* cmp) {
-  consume(cmp, TOKEN_LEFT_PAREN, "Expecting '('.");
-
-  beginScope(cmp);
-  Iterator iter;
-  int exitJump = iterationStart(cmp, &iter);
-
-  expression(cmp);
-  emitByte(cmp, OP_NOT);
-  int successJump = emitJump(cmp, OP_JUMP_IF_FALSE);
-  emitByte(cmp, OP_POP);  // predication.
-
-  // if we reach the end, then the existential is false.
-  iterationEnd(cmp, iter, exitJump);
-  endScope(cmp);
-  emitByte(cmp, OP_FALSE);
-
-  // and we have to jump over the success instruction.
-  int failureJump = emitJump(cmp, OP_JUMP);
-  patchJump(cmp, successJump);
-  emitByte(cmp, OP_POP);  // the predication.
-  emitByte(cmp, OP_POP);  // the iterator.
-  endScope(cmp);
-  emitByte(cmp, OP_TRUE);
-  patchJump(cmp, failureJump);
-}
-
-static void forAll(Compiler* cmp) {
-  consume(cmp, TOKEN_LEFT_PAREN, "Expecting '('.");
-
-  beginScope(cmp);
-  Iterator iter;
-  int exitJump = iterationStart(cmp, &iter);
-
-  expression(cmp);
-  int failureJump = emitJump(cmp, OP_JUMP_IF_FALSE);
-  emitByte(cmp, OP_POP);  // predication.
-
-  // if we reach the end, then the universal is true.
-  iterationEnd(cmp, iter, exitJump);
-  endScope(cmp);
-  emitByte(cmp, OP_TRUE);
-
-  // and we have to jump over the failure instruction.
-  int successJump = emitJump(cmp, OP_JUMP);
-  // otherwise:
-  patchJump(cmp, failureJump);
-  emitByte(cmp, OP_POP);  // the predication.
-  emitByte(cmp, OP_POP);  // the iterator.
-  endScope(cmp);
-  emitByte(cmp, OP_FALSE);
-  patchJump(cmp, successJump);
-}
-
-static void forQuantification(Compiler* cmp, bool canAssign) {
-  if (matchStr(cmp, "some")) return forSome(cmp);
-  if (matchStr(cmp, "all")) return forAll(cmp);
-
-  advance(cmp);
-  error(cmp, "Expecting 'some' or 'all'.");
 }
 
 static void forStatement(Compiler* cmp) {
