@@ -66,7 +66,7 @@ class SubtypeState extends SimpleTypeState {
       let tElement = this.principal(element);
       let tCollection =  this.principal(collection);
 
-      this.constraints.push(tCollection <| TInstance(Base));
+      this.constraints.push(tCollection <| TCollection(tElement));
 
       if (tCollection is TInstance and "__in__" in tCollection.klass) {
         let tIn = this.type(tCollection.klass.__in__);
@@ -103,53 +103,52 @@ class SubtypeState extends SimpleTypeState {
       let tCondition = this.principal(condition),
           tConsequent = this.principal(consequent);
 
-      this.constraints.push(tCondition <| (bool || void || undef));
+      this.constraints.push(tCondition <| bool);
       return void;
     }
-
 
     return super.constrain(node);
   }
 
   _unify(constraint: Constraint) => {
-    if (constraint is SubtypeConstraint) {
-      let left = constraint.left,
-          right = constraint.right;
+    if (constraint is not SubtypeConstraint)
+      return super._unify(constraint);
+
+    let left = constraint.left,
+        right = constraint.right;
     
-      if (left is TVar or right is TVar) {
-        return super._unify(constraint);
+    if (left is TVar or right is TVar)
+      return super._unify(constraint);
 
-      // a -> b < c -> d iff a > c and b < d.
-      } else if (left is TFunction and right is TFunction) {
+    if (left is TCollection and right is TCollection) {
+      if (len(left) == len(right)) {
         this.constraints.extend([
-        // fixme: the compiler fails when these are unparenthesized.
-          (right.domain <| left.domain),
-          (left.range <| right.range)
+          x[0] <| x[1] | x in zip(left.elements, right.elements)
         ]);
-
         return this.solve();
-
-      } else if (left is TProduct and right is TProduct) {
-        if (len(left) == len(right)) {
-          this.constraints.extend([
-            x[0] <| x[1] | x in zip(left.elements, right.elements)
-          ]);
-          return this.solve();
-        }
-
-        return false;
-
-      } else if (left is TInstance and right is TInstance) {
-        return isSubclass(left.klass, right.klass);
-      } else {
-        let a = TSum.lift(left);
-        let b = TSum.lift(right);
-
-        return a.subtypeOf(b);
       }
+
+      return false;
     }
 
-    return super._unify(constraint);
+    if (left is TInstance and right is TInstance)
+      return isSubclass(left.klass, right.klass);
+
+    // a -> b < c -> d iff a > c and b < d.
+    if (left is TFunction and right is TFunction) {
+      this.constraints.extend([
+      // fixme: the compiler fails when these are unparenthesized.
+        (right.domain <| left.domain),
+        (left.range <| right.range)
+      ]);
+
+      return this.solve();
+    }
+
+    let a = TSum.lift(left);
+    let b = TSum.lift(right);
+
+    return a.subtypeOf(b);
   }
 
   // Value must be subtype of its annotation.

@@ -14,8 +14,8 @@ assert(h.fn(b) == b);
 let f = TGeneralization(a -> b);
 assert(f.fn(c,d) == c -> d);
 
-let g = TGeneralization(TProduct([a,b]));
-assert(g.fn(c,d) == TProduct([c,d]));
+let g = TGeneralization(TProduct(a,b));
+assert(g.fn(c,d) == TProduct(c,d));
 
 // the simple type system can't type the id function.
 
@@ -184,6 +184,14 @@ typefail(() => f(h, f("x", g)));
 typefail(() => f(h, f(g, "x")));
 typefail(() => f(f(g, "x"), h));
 typefail(() => f(f("x", g), h));
+
+// the polymorphic type system types quantification.
+
+typecheck(() => for all (x in {1,2,3}) x in {1,2});
+typecheck(() => for some (x in {true,false}) x);
+typefail(() => for no (x in {1,2,3}) x);
+
+typecheck(() => for some (x in {1,2,3}) x > 1 and x < 3);
 
 // reconstruction.
 

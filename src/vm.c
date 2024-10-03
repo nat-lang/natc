@@ -81,6 +81,7 @@ void initCore(Core* core) {
   core->astOverload = NULL;
   core->astMembership = NULL;
   core->astBlock = NULL;
+  core->astQuantification = NULL;
 
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
@@ -1145,6 +1146,7 @@ InterpretResult vmExecute(int baseFrame) {
               break;
             }
 
+            // otherwise check the fields.
             if (!vmInstanceHas(instance, val)) return INTERPRET_RUNTIME_ERROR;
             break;
           }
@@ -1419,6 +1421,20 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_UNIT: {
         vmPush(UNIT_VAL);
+        break;
+      }
+      case OP_QUANTIFY: {
+        Value body = vmPop();
+        Value restriction = vmPop();
+        Value quantifier = vmPop();
+
+        vmPush(quantifier);
+        vmPush(restriction);
+        vmPush(body);
+
+        if (!vmCallValue(quantifier, 2)) return INTERPRET_RUNTIME_ERROR;
+        frame = &vm.frames[vm.frameCount - 1];
+
         break;
       }
       default:

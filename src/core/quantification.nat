@@ -1,0 +1,6 @@
+
+let Quantification = Object();
+
+Quantification.all = (r, b) => r.all(b);
+Quantification.some = (r, b) => r.some(b);
+Quantification.no = (r, b) => !r.some(b);

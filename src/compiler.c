@@ -1002,110 +1002,117 @@ static void typeExpression(Compiler* cmp) {
   parsePrecedence(cmp, PREC_TYPE_ASSIGNMENT);
 }
 
+static void variableParameter(Compiler* cmp, Compiler* sigCmp) {
+  advance(cmp);
+  declareVariable(cmp);
+  markInitialized(cmp);
+
+  // put the param in the signature's constant table.
+  uint16_t constant = identifierConstant(sigCmp, &parser.previous);
+  emitConstInstr(sigCmp, OP_VARIABLE, constant);
+  // parse an optional type.
+  if (match(sigCmp, TOKEN_COLON))
+    expression(sigCmp);
+  else
+    emitByte(sigCmp, OP_UNDEFINED);
+}
+
+static void patternParameter(Compiler* cmp, Compiler* sigCmp) {
+  cmp->function->patterned = true;
+  // include the literal in the signature.
+  parsePrecedence(sigCmp, PREC_ASSIGNMENT);
+  // type defaults downstream to a tvar.
+  emitByte(sigCmp, OP_UNDEFINED);
+  // offset the local stack so that the literal
+  // can be passed to the function as an argument
+  // even if it's not bound.
+  addLocal(cmp, syntheticToken("#pattern"));
+}
+
 static void parameter(Compiler* cmp, Compiler* sigCmp) {
   getGlobalConstant(sigCmp, "PatternElement");
 
   if (checkVariable()) {
-    advance(cmp);
-    declareVariable(cmp);
-    markInitialized(cmp);
-
-    // include the param in the signature.
-    uint16_t constant = identifierConstant(sigCmp, &parser.previous);
-    emitConstInstr(sigCmp, OP_VARIABLE, constant);
-    // type.
-    if (match(sigCmp, TOKEN_COLON))
-      expression(sigCmp);
-    else
-      emitByte(sigCmp, OP_UNDEFINED);
+    variableParameter(cmp, sigCmp);
   } else {
-    cmp->function->patterned = true;
-    // include the literal in the signature.
-    parsePrecedence(sigCmp, PREC_ASSIGNMENT);
-    // type defaults downstream to a tvar.
-    emitByte(sigCmp, OP_UNDEFINED);
-    // offset the local stack so that the literal
-    // can be passed to the function as an argument
-    // even if it's not bound.
-    addLocal(cmp, syntheticToken("#pattern"));
+    patternParameter(cmp, sigCmp);
   }
 
   emitBytes(sigCmp, OP_CALL, 2);
 }
 
-static void function(Compiler* enclosing, FunctionType type, Token name) {
+static void openFunction(Compiler* enclosing, Compiler* cmp, Compiler* sigCmp,
+                         FunctionType type, Token name) {
   Token sigToken = syntheticToken("signature");
+  initCompiler(sigCmp, enclosing, NULL, TYPE_IMPLICIT, sigToken);
+  beginScope(sigCmp);
 
-  Compiler sigCmp;
-  initCompiler(&sigCmp, enclosing, NULL, TYPE_IMPLICIT, sigToken);
-  beginScope(&sigCmp);
+  initCompiler(cmp, enclosing, sigCmp, type, name);
+  beginScope(cmp);
+}
 
-  Compiler cmp;
-  initCompiler(&cmp, enclosing, &sigCmp, type, name);
-  beginScope(&cmp);
-
-  consume(&cmp, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
-
-  getGlobalConstant(&sigCmp, "Signature");
-
+static void openSignature(Compiler* sigCmp) {
+  getGlobalConstant(sigCmp, "Signature");
   // domain pattern.
-  getGlobalConstant(&sigCmp, "Pattern");
+  getGlobalConstant(sigCmp, "Pattern");
+}
+
+static void closeSignature(Compiler* cmp, Compiler* sigCmp) {
+  emitBytes(sigCmp, OP_CALL, cmp->function->arity);
+  // range pattern.
+  getGlobalConstant(sigCmp, "Pattern");
+  emitBytes(sigCmp, OP_CALL, 0);
+  // signature.
+  emitBytes(sigCmp, OP_CALL, 2);
+  emitByte(sigCmp, OP_RETURN);
+}
+
+static void variadicSignature(Compiler* cmp, Compiler* sigCmp) {
+  openSignature(sigCmp);
+
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
-      if (cmp.function->variadic)
-        error(&cmp, "Can only apply * to the final parameter.");
+      if (cmp->function->variadic)
+        error(cmp, "Can only apply * to the final parameter.");
 
-      cmp.function->arity++;
-      if (cmp.function->arity > 255) {
-        errorAtCurrent(&cmp, "Can't have more than 255 parameters.");
+      cmp->function->arity++;
+      if (cmp->function->arity > 255) {
+        errorAtCurrent(cmp, "Can't have more than 255 parameters.");
       }
 
       if (checkStr("*")) {
-        cmp.function->variadic = true;
+        cmp->function->variadic = true;
         // shift the star off the parameter's token.
         parser.current.start++;
         parser.current.length--;
       }
 
-      parameter(&cmp, &sigCmp);
-    } while (match(&cmp, TOKEN_COMMA));
+      parameter(cmp, sigCmp);
+    } while (match(cmp, TOKEN_COMMA));
   }
+  closeSignature(cmp, sigCmp);
+}
 
+static void function(Compiler* enclosing, FunctionType type, Token name) {
+  Compiler cmp, sigCmp;
+
+  openFunction(enclosing, &cmp, &sigCmp, type, name);
+  consume(&cmp, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+  variadicSignature(&cmp, &sigCmp);
   consume(&cmp, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-
-  emitBytes(&sigCmp, OP_CALL, cmp.function->arity);
-  // range pattern.
-  getGlobalConstant(&sigCmp, "Pattern");
-  emitBytes(&sigCmp, OP_CALL, 0);
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
-  // signature.
-  emitBytes(&sigCmp, OP_CALL, 2);
-  emitByte(&sigCmp, OP_RETURN);
-
   blockOrExpression(&cmp);
-
   signFunction(&cmp, &sigCmp, enclosing);
 }
 
 static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
-  Token sigToken = syntheticToken("signature");
+  Compiler cmp, sigCmp;
+  openFunction(enclosing, &cmp, &sigCmp, type, name);
 
-  Compiler sigCmp;
-  initCompiler(&sigCmp, enclosing, NULL, TYPE_IMPLICIT, sigToken);
-  beginScope(&sigCmp);
-
-  Compiler cmp;
-  initCompiler(&cmp, enclosing, &sigCmp, type, name);
-  beginScope(&cmp);
-
-  getGlobalConstant(&sigCmp, "Signature");
-
+  openSignature(&sigCmp);
   cmp.function->arity = 1;
-
-  getGlobalConstant(&sigCmp, "Pattern");
   parameter(&cmp, &sigCmp);
-  // domain pattern.
-  emitBytes(&sigCmp, OP_CALL, cmp.function->arity);
+  closeSignature(&cmp, &sigCmp);
 
   if (check(TOKEN_FAT_ARROW)) {
     advance(&cmp);
@@ -1114,13 +1121,6 @@ static void nakedFunction(Compiler* enclosing, FunctionType type, Token name) {
     nakedFunction(&cmp, TYPE_ANONYMOUS, syntheticToken("lambda"));
     emitByte(&cmp, OP_RETURN);
   }
-
-  // range pattern.
-  getGlobalConstant(&sigCmp, "Pattern");
-  emitBytes(&sigCmp, OP_CALL, 0);
-  // signature.
-  emitBytes(&sigCmp, OP_CALL, 2);
-  emitByte(&sigCmp, OP_RETURN);
 
   signFunction(&cmp, &sigCmp, enclosing);
 }
@@ -1205,12 +1205,48 @@ static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
   // condition.
   emitByte(cmp, OP_POP);
 }
+
 static void forInStatement(Compiler* cmp) {
   Iterator iter = iterator(cmp);
   consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
   int exitJump = iterationNext(cmp, iter);
   statement(cmp);
   iterationEnd(cmp, iter, exitJump);
+}
+
+static void forQuantification(Compiler* enclosing, bool canAssign) {
+  getGlobalConstant(enclosing, "Quantification");
+  consumeIdentifier(enclosing, "Expect quantifier.");
+  uint16_t quantifier = identifierConstant(enclosing, &parser.previous);
+  emitConstInstr(enclosing, OP_GET_PROPERTY, quantifier);
+
+  Compiler cmp, sigCmp;
+  Token name = syntheticToken("#quantifierBody");
+  openFunction(enclosing, &cmp, &sigCmp, TYPE_ANONYMOUS, name);
+
+  consume(enclosing, TOKEN_LEFT_PAREN, "Expect '(' after quantifier.");
+  openSignature(&sigCmp);
+  if (!check(TOKEN_IN)) {
+    do {
+      cmp.function->arity++;
+      if (cmp.function->arity > 255)
+        errorAtCurrent(&cmp, "Can't have more than 255 parameters.");
+
+      getGlobalConstant(&sigCmp, "PatternElement");
+      variableParameter(&cmp, &sigCmp);
+      emitBytes(&sigCmp, OP_CALL, 2);
+    } while (match(enclosing, TOKEN_COMMA));
+  }
+
+  consume(enclosing, TOKEN_IN, "Expect restriction.");
+  expression(enclosing);
+  consume(enclosing, TOKEN_RIGHT_PAREN, "Expect ')' after restriction.");
+  closeSignature(&cmp, &sigCmp);
+
+  blockOrExpression(&cmp);
+  signFunction(&cmp, &sigCmp, enclosing);
+
+  emitByte(enclosing, OP_QUANTIFY);
 }
 
 // Parse a comprehension, given a [Parser] that points at the body,
@@ -1730,7 +1766,9 @@ void importStatement(Compiler* cmp) {
   ObjModule* module = vmCompileModule(uri, MODULE_IMPORT);
   gotoParser(checkpoint);
 
-  if (module != NULL) {
+  if (module == NULL) {
+    error(cmp, "Failed to compile import.");
+  } else {
     if (alias == -1) {
       emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
     } else {
@@ -1878,7 +1916,7 @@ ParseRule rules[] = {
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_FOR] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FOR] = {forQuantification, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_IN] = {NULL, binary, PREC_COMPARISON, PREC_COMPARISON + PREC_STEP},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE, PREC_NONE},

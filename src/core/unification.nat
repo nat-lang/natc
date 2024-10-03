@@ -41,8 +41,8 @@ let unify = (function, arguments) => {
 
   state.constraints.push(
     TypeSystem.ConstraintClass(
-      TProduct(argTypes),
-      TProduct(paramTypes)
+      TProduct(..argTypes),
+      TProduct(..paramTypes)
     )
   );
 

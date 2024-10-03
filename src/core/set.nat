@@ -129,7 +129,6 @@ class Set extends Object {
   map(fn) => this.elements().map(fn);
   reduce(fn, acc) => this.elements().reduce(fn, acc);
   all(predicate) => this.elements().all(predicate);
-  each(predicate) => this.all(predicate);
   some(predicate) => this.elements().some(predicate);
 
   str() => "Set(" + join([x.str() | x in this.elements()], ", ") + ")";

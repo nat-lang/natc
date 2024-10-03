@@ -1,4 +1,10 @@
 
+let ASTClosureMock = (*children) => {
+  let mock = ASTClosure(nil,nil,[]);
+  mock.children = children;
+  return mock;
+};
+
 // constant function to literal.
 
 let f <- (a) => 1;
@@ -748,3 +754,103 @@ assert(p is ASTParameter);
 assert(p.id == 1);
 assert(p.value == nil);
 assert(p.type is ->);
+
+// quantification.
+
+let f <- () => for _ (x in p) !x;
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTQuantification(
+      ASTPropertyAccess(
+        ASTGlobal("Quantification"),
+        ASTLiteral("_")
+      ),
+      ASTGlobal("q"),
+      ASTClosureMock(
+        ASTReturn(
+          ASTNegation(
+            ASTLocal(1)
+          )
+        ),
+        ASTImplicitReturn(
+          ASTLiteral(nil)
+        )
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- () => for _ (x in {1,2,3}) x not in {4,5,6};
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTQuantification(
+      ASTPropertyAccess(
+        ASTGlobal("Quantification"),
+        ASTLiteral("_")
+      ),
+      ASTApp(
+        ASTGlobal("Set"),
+        ASTArgumentSequence(
+          ASTLiteral(1),
+          ASTLiteral(2),
+          ASTLiteral(3)
+        )
+      ),
+      ASTClosureMock(
+        ASTReturn(
+          ASTNegation(
+            ASTMembership(
+              ASTLocal(1),
+              ASTApp(
+                ASTGlobal(Set),
+                ASTArgumentSequence(
+                  ASTLiteral(4),
+                  ASTLiteral(5),
+                  ASTLiteral(6)
+                )
+              )
+            )
+          )
+        ),
+        ASTImplicitReturn(
+          ASTLiteral(nil)
+        )
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- () => for all (x in {1,2,3}) x not in {4,5,6};
+let q = f[0][0];
+
+assert(q.resolve());
+
+assert(q.body is ASTClosure);
+assert(vType(q.body.function.signature) == OFunction);
+assert(q.body.sign() is ASTSignature);
+
+let f <- () => for no (x in {1,2,3}) x in {1};
+let q = f[0][0];
+
+assert(!q.resolve());
+
+assert(q.body is ASTClosure);
+assert(vType(q.body.function.signature) == OFunction);
+assert(q.body.sign() is ASTSignature);
+
+let f <- () => for some (x in {1,2,3}) x == 1;
+let q = f[0][0];
+
+assert(q.resolve());
+
+assert(q.body is ASTClosure);
+assert(vType(q.body.function.signature) == OFunction);
+assert(q.body.sign() is ASTSignature);

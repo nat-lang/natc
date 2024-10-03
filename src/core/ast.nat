@@ -338,3 +338,14 @@ class ASTOverload extends ASTExpr {
   resolve() => this.overload;
 }
 
+class ASTQuantification extends ASTExpr {
+  init(quantifier, restriction, body) => {
+    this.quantifier = quantifier;
+    this.restriction = restriction;
+    this.body = body;
+
+    this.children = [quantifier, restriction, body];
+  }
+
+  resolve() => this.quantifier.resolve()(this.restriction.resolve(), this.body.resolve());
+}

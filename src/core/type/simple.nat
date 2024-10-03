@@ -150,35 +150,40 @@ class TInstance extends TClassy {
   str() => "TInstance(" + str(this.klass) + ")";
 }
 
-class TProduct extends TInstance {
-  init(elements) => {
+class TCollection extends TInstance {
+  init(*elements) => {
+    this.klass = Base;
     this.elements = elements;
-    this.klass = Tuple;
   }
-
-  fvs() => bigUnion(..[x.fvs() | x in this.elements]);
-  str() => "(" + join(this.elements.map(x => x.str()), ", ") + ")";
+  str() => "TCollection(" + this.elements[0].str() + ")";
+  map(fn) => this.__class__(..this.elements.map(fn));
+  substitute(c: Constraint) => this.map(x => x.substitute(c));
   hash() => this.elements.hash();
-  substitute(c: Constraint) => {
-    return TProduct(this.elements.map(x => x.substitute(c)));
-  }
-
   __iter__() => iter(this.elements);
   __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
-
-   map(fn) => TProduct(this.elements.map(fn));
 }
 
-class TSet extends TInstance {
-  init(element) => {
-    this.element = element;
+class TProduct extends TCollection {
+  init(*elements) => {
+    this.klass = Tuple;
+    super.init(..elements);
+  }
+  fvs() => bigUnion(..[x.fvs() | x in this.elements]);
+  str() => "(#{join(this.elements.map(x => x.str()), ", ")})";
+}
+
+class TSet extends TCollection {
+  init(*elements) => {
     this.klass = Set;
+    super.init(..elements);
   }
-  str() => "TSet(" + this.element.str() + ")";
-  substitute(c: Constraint) => {
-    return TSet(this.element.substitute(c));
+  init(*elements) => {
+    if (len(elements) != 1)
+      throw TypeError("TSet requires one argument, got #{len(elements)}.");
+    super.init(..elements);
   }
+  str() => "TSet(" + this.elements[0].str() + ")";
 }
 
 let unit = TUnit();
@@ -231,7 +236,7 @@ class SimpleTypeSystem {
     if (value == undefined)
       return typeVar();
     if (value is Tuple)
-      return TProduct(value.map(this.typify));
+      return TProduct(..value.map(this.typify));
     if (vType(value) == OSequence)
       return this.typify(Sequence.fromRaw(value));
     if (vType(value) == OClass)
@@ -336,7 +341,7 @@ class SimpleTypeState {
     else if (node.function.arity == 1)
       return paramTypes[0];
     else
-      return TProduct(paramTypes);
+      return TProduct(..paramTypes);
   }
 
   constrainFnRange(node: ASTClosure) => {
@@ -404,8 +409,8 @@ class SimpleTypeState {
       return this.type(value);
     }
 
-    // the ast closes over a variable out of its scope.
-    // resolve it and type its value.
+    // the ast closes over a variable out of
+    // its scope. resolve it and type its value.
     if (node is ASTExternalUpvalue) {
       let value = node.resolve();
       return this.type(value);
@@ -414,7 +419,7 @@ class SimpleTypeState {
     if (node is ASTVariable)
       return this.lookup(node);
 
-    // punt: requires proper class typing.
+      // punt: requires proper class typing.
     if (node is ASTPropertyAccess)
       return typeVar();
 
@@ -426,7 +431,7 @@ class SimpleTypeState {
       else if (len(tArgs) == 1)
         return tArgs[0];
       else
-        return TProduct(tArgs);
+        return TProduct(..tArgs);
     }
 
     if (node is ASTApp) {
@@ -536,8 +541,8 @@ class SimpleTypeState {
       return this.solve();
     }
 
-    // product types of equal length become pairwise sequences of constraints.
-    if (left is TProduct and right is TProduct) {
+    // collection types of equal length become pairwise sequences of constraints.
+    if (left is TCollection and right is TCollection) {
       if (len(left) == len(right)) {
         this.constraints.extend(
           zip(left.elements, right.elements).map(x => x[0] ~ x[1])
