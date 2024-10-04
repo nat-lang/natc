@@ -411,5 +411,12 @@ class ASTQuantification extends ASTExpr {
     this.children = [quantifier, restriction, body];
   }
 
+  tex() => {
+    let qFn = this.quantifier.resolve();
+    if (!qFn.tex)
+      throw Error("Quantifier '#{qFn.name}' defines no tex() function.");
+    return qFn.tex(this.restriction, this.body);
+  }
+  
   resolve() => this.quantifier.resolve()(this.restriction.resolve(), this.body.resolve());
 }

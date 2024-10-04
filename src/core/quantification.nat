@@ -1,6 +1,33 @@
 
+// We keep the quantifiers in their own namespace
+// namespace so that grammars can use the identifiers.
+
 let Quantification = Object();
 
-Quantification.all = (r, b) => r.all(b);
-Quantification.some = (r, b) => r.some(b);
-Quantification.no = (r, b) => !r.some(b);
+let all = (r, b) => r.all(b);
+let some = (r, b) => r.some(b);
+let no = (r, b) => !r.some(b);
+
+
+all.tex = (restriction, body) => {
+  print restriction;
+  print body;
+  return "all!";
+};
+
+some.tex = (restriction, body) => {
+  print restriction;
+  print body;
+  return "some!";
+};
+
+no.tex = (restriction, body) => {
+  print restriction;
+  print body;
+  return "no!";
+};
+
+
+Quantification.all = all;
+Quantification.some = some;
+Quantification.no = no;

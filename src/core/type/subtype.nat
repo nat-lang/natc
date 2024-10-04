@@ -26,7 +26,9 @@ class TSum extends Type {
   lower() => this.disjuncts.elements()[0];
 
   fvs() => union(..[x.fvs() | x in this]);
-  str() => "TSum(" + join(this.elements().map(x => x.str()), ", ") + ")";
+  join(sep) => join(this.elements().map(x => x.str()), sep);
+  str() => "TSum(" + this.join(", ") + ")";
+  tex() => this.join(" \mid ");
   pp() => { print this.str(); }
   hash() => this.disjuncts.hash();
   
