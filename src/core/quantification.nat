@@ -12,6 +12,8 @@ class Quantifier {
     let signature = body.signature();
     let params = join(signature.params.map(p => p.var.name), ", ");
 
+    print this.uniSym;
+        print body[0].children.values;
     return "#{this.texSym} #{params} \in #{restriction.tex()}. #{body.bodyTex()}";
   }
 }

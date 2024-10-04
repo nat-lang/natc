@@ -168,7 +168,9 @@ class ASTConditional extends ASTStatement {
     this.children = [condition, consequence];
   }
 
-  tex() => "if #{this[0].tex()} then #{this[1].tex()}";
+  tex() => {
+    return "if #{this[0].tex()} then #{this[1].tex()}";
+  }
 }
 
 class ASTLiteral extends ASTExpr {
@@ -191,6 +193,8 @@ class ASTEquality extends ASTExpr {
   init(left, right) => {
     this.children = [left, right];
   }
+
+  tex() => "#{this[0].tex()} = #{this[1].tex()}";
 }
 
 class ASTSequence extends ASTExpr {
@@ -288,8 +292,10 @@ class ASTApp extends ASTExprStatement {
     
     if (this[0] is ASTGlobal) {
       let lhs = this[0].resolve();
-      if (vType(lhs) == OClass and "tex" in lhs)
+      if (vType(lhs) == OClass and "tex" in lhs) {
+        print lhs;
         return lhs.tex(this[1]);
+      }
     }
 
     return "#{this[0].tex()}(#{this[1].tex()})";
