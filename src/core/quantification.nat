@@ -1,33 +1,21 @@
 
-// We keep the quantifiers in their own namespace
-// namespace so that grammars can use the identifiers.
+class Quantifier {
+  init(uniSym, texSym, fn) => {
+    this.uniSym = uniSym;
+    this.texSym = texSym;
+    this.fn = fn;
+  }
 
-let Quantification = Object();
+  call(restriction, body) => this.fn(restriction, body);
+  
+  tex(restriction: ASTNode, body: ASTClosure) => {
+    let signature = body.signature();
+    let params = join(signature.params.map(p => p.var.name), ", ");
 
-let all = (r, b) => r.all(b);
-let some = (r, b) => r.some(b);
-let no = (r, b) => !r.some(b);
+    return "#{this.texSym} #{params} \in #{restriction.tex()}. #{body.bodyTex()}";
+  }
+}
 
-
-all.tex = (restriction, body) => {
-  print restriction;
-  print body;
-  return "all!";
-};
-
-some.tex = (restriction, body) => {
-  print restriction;
-  print body;
-  return "some!";
-};
-
-no.tex = (restriction, body) => {
-  print restriction;
-  print body;
-  return "no!";
-};
-
-
-Quantification.all = all;
-Quantification.some = some;
-Quantification.no = no;
+let all = Quantifier("∀", "\forall", (r, b) => r.all(b));
+let some = Quantifier("∃", "\exists", (r, b) => r.some(b));
+let no = Quantifier("¬∃", "\neg\exists", (r, b) => !r.some(b));

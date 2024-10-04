@@ -17,4 +17,3 @@ import src/core/type/subtype
 import src/core/type/adhoc
 import src/core/type/poly
 import src/core/type/denotational
-import src/core/quantification

@@ -20,7 +20,7 @@ class ASTNode extends Tree {
     this.children = children;
   }
 
-  tex() => { throw NotImplemented(); }
+  tex() => { throw NotImplemented(this.__class__, this.tex); }
 
   // Give the tree's variables uuids. Identify upvalues
   // with the locals they close over. 
@@ -159,12 +159,16 @@ class ASTBlock extends ASTNode {
     this.children = children;
   }
   opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
+
+  tex() => join(this.children.map(x => x.tex()), "");
 }
 
 class ASTConditional extends ASTStatement {
   init(condition, consequence) => {
     this.children = [condition, consequence];
   }
+
+  tex() => "if #{this[0].tex()} then #{this[1].tex()}";
 }
 
 class ASTLiteral extends ASTExpr {
@@ -252,7 +256,7 @@ class ASTParameter extends ASTVariable {
   }
 
   tex() => {
-    let tex = "\lambda #{this.name}";
+    let tex = "\lambda #{this.var.name}";
 
     if (this.type != undefined)
       tex = tex + "_{#{this.type}}";
@@ -335,15 +339,9 @@ class ASTClosure extends ASTExpr {
     }
   }
 
-  tex() => {
-    let signature = this.signature().tex();
-
-    // the first explicit return of a naked function.
-    let explReturn = this.children[0],
-        body = explReturn.tex();
-
-    return "#{signature}. #{body}";
-  }
+  // The first explicit return of a naked function.
+  bodyTex() => this.children[0].tex();
+  tex() => "#{this.signature().tex()}. #{this.bodyTex()}";
 
   resolve() => this.function;
 
@@ -417,6 +415,6 @@ class ASTQuantification extends ASTExpr {
       throw Error("Quantifier '#{qFn.name}' defines no tex() function.");
     return qFn.tex(this.restriction, this.body);
   }
-  
+
   resolve() => this.quantifier.resolve()(this.restriction.resolve(), this.body.resolve());
 }
