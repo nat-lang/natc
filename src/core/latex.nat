@@ -33,6 +33,6 @@ class TexDocument {
 
 class TreeDocument extends TexDocument {
   init(blocks) => {
-    super.init("standalone", ["tikz", "tikz-qtree"], blocks);
+    super.init("standalone", ["amsmath", "tikz", "tikz-qtree"], blocks);
   }
 }

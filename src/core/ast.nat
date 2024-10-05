@@ -287,20 +287,19 @@ class ASTApp extends ASTExprStatement {
   }
 
   resolve() => this.evaluate();
-
-  tex() => {
-    // let lhs = this[0].resolve();
-    
+  resolveTex() => {
     if (this[0] is ASTGlobal) {
-      let lhs = this[0].resolve();
-      if (vType(lhs) == OClass && "tex" in lhs) {
-        print lhs;
-        return lhs.tex(this[1]);
-      }
+      let fn = this[0].resolve();
+      if (fn.tex)
+        return fn.tex(this[1]);
     }
-
-    return "#{this[0].tex()}(#{this[1].tex()})";
   }
+
+  tex() => this.resolveTex() || "#{this[0].tex()}(#{this[1].tex()})";
+}
+
+class ASTAppInfix extends ASTApp {
+  tex() => this.resolveTex() || "#{this[1][0].tex()} #{this[0].tex()} #{this[1][1].tex()}";
 }
 
 class ASTAppInfix extends ASTApp {}
