@@ -24,7 +24,7 @@ class OOverload extends CObject {}
 class OSequence extends CObject {}
 
 let isSubclass = (a, b) => {
-  if (vType(a) != OClass or vType(b) != OClass) 
+  if (vType(a) != OClass || vType(b) != OClass) 
     return false;
   
   let klass = a;
@@ -44,7 +44,7 @@ let infix(5) is = (a, b) => {
   let aType = vType(a);
   let bType = vType(b);
 
-  if (aType != OInstance or bType != OClass)
+  if (aType != OInstance || bType != OClass)
     return false;
 
   return isSubclass(a.__class__, b);

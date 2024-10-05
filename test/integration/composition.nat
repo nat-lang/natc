@@ -128,7 +128,7 @@ let every : (e -> t) -> (e -> t) -> t
 
 // coordination.
 
-let or': (e -> t) -> (e -> t) -> (e -> t) = p q x => p(x) || q(x);
+let or': (e -> t) -> (e -> t) -> e -> t = p q x => p(x) or q(x);
 
 // composition rules.
 

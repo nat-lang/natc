@@ -20,6 +20,7 @@ class ASTNode extends Tree {
     this.children = children;
   }
 
+  str() => str(this.__class__);
   tex() => { throw NotImplemented(this.__class__, this.tex); }
 
   // Give the tree's variables uuids. Identify upvalues
@@ -292,7 +293,7 @@ class ASTApp extends ASTExprStatement {
     
     if (this[0] is ASTGlobal) {
       let lhs = this[0].resolve();
-      if (vType(lhs) == OClass and "tex" in lhs) {
+      if (vType(lhs) == OClass && "tex" in lhs) {
         print lhs;
         return lhs.tex(this[1]);
       }

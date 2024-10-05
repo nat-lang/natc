@@ -15,7 +15,7 @@ class TOverload extends Type {
   lift(type) => {
     // if a function has a disjunctive domain we can map it
     // into an overload with a case for each disjunct.
-    if (type is TFunction and type.domain is TSum)
+    if (type is TFunction && type.domain is TSum)
       return TOverload(..[x -> type.range | x in type.domain]);
 
     return this.unit(type);
@@ -23,7 +23,7 @@ class TOverload extends Type {
 
   concat(that) => TOverload(..this.cases.concat(that.cases));
 
-  __eq__(that) => that is TOverload and this.cases == that.cases;
+  __eq__(that) => that is TOverload && this.cases == that.cases;
 
   str() => "TOverload(" + join([x.str() | x in this.cases], ", ") + ")";
   pp() => { print this.str(); }
@@ -47,10 +47,10 @@ class AdhocTypeState extends SubtypeState {
         right = constraint.right;
 
     if (constraint is SubtypeConstraint) {
-      if (left is TVar or right is TVar)
+      if (left is TVar || right is TVar)
         return super._unify(constraint);
 
-      if (left is TOverload or right is TOverload) {
+      if (left is TOverload || right is TOverload) {
         left = TOverload.lift(left);
         right = TOverload.lift(right);
 
@@ -75,7 +75,7 @@ class AdhocTypeState extends SubtypeState {
     }
 
     // left ~ right iff left <| right & right <| left
-    if (left is TOverload or right is TOverload) {
+    if (left is TOverload || right is TOverload) {
       left = TOverload.lift(left);
       right = TOverload.lift(right);
 

@@ -84,14 +84,14 @@ class PolyTypeState extends AdhocTypeState {
         right = constraint.right;
 
     if (left is TAbstract) {
-      if (left.variadic and right is -> and right.domain is TProduct)
+      if (left.variadic && right is -> && right.domain is TProduct)
         left = left.instantiateWith(len(right.domain));
       else if (right is not TVar)
         left = left.instantiate();
     }
     
     if (right is TAbstract) {
-      if (right.variadic and left is -> and left.domain is TProduct)
+      if (right.variadic && left is -> && left.domain is TProduct)
         right = right.instantiateWith(len(left.domain));
       else if (left is not TVar)
         right = right.instantiate();

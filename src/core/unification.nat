@@ -25,7 +25,7 @@ let unify = (function, arguments) => {
     // then it unifies by equality. we fail here just in case it's
     // a literal and it fails to unify.
     if (param.type == undefined) {
-      if (isVar(param.value) or param.value == arguments[i])
+      if (isVar(param.value) || param.value == arguments[i])
         paramTypes.push(typeVar());
       else
         return false;

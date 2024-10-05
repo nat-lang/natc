@@ -119,10 +119,10 @@ class SubtypeState extends SimpleTypeState {
     let left = constraint.left,
         right = constraint.right;
     
-    if (left is TVar or right is TVar)
+    if (left is TVar || right is TVar)
       return super._unify(constraint);
 
-    if (left is TCollection and right is TCollection) {
+    if (left is TCollection && right is TCollection) {
       if (len(left) == len(right)) {
         this.constraints.extend([
           x[0] <| x[1] | x in zip(left.elements, right.elements)
@@ -133,11 +133,11 @@ class SubtypeState extends SimpleTypeState {
       return false;
     }
 
-    if (left is TInstance and right is TInstance)
+    if (left is TInstance && right is TInstance)
       return isSubclass(left.klass, right.klass);
 
-    // a -> b < c -> d iff a > c and b < d.
-    if (left is TFunction and right is TFunction) {
+    // a -> b < c -> d iff a > c && b < d.
+    if (left is TFunction && right is TFunction) {
       this.constraints.extend([
       // fixme: the compiler fails when these are unparenthesized.
         (right.domain <| left.domain),

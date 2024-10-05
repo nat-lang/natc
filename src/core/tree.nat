@@ -86,7 +86,7 @@ class Tree extends Object {
   }
   pp() => this._pp(0);
 
-  __eq__(that) => this.__class__ == that.__class__ and this.children == that.children;
+  __eq__(that) => this.__class__ == that.__class__ && this.children == that.children;
 
   bracket() => {
     let datum = () => {

@@ -32,7 +32,7 @@ class Map extends Object {
   __eq__(that) => {
     if (len(this) != len(that)) return false;
 
-    return this.subMap(that) and that.subMap(this);
+    return this.subMap(that) && that.subMap(this);
   }
 
   copy() => this.__class__(..this.entries());

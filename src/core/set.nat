@@ -71,7 +71,7 @@ class Set extends Object {
   supsetEq(that) => that.subsetEq(this);
 
   // Is [this] equal to [that]?
-  __eq__(that) => this.subsetEq(that) and that.subsetEq(this);
+  __eq__(that) => this.subsetEq(that) && that.subsetEq(this);
 
   union(that) => {
     let set = {};
