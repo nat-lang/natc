@@ -667,10 +667,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   emitBytes(cmp, OP_CALL, 1);
   emitBytes(cmp, OP_CALL, 2);
 
-<<<<<<< HEAD
   // pretend the
-=======
->>>>>>> 154c105 (wip)
   rewindScanner(parser.current);
   parser.next = scanVirtualToken('"');
 

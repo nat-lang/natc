@@ -373,15 +373,6 @@ Token consumeToken(char c) {
   return errorToken("Unexpected character.");
 }
 
-<<<<<<< HEAD
-=======
-Token scanSlashedIdentifier() {
-  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
-  return scanner.current == scanner.start ? errorToken("Unexpected character.")
-                                          : makeToken(TOKEN_IDENTIFIER);
-}
-
->>>>>>> 154c105 (wip)
 Token scanVirtualToken(char c) {
   if (isAtEnd()) return makeToken(TOKEN_EOF);
 

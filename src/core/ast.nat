@@ -260,14 +260,7 @@ class ASTParameter extends ASTVariable {
     this.type = type;
   }
 
-  tex() => {
-    let tex = "\lambda #{this.var.name}";
-
-    if (this.type != undefined)
-      tex = tex + "_{#{this.type}}";
-
-    return tex;
-  }
+  tex() => "\lambda #{this.var.name}";
 }
 
 class ASTArgumentSequence extends ASTExpr {
@@ -412,6 +405,7 @@ class ASTOverload extends ASTExpr {
     this.children = closures;
   }
   resolve() => this.overload;
+  tex() => join([fn.tex() | fn in this.children], " \mid ");
 }
 
 class ASTQuantification extends ASTExpr {

@@ -88,13 +88,13 @@ class Tree extends Object {
 
   __eq__(that) => this.__class__ == that.__class__ && this.children == that.children;
 
-  bracket() => {
+  texBracket() => {
     let datum = () => {
       if (this.data == nil) return "{}";
 
       let type = TypeSystem.type(this.data);
 
-      if (vType(this.data) == OFunction) {
+      if (vType(this.data) in [OFunction, OOverload]) {
         let ast <- this.data;
         return "{#{this.data.name} \\ $#{ast.tex()}$ \\ $#{type.tex()}$}";
       }
@@ -104,11 +104,11 @@ class Tree extends Object {
 
     if (this.leaf()) return datum();
 
-    let children = join(this.children.map(n => n.bracket()), " ");
+    let children = join(this.children.map(n => n.texBracket()), " ");
     return "[.#{datum()} #{children} ]";
   }
 
-  tex() => "\tikz{{\Tree#{this.bracket()}}}";
+  tex() => "\tikz{{\Tree#{this.texBracket()}}}";
 }
 
 // Functions for building tree literals during compilation.
