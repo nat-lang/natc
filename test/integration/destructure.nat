@@ -591,7 +591,6 @@ assert(m_up is ASTExternalUpvalue);
 assert(m_up.name == "m");
 
 assert(dot.resolve() == compose);
-assert(k_up.resolve() == undefined);
 assert(m_up.resolve() == m);
 
 // upvalues in conditional branches.

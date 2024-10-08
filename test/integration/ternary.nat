@@ -1,0 +1,6 @@
+
+print if true then false;
+print if true then false else true;
+
+print true if false;
+print false if true else false;

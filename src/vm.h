@@ -30,6 +30,7 @@ typedef struct {
   ObjString* sValues;
   ObjString* sSignature;
   ObjString* sFunction;
+  ObjString* sModule;
 
   ObjClass* base;
   ObjClass* object;

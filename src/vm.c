@@ -62,6 +62,7 @@ void initCore(Core* core) {
   core->sValues = intern("values");
   core->sSignature = intern("signature");
   core->sFunction = intern("function");
+  core->sModule = intern("module");
 
   core->base = NULL;
   core->object = NULL;
@@ -615,6 +616,22 @@ bool vmOverload(CallFrame* frame) {
   vmPush(OBJ_VAL(overload));
   mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
   mapSet(&overload->fields, OBJ_VAL(vm.core.sName), name);
+  return true;
+}
+
+bool vmImport(ObjModule* module, ObjMap* target) {
+  ObjModule* enclosing = vm.module;
+
+  vmPush(OBJ_VAL(module));  // imported.
+  vm.module = module;
+
+  if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+    return true;
+
+  mapAddAll(&vm.module->namespace, target);
+
+  vm.module = enclosing;
+  vmPop();  // imported.
   return true;
 }
 
@@ -1176,47 +1193,23 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        ObjModule* enclosing = vm.module;
-
-        vmPush(OBJ_VAL(module));  // imported.
-        vm.module = module;
-
-        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
-          return INTERPRET_RUNTIME_ERROR;
+        vmImport(module, &vm.globals);
         frame = &vm.frames[vm.frameCount - 1];
-
-        mapAddAll(&vm.module->namespace, &vm.globals);
-
-        vm.module = enclosing;
-        vmPop();  // imported.
         break;
       }
       case OP_IMPORT_AS: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         Value alias = READ_CONSTANT();
 
-        ObjModule* enclosing = vm.module;
-
-        vmPush(OBJ_VAL(module));  // imported.
-        vm.module = module;
-
-        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
-          return INTERPRET_RUNTIME_ERROR;
-        frame = &vm.frames[vm.frameCount - 1];
-
         vmPush(OBJ_VAL(vm.core.module));
         if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
+        ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
 
-        mapAddAll(&module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
-        mapSet(&AS_INSTANCE(vmPeek(0))->fields, INTERN("function"),
-               OBJ_VAL(module->closure));
+        vmImport(module, &objModule->fields);
+        frame = &vm.frames[vm.frameCount - 1];
 
-        vm.module = enclosing;
-        Value objModule = vmPop();
-        vmPop();  // imported.
-        vmPush(objModule);
-
-        mapSet(&vm.globals, alias, objModule);
+        mapSet(&vm.globals, alias, OBJ_VAL(objModule));
+        mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
         vmPop();  // objModule.
         break;

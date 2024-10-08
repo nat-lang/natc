@@ -17,7 +17,7 @@ if __name__ == "__main__":
   with open(config, "w+") as f:
     configuration = CONFIGURATION.format(
       base_dir=base_dir,
-      core_loc=os.path.join(src_dir, "core", "__index__"),
+      core_loc=os.path.join(src_dir, "core", "index"),
       system_loc=os.path.join(src_dir, "core", "system")
     )
 
