@@ -147,8 +147,15 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_IMPLICIT_RETURN", offset);
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
-    case OP_OVERLOAD:
-      return byteInstruction("OP_OVERLOAD", chunk, offset);
+    case OP_OVERLOAD: {
+      uint8_t slot = chunk->code[offset + 1];
+      uint16_t constant = readShort(chunk, offset + 1);
+
+      printf("%-16s %4d '", "OP_OVERLOAD", slot);
+      printValue(chunk->constants.values[constant]);
+      printf("'\n");
+      return offset + 5;
+    }
     case OP_CLASS:
       return constantInstruction("OP_CLASS", chunk, offset);
     case OP_INHERIT:

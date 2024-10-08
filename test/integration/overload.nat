@@ -7,22 +7,25 @@ assert(f(1));
 assert(f(2) == false);
 assert(f(3) == undefined);
 
+assert(f.name == "f");
 assert(f.arity == 1);
 
-let f = nil => true;
+let g = nil => true;
 
-assert(f(nil));
-assert(f(2) == undefined);
+assert(g(nil));
+assert(g(2) == undefined);
 
-assert(f.arity == 1);
+assert(g.name == "g");
+assert(g.arity == 1);
 
-let f = nil => true | undefined => true | false => false;
+let h = nil => true | undefined => true | false => false;
 
-assert(f(nil));
-assert(f(undefined));
-assert(f(false) == false);
+assert(h(nil));
+assert(h(undefined));
+assert(h(false) == false);
 
-assert(f.arity == 1);
+assert(h.name == "h");
+assert(h.arity == 1);
 
 // overloads can dispatch on parenthesized literals.
 

@@ -589,6 +589,7 @@ void vmSign(CallFrame* frame) {
 
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
+  Value name = READ_CONSTANT();
   int arity = 0;
   ObjOverload* overload = newOverload(cases);
 
@@ -613,6 +614,7 @@ bool vmOverload(CallFrame* frame) {
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
   mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
+  mapSet(&overload->fields, OBJ_VAL(vm.core.sName), name);
   return true;
 }
 

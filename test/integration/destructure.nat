@@ -654,6 +654,7 @@ let f <- 1 => true | 2 => false;
 
 assert(f is ASTOverload);
 assert(vType(f.overload) == OOverload);
+assert(f.overload.name == "f");
 assert(f.count == 2);
 assert(f[0] is ASTClosure);
 assert(f[1] is ASTClosure);
@@ -666,6 +667,7 @@ let g = f[0][1];
 
 assert(g is ASTOverload);
 assert(vType(g.overload) == OOverload);
+assert(g.overload.name == "g");
 assert(g.count == 2);
 assert(g[0] is ASTClosure);
 assert(g[1] is ASTClosure);

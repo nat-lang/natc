@@ -912,6 +912,7 @@ void overload(Compiler* cmp, FunctionType fnType, Token name) {
   } while (match(cmp, TOKEN_PIPE));
 
   emitBytes(cmp, OP_OVERLOAD, count);
+  emitConstant(cmp, identifierConstant(cmp, &name));
 }
 
 static bool tryFunction(Compiler* cmp, FunctionType fnType, Token name) {
@@ -1587,7 +1588,7 @@ static void letDeclaration(Compiler* cmp) {
   if (match(cmp, TOKEN_EQUAL)) {
     boundExpression(cmp, name);
   } else if (match(cmp, TOKEN_ARROW_LEFT)) {
-    expression(cmp);
+    boundExpression(cmp, name);
     emitByte(cmp, OP_DESTRUCTURE);
   } else {
     emitByte(cmp, OP_NIL);
