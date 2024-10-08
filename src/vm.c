@@ -508,7 +508,7 @@ static void bindClosure(Value receiver, Value* value) {
   }
 }
 
-ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot) {
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot, ObjString* name) {
   ObjUpvalue* prevUpvalue = NULL;
   ObjUpvalue* upvalue = vm.openUpvalues;
   while (upvalue != NULL && upvalue->location > local) {
@@ -520,7 +520,7 @@ ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot) {
     return upvalue;
   }
 
-  ObjUpvalue* createdUpvalue = newUpvalue(local, slot);
+  ObjUpvalue* createdUpvalue = newUpvalue(local, slot, name);
   createdUpvalue->next = upvalue;
 
   if (prevUpvalue == NULL) {
@@ -537,7 +537,12 @@ void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame) {
     uint8_t isLocal = READ_BYTE();
     uint8_t index = READ_BYTE();
     if (isLocal) {
-      closure->upvalues[i] = vmCaptureUpvalue(frame->slots + index, index);
+      Token token = frame->closure->function->locals[index].name;
+      ObjString* name = copyString(token.start, token.length);
+      vmPush(OBJ_VAL(name));
+      closure->upvalues[i] =
+          vmCaptureUpvalue(frame->slots + index, index, name);
+      vmPop();
     } else {
       closure->upvalues[i] = frame->closure->upvalues[index];
     }

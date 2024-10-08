@@ -203,6 +203,10 @@ class ASTVariable extends ASTExpr {
 }
 
 class ASTLocal extends ASTVariable {
+  init(id, name) => {
+    this.name = name;
+    super.init(id);
+  }
   str() => { return "ASTLocal(" + str(this.id) + ")"; }
 }
 class ASTGlobal extends ASTVariable {
@@ -210,8 +214,9 @@ class ASTGlobal extends ASTVariable {
 }
 
 class ASTUpvalue extends ASTVariable {
-  init(id, localId, upvalue) => {
+  init(id, localId, upvalue, name) => {
     super.init(id);
+    this.name = name;
     this.localId = localId;
     this.upvalue = upvalue;
   }

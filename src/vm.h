@@ -138,6 +138,6 @@ void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
-ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot, ObjString* name);
 
 #endif

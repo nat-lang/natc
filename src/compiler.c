@@ -282,20 +282,20 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->function = NULL;
   cmp->function = newFunction(currentModule);
   cmp->functionType = functionType;
-  cmp->localCount = 0;
+  cmp->function->localCount = 0;
   cmp->scopeDepth = 0;
 
   vm.compiler = cmp;
   cmp->function->name = copyString(name.start, name.length);
 
   for (int i = 0; i < UINT8_COUNT; i++) {
-    cmp->locals[i].depth = 0;
-    cmp->locals[i].isCaptured = false;
+    cmp->function->locals[i].depth = 0;
+    cmp->function->locals[i].isCaptured = false;
 
-    initToken(&cmp->locals[i].name);
+    initToken(&cmp->function->locals[i].name);
   }
 
-  Local* local = &cmp->locals[cmp->localCount++];
+  Local* local = &cmp->function->locals[cmp->function->localCount++];
   local->depth = 0;
   local->isCaptured = false;
   local->name.type = TOKEN_IDENTIFIER;
@@ -341,15 +341,16 @@ static void beginScope(Compiler* cmp) { cmp->scopeDepth++; }
 static void endScope(Compiler* cmp) {
   cmp->scopeDepth--;
 
-  while (cmp->localCount > 0 &&
-         cmp->locals[cmp->localCount - 1].depth > cmp->scopeDepth) {
-    if (cmp->locals[cmp->localCount - 1].isCaptured) {
+  while (cmp->function->localCount > 0 &&
+         cmp->function->locals[cmp->function->localCount - 1].depth >
+             cmp->scopeDepth) {
+    if (cmp->function->locals[cmp->function->localCount - 1].isCaptured) {
       emitByte(cmp, OP_CLOSE_UPVALUE);
     } else {
       emitByte(cmp, OP_POP);
     }
 
-    cmp->localCount--;
+    cmp->function->localCount--;
   }
 }
 
@@ -411,8 +412,8 @@ static bool identifiersEqual(Token* a, Token* b) {
 }
 
 static int resolveLocal(Compiler* cmp, Token* name) {
-  for (int i = cmp->localCount - 1; i >= 0; i--) {
-    Local* local = &cmp->locals[i];
+  for (int i = cmp->function->localCount - 1; i >= 0; i--) {
+    Local* local = &cmp->function->locals[i];
 
     if (identifiersEqual(name, &local->name)) {
       if (local->depth == -1) {
@@ -450,7 +451,7 @@ static int resolveUpvalue(Compiler* cmp, Token* name) {
 
   int local = resolveLocal(cmp->enclosing, name);
   if (local != -1) {
-    cmp->enclosing->locals[local].isCaptured = true;
+    cmp->enclosing->function->locals[local].isCaptured = true;
     return addUpvalue(cmp, (uint8_t)local, true);
   }
 
@@ -463,29 +464,29 @@ static int resolveUpvalue(Compiler* cmp, Token* name) {
 }
 
 static uint8_t addLocal(Compiler* cmp, Token name) {
-  if (cmp->localCount == UINT8_COUNT) {
+  if (cmp->function->localCount == UINT8_COUNT) {
     error(cmp, "Too many local variables in function.");
     return 0;
   }
 
-  Local* local = &cmp->locals[cmp->localCount++];
+  Local* local = &cmp->function->locals[cmp->function->localCount++];
 
   local->name = name;
   local->depth = -1;
   local->isCaptured = false;
 
-  return cmp->localCount - 1;
+  return cmp->function->localCount - 1;
 }
 
 static void markInitialized(Compiler* cmp) {
   if (cmp->scopeDepth == 0) return;
 
-  cmp->locals[cmp->localCount - 1].depth = cmp->scopeDepth;
+  cmp->function->locals[cmp->function->localCount - 1].depth = cmp->scopeDepth;
 }
 
 static uint8_t declareLocal(Compiler* cmp, Token* name) {
-  for (int i = cmp->localCount - 1; i >= 0; i--) {
-    Local* local = &cmp->locals[i];
+  for (int i = cmp->function->localCount - 1; i >= 0; i--) {
+    Local* local = &cmp->function->locals[i];
     if (local->depth != -1 && local->depth < cmp->scopeDepth) {
       break;
     }

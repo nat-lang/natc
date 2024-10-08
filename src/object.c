@@ -196,12 +196,13 @@ ObjString* intern(const char* chars) {
   return copyString(chars, strlen(chars));
 }
 
-ObjUpvalue* newUpvalue(Value* value, uint8_t slot) {
+ObjUpvalue* newUpvalue(Value* value, uint8_t slot, ObjString* name) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
   upvalue->location = value;
   upvalue->slot = slot;
   upvalue->closed = NIL_VAL;
   upvalue->next = NULL;
+  upvalue->name = name;
   return upvalue;
 }
 
