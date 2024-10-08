@@ -235,9 +235,9 @@ static TokenType identifierType() {
       if (CURRENT - START > 1) {
         switch (START[1]) {
           case 'i':
-            return checkpointKeyword(1, 2, "il", TOKEN_NIL);
+            return checkpointKeyword(2, 1, "l", TOKEN_NIL);
           case 'o':
-            return checkpointKeyword(1, 2, "ot", TOKEN_NOT);
+            return checkpointKeyword(2, 1, "t", TOKEN_NOT);
         }
       }
       break;
