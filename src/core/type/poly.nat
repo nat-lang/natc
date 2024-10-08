@@ -15,6 +15,23 @@ class TAbstract extends Type {
   instantiate() => this.instantiateWith(this.arity);
 
   pp() => { print str(this); }
+  prettyTVars() => {
+    class PrettyTVar extends TVar { str() => this.id; }
+
+    let tVars = [["u", "v", "w", "x", "y", "z"][i] | i in range(0, this.arity)];
+
+    return [PrettyTVar(v) | v in tVars];
+  }
+  str() => {
+    let tVars = this.prettyTVars();
+    let type = TypeSystem.typify(this.fn(..tVars));
+    return "(#{join([v.id | v in tVars], ",")}) => #{type.str()}";
+  }
+  tex() => {
+    let tVars = this.prettyTVars();
+    let type = TypeSystem.typify(this.fn(..tVars));
+    return "\forall #{join([v.id | v in tVars], ",")}. #{type.tex()}";
+  }
 }
 
 class TGeneralization extends TAbstract {
@@ -23,14 +40,7 @@ class TGeneralization extends TAbstract {
     this.arity = len(concrete.fvs());
     this.variadic = false;
   }
-  str() => {
-    let tVars = [
-      ["u", "v", "w", "x", "y", "z"][i] | i in range(0, this.arity)
-    ];
-    class PrettyTVar extends TVar { str() => this.id; }
-    let type = TypeSystem.typify(this.fn(..[PrettyTVar(v) | v in tVars]));
-    return "(" + join([v | v in tVars], ",") + ") => " + type.str();
-  }
+
   fvs() => this.concrete.fvs();
 
   fn(*args) => {

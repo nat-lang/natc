@@ -59,6 +59,7 @@ class Type extends Base {
   );
 
   str() => str(this);
+  tex() => { throw NotImplemented(this.__class__, this.tex); }
   pp() => { print this.str(); }
   map(fn) => fn(this);
 }
@@ -225,6 +226,10 @@ class SimpleTypeSystem {
         return this.type(value.init);
       return unit -> TInstance(value);
     }
+    // these have to be constructed recursively.
+    if (type == OFunction) return nil;
+    if (type == OBoundFunction) return nil;
+    if (type == OOverload) return nil;
 
     // these need to be inferred.
     if (type == OFunction) return nil;
@@ -254,7 +259,7 @@ class SimpleTypeSystem {
     return value;
   }
 
-  // Assemble && return the [TypeState] produced
+  // Assemble and return the [TypeState] produced
   // by [expr].
   _typecheck(expr, debug) => {
     let node <- expr;
@@ -319,7 +324,7 @@ class SimpleTypeState {
   }
 
   // Look up the type of a variable by its id
-  // && apply the current solution to it.
+  // and apply the current solution to it.
   find(id) => {
     let type = this.typeEnv.find(n => n.id == id);
 
@@ -483,7 +488,7 @@ class SimpleTypeState {
     if (node is ASTExprStatement)
       return this.principal(node[0]);
 
-    if (node is ASTReturn) 
+    if (node is ASTReturn)
       return this.principal(node[0]);
     
     if (node is ASTBlock) {

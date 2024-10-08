@@ -55,22 +55,19 @@ class AdhocTypeState extends SubtypeState {
         right = TOverload.lift(right);
 
         // ∀x in right. ∃y in left. y <| x
-        return right.cases.all(
-          x => left.cases.some(
-            y => {
-              // we only want to propagate information for a
-              // successful case, so typecheck in a local copy
-              // of the state.
-              let substate = this.copy();
-              let unified = substate.unify(y <| x);
+        return for all (x in right.cases)
+          for some (y in left.cases) {
+          // we only want to propagate information for a
+          // successful case, so typecheck in a local copy
+          // of the state.
+          let substate = this.copy();
+          let unified = substate.unify(y <| x);
 
-              if (unified)
-                this.solution = substate.solution;
+          if (unified)
+            this.solution = substate.solution;
 
-              return unified;
-            }
-          )
-        );
+          return unified;
+        };
       }
     }
 

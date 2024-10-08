@@ -52,8 +52,6 @@ void vmRuntimeError(const char* format, ...) {
             function->module->path->chars, NAT_EXT,
             function->chunk.lines[instruction]);
   }
-
-  resetStack();
 }
 
 void initCore(Core* core) {

@@ -286,7 +286,6 @@ typefail(() => A(1));
 class B { init(a) => {} }
 
 typecheck(() => B(1));
-
 typefail(() => B());
 
 // annotated parameter.
@@ -294,7 +293,6 @@ typefail(() => B());
 class C { init(a: num) => {} }
 
 typecheck(() => C(1));
-
 typefail(() => C(true));
 
 // returns TInstance.
