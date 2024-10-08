@@ -623,19 +623,12 @@ class SimpleTypeState {
   unifyAnnotations(expr, type) => {
     let tAnnotations = annotations(expr).map(this.system.typify);
 
-    if (len(tAnnotations) > 1) {
-      throw TypeError("Too many annotations for #{expr}: #{
-        join([this.system.typify(a).str() | a in tAnnotations], ", ")
-      }");
-    }
-
-    if (len(tAnnotations) == 1) {
-      let annotation = this.system.typify(tAnnotations[0]);
-
-      this.constrainAnnotation(annotation, type);
+    if (len(tAnnotations) > 0) {
+      for (annotation in tAnnotations)
+        this.constrainAnnotation(annotation, type);
 
       if (this.solve())
-        return annotation.apply(this.solution);
+        return tAnnotations[0].apply(this.solution);
     }
 
     return type;

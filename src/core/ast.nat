@@ -346,8 +346,16 @@ class ASTClosure extends ASTExpr {
   }
 
   // The first explicit return of a naked function.
-  bodyTex() => this.children[0].tex();
-  tex() => "#{this.signature().tex()}. #{this.bodyTex()}";
+  nakedBody() => this.children[0];
+  tex() => {
+    let body = this.nakedBody();
+
+    let sep = ". ";
+    if (body[0] is ASTClosure or body[0] is ASTQuantification)
+      sep = "";
+
+    return "#{this.signature().tex()}#{sep}#{body.tex()}";
+  }
 
   resolve() => this.function;
 
