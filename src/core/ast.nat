@@ -225,7 +225,9 @@ class ASTUpvalue extends ASTVariable {
 }
 
 class ASTExternalUpvalue extends ASTUpvalue {}
-class ASTInternalUpvalue extends ASTUpvalue {}
+class ASTInternalUpvalue extends ASTUpvalue {
+  resolve() => { throw Error("Not resolvable."); }
+}
 
 class ASTParameter extends ASTVariable {
   init(id, name, type) => {
