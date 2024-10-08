@@ -51,8 +51,6 @@ static void gotoParser(Parser checkpoint) {
   parser = checkpoint;
 }
 
-static void rewindParser() { rewindScanner(parser.current); }
-
 static void errorAt(Compiler* cmp, Token* token, const char* message) {
   if (parser.panicMode)
     return;
@@ -112,11 +110,6 @@ static void advance(Compiler* cmp) {
   shiftParser();
   parser.next = scanToken();
   checkError(cmp);
-}
-
-static void advanceVirtual(Compiler* cmp, char c) {
-  parser.next = virtualToken(c);
-  advance(cmp);
 }
 
 static void advanceSlashedIdentifier(Compiler* cmp) {
@@ -666,10 +659,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   getGlobalConstant(cmp, "+");
   getGlobalConstant(cmp, "+");
   loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
-                                       parser.previous.length - 1)));
-
-  advance(cmp);  // consume the '#'.
-  consume(cmp, TOKEN_LEFT_BRACE, "Expecting '{'.");
+                                       parser.previous.length - 3)));
 
   getGlobalConstant(cmp, "str");
   expression(cmp);
@@ -677,11 +667,11 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   emitBytes(cmp, OP_CALL, 1);
   emitBytes(cmp, OP_CALL, 2);
 
-  if (check(TOKEN_RIGHT_BRACE)) {
-    // unparse and reparse the next token.
-    rewindParser();
-    advanceVirtual(cmp, '"');
+  // pretend the
+  rewindScanner(parser.current);
+  parser.next = scanVirtualToken('"');
 
+  if (match(cmp, TOKEN_RIGHT_BRACE)) {
     if (match(cmp, TOKEN_STRING))
       string(cmp, canAssign);
     else if (match(cmp, TOKEN_INTERPOLATION))

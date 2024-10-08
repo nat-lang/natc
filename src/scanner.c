@@ -39,6 +39,7 @@ Scanner saveScanner() {
 void gotoScanner(Scanner checkpoint) { scanner = checkpoint; }
 
 void rewindScanner(Token token) {
+  scanner.line = token.line;
   scanner.current = scanner.start = token.start;
 }
 
@@ -305,8 +306,11 @@ static Token number() {
 
 static Token string() {
   while (peek() != '"' && !isAtEnd()) {
-    if (peek() == '#' && peekNext() == '{')
+    if (peek() == '#' && peekNext() == '{') {
+      advance();
+      advance();
       return makeToken(TOKEN_INTERPOLATION);
+    }
 
     if (peek() == '\n') scanner.line++;
     advance();
