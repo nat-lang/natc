@@ -68,7 +68,7 @@ class SubtypeState extends SimpleTypeState {
 
       this.constraints.push(tCollection <| TCollection(tElement));
 
-      if (tCollection is TInstance and "__in__" in tCollection.klass) {
+      if (tCollection is TInstance && "__in__" in tCollection.klass) {
         let tIn = this.type(tCollection.klass.__in__);
 
         this.constraints.push(tIn <| tElement -> bool);

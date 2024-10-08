@@ -220,7 +220,7 @@ assert(f[0][0][0][1] is ASTLocal);
 
 // and.
 
-let f <- () => true and false;
+let f <- () => true && false;
 
 assert(f is ASTClosure);
 assert(f.children == [
@@ -243,7 +243,7 @@ assert(f.children == [
 
 // or.
 
-let f <- () => true or false;
+let f <- () => true || false;
 
 assert(f is ASTClosure);
 assert(f.children == [
@@ -596,7 +596,7 @@ assert(m_up.resolve() == m);
 
 // upvalues in conditional branches.
 
-let f <- up x => x and up;
+let f <- up x => x && up;
 
 assert(f is ASTClosure);
 
@@ -624,7 +624,7 @@ assert(g.children == [
 
 let f = (() => {
   let up = false;
-  let g <- x => x and up;
+  let g <- x => x && up;
   return g;
 })();
 

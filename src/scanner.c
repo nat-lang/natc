@@ -145,17 +145,8 @@ static TokenType identifierType() {
 #define CURRENT scanner.current
 
   switch (START[0]) {
-    case 'a': {
-      if (CURRENT - START > 1) {
-        switch (START[1]) {
-          case 'n':
-            return checkpointKeyword(2, 1, "d", TOKEN_AND);
-          case 's':
-            return checkpointKeyword(1, 1, "s", TOKEN_AS);
-        }
-      }
-      break;
-    }
+    case 'a':
+      return checkpointKeyword(1, 1, "s", TOKEN_AS);
     case 'c': {
       if (CURRENT - START > 1) {
         switch (START[1]) {
@@ -241,8 +232,6 @@ static TokenType identifierType() {
         }
       }
       break;
-    case 'o':
-      return checkpointKeyword(1, 1, "r", TOKEN_OR);
     case 'p':
       return checkpointKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
@@ -272,6 +261,11 @@ static TokenType identifierType() {
       return checkpointKeyword(1, 8, "ndefined", TOKEN_UNDEFINED);
     case 'w':
       return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
+    case '&':
+      return checkpointKeyword(1, 1, "&", TOKEN_AND);
+    case '|': {
+      return checkpointKeyword(1, 1, "|", TOKEN_OR);
+    }
   }
 
   return TOKEN_IDENTIFIER;

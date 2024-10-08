@@ -48,7 +48,7 @@ class DenotationalTypeSystem extends PolyTypeSystem {
   }
 
   literalType(value) => {
-    if (hashable(value) and value in this.literals)
+    if (hashable(value) && value in this.literals)
       return this.domains[this.literals[value]];
     if (value is Domain)
       return TSet(value);
