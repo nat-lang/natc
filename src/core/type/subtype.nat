@@ -36,7 +36,7 @@ class TSum extends Type {
   __len__() => len(this.disjuncts);
 }
 
-let infix(9) || = (a, b) => TSum.lift(a) & TSum.lift(b);
+let infix(9) % = (a, b) => TSum.lift(a) & TSum.lift(b);
 
 class SubtypeConstraint extends Constraint {
   str() => this.left.str() + " <| " + this.right.str();
@@ -79,7 +79,7 @@ class SubtypeState extends SimpleTypeState {
 
     if (node is ASTNegation) {
       let tArg = this.principal(node[0]);
-      this.constraints.push(tArg <| (bool || void || undef));
+      this.constraints.push(tArg <| (bool % void % undef));
       return bool;
     }
 

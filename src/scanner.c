@@ -55,7 +55,7 @@ static bool isSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
           c == '+' || c == '-' || c == '/' || c == '*' || c == '|' ||
-          c == '=' || c == '_');
+          c == '=' || c == '_' || c == '%');
 }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }

@@ -1,0 +1,2 @@
+let infix(3) or = (p, q) => p || q;
+let infix(4) and = (p, q) => p && q;
