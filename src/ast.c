@@ -296,7 +296,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(left);
       vmPush(right);
 
-      OK_IF(vmExecuteMethod("opCall", 3));
+      OK_IF(vmExecuteMethod("opCallInfix", 3));
     }
     case OP_CALL_POSTFIX: {
       int argCount = READ_BYTE();

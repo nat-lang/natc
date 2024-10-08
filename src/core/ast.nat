@@ -75,6 +75,7 @@ class ASTNode extends Tree {
   opGetUpvalue(address) => this.upvalues[address];
   opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
+  opCallInfix(fn, left, right) => ASTAppInfix(fn, ASTArgumentSequence(left, right));
   opVariable(var) => ASTPatternVariable(var);
   opMember(element, collection) => ASTMembership(element, collection);
 
@@ -250,6 +251,8 @@ class ASTApp extends ASTExprStatement {
 
   resolve() => this.evaluate();
 }
+
+class ASTAppInfix extends ASTApp {}
 
 class ASTPropertyAccess extends ASTExpr {
   init(obj, key) => {

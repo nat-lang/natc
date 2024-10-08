@@ -75,7 +75,7 @@ let f <- (a) => a + 1;
 let r = f[0];
 
 assert(r is ASTReturn);
-assert(r[0] is ASTApp);
+assert(r[0] is ASTAppInfix);
 assert(r[0][0].id == "+");
 
 let f <- (a) => +(a, 1);
