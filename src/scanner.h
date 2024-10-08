@@ -13,13 +13,13 @@ Scanner initScanner(const char* source);
 Scanner saveScanner();
 void initToken(Token* token);
 Token syntheticToken(const char* start);
-Token virtualToken(char c);
 void gotoScanner(Scanner scanner);
 void rewindScanner(Token token);
 void printScanner(Scanner sc);
 void skipWhitespace();
 Token scanToken();
-Token slashedIdentifier();
+Token scanSlashedIdentifier();
+Token scanVirtualToken(char c);
 char charAt(int i);
 bool isWhite(char c);
 

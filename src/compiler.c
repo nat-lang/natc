@@ -121,7 +121,7 @@ static void advanceVirtual(Compiler* cmp, char c) {
 
 static void advanceSlashedIdentifier(Compiler* cmp) {
   shiftParser();
-  parser.next = slashedIdentifier();
+  parser.next = scanSlashedIdentifier();
   checkError(cmp);
 }
 

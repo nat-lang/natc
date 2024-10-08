@@ -289,12 +289,6 @@ Token typeVariable() {
   return makeToken(TOKEN_TYPE_VARIABLE);
 }
 
-Token slashedIdentifier() {
-  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
-  return scanner.current == scanner.start ? errorToken("Unexpected character.")
-                                          : makeToken(TOKEN_IDENTIFIER);
-}
-
 static Token number() {
   while (isDigit(peek())) advance();
 
@@ -381,10 +375,16 @@ Token consumeToken(char c) {
   return errorToken("Unexpected character.");
 }
 
-Token virtualToken(char c) {
+Token scanVirtualToken(char c) {
   if (isAtEnd()) return makeToken(TOKEN_EOF);
 
   return consumeToken(c);
+}
+
+Token scanSlashedIdentifier() {
+  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
+  return scanner.current == scanner.start ? errorToken("Unexpected character.")
+                                          : makeToken(TOKEN_IDENTIFIER);
 }
 
 Token scanToken() {
