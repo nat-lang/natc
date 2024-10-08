@@ -57,3 +57,8 @@ char* readSource(const char* path) {
   char* source = readFile(qualifiedPath);
   return source;
 }
+
+char* readRelativeSource(const char* path) {
+  char* absolutePath = pathToUri(path);
+  return readSource(absolutePath);
+}

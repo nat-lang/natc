@@ -11,8 +11,8 @@ CONFIGURATION = """
 
 if __name__ == "__main__":
   base_dir = os.environ["NAT_BASE_DIR"]
-  src_dir = os.path.join(base_dir, "src")
   config = os.path.join(base_dir, "src", "config.h")
+  src_dir = "src"
 
   with open(config, "w+") as f:
     configuration = CONFIGURATION.format(

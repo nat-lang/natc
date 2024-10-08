@@ -30,18 +30,27 @@ void vmRuntimeError(const char* format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
+  int leftOffset = 6;  // strlen("module").
+
+  for (int i = vm.frameCount - 1; i >= 0; i--) {
+    CallFrame* frame = &vm.frames[i];
+    if (frame->closure->function->module->closure == frame->closure) continue;
+    int fnNameLen = strlen(frame->closure->function->name->chars);
+    if (fnNameLen > leftOffset) leftOffset = fnNameLen;
+  }
+
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame* frame = &vm.frames[i];
     ObjClosure* closure = frame->closure;
     ObjFunction* function = closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
-    fprintf(stderr, "  [line %d] in %s", function->chunk.lines[instruction],
-            function->name->chars);
 
-    if (function->module->closure == closure)
-      fprintf(stderr, "\n");
-    else
-      fprintf(stderr, " (%s)\n", function->module->path->chars);
+    char* name =
+        function->module->closure == closure ? "module" : function->name->chars;
+
+    fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset, name,
+            function->module->path->chars, NAT_EXT,
+            function->chunk.lines[instruction]);
   }
 
   resetStack();
@@ -1459,7 +1468,7 @@ ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
 }
 
 ObjModule* vmCompileModule(char* path, ModuleType type) {
-  char* source = readSource(path);
+  char* source = readSource(pathToUri(path));
 
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));

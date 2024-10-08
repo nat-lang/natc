@@ -1745,7 +1745,6 @@ void importStatement(Compiler* cmp) {
 
   advance(cmp);
   ObjString* path = copyString(parser.previous.start, parser.previous.length);
-  char* uri = pathToUri(path->chars);
 
   int alias = -1;
   if (match(cmp, TOKEN_AS)) {
@@ -1755,7 +1754,7 @@ void importStatement(Compiler* cmp) {
 
   Parser checkpoint = saveParser();
 
-  ObjModule* module = vmCompileModule(uri, MODULE_IMPORT);
+  ObjModule* module = vmCompileModule(path->chars, MODULE_IMPORT);
   gotoParser(checkpoint);
 
   if (module == NULL) {
