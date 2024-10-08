@@ -48,7 +48,6 @@ class CompositionSystem {
 
         if (data != undefined)
           return TypedTree(data, [left, right], TypeSystem.type(data));
-
       }
 
       return TypedTree(node.data, [left, right], nil);

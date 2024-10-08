@@ -136,7 +136,7 @@ class SubtypeState extends SimpleTypeState {
     if (left is TInstance && right is TInstance)
       return isSubclass(left.klass, right.klass);
 
-    // a -> b < c -> d iff a > c && b < d.
+    // a -> b <| c -> d iff c <| a and b <| d.
     if (left is TFunction && right is TFunction) {
       this.constraints.extend([
       // fixme: the compiler fails when these are unparenthesized.
