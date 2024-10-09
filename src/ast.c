@@ -553,6 +553,8 @@ bool ast(Value value) {
 
           return astOverload(AS_OVERLOAD(value));
         }
+        case OBJ_MODULE:
+          return astClosure(NULL, AS_MODULE(value)->closure);
         default:
           vmRuntimeError("Undestructurable object.");
           return false;

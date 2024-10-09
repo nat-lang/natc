@@ -6,3 +6,8 @@
 import src/core/type/system
 import src/core/unification
 import src/core/composition
+
+// We keep the quantifiers in their own namespace
+// so that grammars can use the identifiers.
+
+import src/core/quantification as Quantification

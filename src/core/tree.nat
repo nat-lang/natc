@@ -4,10 +4,10 @@ class Tree extends Object {
   init(data, children) => {
     this.data = data;
     this.children = children;
-
-    this.depth = -1;
-    this.breadth = -1;
   }
+
+  __eq__(that) => this.__class__ == that.__class__ &&
+                  this.children == that.children;
 
   // Subscript access is to children.
   __get__(idx) => this.children[idx];
@@ -88,8 +88,27 @@ class Tree extends Object {
     this.children.map(x => x._pp(depth + 1));
   }
   pp() => this._pp(0);
+  texBracket() => {
+    let datum = () => {
+      if (this.data == nil) return "{}";
 
-  __eq__(that) => this.__class__ == that.__class__ and this.children == that.children;
+      let type = TypeSystem.type(this.data);
+
+      if (vType(this.data) in [OFunction, OOverload]) {
+        let ast <- this.data;
+        return "{#{this.data.name} \\ $#{ast.tex()}$ \\ $#{type.tex()}$}";
+      }
+
+      return "{#{this.data} \\ $#{type.tex()}$}";
+    };
+
+    if (this.leaf()) return datum();
+
+    let children = join(this.children.map(n => n.texBracket()), " ");
+    return "[.#{datum()} #{children} ]";
+  }
+
+  tex() => "\tikz{{\Tree#{this.texBracket()}}}";
 }
 
 // Functions for building tree literals during compilation.

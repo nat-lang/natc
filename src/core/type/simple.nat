@@ -59,6 +59,7 @@ class Type extends Base {
   );
 
   str() => str(this);
+  tex() => { throw NotImplemented(this.__class__, this.tex); }
   pp() => { print this.str(); }
   map(fn) => fn(this);
 }
@@ -69,7 +70,8 @@ class TFunction extends Type {
     this.range = range;
   }
 
-  __eq__(that) => this.domain == that.domain and this.range == that.range;
+  __eq__(that) => this.domain == that.domain &&
+                  this.range == that.range;
 
   str() => {
     let domain = this.domain.str(),
@@ -79,6 +81,13 @@ class TFunction extends Type {
       domain = "(" + domain + ")";
 
     return domain + " -> " + range;
+  }
+  tex() => {
+    let domain = this.domain.tex();
+    if (this.domain is TFunction)
+      domain = "(#{domain})";
+
+    return "#{domain} \to #{this.range.tex()}";
   }
   fvs() => this.domain.fvs() & this.range.fvs();
 
@@ -97,7 +106,8 @@ class TVar extends Type {
   __eq__(that) => this.id == that.id;
   hash() => hash(this.id);
   fvs() => Set(this);
-  str() => "<var " + str(this.id) + ">";
+  str() => "<var #{this.id}>";
+  tex() => str(this.id);
 }
 
 class TypeVarSupply extends NameSupply {
@@ -155,7 +165,8 @@ class TCollection extends TInstance {
     this.klass = Base;
     this.elements = elements;
   }
-  str() => "TCollection(" + this.elements[0].str() + ")";
+  fvs() => union(..[x.fvs() | x in this.elements]);
+  str() => "(" + join(this.elements.map(x => x.str()), ", ") + ")";
   map(fn) => this.__class__(..this.elements.map(fn));
   substitute(c: Constraint) => this.map(x => x.substitute(c));
   hash() => this.elements.hash();
@@ -169,7 +180,7 @@ class TProduct extends TCollection {
     this.klass = Tuple;
     super.init(..elements);
   }
-  fvs() => bigUnion(..[x.fvs() | x in this.elements]);
+  fvs() => union(..[x.fvs() | x in this.elements]);
   str() => "(#{join(this.elements.map(x => x.str()), ", ")})";
 }
 

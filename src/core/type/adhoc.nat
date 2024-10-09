@@ -23,9 +23,10 @@ class TOverload extends Type {
 
   concat(that) => TOverload(..this.cases.concat(that.cases));
 
-  __eq__(that) => that is TOverload and this.cases == that.cases;
+  __eq__(that) => that is TOverload && this.cases == that.cases;
 
-  str() => "TOverload(" + join([x.str() | x in this.cases], ", ") + ")";
+  str() => "TOverload(#{join([x.str() | x in this.cases], ", ")})";
+  tex() => join([case.tex() | case in this.cases], " \mid ");
   pp() => { print this.str(); }
 }
 

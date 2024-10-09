@@ -9,7 +9,7 @@ class Domain extends Type {
 
   substitute(c) => this;
   str() => this.name;
-
+  tex() => this.str();
   all(predicate) => this.elements.all(predicate);
   some(predicate) => this.elements.some(predicate);
 

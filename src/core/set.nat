@@ -131,7 +131,9 @@ class Set extends Object {
   all(predicate) => this.elements().all(predicate);
   some(predicate) => this.elements().some(predicate);
 
-  str() => "Set(" + join([x.str() | x in this.elements()], ", ") + ")";
+  join() => join([x.str() | x in this.elements()], ", ");
+  str() => "Set(#{this.join()}))";
+  tex(ast: ASTArgumentSequence) => "\{#{ast.tex()}\}";
   pp() => {
     print this.str();
   }
@@ -140,7 +142,7 @@ class Set extends Object {
   fromSeq(seq: Sequential) => Set(..seq);
 }
 
-let bigUnion = (*sets) => sets.reduce(
+let union = (*sets) => sets.reduce(
   (big, set) => big & set,
   {}
 );
