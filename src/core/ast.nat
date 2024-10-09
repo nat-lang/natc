@@ -90,12 +90,12 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
-  opSetGlobalValue(local, value) => {
+  opSetGlobalValue(global, value) => {
     let node = ASTGlobalValueAssignment(local, value);
     this.children.push(node);
   }
 
-  opSetGlobalType(local, type) => {
+  opSetGlobalType(global, type) => {
     let node = ASTGlobalTypeAssignment(local, type);
     this.children.push(node);
   }
@@ -230,9 +230,9 @@ class ASTInternalUpvalue extends ASTUpvalue {
 }
 
 class ASTParameter extends ASTVariable {
-  init(id, name, type) => {
+  init(id, var, type) => {
     super.init(id);
-    this.name = name;
+    this.var = var;
     this.type = type;
   }
 }

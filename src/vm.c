@@ -636,7 +636,7 @@ bool vmImport(ObjModule* module, ObjMap* target) {
 
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return false;
-  printf("1\n");
+
   mapAddAll(&vm.module->namespace, target);
 
   vm.module = enclosing;
