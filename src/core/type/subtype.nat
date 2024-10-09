@@ -153,7 +153,7 @@ class SubtypeState extends SimpleTypeState {
 
   // Value must be subtype of its annotation.
   constrainAnnotation(annotation, type) => this.constraints.push(
-    type <| this.system.typify(annotation)
+    type <| annotation
   );
 }
 

@@ -208,21 +208,18 @@ class SimpleTypeSystem {
     if (type == OInstance) return TInstance(value.__class__);
     // if it's a native we punt.
     if (type == ONative) return typeVar() -> typeVar();
-    if (type == OFunction) return nil;
-    if (type == OBoundFunction) return nil;
-    if (type == OOverload) return nil;
     // we'll treat the type of a class as synonymous with
     // its initializer for now.
     if (type == OClass) {
-      let domain = unit;
-
-      if (value.init != nil) {
-        let tInit = this.type(value.init);
-        domain = tInit.domain;
-      }
-
-      return domain -> TInstance(value);
+      if (value.init != nil)
+        return this.type(value.init);
+      return unit -> TInstance(value);
     }
+
+    // these need to be inferred.
+    if (type == OFunction) return nil;
+    if (type == OBoundFunction) return nil;
+    if (type == OOverload) return nil;
 
     throw TypeError("Don't know the literal type of " + str(value) + ".");
   }
@@ -602,18 +599,18 @@ class SimpleTypeState {
   }
 
   constrainAnnotation(annotation, type) => this.constraints.push(
-    this.system.typify(annotation) ~ type
+    annotation ~ type
   );
 
   unifyAnnotations(expr, type) => {
-    let tAnnotations = annotations(expr);
+    let tAnnotations = annotations(expr).map(this.system.typify);
 
     if (len(tAnnotations) > 0) {
       for (annotation in tAnnotations)
         this.constrainAnnotation(annotation, type);
 
       if (this.solve())
-        return type.apply(this.solution);
+        return tAnnotations[0].apply(this.solution);
     }
 
     return type;

@@ -99,18 +99,13 @@ class PolyTypeState extends AdhocTypeState {
     return super._unify(constraint.__class__(left, right));
   }
 
-  // Calculate the type of [value], inferring it if necessary.
-  type(value) => {
-    let type = this.system.literalType(value);
-    if (type) return type;
-
-    type = this.infer(value);
-
-    // instantiate abstract types.
+  // Abstract types need to be instantiated before
+  // they're unified with a set of annotations.
+  constrainAnnotation(annotation, type) => {
     if (type is TAbstract)
       type = type.instantiate();
 
-    return this.unifyAnnotations(value, type);
+    super.constrainAnnotation(annotation, type);
   }
 }
 

@@ -1202,7 +1202,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        vmImport(module, &vm.globals);
+        if (!vmImport(module, &vm.globals)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1214,7 +1214,8 @@ InterpretResult vmExecute(int baseFrame) {
         if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
         ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
 
-        vmImport(module, &objModule->fields);
+        if (!vmImport(module, &objModule->fields))
+          return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
         mapSet(&vm.globals, alias, OBJ_VAL(objModule));
