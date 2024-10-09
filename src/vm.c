@@ -635,8 +635,8 @@ bool vmImport(ObjModule* module, ObjMap* target) {
   vm.module = module;
 
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
-    return true;
-
+    return false;
+  printf("1\n");
   mapAddAll(&vm.module->namespace, target);
 
   vm.module = enclosing;
@@ -1455,7 +1455,7 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
-ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
+ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
   ObjFunction* function = compileModule(vm.compiler, source, path, module);
 
   if (function == NULL) return NULL;
@@ -1467,16 +1467,14 @@ ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
   return closure;
 }
 
-ObjModule* vmCompileModule(char* path, ModuleType type) {
-  char* source = readSource(pathToUri(path));
+ObjModule* vmCompileModule(Token path, ModuleType type) {
+  ObjString* objPath = copyString(path.start, path.length);
+  vmPush(OBJ_VAL(objPath));
 
+  char* source = readSource(pathToUri(objPath->chars));
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
-
   free(source);
-
-  ObjString* objPath = intern(path);
-  vmPush(OBJ_VAL(objPath));
 
   ObjModule* module = newModule(objPath, objSource, type);
   vmPush(OBJ_VAL(module));
@@ -1496,7 +1494,8 @@ ObjModule* vmCompileModule(char* path, ModuleType type) {
 // Entrypoints.
 
 InterpretResult vmInterpretExpr(char* path, char* expr) {
-  ObjClosure* closure = vmCompileClosure(path, expr, NULL);
+  Token tokPath = syntheticToken(path);
+  ObjClosure* closure = vmCompileClosure(tokPath, expr, NULL);
 
   if (closure == NULL) return INTERPRET_COMPILE_ERROR;
 
@@ -1508,12 +1507,11 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
 
 InterpretResult vmInterpretSource(char* path, char* source) {
   if (!initVM()) exit(2);
-
   return vmInterpretExpr(path, source);
 }
 
 InterpretResult vmInterpretModule(char* path) {
-  ObjModule* module = vmCompileModule(path, MODULE_ENTRYPOINT);
+  ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 

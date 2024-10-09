@@ -1742,9 +1742,9 @@ static void ifStatement(Compiler* cmp) {
 void importStatement(Compiler* cmp) {
   advanceSlashedIdentifier(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
+  Token path = parser.current;
 
   advance(cmp);
-  ObjString* path = copyString(parser.previous.start, parser.previous.length);
 
   int alias = -1;
   if (match(cmp, TOKEN_AS)) {
@@ -1754,7 +1754,7 @@ void importStatement(Compiler* cmp) {
 
   Parser checkpoint = saveParser();
 
-  ObjModule* module = vmCompileModule(path->chars, MODULE_IMPORT);
+  ObjModule* module = vmCompileModule(path, MODULE_IMPORT);
   gotoParser(checkpoint);
 
   if (module == NULL) {
@@ -2005,7 +2005,7 @@ static void declarations(Compiler* cmp) {
   while (!match(cmp, TOKEN_EOF)) declaration(cmp);
 }
 
-ObjFunction* compileModule(Compiler* enclosing, const char* source, char* path,
+ObjFunction* compileModule(Compiler* enclosing, const char* source, Token path,
                            ObjModule* module) {
   currentModule = module;
 
@@ -2013,7 +2013,7 @@ ObjFunction* compileModule(Compiler* enclosing, const char* source, char* path,
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, syntheticToken(path));
+  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, path);
 
   declarations(&cmp);
 
