@@ -326,7 +326,7 @@ typecheck(() => k(nil));
 
 // infer the type of a function from its application.
 // poly type systems will infer generalizations in these
-// cases.
+// cases, so skip them.
 
 if (TypeSystem != PolyTypeSystem and TypeSystem is not DenotationalTypeSystem) {
   let t = type(h => h(1)).domain;
