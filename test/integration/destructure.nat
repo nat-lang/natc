@@ -75,7 +75,7 @@ let f <- (a) => a + 1;
 let r = f[0];
 
 assert(r is ASTReturn);
-assert(r[0] is ASTApp);
+assert(r[0] is ASTAppInfix);
 assert(r[0][0].id == "+");
 
 let f <- (a) => +(a, 1);
@@ -220,7 +220,7 @@ assert(f[0][0][0][1] is ASTLocal);
 
 // and.
 
-let f <- () => true and false;
+let f <- () => true && false;
 
 assert(f is ASTClosure);
 assert(f.children == [
@@ -243,7 +243,7 @@ assert(f.children == [
 
 // or.
 
-let f <- () => true or false;
+let f <- () => true || false;
 
 assert(f is ASTClosure);
 assert(f.children == [
@@ -422,6 +422,7 @@ let k = f.signature().params[0];
 let k_up = f[0][0][0][0];
 
 assert(k_up is ASTInternalUpvalue);
+assert(k_up.name == "k");
 assert(k.uuid == k_up.uuid);
 
 // 
@@ -440,7 +441,10 @@ let k_up = args[0],
     j_up = args[1];
 
 assert(k_up is ASTInternalUpvalue);
+assert(k_up.name == "k");
+
 assert(j_up is ASTInternalUpvalue);
+assert(j_up.name == "j");
 
 assert(k.uuid == k_up.uuid);
 assert(j.uuid == j_up.uuid);
@@ -466,8 +470,13 @@ let r = f[0][0][1][0][0],
     z_up = args[2];
 
 assert(x_up is ASTInternalUpvalue);
+assert(x_up.name == "x");
+
 assert(y_up is ASTInternalUpvalue);
+assert(y_up.name == "y");
+
 assert(z_up is ASTInternalUpvalue);
+assert(z_up.name == "z");
 
 assert(x.uuid == x_up.uuid);
 assert(y.uuid == y_up.uuid);
@@ -500,7 +509,10 @@ let g_x_up = g[0][0][1][0];
 let g_z_up = g[0][0][1][1];
 
 assert(g_x_up is ASTInternalUpvalue);
+assert(g_x_up.name == "x");
+
 assert(g_z_up is ASTInternalUpvalue);
+assert(g_z_up.name == "z");
 
 assert(g_x_up.uuid == x.uuid);
 assert(g_z_up.uuid == z.uuid);
@@ -509,7 +521,10 @@ let h_x_up = h[0][0][1][0];
 let h_y_up = h[0][0][1][1];
 
 assert(h_x_up is ASTInternalUpvalue);
+assert(h_x_up.name == "x");
+
 assert(h_y_up is ASTInternalUpvalue);
+assert(h_y_up.name == "y");
 
 assert(h_x_up.uuid == x.uuid);
 assert(h_y_up.uuid == y.uuid);
@@ -518,7 +533,10 @@ let j_x_up = j[1][0][0][0][1][0][1][0];
 let j_y_up = j[1][0][0][0][1][0][1][1];
 
 assert(j_x_up is ASTInternalUpvalue);
+assert(j_x_up.name == "x");
+
 assert(j_y_up is ASTInternalUpvalue);
+assert(j_y_up.name == "y");
 
 assert(j_x_up.uuid == x.uuid);
 assert(j_y_up.uuid == y.uuid);
@@ -527,6 +545,7 @@ let a = j[0][0];
 let j_a_up = j[1][0][0][0][1][1];
 
 assert(j_a_up is ASTInternalUpvalue);
+assert(j_a_up.name == "a");
 assert(j_a_up.uuid == a.uuid);
 
 // upvalues to locals outside the scope of
@@ -541,6 +560,7 @@ let f = g[0], set = g[1];
 let x = f[0][0];
 
 assert(x is ASTExternalUpvalue);
+assert(x.name == "x");
 assert(x.resolve() == 1);
 
 set(2);
@@ -565,15 +585,17 @@ let r = f[0][0][0],
 
 assert(dot is ASTGlobal);
 assert(k_up is ASTInternalUpvalue);
+assert(k_up.name == "k");
+
 assert(m_up is ASTExternalUpvalue);
+assert(m_up.name == "m");
 
 assert(dot.resolve() == compose);
-assert(k_up.resolve() == undefined);
 assert(m_up.resolve() == m);
 
 // upvalues in conditional branches.
 
-let f <- up x => x and up;
+let f <- up x => x && up;
 
 assert(f is ASTClosure);
 
@@ -581,18 +603,18 @@ let g = f[0][0];
 
 assert(g.children == [
   ASTConditional(
-    ASTLocal(1),
+    ASTLocal(1, "x"),
     ASTBlock(
       g,
       ASTReturn(
         // dummy params: the values change run to run
         // and we're interested in the structure.
-        ASTInternalUpvalue(undefined,undefined,undefined)
+        ASTInternalUpvalue(undefined,undefined,undefined,"up")
       )
     )
   ),
   ASTReturn(
-    ASTLocal(1)
+    ASTLocal(1, "x")
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)
@@ -601,7 +623,7 @@ assert(g.children == [
 
 let f = (() => {
   let up = false;
-  let g <- x => x and up;
+  let g <- x => x && up;
   return g;
 })();
 
@@ -609,16 +631,16 @@ assert(f is ASTClosure);
 
 assert(f.children == [
   ASTConditional(
-    ASTLocal(1),
+    ASTLocal(1, "x"),
     ASTBlock(
       f,
       ASTReturn(
-        ASTExternalUpvalue(undefined,undefined,undefined)
+        ASTExternalUpvalue(undefined,undefined,undefined, "up")
       )
     )
   ),
   ASTReturn(
-    ASTLocal(1)
+    ASTLocal(1, "x")
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)
@@ -631,6 +653,7 @@ let f <- 1 => true | 2 => false;
 
 assert(f is ASTOverload);
 assert(vType(f.overload) == OOverload);
+assert(f.overload.name == "f");
 assert(f.count == 2);
 assert(f[0] is ASTClosure);
 assert(f[1] is ASTClosure);
@@ -643,6 +666,7 @@ let g = f[0][1];
 
 assert(g is ASTOverload);
 assert(vType(g.overload) == OOverload);
+assert(g.overload.name == "g");
 assert(g.count == 2);
 assert(g[0] is ASTClosure);
 assert(g[1] is ASTClosure);
@@ -770,7 +794,7 @@ assert(f == ASTClosureMock(
       ASTClosureMock(
         ASTReturn(
           ASTNegation(
-            ASTLocal(1)
+            ASTLocal(1, "x")
           )
         ),
         ASTImplicitReturn(
@@ -805,7 +829,7 @@ assert(f == ASTClosureMock(
         ASTReturn(
           ASTNegation(
             ASTMembership(
-              ASTLocal(1),
+              ASTLocal(1, "x"),
               ASTApp(
                 ASTGlobal(Set),
                 ASTArgumentSequence(

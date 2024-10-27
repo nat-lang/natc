@@ -30,6 +30,7 @@ typedef struct {
   ObjString* sValues;
   ObjString* sSignature;
   ObjString* sFunction;
+  ObjString* sModule;
 
   ObjClass* base;
   ObjClass* object;
@@ -120,7 +121,7 @@ void vmRuntimeError(const char* format, ...);
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpreSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
-ObjModule* vmCompileModule(char* path, ModuleType type);
+ObjModule* vmCompileModule(Token path, ModuleType type);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
@@ -138,6 +139,6 @@ void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
 bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
-ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot);
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot, ObjString* name);
 
 #endif

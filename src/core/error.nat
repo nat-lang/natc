@@ -4,4 +4,8 @@ class Error extends Base {
   }
 }
 
-class NotImplemented extends Error {}
+class NotImplemented extends Error {
+  init(klass, method) => {
+    this.message = "#{klass}.#{method.name}()";
+  }
+}

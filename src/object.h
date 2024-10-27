@@ -101,11 +101,14 @@ typedef struct {
   bool patterned;
   int upvalueCount;
 
-  ObjMap fields;
-
   Chunk chunk;
+  Local locals[UINT8_COUNT];
+  int localCount;
+
+  ObjMap fields;
   ObjString *name;
   ObjModule *module;
+
   // cache from values to constant indices
   // in the function's chunk.constants.
   ObjMap constants;
@@ -129,6 +132,7 @@ typedef struct ObjUpvalue {
   // the address of the local that's closed over.
   // we stash this only to reconstruct the ast.
   uint8_t slot;
+  ObjString *name;
 } ObjUpvalue;
 
 typedef struct {
@@ -207,7 +211,7 @@ ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
 ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjString *intern(const char *chars);
-ObjUpvalue *newUpvalue(Value *value, uint8_t slot);
+ObjUpvalue *newUpvalue(Value *value, uint8_t slot, ObjString *name);
 ObjSpread *newSpread(Value value);
 
 void printObject(Value value);

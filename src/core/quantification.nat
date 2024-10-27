@@ -1,6 +1,19 @@
+class Quantifier {
+  init(uniSym, texSym, fn) => {
+    this.uniSym = uniSym;
+    this.texSym = texSym;
+    this.fn = fn;
+  }
 
-let Quantification = Object();
+  call(restriction, body) => this.fn(restriction, body);
 
-Quantification.all = (r, b) => r.all(b);
-Quantification.some = (r, b) => r.some(b);
-Quantification.no = (r, b) => !r.some(b);
+  tex(restriction: ASTNode, body: ASTClosure) => {
+    let signature = body.signature();
+    let params = join(signature.params.map(p => p.var.name), ", ");
+    return "#{this.texSym} #{params} \in #{restriction.tex()}. #{body.nakedBody().tex()}";
+  }
+}
+
+let all = Quantifier("∀", "\forall", (r, b) => r.all(b));
+let some = Quantifier("∃", "\exists", (r, b) => r.some(b));
+let no = Quantifier("¬∃", "\neg\exists", (r, b) => !r.some(b));

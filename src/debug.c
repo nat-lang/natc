@@ -34,7 +34,7 @@ static uint16_t readShort(Chunk* chunk, int offset) {
 
 static int shortInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t slot = readShort(chunk, offset);
-  printf("%-16s %d\n", name, slot);
+  printf("%-16s %4d\n", name, slot);
   return offset + 3;
 }
 
@@ -48,30 +48,10 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk,
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t constant = readShort(chunk, offset);
 
-  printf("%-16s %d '", name, constant);
+  printf("%-16s %4d '", name, constant);
   printValue(chunk->constants.values[constant]);
   printf("'\n");
   return offset + 3;
-}
-
-static int closureInstruction(const char* name, Chunk* chunk, int offset) {
-  uint16_t constant = readShort(chunk, offset);
-  offset += 3;
-
-  printf("%-16s %4d ", name, constant);
-  printValue(chunk->constants.values[constant]);
-  printf("\n");
-
-  ObjFunction* function = AS_FUNCTION(chunk->constants.values[constant]);
-
-  for (int j = 0; j < function->upvalueCount; j++) {
-    int isLocal = chunk->code[offset++];
-    int index = chunk->code[offset++];
-    printf("%04d      |                     %s %d\n", offset - 2,
-           isLocal ? "local" : "upvalue", index);
-  }
-
-  return offset;
 }
 
 int disassembleInstruction(Chunk* chunk, int offset) {
@@ -135,10 +115,34 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_CALL_INFIX", chunk, offset);
     case OP_CALL_POSTFIX:
       return byteInstruction("OP_CALL_POSTFIX", chunk, offset);
-    case OP_SIGN:
-      return constantInstruction("OP_SIGN", chunk, offset);
-    case OP_CLOSURE:
-      return closureInstruction("OP_CLOSURE", chunk, offset);
+    case OP_SIGN: {
+      uint16_t constant = readShort(chunk, offset);
+      offset += 3;
+
+      printf("%-16s %4d ", "OP_SIGN", constant);
+      printValue(chunk->constants.values[constant]);
+      printf("\n");
+      return offset;
+    }
+    case OP_CLOSURE: {
+      uint16_t constant = readShort(chunk, offset);
+      offset += 3;
+
+      printf("%-16s %4d ", "OP_CLOSURE", constant);
+      printValue(chunk->constants.values[constant]);
+      printf("\n");
+
+      ObjFunction* function = AS_FUNCTION(chunk->constants.values[constant]);
+
+      for (int j = 0; j < function->upvalueCount; j++) {
+        int isLocal = chunk->code[offset++];
+        int index = chunk->code[offset++];
+        printf("%04d      |                     %s %d\n", offset - 2,
+               isLocal ? "local" : "upvalue", index);
+      }
+
+      return offset;
+    }
     case OP_VARIABLE:
       return constantInstruction("OP_VARIABLE", chunk, offset);
     case OP_CLOSE_UPVALUE:
@@ -147,8 +151,15 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_IMPLICIT_RETURN", offset);
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
-    case OP_OVERLOAD:
-      return byteInstruction("OP_OVERLOAD", chunk, offset);
+    case OP_OVERLOAD: {
+      uint8_t slot = chunk->code[offset + 1];
+      uint16_t constant = readShort(chunk, offset + 1);
+
+      printf("%-16s %4d '", "OP_OVERLOAD", slot);
+      printValue(chunk->constants.values[constant]);
+      printf("'\n");
+      return offset + 5;
+    }
     case OP_CLASS:
       return constantInstruction("OP_CLASS", chunk, offset);
     case OP_INHERIT:

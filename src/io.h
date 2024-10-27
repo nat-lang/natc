@@ -3,7 +3,8 @@
 
 #include "vm.h"
 
-char* readSource(const char* path);
 char* pathToUri(char* path);
+char* readSource(const char* path);
+char* readRelativeSource(const char* path);
 
 #endif

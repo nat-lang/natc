@@ -22,14 +22,14 @@ import test/integration/membership
 import test/integration/native
 import test/integration/negation
 import test/integration/object
-import test/integration/module
+import test/integration/module/index
 import test/integration/recursion
 import test/integration/return
 import test/integration/sequential
 import test/integration/set
 import test/integration/string
 import test/integration/tree
-import test/integration/type/__index__
+import test/integration/type/index
 import test/integration/overload
 import test/integration/quantification
 import test/integration/composition

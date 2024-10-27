@@ -1,0 +1,37 @@
+class Document {}
+
+let newline = "
+";
+
+class TexDocument {
+  init(documentClass, packages, blocks) => {
+    this.packages = packages;
+    this.documentClass = documentClass;
+    this.blocks = blocks;
+  }
+
+  add(block) => this.blocks.push(block);
+
+  renderPreamble() => "\documentclass{#{this.documentClass}}
+\usepackage{#{join(this.packages, ",")}}
+\tikzset{aligned/.style={baseline=(current bounding box.center)}}
+\tikzset{every tree node/.style={align=center,anchor=north}}
+  ";
+
+  renderBlocks() => join([block.tex() | block in this.blocks], newline + newline);
+
+  renderBody() => "\begin{document}
+  #{this.renderBlocks()}
+\end{document}
+  ";
+
+  render() => "#{this.renderPreamble()}
+#{this.renderBody()}
+  ";
+}
+
+class TreeDocument extends TexDocument {
+  init(blocks) => {
+    super.init("standalone", ["amsmath", "tikz", "tikz-qtree"], blocks);
+  }
+}

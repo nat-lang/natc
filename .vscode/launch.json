@@ -6,7 +6,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/build/nat",
       "args": [
-        "${workspaceFolder}/test/integration/__index__",
+        "test/integration/index",
       ],
     }
   ],

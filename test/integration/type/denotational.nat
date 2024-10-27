@@ -26,10 +26,10 @@ typecheck((f: e -> t, g: t -> e) => f(g(true)));
 
 // subtype.
 
-typecheck((f: (e || t) -> e) => f(a));
-typecheck((f: (e || t) -> e) => f(true));
+typecheck((f: (e % t) -> e) => f(a));
+typecheck((f: (e % t) -> e) => f(true));
 
-typefail((f: (e || t) -> e) => f(nil));
+typefail((f: (e % t) -> e) => f(nil));
 
 // poly adhoc.
 

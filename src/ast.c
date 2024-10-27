@@ -10,7 +10,7 @@
 #include "vm.h"
 
 bool astClosure(Value* enclosing, ObjClosure* closure);
-bool astLocal(uint8_t slot);
+bool astLocal(uint8_t slot, ObjFunction* function);
 bool astGlobal(ObjString* name);
 bool astOverload(ObjOverload* overload);
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root);
@@ -156,14 +156,15 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       return AST_INSTRUCTION_OK;
     }
     case OP_GET_LOCAL:
-      OK_IF(astLocal(READ_SHORT()));
+      OK_IF(astLocal(READ_SHORT(), frame->closure->function));
     case OP_SET_LOCAL: {
       uint8_t slot = READ_SHORT();
       Value value = vmPeek(0);
 
       vmPush(root);
 
-      if (!astLocal(slot)) return AST_INSTRUCTION_FAIL;
+      if (!astLocal(slot, frame->closure->function))
+        return AST_INSTRUCTION_FAIL;
       vmPush(value);
 
       FAIL_UNLESS(vmExecuteMethod("opSetLocalValue", 2));
@@ -208,8 +209,8 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       Value right = vmPop();
 
       vmPush(root);
-      vmPush(left);
       vmPush(right);
+      vmPush(left);
 
       OK_IF(vmExecuteMethod("opEqual", 2));
     }
@@ -295,7 +296,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(left);
       vmPush(right);
 
-      OK_IF(vmExecuteMethod("opCall", 3));
+      OK_IF(vmExecuteMethod("opCallInfix", 3));
     }
     case OP_CALL_POSTFIX: {
       int argCount = READ_BYTE();
@@ -327,7 +328,8 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       Value type = vmPeek(0);
 
       vmPush(root);
-      if (!astLocal(slot)) return AST_INSTRUCTION_FAIL;
+      if (!astLocal(slot, frame->closure->function))
+        return AST_INSTRUCTION_FAIL;
       vmPush(type);
 
       FAIL_UNLESS(vmExecuteMethod("opSetLocalType", 2));
@@ -438,10 +440,12 @@ bool astFrame(Value root) {
   return false;
 }
 
-bool astLocal(uint8_t slot) {
+bool astLocal(uint8_t slot, ObjFunction* function) {
+  Token token = function->locals[slot].name;
   vmPush(OBJ_VAL(vm.core.astLocal));
   vmPush(NUMBER_VAL(slot));
-  return vmInitInstance(vm.core.astLocal, 1);
+  vmPush(OBJ_VAL(copyString(token.start, token.length)));
+  return vmInitInstance(vm.core.astLocal, 2);
 }
 
 bool astGlobal(ObjString* name) {
@@ -453,16 +457,17 @@ bool astGlobal(ObjString* name) {
 bool astUpvalues(ObjClosure* closure, bool root) {
   // if the closure is the root of the ast, any upvalues
   // it closes over are resolvable, so we distinguish them.
-  ObjClass* upvalue =
+  ObjClass* astClass =
       root ? vm.core.astExternalUpvalue : vm.core.astInternalUpvalue;
 
   for (int i = 0; i < closure->upvalueCount; i++) {
-    vmPush(OBJ_VAL(upvalue));
+    vmPush(OBJ_VAL(astClass));
     vmPush(NUMBER_VAL((uintptr_t)closure->upvalues[i]));
     vmPush(NUMBER_VAL(closure->upvalues[i]->slot));
     vmPush(OBJ_VAL(closure->upvalues[i]));
+    vmPush(OBJ_VAL(closure->upvalues[i]->name));
 
-    if (!vmInitInstance(upvalue, 3)) return AST_INSTRUCTION_FAIL;
+    if (!vmInitInstance(astClass, 4)) return AST_INSTRUCTION_FAIL;
   }
   return vmTuplify(closure->upvalueCount, true);
 }
@@ -548,6 +553,8 @@ bool ast(Value value) {
 
           return astOverload(AS_OVERLOAD(value));
         }
+        case OBJ_MODULE:
+          return astClosure(NULL, AS_MODULE(value)->closure);
         default:
           vmRuntimeError("Undestructurable object.");
           return false;

@@ -124,9 +124,12 @@ static void blackenObject(Obj* object) {
       markMap(&instance->fields);
       break;
     }
-    case OBJ_UPVALUE:
-      markValue(((ObjUpvalue*)object)->closed);
+    case OBJ_UPVALUE: {
+      ObjUpvalue* upvalue = (ObjUpvalue*)(object);
+      markValue(upvalue->closed);
+      markObject((Obj*)upvalue->name);
       break;
+    }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
@@ -161,6 +164,7 @@ static void blackenObject(Obj* object) {
       ObjModule* module = (ObjModule*)object;
       markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
+      markObject((Obj*)module->path);
       markMap(&module->namespace);
       break;
     }
@@ -277,6 +281,7 @@ static void markRoots() {
   markObject((Obj*)vm.core.sValues);
   markObject((Obj*)vm.core.sSignature);
   markObject((Obj*)vm.core.sFunction);
+  markObject((Obj*)vm.core.sModule);
 
   markCompilerRoots(vm.compiler);
 }

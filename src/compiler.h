@@ -8,12 +8,6 @@
 #include "value.h"
 
 typedef struct {
-  Token name;
-  int depth;
-  bool isCaptured;
-} Local;
-
-typedef struct {
   uint8_t index;
   bool isLocal;
 } Upvalue;
@@ -46,8 +40,6 @@ typedef struct Compiler {
   ObjFunction* function;
   FunctionType functionType;
 
-  Local locals[UINT8_COUNT];
-  int localCount;
   Upvalue upvalues[UINT8_COUNT];
   int scopeDepth;
 } Compiler;
@@ -67,7 +59,7 @@ typedef enum {
   PREC_PRIMARY
 } Precedence;
 
-ObjFunction* compileModule(Compiler* root, const char* source, char* path,
+ObjFunction* compileModule(Compiler* root, const char* source, Token path,
                            ObjModule* module);
 void markCompilerRoots(Compiler* cmp);
 

@@ -296,6 +296,28 @@ bool __vType__(int argCount, Value* args) {
   return true;
 }
 
+bool __moduleImport__(int argCount, Value* args) {
+  ObjInstance* obj = AS_INSTANCE(vmPeek(0));
+
+  Value module;
+  if (!mapGet(&obj->fields, OBJ_VAL(vm.core.sModule), &module)) {
+    vmRuntimeError("Module instance missing its module field!");
+    return false;
+  }
+
+  if (!IS_MODULE(module)) {
+    vmRuntimeError("Module.module is not a module!");
+    return false;
+  }
+
+  ObjMap* target = vm.module->type == MODULE_ENTRYPOINT ? &vm.globals
+                                                        : &vm.module->namespace;
+  mapAddAll(&AS_MODULE(module)->namespace, target);
+  vmPop();
+  vmPop();
+  return true;
+}
+
 bool __globals__(int argCount, Value* args) {
   vmPop();  // native fn.
 
@@ -507,9 +529,12 @@ InterpretResult initializeCore() {
   defineNativeFnMethod(S_ADD, 1, false, __sequencePush__, vm.core.sequence);
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.core.sequence);
 
+  if ((vm.core.module = getGlobalClass(S_MODULE)) == NULL) return false;
+  defineNativeFnMethod("__import__", 0, false, __moduleImport__,
+                       vm.core.module);
+
   if ((vm.core.map = getGlobalClass(S_MAP)) == NULL ||
       (vm.core.set = getGlobalClass(S_SET)) == NULL ||
-      (vm.core.module = getGlobalClass(S_MODULE)) == NULL ||
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
       (vm.core.astExternalUpvalue = getGlobalClass(S_AST_EXTERNAL_UPVALUE)) ==

@@ -55,13 +55,13 @@ debug-log-gc:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
 
 integration:
-	@ $(BUILD_DIR)/nat test/integration/__index__
+	@ $(BUILD_DIR)/nat test/integration/index
 
 regression:
-	@ $(BUILD_DIR)/nat test/regression/__index__
+	@ $(BUILD_DIR)/nat test/regression/index
 
 trip:
-	@ $(BUILD_DIR)/nat test/trip/__index__
+	@ $(BUILD_DIR)/nat test/trip/index
 
 tests:
 	@ $(MAKE) integration
@@ -74,13 +74,13 @@ test-leaks:
 	@ $(MAKE) debug
 	@ codesign -s - --entitlements $(BUILD_DIR)/nat.entitlements -f build/nat
 	@ dsymutil build/nat
-	@ MallocStackLogging=1 leaks --atExit -- $(BUILD_DIR)/nat test/integration/__index__
+	@ MallocStackLogging=1 leaks --atExit -- $(BUILD_DIR)/nat test/integration/index
 
 # Run valgrind against the integration tests.
 test-valgrind:
 	@ $(MAKE) clean
 	@ $(MAKE) debug
-	@ valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=1 -s build/nat test/integration/__index__
+	@ valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=1 -s build/nat test/integration/index
 
 # Run valgrind against the integration tests in a container.
 valgrind:

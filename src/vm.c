@@ -30,18 +30,27 @@ void vmRuntimeError(const char* format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
+  int leftOffset = 6;  // strlen("module").
+
+  for (int i = vm.frameCount - 1; i >= 0; i--) {
+    CallFrame* frame = &vm.frames[i];
+    if (frame->closure->function->module->closure == frame->closure) continue;
+    int fnNameLen = strlen(frame->closure->function->name->chars);
+    if (fnNameLen > leftOffset) leftOffset = fnNameLen;
+  }
+
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame* frame = &vm.frames[i];
     ObjClosure* closure = frame->closure;
     ObjFunction* function = closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
-    fprintf(stderr, "  [line %d] in %s", function->chunk.lines[instruction],
-            function->name->chars);
 
-    if (function->module->closure == closure)
-      fprintf(stderr, "\n");
-    else
-      fprintf(stderr, " (%s)\n", function->module->path->chars);
+    char* name =
+        function->module->closure == closure ? "module" : function->name->chars;
+
+    fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset, name,
+            function->module->path->chars, NAT_EXT,
+            function->chunk.lines[instruction]);
   }
 
   resetStack();
@@ -62,6 +71,7 @@ void initCore(Core* core) {
   core->sValues = intern("values");
   core->sSignature = intern("signature");
   core->sFunction = intern("function");
+  core->sModule = intern("module");
 
   core->base = NULL;
   core->object = NULL;
@@ -508,7 +518,7 @@ static void bindClosure(Value receiver, Value* value) {
   }
 }
 
-ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot) {
+ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot, ObjString* name) {
   ObjUpvalue* prevUpvalue = NULL;
   ObjUpvalue* upvalue = vm.openUpvalues;
   while (upvalue != NULL && upvalue->location > local) {
@@ -520,7 +530,7 @@ ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot) {
     return upvalue;
   }
 
-  ObjUpvalue* createdUpvalue = newUpvalue(local, slot);
+  ObjUpvalue* createdUpvalue = newUpvalue(local, slot, name);
   createdUpvalue->next = upvalue;
 
   if (prevUpvalue == NULL) {
@@ -537,7 +547,12 @@ void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame) {
     uint8_t isLocal = READ_BYTE();
     uint8_t index = READ_BYTE();
     if (isLocal) {
-      closure->upvalues[i] = vmCaptureUpvalue(frame->slots + index, index);
+      Token token = frame->closure->function->locals[index].name;
+      ObjString* name = copyString(token.start, token.length);
+      vmPush(OBJ_VAL(name));
+      closure->upvalues[i] =
+          vmCaptureUpvalue(frame->slots + index, index, name);
+      vmPop();
     } else {
       closure->upvalues[i] = frame->closure->upvalues[index];
     }
@@ -584,6 +599,7 @@ void vmSign(CallFrame* frame) {
 
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
+  Value name = READ_CONSTANT();
   int arity = 0;
   ObjOverload* overload = newOverload(cases);
 
@@ -608,6 +624,23 @@ bool vmOverload(CallFrame* frame) {
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
   mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
+  mapSet(&overload->fields, OBJ_VAL(vm.core.sName), name);
+  return true;
+}
+
+bool vmImport(ObjModule* module, ObjMap* target) {
+  ObjModule* enclosing = vm.module;
+
+  vmPush(OBJ_VAL(module));  // imported.
+  vm.module = module;
+
+  if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+    return false;
+
+  mapAddAll(&vm.module->namespace, target);
+
+  vm.module = enclosing;
+  vmPop();  // imported.
   return true;
 }
 
@@ -1169,47 +1202,24 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        ObjModule* enclosing = vm.module;
-
-        vmPush(OBJ_VAL(module));  // imported.
-        vm.module = module;
-
-        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
-          return INTERPRET_RUNTIME_ERROR;
+        if (!vmImport(module, &vm.globals)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
-
-        mapAddAll(&vm.module->namespace, &vm.globals);
-
-        vm.module = enclosing;
-        vmPop();  // imported.
         break;
       }
       case OP_IMPORT_AS: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         Value alias = READ_CONSTANT();
 
-        ObjModule* enclosing = vm.module;
+        vmPush(OBJ_VAL(vm.core.module));
+        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
+        ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
 
-        vmPush(OBJ_VAL(module));  // imported.
-        vm.module = module;
-
-        if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+        if (!vmImport(module, &objModule->fields))
           return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
-        vmPush(OBJ_VAL(vm.core.module));
-        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
-
-        mapAddAll(&module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
-        mapSet(&AS_INSTANCE(vmPeek(0))->fields, INTERN("function"),
-               OBJ_VAL(module->closure));
-
-        vm.module = enclosing;
-        Value objModule = vmPop();
-        vmPop();  // imported.
-        vmPush(objModule);
-
-        mapSet(&vm.globals, alias, objModule);
+        mapSet(&vm.globals, alias, OBJ_VAL(objModule));
+        mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
         vmPop();  // objModule.
         break;
@@ -1446,7 +1456,7 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
-ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
+ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
   ObjFunction* function = compileModule(vm.compiler, source, path, module);
 
   if (function == NULL) return NULL;
@@ -1458,16 +1468,14 @@ ObjClosure* vmCompileClosure(char* path, char* source, ObjModule* module) {
   return closure;
 }
 
-ObjModule* vmCompileModule(char* path, ModuleType type) {
-  char* source = readSource(path);
+ObjModule* vmCompileModule(Token path, ModuleType type) {
+  ObjString* objPath = copyString(path.start, path.length);
+  vmPush(OBJ_VAL(objPath));
 
+  char* source = readSource(pathToUri(objPath->chars));
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
-
   free(source);
-
-  ObjString* objPath = intern(path);
-  vmPush(OBJ_VAL(objPath));
 
   ObjModule* module = newModule(objPath, objSource, type);
   vmPush(OBJ_VAL(module));
@@ -1487,7 +1495,8 @@ ObjModule* vmCompileModule(char* path, ModuleType type) {
 // Entrypoints.
 
 InterpretResult vmInterpretExpr(char* path, char* expr) {
-  ObjClosure* closure = vmCompileClosure(path, expr, NULL);
+  Token tokPath = syntheticToken(path);
+  ObjClosure* closure = vmCompileClosure(tokPath, expr, NULL);
 
   if (closure == NULL) return INTERPRET_COMPILE_ERROR;
 
@@ -1499,12 +1508,11 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
 
 InterpretResult vmInterpretSource(char* path, char* source) {
   if (!initVM()) exit(2);
-
   return vmInterpretExpr(path, source);
 }
 
 InterpretResult vmInterpretModule(char* path) {
-  ObjModule* module = vmCompileModule(path, MODULE_ENTRYPOINT);
+  ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 

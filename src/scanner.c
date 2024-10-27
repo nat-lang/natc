@@ -39,6 +39,7 @@ Scanner saveScanner() {
 void gotoScanner(Scanner checkpoint) { scanner = checkpoint; }
 
 void rewindScanner(Token token) {
+  scanner.line = token.line;
   scanner.current = scanner.start = token.start;
 }
 
@@ -54,7 +55,7 @@ static bool isSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
           c == '+' || c == '-' || c == '/' || c == '*' || c == '|' ||
-          c == '=' || c == '_');
+          c == '=' || c == '_' || c == '%');
 }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }
@@ -144,17 +145,8 @@ static TokenType identifierType() {
 #define CURRENT scanner.current
 
   switch (START[0]) {
-    case 'a': {
-      if (CURRENT - START > 1) {
-        switch (START[1]) {
-          case 'n':
-            return checkpointKeyword(2, 1, "d", TOKEN_AND);
-          case 's':
-            return checkpointKeyword(1, 1, "s", TOKEN_AS);
-        }
-      }
-      break;
-    }
+    case 'a':
+      return checkpointKeyword(1, 1, "s", TOKEN_AS);
     case 'c': {
       if (CURRENT - START > 1) {
         switch (START[1]) {
@@ -234,14 +226,12 @@ static TokenType identifierType() {
       if (CURRENT - START > 1) {
         switch (START[1]) {
           case 'i':
-            return checkpointKeyword(1, 2, "il", TOKEN_NIL);
+            return checkpointKeyword(2, 1, "l", TOKEN_NIL);
           case 'o':
-            return checkpointKeyword(1, 2, "ot", TOKEN_NOT);
+            return checkpointKeyword(2, 1, "t", TOKEN_NOT);
         }
       }
       break;
-    case 'o':
-      return checkpointKeyword(1, 1, "r", TOKEN_OR);
     case 'p':
       return checkpointKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
@@ -271,6 +261,11 @@ static TokenType identifierType() {
       return checkpointKeyword(1, 8, "ndefined", TOKEN_UNDEFINED);
     case 'w':
       return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
+    case '&':
+      return checkpointKeyword(1, 1, "&", TOKEN_AND);
+    case '|': {
+      return checkpointKeyword(1, 1, "|", TOKEN_OR);
+    }
   }
 
   return TOKEN_IDENTIFIER;
@@ -289,12 +284,6 @@ Token typeVariable() {
   return makeToken(TOKEN_TYPE_VARIABLE);
 }
 
-Token slashedIdentifier() {
-  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
-  return scanner.current == scanner.start ? errorToken("Unexpected character.")
-                                          : makeToken(TOKEN_IDENTIFIER);
-}
-
 static Token number() {
   while (isDigit(peek())) advance();
 
@@ -311,8 +300,11 @@ static Token number() {
 
 static Token string() {
   while (peek() != '"' && !isAtEnd()) {
-    if (peek() == '#' && peekNext() == '{')
+    if (peek() == '#' && peekNext() == '{') {
+      advance();
+      advance();
       return makeToken(TOKEN_INTERPOLATION);
+    }
 
     if (peek() == '\n') scanner.line++;
     advance();
@@ -381,10 +373,16 @@ Token consumeToken(char c) {
   return errorToken("Unexpected character.");
 }
 
-Token virtualToken(char c) {
+Token scanVirtualToken(char c) {
   if (isAtEnd()) return makeToken(TOKEN_EOF);
 
   return consumeToken(c);
+}
+
+Token scanSlashedIdentifier() {
+  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
+  return scanner.current == scanner.start ? errorToken("Unexpected character.")
+                                          : makeToken(TOKEN_IDENTIFIER);
 }
 
 Token scanToken() {

@@ -20,6 +20,9 @@ class ASTNode extends Tree {
     this.children = children;
   }
 
+  str() => str(this.__class__);
+  tex() => { throw NotImplemented(this.__class__, this.tex); }
+
   // Give the tree's variables uuids. Identify upvalues
   // with the locals they close over. 
   uniquelyIdentifyVariables(uuids) => {
@@ -75,6 +78,7 @@ class ASTNode extends Tree {
   opGetUpvalue(address) => this.upvalues[address];
   opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
   opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
+  opCallInfix(fn, left, right) => ASTAppInfix(fn, ASTArgumentSequence(left, right));
   opVariable(var) => ASTPatternVariable(var);
   opMember(element, collection) => ASTMembership(element, collection);
 
@@ -89,13 +93,13 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
-  opSetGlobalValue(local, value) => {
-    let node = ASTGlobalValueAssignment(local, value);
+  opSetGlobalValue(global, value) => {
+    let node = ASTGlobalValueAssignment(global, value);
     this.children.push(node);
   }
 
-  opSetGlobalType(local, type) => {
-    let node = ASTGlobalTypeAssignment(local, type);
+  opSetGlobalType(global, type) => {
+    let node = ASTGlobalTypeAssignment(global, type);
     this.children.push(node);
   }
 
@@ -142,8 +146,12 @@ class ASTLocalTypeAssignment extends ASTTypeAssignment {}
 class ASTGlobalValueAssignment extends ASTAssignment {}
 class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
 
-class ASTReturn extends ASTStatement {}
-class ASTImplicitReturn extends ASTReturn {}
+class ASTReturn extends ASTStatement {
+  tex() => join([n.tex() | n in this.children], " ");
+}
+class ASTImplicitReturn extends ASTReturn {
+  tex() => "";
+}
 class ASTExprStatement extends ASTStatement {}
 
 class ASTBlock extends ASTNode {
@@ -152,12 +160,14 @@ class ASTBlock extends ASTNode {
     this.children = children;
   }
   opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
+  tex() => join(this.children.map(x => x.tex()), "");
 }
 
 class ASTConditional extends ASTStatement {
   init(condition, consequence) => {
     this.children = [condition, consequence];
   }
+  tex() => "if #{this[0].tex()} then #{this[1].tex()}";
 }
 
 class ASTLiteral extends ASTExpr {
@@ -165,16 +175,21 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
-  str() => { return str(this.value); }
+  str() => str(this.value);
+  tex() => this.str();
   resolve() => this.value;
   __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
 }
-class ASTNegation extends ASTExpr {}
+
+class ASTNegation extends ASTExpr {
+  tex() => "\neg #{this[0].tex()}";
+}
 
 class ASTEquality extends ASTExpr {
   init(left, right) => {
     this.children = [left, right];
   }
+  tex() => "#{this[0].tex()} = #{this[1].tex()}";
 }
 
 class ASTSequence extends ASTExpr {
@@ -203,34 +218,47 @@ class ASTVariable extends ASTExpr {
 }
 
 class ASTLocal extends ASTVariable {
-  str() => { return "ASTLocal(" + str(this.id) + ")"; }
+  init(id, name) => {
+    this.name = name;
+    super.init(id);
+  }
+  str() => "ASTLocal(#{str(this.id)})";
+  tex() => this.name;
 }
+
 class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
+  tex() => str(this.id);
 }
 
 class ASTUpvalue extends ASTVariable {
-  init(id, localId, upvalue) => {
+  init(id, localId, upvalue, name) => {
     super.init(id);
+    this.name = name;
     this.localId = localId;
     this.upvalue = upvalue;
   }
   resolve() => resolveUpvalue(this.upvalue);
+  tex() => this.name;
 }
 
 class ASTExternalUpvalue extends ASTUpvalue {}
-class ASTInternalUpvalue extends ASTUpvalue {}
+class ASTInternalUpvalue extends ASTUpvalue {
+  resolve() => { throw Error("Not resolvable."); }
+}
 
 class ASTParameter extends ASTVariable {
-  init(id, name, type) => {
+  init(id, var, type) => {
     super.init(id);
-    this.name = name;
+    this.var = var;
     this.type = type;
   }
+  tex() => "\lambda #{this.var.name}";
 }
 
 class ASTArgumentSequence extends ASTExpr {
   resolve() => this.children.map(node => node.resolve());
+  tex() => join([arg.tex() | arg in this.children], ", ");
 }
 
 class ASTApp extends ASTExprStatement {
@@ -244,6 +272,19 @@ class ASTApp extends ASTExprStatement {
   }
 
   resolve() => this.evaluate();
+  resolveTex() => {
+    if (this[0] is ASTGlobal) {
+      let fn = this[0].resolve();
+      if (fn.tex)
+        return fn.tex(this[1]);
+    }
+  }
+
+  tex() => this.resolveTex() || "#{this[0].tex()}(#{this[1].tex()})";
+}
+
+class ASTAppInfix extends ASTApp {
+  tex() => this.resolveTex() || "#{this[1][0].tex()} #{this[0].tex()} #{this[1][1].tex()}";
 }
 
 class ASTPropertyAccess extends ASTExpr {
@@ -251,18 +292,21 @@ class ASTPropertyAccess extends ASTExpr {
     this.children = [obj, key];
   }
   resolve() => this[0].resolve()[this[1].resolve()];
+  tex() => "#{this[0].tex()}.#{this[1].tex()}";
 }
 
 class ASTMembership extends ASTExpr {
   init(element, collection) => {
     this.children = [element, collection];
   }
+  tex() => "#{this[0].tex()} \in #{this[1].tex()}";
 }
 
 class ASTSignature extends ASTNode {
   init(params) => {
     this.params = params;
   }
+  tex() => join([p.tex() | p in this.params], "");
 }
 
 class ASTClosure extends ASTExpr {
@@ -279,6 +323,18 @@ class ASTClosure extends ASTExpr {
       if (!this.upvalues[val.id])
         this.upvalues[val.id] = val;
     }
+  }
+
+  // The first explicit return of a naked function.
+  nakedBody() => this.children[0];
+  tex() => {
+    let body = this.nakedBody();
+
+    let sep = ". ";
+    if (body[0] is ASTClosure or body[0] is ASTQuantification)
+      sep = "";
+
+    return "#{this.signature().tex()}#{sep}#{body.tex()}";
   }
 
   resolve() => this.function;
@@ -336,6 +392,7 @@ class ASTOverload extends ASTExpr {
     this.children = closures;
   }
   resolve() => this.overload;
+  tex() => join([fn.tex() | fn in this.children], " \mid ");
 }
 
 class ASTQuantification extends ASTExpr {
@@ -348,4 +405,10 @@ class ASTQuantification extends ASTExpr {
   }
 
   resolve() => this.quantifier.resolve()(this.restriction.resolve(), this.body.resolve());
+  tex() => {
+    let qFn = this.quantifier.resolve();
+    if (!qFn.tex)
+      throw Error("Quantifier '#{qFn.name}' defines no tex() function.");
+    return qFn.tex(this.restriction, this.body);
+  }
 }

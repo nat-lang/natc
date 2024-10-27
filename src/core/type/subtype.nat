@@ -25,8 +25,10 @@ class TSum extends Type {
   }
   lower() => this.disjuncts.elements()[0];
 
-  fvs() => bigUnion(..[x.fvs() | x in this]);
-  str() => "TSum(" + join(this.elements().map(x => x.str()), ", ") + ")";
+  fvs() => union(..[x.fvs() | x in this]);
+  join(sep) => join(this.elements().map(x => x.str()), sep);
+  str() => "TSum(" + this.join(", ") + ")";
+  tex() => this.join(" \mid ");
   pp() => { print this.str(); }
   hash() => this.disjuncts.hash();
   
@@ -36,7 +38,7 @@ class TSum extends Type {
   __len__() => len(this.disjuncts);
 }
 
-let infix(9) || = (a, b) => TSum.lift(a) & TSum.lift(b);
+let infix(9) % = (a, b) => TSum.lift(a) & TSum.lift(b);
 
 class SubtypeConstraint extends Constraint {
   str() => this.left.str() + " <| " + this.right.str();
@@ -68,7 +70,7 @@ class SubtypeState extends SimpleTypeState {
 
       this.constraints.push(tCollection <| TCollection(tElement));
 
-      if (tCollection is TInstance and "__in__" in tCollection.klass) {
+      if (tCollection is TInstance && "__in__" in tCollection.klass) {
         let tIn = this.type(tCollection.klass.__in__);
 
         this.constraints.push(tIn <| tElement -> bool);
@@ -79,7 +81,7 @@ class SubtypeState extends SimpleTypeState {
 
     if (node is ASTNegation) {
       let tArg = this.principal(node[0]);
-      this.constraints.push(tArg <| (bool || void || undef));
+      this.constraints.push(tArg <| (bool % void % undef));
       return bool;
     }
 
@@ -153,7 +155,7 @@ class SubtypeState extends SimpleTypeState {
 
   // Value must be subtype of its annotation.
   constrainAnnotation(annotation, type) => this.constraints.push(
-    type <| this.system.typify(annotation)
+    type <| annotation
   );
 }
 
