@@ -1,10 +1,12 @@
+let x = 0;
+
 import test/integration/module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
-
-let x = 0;
+assert(x == 0);
 
 importable.__import__();
 
 assert(x == 1);
+

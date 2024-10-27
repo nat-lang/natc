@@ -1,0 +1,30 @@
+
+assert(vType(undefined) == CUndef);
+
+assert(vType(()) == CUnit);
+
+assert(vType(true) == CBool);
+assert(vType(false) == CBool);
+
+assert(vType(nil) == CNil);
+
+for (x in range(0, 10))
+  assert(vType(x) == CNumber);
+
+class A { method() => 1; }
+
+assert(vType(A) == OClass);
+assert(vType(A()) == OInstance);
+assert(vType(A().method) == OBoundFunction);
+
+assert(vType("string") == OString);
+assert(vType(clock) == ONative);
+assert(vType(() => 1) == OFunction);
+assert(vType(() => 1 | () => 2) == OOverload);
+assert(vType([1,2,3].values) == OSequence);
+
+import test/integration/module/importable as importable
+
+assert(vType(importable.module) == OModule);
+
+

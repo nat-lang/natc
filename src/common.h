@@ -64,6 +64,7 @@
 #define S_OTYPE_NATIVE "ONative"
 #define S_OTYPE_OVERLOAD "OOverload"
 #define S_OTYPE_SEQUENCE "OSequence"
+#define S_OTYPE_MODULE "OModule"
 
 #define S_GRAMMAR "Grammar"
 #define S_TYPE_SYSTEM "TypeSystem"

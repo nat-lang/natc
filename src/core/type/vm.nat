@@ -6,12 +6,12 @@ class TypeError extends Error {}
 
 class CType extends Base {}
 
+class CUndef extends CType {}
 class CUnit extends CType {}
 class CBool extends CType {}
 class CNil extends CType {}
 class CNumber extends CType {}
 class CObject extends CType {}
-class CUndef extends CType {}
 
 class OVariable extends CObject {}
 class OClass extends CObject {}
@@ -22,6 +22,7 @@ class OFunction extends CObject {}
 class OBoundFunction extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
+class OModule extends CObject {}
 
 let isSubclass = (a, b) => {
   if (vType(a) != OClass or vType(b) != OClass) 

@@ -66,6 +66,7 @@ typedef struct {
   ObjClass* oTypeBoundFunction;
   ObjClass* oTypeOverload;
   ObjClass* oTypeSequence;
+  ObjClass* oTypeModule;
 
   ObjClosure* unify;
   ObjInstance* typeSystem;

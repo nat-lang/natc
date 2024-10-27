@@ -105,6 +105,7 @@ void initCore(Core* core) {
   core->oTypeBoundFunction = NULL;
   core->oTypeOverload = NULL;
   core->oTypeSequence = NULL;
+  core->oTypeModule = NULL;
 
   core->unify = NULL;
   core->typeSystem = NULL;
@@ -641,6 +642,19 @@ bool vmImport(ObjModule* module, ObjMap* target) {
 
   vm.module = enclosing;
   vmPop();  // imported.
+  return true;
+}
+
+bool vmImportAs(ObjModule* module, ObjString* alias) {
+  vmPush(OBJ_VAL(vm.core.module));
+  if (!vmInitInstance(vm.core.module, 0)) return false;
+  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
+
+  if (!vmImport(module, &objModule->fields)) return false;
+
+  mapSet(&vm.globals, OBJ_VAL(alias), OBJ_VAL(objModule));
+  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+  vmPop();  // objModule.
   return true;
 }
 
@@ -1208,20 +1222,9 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT_AS: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        Value alias = READ_CONSTANT();
-
-        vmPush(OBJ_VAL(vm.core.module));
-        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
-        ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
-
-        if (!vmImport(module, &objModule->fields))
-          return INTERPRET_RUNTIME_ERROR;
+        ObjString* alias = READ_STRING();
+        if (!vmImportAs(module, alias)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
-
-        mapSet(&vm.globals, alias, OBJ_VAL(objModule));
-        mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
-
-        vmPop();  // objModule.
         break;
       }
       case OP_THROW: {
@@ -1506,11 +1509,6 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
   return vmExecute(vm.frameCount - 1);
 }
 
-InterpretResult vmInterpretSource(char* path, char* source) {
-  if (!initVM()) exit(2);
-  return vmInterpretExpr(path, source);
-}
-
 InterpretResult vmInterpretModule(char* path) {
   ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
 
@@ -1522,4 +1520,16 @@ InterpretResult vmInterpretModule(char* path) {
   callModule(module);
 
   return vmExecute(vm.frameCount - 1);
+}
+
+// Wasm entrypoints.
+
+InterpretResult vmInterpretSource(char* path, char* source) {
+  if (!initVM()) exit(2);
+  return vmInterpretExpr(path, source);
+}
+
+InterpretResult vmTypesetSource(char* path, char* source) {
+  if (!initVM()) exit(2);
+  return vmInterpretExpr(path, source);
 }

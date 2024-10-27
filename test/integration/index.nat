@@ -16,6 +16,7 @@ import test/integration/hash
 import test/integration/iteration
 import test/integration/length
 import test/integration/logic
+import test/integration/type/vm
 import test/integration/math
 import test/integration/map
 import test/integration/membership

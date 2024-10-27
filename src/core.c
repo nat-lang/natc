@@ -235,7 +235,7 @@ bool __vType__(int argCount, Value* args) {
 
   switch (value.vType) {
     case VAL_UNIT:
-      vmPush(value);
+      vmPush(OBJ_VAL(vm.core.vTypeUnit));
       break;
     case VAL_BOOL:
       vmPush(OBJ_VAL(vm.core.vTypeBool));
@@ -280,6 +280,9 @@ bool __vType__(int argCount, Value* args) {
         case OBJ_SEQUENCE:
           vmPush(OBJ_VAL(vm.core.oTypeSequence));
           break;
+        case OBJ_MODULE:
+          vmPush(OBJ_VAL(vm.core.oTypeModule));
+          break;
         default: {
           vmRuntimeError("Unexpected object (type %i).", AS_OBJ(value)->oType);
           return false;
@@ -313,8 +316,10 @@ bool __moduleImport__(int argCount, Value* args) {
   ObjMap* target = vm.module->type == MODULE_ENTRYPOINT ? &vm.globals
                                                         : &vm.module->namespace;
   mapAddAll(&AS_MODULE(module)->namespace, target);
+
   vmPop();
-  vmPop();
+  vmPush(NIL_VAL);
+
   return true;
 }
 
@@ -562,7 +567,8 @@ InterpretResult initializeCore() {
       (vm.core.oTypeBoundFunction = getGlobalClass(S_OTYPE_BOUND_FUNCTION)) ==
           NULL ||
       (vm.core.oTypeOverload = getGlobalClass(S_OTYPE_OVERLOAD)) == NULL ||
-      (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL)
+      (vm.core.oTypeSequence = getGlobalClass(S_OTYPE_SEQUENCE)) == NULL ||
+      (vm.core.oTypeModule = getGlobalClass(S_OTYPE_MODULE)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   // system objects and functions.
