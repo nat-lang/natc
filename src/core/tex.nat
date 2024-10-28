@@ -43,9 +43,12 @@ class TreeDocument extends TexDocument {
 }
 
 let typeset = (module: Module) => {
+  print module;
   module.__import__();
 
   let trees = [val.tex() | val in module.values(), val is Tree];
 
-  return jsonEncode({"success": true, "data": trees});
+  let z = jsonEncode({"success": true, "data": trees});
+  print z;
+  return z;
 };

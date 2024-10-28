@@ -656,7 +656,6 @@ bool vmImportAs(ObjModule* module, ObjString* alias) {
 
   if (!vmImport(module, &objModule->fields)) return false;
 
-  mapSet(&vm.globals, OBJ_VAL(alias), OBJ_VAL(objModule));
   mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
   return true;
@@ -1228,7 +1227,8 @@ InterpretResult vmExecute(int baseFrame) {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         ObjString* alias = READ_STRING();
         if (!vmImportAs(module, alias)) return INTERPRET_RUNTIME_ERROR;
-        vmPop();  // objModule.
+        mapSet(&vm.globals, OBJ_VAL(alias), vmPeek(0));
+        vmPop();  // module instance.
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1476,32 +1476,26 @@ ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
   return closure;
 }
 
-ObjModule* vmCompileSource(ObjString* path, ObjString* source,
-                           ModuleType type) {
-  ObjModule* module = newModule(path, source, type);
+ObjModule* vmCompileModule(Token path, ModuleType type) {
+  ObjString* objPath = copyString(path.start, path.length);
+  vmPush(OBJ_VAL(objPath));
+
+  char* source = readSource(pathToUri(objPath->chars));
+  ObjString* objSource = intern(source);
+  vmPush(OBJ_VAL(objSource));
+  free(source);
+
+  ObjModule* module = newModule(objPath, objSource, type);
   vmPush(OBJ_VAL(module));
 
-  ObjClosure* closure =
-      vmCompileClosure(syntheticToken(path->chars), source->chars, module);
+  ObjClosure* closure = vmCompileClosure(path, objSource->chars, module);
   if (closure == NULL) return NULL;
 
   module->closure = closure;
 
   vmPop();  // module.
-
-  return module;
-}
-
-ObjModule* vmCompileModule(char* path, ModuleType type) {
-  char* source = readSource(pathToUri(path));
-  ObjString* objSource = intern(source);
-  vmPush(OBJ_VAL(objSource));
-  free(source);
-
-  vmPush(INTERN(path));
-  ObjModule* module = vmCompileSource(AS_STRING(vmPeek(0)), objSource, type);
-  vmPop();  // path.
   vmPop();  // objSource.
+  vmPop();  // objPath.
 
   return module;
 }
@@ -1521,12 +1515,7 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
 }
 
 InterpretResult vmInterpretModule(char* path) {
-  ObjString* objPath = intern(path);
-  vmPush(OBJ_VAL(objPath));
-
-  ObjModule* module = vmCompileModule(objPath, MODULE_ENTRYPOINT);
-
-  vmPop();
+  ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
@@ -1550,16 +1539,38 @@ InterpretResult vmInterpretSource(char* path, char* source) {
 char* vmTypesetSource(char* path, char* source) {
   if (!initVM()) exit(2);
 
-  vmPush(OBJ_VAL(vm.core.typeset));
-  vmPush(INTERN(path));
-  ObjModule* module = vmCompileModule(AS_STRING(vmPeek(0)), MODULE_ENTRYPOINT);
-  if (module == NULL) return JSON_FAILURE;
-  vmPop();
+  ObjString* objPath = intern(path);
+  vmPush(OBJ_VAL(objPath));
+  ObjString* objSource = intern(source);
+  vmPush(OBJ_VAL(objSource));
+  ObjModule* module = newModule(objPath, objSource, MODULE_ENTRYPOINT);
   vmPush(OBJ_VAL(module));
+  ObjClosure* closure =
+      vmCompileClosure(syntheticToken(path), objSource->chars, module);
 
-  if (!vmCallValue(OBJ_VAL(vm.core.typeset), 1)) return JSON_FAILURE;
+  if (closure == NULL) return "{\"success\": \"false 0\", \"data\":[]}";
+
+  module->closure = closure;
+
+  vmPop();  // module.
+  vmPop();  // objSource.
+  vmPop();  // objPath.
+
+  vmPush(OBJ_VAL(vm.core.typeset));
+
+  disassembleStack();
+  printf("\n");
+  if (!vmImportAs(module, objPath))
+    return "{\"success\": \"false 0.75\", \"data\":[]}";
+
+  disassembleStack();
+  printf("\n");
+  if (!vmCallValue(OBJ_VAL(vm.core.typeset), 1) ||
+      vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+    return "{\"success\": \"false 1\", \"data\":[]}";
 
   Value result = vmPop();
-  if (!IS_STRING(result)) return JSON_FAILURE;
+  if (!IS_STRING(result)) return "{\"success\": \"false 2\", \"data\":[]}";
+  fprintf(stderr, "3 - typeset");
   return AS_STRING(result)->chars;
 }
