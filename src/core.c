@@ -578,8 +578,14 @@ InterpretResult initializeCore() {
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||
       (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL ||
-      (vm.core.grammar = getGlobalInstance(S_GRAMMAR)) == NULL)
+      (vm.core.typeset = getGlobalClosure(S_TYPESET)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
+
+  ObjInstance* strings = getGlobalInstance("Strings");
+  if (strings == NULL) return INTERPRET_RUNTIME_ERROR;
+
+  mapSet(&strings->fields, INTERN("quote"), OBJ_VAL(vm.core.sQuote));
+  mapSet(&strings->fields, INTERN("backslash"), OBJ_VAL(vm.core.sBackslash));
 
   return INTERPRET_OK;
 }

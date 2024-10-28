@@ -32,6 +32,9 @@ typedef struct {
   ObjString* sFunction;
   ObjString* sModule;
 
+  ObjString* sQuote;
+  ObjString* sBackslash;
+
   ObjClass* base;
   ObjClass* object;
   ObjClass* module;
@@ -70,7 +73,7 @@ typedef struct {
 
   ObjClosure* unify;
   ObjInstance* typeSystem;
-  ObjInstance* grammar;
+  ObjClosure* typeset;
 } Core;
 
 typedef struct {
@@ -120,9 +123,10 @@ void freeVM();
 void vmRuntimeError(const char* format, ...);
 
 InterpretResult vmInterpretExpr(char* path, char* expr);
-InterpretResult vmInterpreSource(char* path, char* source);
+InterpretResult vmInterpretSource(char* path, char* source);
+char* vmTypesetSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
-ObjModule* vmCompileModule(Token path, ModuleType type);
+ObjModule* vmCompileModule(char* path, ModuleType type);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();

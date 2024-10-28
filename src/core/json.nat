@@ -1,0 +1,26 @@
+class JSONError extends Error {}
+
+let jsonEscapeChar = char => {
+  if (char == Strings.backslash) return "\\";
+  if (char == Strings.quote) return "\" + Strings.quote;
+  return char;
+};
+
+let jsonEscape = string => [jsonEscapeChar(char) | char in string].join();
+
+let jsonEncode = value => {
+  if (vType(value) == CBool) return str(value);
+  if (vType(value) == OString) return quote(jsonEscape(value));
+  if (value is Sequence) return "[#{join(value.map(jsonEncode), ", ")}]";
+
+  if (value is Object) {
+    let entries = value.entries().map(entry => {
+      let key = entry[0], val = entry[1];
+      return "#{jsonEncode(key)}: #{jsonEncode(val)}";
+    });
+
+    return "{#{join(entries, ", ")}}";
+  }
+
+  throw JSONError("Don't know how to encode.");
+};
