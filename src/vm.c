@@ -634,18 +634,31 @@ bool vmOverload(CallFrame* frame) {
 }
 
 bool vmImport(ObjModule* module, ObjMap* target) {
+  printf("vmImport 0 \n");
+  disassembleStack();
+  printf("\n");
   ObjModule* enclosing = vm.module;
-
-  vmPush(OBJ_VAL(module));  // imported.
   vm.module = module;
-
+  printf("vmImport 1 \n");
+  disassembleStack();
+  printf("\n");
+  vmPush(OBJ_VAL(module));  // [ObjModule].
+  printf("vmImport 2 \n");
+  disassembleStack();
+  printf("\n");
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return false;
 
+  printf("vmImport 3 \n");
+  disassembleStack();
+  printf("\n");
+
+  printf("vmImport 4 \n");
+  disassembleStack();
+  printf("\n");
   mapAddAll(&vm.module->namespace, target);
 
   vm.module = enclosing;
-  vmPop();  // imported.
   return true;
 }
 
@@ -655,7 +668,9 @@ bool vmImportAs(ObjModule* module, ObjString* alias) {
   ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
 
   if (!vmImport(module, &objModule->fields)) return false;
-
+  vmPop();  // nil.
+  disassembleStack();
+  printf("\n");
   mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
   return true;
@@ -1220,6 +1235,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         if (!vmImport(module, &vm.globals)) return INTERPRET_RUNTIME_ERROR;
+        vmPop();  // nil.
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1228,7 +1244,7 @@ InterpretResult vmExecute(int baseFrame) {
         ObjString* alias = READ_STRING();
         if (!vmImportAs(module, alias)) return INTERPRET_RUNTIME_ERROR;
         mapSet(&vm.globals, OBJ_VAL(alias), vmPeek(0));
-        vmPop();  // module instance.
+        vmPop();  // [Module] instance.
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1558,17 +1574,34 @@ char* vmTypesetSource(char* path, char* source) {
 
   vmPush(OBJ_VAL(vm.core.typeset));
 
+  printf("pre vmInitInstance\n");
   disassembleStack();
   printf("\n");
-  if (!vmImportAs(module, objPath))
+  vmPush(OBJ_VAL(vm.core.module));
+  if (!vmInitInstance(vm.core.module, 0))
+    return "{\"success\": \"false 0.5\", \"data\":[]}";
+  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
+  printf("post vmInitInstance\n");
+  disassembleStack();
+  printf("\n");
+  printf("pre vmImport\n");
+  disassembleStack();
+  printf("\n");
+  if (!vmImport(module, &objModule->fields))
     return "{\"success\": \"false 0.75\", \"data\":[]}";
+  printf("post vmImport\n");
+  disassembleStack();
+  printf("\n");
+  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
   disassembleStack();
   printf("\n");
   if (!vmCallValue(OBJ_VAL(vm.core.typeset), 1) ||
       vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return "{\"success\": \"false 1\", \"data\":[]}";
-
+  printf("post typeset\n");
+  disassembleStack();
+  printf("\n");
   Value result = vmPop();
   if (!IS_STRING(result)) return "{\"success\": \"false 2\", \"data\":[]}";
   fprintf(stderr, "3 - typeset");
