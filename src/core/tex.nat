@@ -47,9 +47,12 @@ let typeset = (module: Module) => {
   module.__import__();
   print 100;
   let trees = [val.tex() | val in module.values(), val is Tree];
+  let x = false;
   print 101;
   let z = jsonEncode({"success": true, "data": trees});
   print 102;
   print z;
+  print address(z);
+  print vType(z);
   return z;
 };

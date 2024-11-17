@@ -299,6 +299,50 @@ bool __vType__(int argCount, Value* args) {
   return true;
 }
 
+bool __compile__(int argCount, Value* args) {
+  Value path = vmPop(), source = vmPop();
+
+  if (!IS_STRING(path)) {
+    vmRuntimeError("Expecting string for path.");
+    return false;
+  }
+  if (!IS_STRING(source)) {
+    vmRuntimeError("Expecting string for source.");
+    return false;
+  }
+
+  char* strPath = AS_STRING(path)->chars;
+  char* strSource = AS_STRING(source)->chars;
+
+  ObjString* objPath = intern(path);
+  vmPush(OBJ_VAL(objPath));
+  ObjString* objSource = intern(source);
+  vmPush(OBJ_VAL(objSource));
+  ObjModule* module = newModule(objPath, objSource, MODULE_ENTRYPOINT);
+  vmPush(OBJ_VAL(module));
+  ObjClosure* closure =
+      vmCompileClosure(syntheticToken(path), objSource->chars, module);
+
+  if (closure == NULL) return TYPESET_FAILURE;
+
+  module->closure = closure;
+
+  vmPop();  // module.
+  vmPop();  // objSource.
+  vmPop();  // objPath.
+
+  vmPush(OBJ_VAL(vm.core.typeset));
+
+  vmPush(OBJ_VAL(vm.core.module));
+  if (!vmInitInstance(vm.core.module, 0)) return TYPESET_FAILURE;
+
+  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
+
+  if (!vmImport(module, &objModule->fields)) return TYPESET_FAILURE;
+
+  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+}
+
 bool __moduleImport__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
 

@@ -1550,7 +1550,7 @@ InterpretResult vmInterpretSource(char* path, char* source) {
   return vmInterpretExpr(path, source);
 }
 
-#define JSON_FAILURE "{\"success\": \"false\", \"data\":[]}"
+#define TYPESET_FAILURE "{\"success\": \"false\", \"data\":[]}"
 
 char* vmTypesetSource(char* path, char* source) {
   if (!initVM()) exit(2);
@@ -1564,7 +1564,7 @@ char* vmTypesetSource(char* path, char* source) {
   ObjClosure* closure =
       vmCompileClosure(syntheticToken(path), objSource->chars, module);
 
-  if (closure == NULL) return "{\"success\": \"false 0\", \"data\":[]}";
+  if (closure == NULL) return TYPESET_FAILURE;
 
   module->closure = closure;
 
@@ -1574,36 +1574,21 @@ char* vmTypesetSource(char* path, char* source) {
 
   vmPush(OBJ_VAL(vm.core.typeset));
 
-  printf("pre vmInitInstance\n");
-  disassembleStack();
-  printf("\n");
   vmPush(OBJ_VAL(vm.core.module));
-  if (!vmInitInstance(vm.core.module, 0))
-    return "{\"success\": \"false 0.5\", \"data\":[]}";
+  if (!vmInitInstance(vm.core.module, 0)) return TYPESET_FAILURE;
+
   ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
-  printf("post vmInitInstance\n");
-  disassembleStack();
-  printf("\n");
-  printf("pre vmImport\n");
-  disassembleStack();
-  printf("\n");
-  if (!vmImport(module, &objModule->fields))
-    return "{\"success\": \"false 0.75\", \"data\":[]}";
-  printf("post vmImport\n");
-  disassembleStack();
-  printf("\n");
+
+  if (!vmImport(module, &objModule->fields)) return TYPESET_FAILURE;
+
   mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
-  disassembleStack();
-  printf("\n");
   if (!vmCallValue(OBJ_VAL(vm.core.typeset), 1) ||
       vmExecute(vm.frameCount - 1) != INTERPRET_OK)
-    return "{\"success\": \"false 1\", \"data\":[]}";
-  printf("post typeset\n");
-  disassembleStack();
-  printf("\n");
+    return TYPESET_FAILURE;
+
   Value result = vmPop();
-  if (!IS_STRING(result)) return "{\"success\": \"false 2\", \"data\":[]}";
-  fprintf(stderr, "3 - typeset");
+  if (!IS_STRING(result)) return TYPESET_FAILURE;
+
   return AS_STRING(result)->chars;
 }
