@@ -4,3 +4,12 @@ let seq = [1,2,3];
 let push = seq.push; // native.
 push(4);
 assert(seq[3] == 4);
+
+// runtime compilation.
+
+let module = compile("foo", "let x = true; let y = false; let z = () => 1;");
+
+assert(module is Module);
+assert(module.x == true);
+assert(module.y == false);
+assert(module.z() == 1);

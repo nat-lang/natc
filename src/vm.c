@@ -634,28 +634,14 @@ bool vmOverload(CallFrame* frame) {
 }
 
 bool vmImport(ObjModule* module, ObjMap* target) {
-  printf("vmImport 0 \n");
-  disassembleStack();
-  printf("\n");
   ObjModule* enclosing = vm.module;
   vm.module = module;
-  printf("vmImport 1 \n");
-  disassembleStack();
-  printf("\n");
   vmPush(OBJ_VAL(module));  // [ObjModule].
-  printf("vmImport 2 \n");
-  disassembleStack();
-  printf("\n");
+
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return false;
+  vmPop();  // nil.
 
-  printf("vmImport 3 \n");
-  disassembleStack();
-  printf("\n");
-
-  printf("vmImport 4 \n");
-  disassembleStack();
-  printf("\n");
   mapAddAll(&vm.module->namespace, target);
 
   vm.module = enclosing;
@@ -668,9 +654,7 @@ bool vmImportAs(ObjModule* module, ObjString* alias) {
   ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
 
   if (!vmImport(module, &objModule->fields)) return false;
-  vmPop();  // nil.
-  disassembleStack();
-  printf("\n");
+
   mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
   return true;
@@ -1235,7 +1219,6 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         if (!vmImport(module, &vm.globals)) return INTERPRET_RUNTIME_ERROR;
-        vmPop();  // nil.
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1550,7 +1533,7 @@ InterpretResult vmInterpretSource(char* path, char* source) {
   return vmInterpretExpr(path, source);
 }
 
-#define TYPESET_FAILURE "{\"success\": \"false\", \"data\":[]}"
+#define TYPESET_FAILURE "{\"success\": false, \"data\":[]}"
 
 char* vmTypesetSource(char* path, char* source) {
   if (!initVM()) exit(2);

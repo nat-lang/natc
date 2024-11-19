@@ -300,7 +300,7 @@ bool __vType__(int argCount, Value* args) {
 }
 
 bool __compile__(int argCount, Value* args) {
-  Value path = vmPop(), source = vmPop();
+  Value source = vmPeek(0), path = vmPeek(1);
 
   if (!IS_STRING(path)) {
     vmRuntimeError("Expecting string for path.");
@@ -311,36 +311,44 @@ bool __compile__(int argCount, Value* args) {
     return false;
   }
 
-  char* strPath = AS_STRING(path)->chars;
-  char* strSource = AS_STRING(source)->chars;
-
-  ObjString* objPath = intern(path);
-  vmPush(OBJ_VAL(objPath));
-  ObjString* objSource = intern(source);
-  vmPush(OBJ_VAL(objSource));
+  ObjString* objPath = AS_STRING(path);
+  ObjString* objSource = AS_STRING(source);
   ObjModule* module = newModule(objPath, objSource, MODULE_ENTRYPOINT);
-  vmPush(OBJ_VAL(module));
-  ObjClosure* closure =
-      vmCompileClosure(syntheticToken(path), objSource->chars, module);
 
-  if (closure == NULL) return TYPESET_FAILURE;
+  vmPush(OBJ_VAL(module));
+  ObjClosure* closure = vmCompileClosure(syntheticToken(objPath->chars),
+                                         objSource->chars, module);
+
+  if (closure == NULL) {
+    vmRuntimeError("Failed to compile.");
+    return false;
+  }
 
   module->closure = closure;
 
-  vmPop();  // module.
-  vmPop();  // objSource.
-  vmPop();  // objPath.
-
-  vmPush(OBJ_VAL(vm.core.typeset));
-
   vmPush(OBJ_VAL(vm.core.module));
-  if (!vmInitInstance(vm.core.module, 0)) return TYPESET_FAILURE;
+  if (!vmInitInstance(vm.core.module, 0)) {
+    vmRuntimeError("Failed to init module.");
+    return false;
+  }
 
   ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
 
-  if (!vmImport(module, &objModule->fields)) return TYPESET_FAILURE;
+  if (!vmImport(module, &objModule->fields)) {
+    vmRuntimeError("Failed to import.");
+    return false;
+  }
 
   mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+
+  vmPop();  // objModule.
+  vmPop();  // module.
+  vmPop();  // objSource.
+  vmPop();  // objPath.
+  vmPop();  // native fn.
+
+  vmPush(OBJ_VAL(objModule));
+  return true;
 }
 
 bool __moduleImport__(int argCount, Value* args) {
@@ -547,6 +555,7 @@ InterpretResult initializeCore() {
   defineNativeFnGlobal("stackTrace", 0, __stackTrace__);
   defineNativeFnGlobal("address", 1, __address__);
   defineNativeFnGlobal("annotations", 1, __annotations__);
+  defineNativeFnGlobal("compile", 2, __compile__);
 
   defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
   defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);

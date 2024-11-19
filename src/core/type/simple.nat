@@ -217,8 +217,6 @@ class SimpleTypeSystem {
     if (type == CNumber) return num;
     if (type == OString) return string; 
     if (type == OInstance) return TInstance(value.__class__);
-    // if it's a native we punt.
-    if (type == ONative) return typeVar() -> typeVar();
     // we'll treat the type of a class as synonymous with
     // its initializer for now.
     if (type == OClass) {
@@ -228,6 +226,7 @@ class SimpleTypeSystem {
     }
 
     // these need to be inferred.
+    if (type == ONative) return typeVar() -> typeVar();
     if (type == OFunction) return nil;
     if (type == OBoundFunction) return nil;
     if (type == OOverload) return nil;
