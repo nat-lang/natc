@@ -1,6 +1,8 @@
 import src/core/json
 
+let main = (path, source) => {
+  let module = compile(path, source);
+  let z = typeset(module);
 
-let main = (*args) => {
-
+  return z;
 };

@@ -113,7 +113,6 @@ void initCore(Core* core) {
 
   core->unify = NULL;
   core->typeSystem = NULL;
-  core->typeset = NULL;
 }
 
 bool initVM() {
@@ -188,6 +187,26 @@ bool vmGetMethod(ObjString* name, int argCount, Value* method) {
   }
 
   return mapGet(fields, OBJ_VAL(name), method);
+}
+
+bool vmGetGlobalObj(char* name, Value* obj, ObjType type) {
+  if (!mapGet(&vm.globals, INTERN(name), obj)) {
+    vmRuntimeError("Couldn't find global '%s'.", name);
+    return NULL;
+  }
+
+  if (!IS_OBJ(*obj)) {
+    vmRuntimeError("Global is not an object.");
+    return false;
+  }
+
+  if (OBJ_TYPE(*obj) != type) {
+    vmRuntimeError("Global has wrong type. Expected '%i' but got '%i.", type,
+                   obj->vType);
+    return false;
+  }
+
+  return true;
 }
 
 bool vmInvoke(ObjString* name, int argCount) {
@@ -778,7 +797,7 @@ InterpretResult vmExecute(int baseFrame) {
         Value value;
         if (!mapGet(&vm.module->namespace, OBJ_VAL(name), &value) &&
             !mapGet(&vm.globals, OBJ_VAL(name), &value)) {
-          vmRuntimeError("Undefined variable '%s'.", name->chars);
+          vmRuntimeError("Undefined variable G '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -787,18 +806,38 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.module->namespace, name, vmPeek(0));
+        ObjMap* map = vm.module->type == MODULE_ENTRYPOINT
+                          ? &vm.globals
+                          : &vm.module->namespace;
+
+        mapSet(map, name, vmPeek(0));
         vmPop();
         break;
       }
       case OP_SET_GLOBAL: {
         Value name = READ_CONSTANT();
-        if (mapSet(&vm.module->namespace, name, vmPeek(0))) {
-          mapDelete(&vm.module->namespace, name);
-          if (mapSet(&vm.globals, name, vmPeek(0))) {
-            mapDelete(&vm.globals, name);
-            vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
-            return INTERPRET_RUNTIME_ERROR;
+
+        switch (vm.module->type) {
+          case MODULE_ENTRYPOINT: {
+            if (mapSet(&vm.globals, name, vmPeek(0))) {
+              mapDelete(&vm.globals, name);
+              vmRuntimeError("Undefined variable '%s'.",
+                             AS_STRING(name)->chars);
+              return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+          }
+          case MODULE_IMPORT: {
+            if (mapSet(&vm.module->namespace, name, vmPeek(0))) {
+              mapDelete(&vm.module->namespace, name);
+              if (mapSet(&vm.globals, name, vmPeek(0))) {
+                mapDelete(&vm.globals, name);
+                vmRuntimeError("Undefined variable '%s'.",
+                               AS_STRING(name)->chars);
+                return INTERPRET_RUNTIME_ERROR;
+              }
+            }
+            break;
           }
         }
         break;
@@ -1521,7 +1560,7 @@ InterpretResult vmInterpretModule(char* path) {
   vmPush(OBJ_VAL(module));
   vm.module = module;
 
-  callModule(module);
+  if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
 
   return vmExecute(vm.frameCount - 1);
 }
@@ -1533,45 +1572,27 @@ InterpretResult vmInterpretSource(char* path, char* source) {
   return vmInterpretExpr(path, source);
 }
 
-#define TYPESET_FAILURE "{\"success\": false, \"data\":[]}"
+#define NLS_FAILURE "{\"success\": false, \"data\":[]}"
 
-char* vmTypesetSource(char* path, char* source) {
+char* vmNLS(char* path, char* source) {
   if (!initVM()) exit(2);
+
+  if (vmInterpretModule("src/core/nls") != INTERPRET_OK) return NLS_FAILURE;
+  Value main;
+  if (!vmGetGlobalObj("main", &main, OBJ_CLOSURE)) return NLS_FAILURE;
+
+  vmPush(main);
 
   ObjString* objPath = intern(path);
   vmPush(OBJ_VAL(objPath));
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
-  ObjModule* module = newModule(objPath, objSource, MODULE_ENTRYPOINT);
-  vmPush(OBJ_VAL(module));
-  ObjClosure* closure =
-      vmCompileClosure(syntheticToken(path), objSource->chars, module);
 
-  if (closure == NULL) return TYPESET_FAILURE;
-
-  module->closure = closure;
-
-  vmPop();  // module.
-  vmPop();  // objSource.
-  vmPop();  // objPath.
-
-  vmPush(OBJ_VAL(vm.core.typeset));
-
-  vmPush(OBJ_VAL(vm.core.module));
-  if (!vmInitInstance(vm.core.module, 0)) return TYPESET_FAILURE;
-
-  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
-
-  if (!vmImport(module, &objModule->fields)) return TYPESET_FAILURE;
-
-  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
-
-  if (!vmCallValue(OBJ_VAL(vm.core.typeset), 1) ||
-      vmExecute(vm.frameCount - 1) != INTERPRET_OK)
-    return TYPESET_FAILURE;
+  if (!vmCallValue(main, 2) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+    return NLS_FAILURE;
 
   Value result = vmPop();
-  if (!IS_STRING(result)) return TYPESET_FAILURE;
+  if (!IS_STRING(result)) return NLS_FAILURE;
 
   return AS_STRING(result)->chars;
 }

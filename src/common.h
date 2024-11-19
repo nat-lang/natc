@@ -66,7 +66,6 @@
 #define S_OTYPE_SEQUENCE "OSequence"
 #define S_OTYPE_MODULE "OModule"
 
-#define S_TYPESET "typeset"
 #define S_TYPE_SYSTEM "TypeSystem"
 #define S_UNIFY "unify"
 

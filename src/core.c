@@ -53,41 +53,21 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
-bool getGlobalObj(char* name, Value* obj, ObjType type) {
-  if (!mapGet(&vm.globals, INTERN(name), obj)) {
-    vmRuntimeError("Couldn't find global '%s'.", name);
-    return NULL;
-  }
-
-  if (!IS_OBJ(*obj)) {
-    vmRuntimeError("Global is not an object.");
-    return false;
-  }
-
-  if (OBJ_TYPE(*obj) != type) {
-    vmRuntimeError("Global has wrong type. Expected '%i' but got '%i.", type,
-                   obj->vType);
-    return false;
-  }
-
-  return true;
-}
-
 ObjClass* getGlobalClass(char* name) {
   Value obj;
-  if (getGlobalObj(name, &obj, OBJ_CLASS)) return AS_CLASS(obj);
+  if (vmGetGlobalObj(name, &obj, OBJ_CLASS)) return AS_CLASS(obj);
   return NULL;
 }
 
 ObjInstance* getGlobalInstance(char* name) {
   Value obj;
-  if (getGlobalObj(name, &obj, OBJ_INSTANCE)) return AS_INSTANCE(obj);
+  if (vmGetGlobalObj(name, &obj, OBJ_INSTANCE)) return AS_INSTANCE(obj);
   return NULL;
 }
 
 ObjClosure* getGlobalClosure(char* name) {
   Value obj;
-  if (getGlobalObj(name, &obj, OBJ_CLOSURE)) return AS_CLOSURE(obj);
+  if (vmGetGlobalObj(name, &obj, OBJ_CLOSURE)) return AS_CLOSURE(obj);
   return NULL;
 }
 
@@ -313,7 +293,7 @@ bool __compile__(int argCount, Value* args) {
 
   ObjString* objPath = AS_STRING(path);
   ObjString* objSource = AS_STRING(source);
-  ObjModule* module = newModule(objPath, objSource, MODULE_ENTRYPOINT);
+  ObjModule* module = newModule(objPath, objSource, MODULE_IMPORT);
 
   vmPush(OBJ_VAL(module));
   ObjClosure* closure = vmCompileClosure(syntheticToken(objPath->chars),
@@ -630,8 +610,7 @@ InterpretResult initializeCore() {
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||
-      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL ||
-      (vm.core.typeset = getGlobalClosure(S_TYPESET)) == NULL)
+      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   ObjInstance* strings = getGlobalInstance("Strings");
