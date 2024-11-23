@@ -65,6 +65,7 @@ void initCore(Core* core) {
   core->sSignature = NULL;
   core->sQuote = NULL;
   core->sBackslash = NULL;
+  core->sArgv = NULL;
 
   core->sName = intern("name");
   core->sArity = intern("arity");
@@ -76,6 +77,7 @@ void initCore(Core* core) {
   core->sModule = intern("module");
   core->sQuote = intern("\"");
   core->sBackslash = intern("\\");
+  core->sArgv = intern("argv");
 
   core->base = NULL;
   core->object = NULL;
@@ -1572,27 +1574,54 @@ InterpretResult vmInterpretSource(char* path, char* source) {
   return vmInterpretExpr(path, source);
 }
 
-#define NLS_FAILURE "{\"success\": false, \"data\":[]}"
+ObjModule* vmCompileEntrypoint() {
+  ObjString* objPath = intern("main");
+  vmPush(OBJ_VAL(objPath));
+  ObjString* objSource = intern("main(..argv);");
+  vmPush(OBJ_VAL(objSource));
 
-char* vmNLS(char* path, char* source) {
+  ObjModule* module = newModule(objPath, objSource, MODULE_ENTRYPOINT);
+  vmPush(OBJ_VAL(module));
+
+  ObjClosure* closure = vmCompileClosure(syntheticToken(objPath->chars),
+                                         objSource->chars, module);
+  if (closure == NULL) return NULL;
+
+  module->closure = closure;
+
+  vmPop();  // module.
+  vmPop();  // objSource.
+  vmPop();  // objPath.
+
+  return module;
+}
+
+InterpretResult vmNLS(char* path, char* source) {
   if (!initVM()) exit(2);
 
-  if (vmInterpretModule("src/core/nls") != INTERPRET_OK) return NLS_FAILURE;
-  Value main;
-  if (!vmGetGlobalObj("main", &main, OBJ_CLOSURE)) return NLS_FAILURE;
-
-  vmPush(main);
+  if (vmInterpretModule("src/core/nls") != INTERPRET_OK)
+    return INTERPRET_RUNTIME_ERROR;
 
   ObjString* objPath = intern(path);
   vmPush(OBJ_VAL(objPath));
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
+  vmTuplify(2, true);
 
-  if (!vmCallValue(main, 2) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
-    return NLS_FAILURE;
+  mapSet(&vm.globals, OBJ_VAL(vm.core.sArgv), vmPeek(0));
+  vmPop();  // argv.
 
-  Value result = vmPop();
-  if (!IS_STRING(result)) return NLS_FAILURE;
+  ObjModule* entrypoint = vmCompileEntrypoint();
 
-  return AS_STRING(result)->chars;
+  if (entrypoint == NULL) return INTERPRET_RUNTIME_ERROR;
+
+  vmPush(OBJ_VAL(entrypoint));
+  vm.module = entrypoint;
+
+  if (!callModule(entrypoint)) return INTERPRET_RUNTIME_ERROR;
+
+  InterpretResult status = vmExecute(vm.frameCount - 1);
+
+  freeVM();
+  return status;
 }

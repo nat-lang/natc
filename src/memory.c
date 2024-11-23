@@ -284,6 +284,7 @@ static void markRoots() {
   markObject((Obj*)vm.core.sModule);
   markObject((Obj*)vm.core.sQuote);
   markObject((Obj*)vm.core.sBackslash);
+  markObject((Obj*)vm.core.sArgv);
 
   markCompilerRoots(vm.compiler);
 }

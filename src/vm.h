@@ -31,6 +31,7 @@ typedef struct {
   ObjString* sSignature;
   ObjString* sFunction;
   ObjString* sModule;
+  ObjString* sArgv;
 
   ObjString* sQuote;
   ObjString* sBackslash;
@@ -121,7 +122,7 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
-char* vmNLS(char* path, char* source);
+InterpretResult vmNLS(char* path, char* source);
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
