@@ -42,7 +42,12 @@ class TreeDocument extends TexDocument {
   ";
 }
 
+
 let typeset = (module: Module) => {
   module.__import__();
-  return [val.tex() | val in module.values(), val is Tree];
+
+  let trees = [val | val in module.values(), val is Tree];
+  let equations = [TreeDocument([val]).render() | val in module.values(), val is Tree];
+
+  return equations;
 };

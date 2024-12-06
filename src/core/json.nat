@@ -16,6 +16,8 @@ let jsonEncode = value => {
   if (value is Object) {
     let entries = value.entries().map(entry => {
       let key = entry[0], val = entry[1];
+      print key;
+      print val;
       return "#{jsonEncode(key)}: #{jsonEncode(val)}";
     });
 

@@ -9,3 +9,5 @@ let main = (path, source) => {
   
   print jsonEncode({"success": true, "data": moduleAst});
 };
+
+main("foo", "let z = [1 2 3];");

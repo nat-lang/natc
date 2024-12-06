@@ -85,7 +85,7 @@ class Set extends Object {
     return set;
   }
 
-  infix & (that) => this.union(that);
+  infix &(that) => this.union(that);
 
   intersection(that) => {
     let set = {};

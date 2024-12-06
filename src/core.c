@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "ast.h"
 #include "compiler.h"
 #include "debug.h"
 #include "io.h"
@@ -155,6 +156,17 @@ bool __randomNumber__(int argCount, Value* args) {
 
   int x = rand() % (uint32_t)AS_NUMBER(upperBound);
   vmPush(NUMBER_VAL(x));
+  return true;
+}
+
+bool __ast__(int argCount, Value* args) {
+  Value value = vmPeek(0);
+  if (!ast(value)) return false;
+  Value ast = vmPop();
+
+  vmPop();  // native fn.
+  vmPush(ast);
+
   return true;
 }
 
@@ -523,6 +535,7 @@ bool __annotations__(int argCount, Value* args) {
 InterpretResult initializeCore() {
   // native functions.
 
+  defineNativeFnGlobal("ast", 1, __ast__);
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);

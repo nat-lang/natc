@@ -1,0 +1,4 @@
+
+import test/f as f
+
+print typeset(f);

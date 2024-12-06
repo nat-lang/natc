@@ -30,7 +30,7 @@ void vmRuntimeError(const char* format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
-  int leftOffset = 6;  // strlen("module").
+  int leftOffset = 0;  // strlen("module").
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame* frame = &vm.frames[i];
@@ -45,12 +45,15 @@ void vmRuntimeError(const char* format, ...) {
     ObjFunction* function = closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
 
-    char* name =
-        function->module->closure == closure ? "module" : function->name->chars;
-
-    fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset, name,
-            function->module->path->chars, NAT_EXT,
-            function->chunk.lines[instruction]);
+    if (i == 0) {
+      fprintf(stderr, "%*s %s%s:%d\n", leftOffset + 8, "in",
+              function->module->path->chars, NAT_EXT,
+              function->chunk.lines[instruction]);
+    } else {
+      fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset,
+              function->name->chars, function->module->path->chars, NAT_EXT,
+              function->chunk.lines[instruction]);
+    }
   }
 
   resetStack();
