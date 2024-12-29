@@ -1,1 +1,0 @@
-var a = { "success": true, "data": ["\documentclass{standalone}\usepackage{amsmath,tikz,tikz-qtree}  \tikzset{aligned.style={baseline=(current bounding box.center)}}\tikzset{every tree node.style={align=center,anchor=north}}  \begin{document}  \tikz{{\Tree[.{} {Agnetha \\ $e$} {smiled \\ $\lambda x. x \in Smile$ \\ $e \to t$} ]}}\end{document}    "] }

@@ -76,6 +76,12 @@ class Tree extends Object {
     }
   }
 
+  json() => ({
+    "data": this.jsonDatum(),
+    "type": this.jsonType(),
+    "children": this.children.map(node => node.json())
+  });
+
   find(predicate) => this.depthFirst().find(predicate);
 
   collect(predicate) => [node | node in this, predicate(node)];
@@ -88,21 +94,29 @@ class Tree extends Object {
     this.children.map(x => x._pp(depth + 1));
   }
   pp() => this._pp(0);
-  texBracket() => {
-    let datum = () => {
-      if (this.data == nil) return "{}";
+  jsonDatum() => {
+    if (this.data == nil) return nil;
 
-      let type = TypeSystem.type(this.data);
+    if (vType(this.data) in [OFunction, OOverload]) {
+      let ast <- this.data;
 
-      if (vType(this.data) in [OFunction, OOverload]) {
-        let ast <- this.data;
-        return "{#{this.data.name} \\ $#{ast.tex()}$ \\ $#{type.tex()}$}";
-      }
+      return {
+        "name": this.data.name,
+        "tex": ast.tex()
+      };
+    }
 
-      return "{#{this.data} \\ $#{type.tex()}$}";
+    return {
+      "name": nil,
+      "tex": str(this.data)
     };
+  }
+  jsonType() => ({
+    "tex": TypeSystem.type(this.data).str()
+  });
 
-    if (this.leaf()) return datum();
+  texBracket() => {
+    if (this.leaf()) return this.texDatum();
 
     let children = join(this.children.map(n => n.texBracket()), " ");
     return "[.#{datum()} #{children} ]";

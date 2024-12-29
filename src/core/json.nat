@@ -10,19 +10,21 @@ let jsonEscape = string => [jsonEscapeChar(char) | char in string].join();
 
 let jsonEncode = value => {
   if (vType(value) == CBool) return str(value);
+  if (vType(value) == CNumber) return str(value);
+  if (vType(value) == CNil) return "null";
   if (vType(value) == OString) return quote(jsonEscape(value));
-  if (value is Sequence) return "[#{join(value.map(jsonEncode), ", ")}]";
 
+  if (value is Sequence) return "[#{join(value.map(jsonEncode), ", ")}]";
+  if (value is Tree) return jsonEncode(value.json());
+  if (value is Type) return jsonEncode(value.str());
   if (value is Object) {
     let entries = value.entries().map(entry => {
       let key = entry[0], val = entry[1];
-      print key;
-      print val;
       return "#{jsonEncode(key)}: #{jsonEncode(val)}";
     });
 
     return "{#{join(entries, ", ")}}";
   }
 
-  throw JSONError("Don't know how to encode.");
+  throw JSONError("Don't know how to encode #{value} of type #{vType(value)}.");
 };

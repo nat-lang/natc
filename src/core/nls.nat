@@ -2,10 +2,8 @@ import src/core/json
 
 let main = (path, source) => {
   let module = compile(path, source);
-  
-  module.__import__();
 
-  let moduleAst = ast(module.module);
-  
-  print jsonEncode({"success": true, "data": moduleAst});
+  let trees = [val | val in module.values(), val is Tree];
+
+  print jsonEncode({"success": true, "data": trees});
 };

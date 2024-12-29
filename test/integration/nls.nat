@@ -1,13 +1,3 @@
-import src/core/json
+import src/core/nls
 
-let main = (path, source) => {
-  let module = compile(path, source);
-  
-  module.__import__();
-
-  let moduleAst = ast(module.module);
-  
-  print jsonEncode({"success": true, "data": moduleAst});
-};
-
-main("foo", "let z = [1 2 3];");
+main("foo", "let z = [1 ((1 => 1)) 4];");

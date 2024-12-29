@@ -802,7 +802,7 @@ InterpretResult vmExecute(int baseFrame) {
         Value value;
         if (!mapGet(&vm.module->namespace, OBJ_VAL(name), &value) &&
             !mapGet(&vm.globals, OBJ_VAL(name), &value)) {
-          vmRuntimeError("Undefined variable G '%s'.", name->chars);
+          vmRuntimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
 
@@ -1602,8 +1602,10 @@ ObjModule* vmCompileEntrypoint() {
 InterpretResult vmNLS(char* path, char* source) {
   if (!initVM()) exit(2);
 
-  if (vmInterpretModule("src/core/nls") != INTERPRET_OK)
+  if (vmInterpretModule("src/core/nls") != INTERPRET_OK) {
+    freeVM();
     return INTERPRET_RUNTIME_ERROR;
+  }
 
   ObjString* objPath = intern(path);
   vmPush(OBJ_VAL(objPath));
@@ -1616,12 +1618,18 @@ InterpretResult vmNLS(char* path, char* source) {
 
   ObjModule* entrypoint = vmCompileEntrypoint();
 
-  if (entrypoint == NULL) return INTERPRET_RUNTIME_ERROR;
+  if (entrypoint == NULL) {
+    freeVM();
+    return INTERPRET_RUNTIME_ERROR;
+  }
 
   vmPush(OBJ_VAL(entrypoint));
   vm.module = entrypoint;
 
-  if (!callModule(entrypoint)) return INTERPRET_RUNTIME_ERROR;
+  if (!callModule(entrypoint)) {
+    freeVM();
+    return INTERPRET_RUNTIME_ERROR;
+  }
 
   InterpretResult status = vmExecute(vm.frameCount - 1);
 

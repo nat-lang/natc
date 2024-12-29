@@ -99,4 +99,4 @@ lib:
 wasm:
 	@ $(MAKE) lib
 	@ mkdir -p $(BUILD_DIR)/wasm
-	@ emcc $(BUILD_DIR)/lib.so -o $(BUILD_DIR)/wasm/nat.js -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap -s EXPORTED_FUNCTIONS=_vmInterpretSource -s STACK_SIZE=5MB --embed-file src/core
+	@ emcc $(BUILD_DIR)/lib.so -o ../online/src/service/nat/wasm/nat.js -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print -s EXPORTED_FUNCTIONS=_vmInterpretSource,_vmNLS -s STACK_SIZE=5MB -sALLOW_MEMORY_GROWTH --embed-file src/core
