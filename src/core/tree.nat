@@ -76,11 +76,29 @@ class Tree extends Object {
     }
   }
 
-  json() => ({
-    "data": this.jsonDatum(),
-    "type": this.jsonType(),
-    "children": this.children.map(node => node.json())
-  });
+  hierarchy() => {
+    let name = nil, tex = nil;
+
+    if (this.data != nil) {
+      if (vType(this.data) in [OFunction, OOverload]) {
+        let ast <- this.data;
+
+        name = this.data.name;
+        tex = ast.tex();
+      } else {
+        tex = str(this.data);
+      }
+    }
+
+    return {
+      "name": name,
+      "tex": tex,
+      "type": TypeSystem.type(this.data).str(),
+      "children": this.children.map(node => node.json())
+    };
+  }
+
+  json() => this.hierarchy();
 
   find(predicate) => this.depthFirst().find(predicate);
 
@@ -94,35 +112,6 @@ class Tree extends Object {
     this.children.map(x => x._pp(depth + 1));
   }
   pp() => this._pp(0);
-  jsonDatum() => {
-    if (this.data == nil) return nil;
-
-    if (vType(this.data) in [OFunction, OOverload]) {
-      let ast <- this.data;
-
-      return {
-        "name": this.data.name,
-        "tex": ast.tex()
-      };
-    }
-
-    return {
-      "name": nil,
-      "tex": str(this.data)
-    };
-  }
-  jsonType() => ({
-    "tex": TypeSystem.type(this.data).str()
-  });
-
-  texBracket() => {
-    if (this.leaf()) return this.texDatum();
-
-    let children = join(this.children.map(n => n.texBracket()), " ");
-    return "[.#{datum()} #{children} ]";
-  }
-
-  tex() => "\tikz{{\Tree#{this.texBracket()}}}";
 }
 
 // Functions for building tree literals during compilation.
