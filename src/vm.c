@@ -1574,7 +1574,9 @@ InterpretResult vmInterpretModule(char* path) {
 
 InterpretResult vmInterpretSource(char* path, char* source) {
   if (!initVM()) exit(2);
-  return vmInterpretExpr(path, source);
+  InterpretResult status = vmInterpretExpr(path, source);
+  freeVM();
+  return status;
 }
 
 ObjModule* vmCompileEntrypoint() {
@@ -1598,6 +1600,8 @@ ObjModule* vmCompileEntrypoint() {
 
   return module;
 }
+
+// CLI entrypoint
 
 InterpretResult vmNLS(char* path, char* source) {
   if (!initVM()) exit(2);
