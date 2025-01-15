@@ -8,4 +8,5 @@ src/config.h
 !build/nat.entitlements
 !build/configure.py
 
+__pycache__
 **/*/.DS_Store
