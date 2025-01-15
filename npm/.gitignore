@@ -1,4 +1,8 @@
 node_modules
-nat.data
-nat.js
-nat.wasm
+
+dist
+types
+
+lib/nat.data
+lib/nat.js
+lib/nat.wasm

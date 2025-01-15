@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "es6",
     "lib": [
       "ES2023"
     ],
@@ -8,10 +8,7 @@
     "skipLibCheck": true,
     /* Bundler mode */
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
@@ -19,7 +16,17 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "types": [
-      "node"
+      "node",
     ],
-  }
+    "outDir": "dist",
+    "declaration": true,
+    "declarationDir": "types"
+  },
+  "include": [
+    "lib/**/*",
+    "src/**/*",
+  ],
+  "exclude": [
+    "test.ts"
+  ]
 }

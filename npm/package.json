@@ -1,6 +1,6 @@
 {
-  "name": "@natlang/nat",
-  "version": "0.1.0",
+  "name": "@nat-lang/nat",
+  "version": "0.1.7",
   "description": "wasm compiler for nat",
   "keywords": [
     "natural",
@@ -18,14 +18,23 @@
   "license": "ISC",
   "author": "alexander shilen",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npx tsc",
+    "clean": "rimraf dist types"
+  },
+  "files": [
+    "lib",
+    "types"
+  ],
+  "dependencies": {
+    "@types/emscripten": "^1.39.13"
   },
   "devDependencies": {
-    "@types/emscripten": "^1.39.13",
     "@types/node": "^22.10.6",
     "eslint": "^9.18.0",
+    "rimraf": "^6.0.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
