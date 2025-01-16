@@ -33,5 +33,6 @@ import test/integration/type/index
 import test/integration/overload
 import test/integration/quantification
 import test/integration/composition
+import test/integration/json
 
 conclude("integration");

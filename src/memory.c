@@ -282,6 +282,10 @@ static void markRoots() {
   markObject((Obj*)vm.core.sSignature);
   markObject((Obj*)vm.core.sFunction);
   markObject((Obj*)vm.core.sModule);
+  markObject((Obj*)vm.core.sQuote);
+  markObject((Obj*)vm.core.sBackslash);
+  markObject((Obj*)vm.core.sArgv);
+  markObject((Obj*)vm.core.sMain);
 
   markCompilerRoots(vm.compiler);
 }

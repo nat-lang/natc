@@ -1,0 +1,21 @@
+assert(jsonEscapeChar("c") == "c");
+assert(jsonEscapeChar("\") == "\\");
+assert(jsonEscapeChar(Strings.quote) == "\" + Strings.quote);
+
+assert(jsonEscape("c" + Strings.quote) == "c" + "\" + Strings.quote);
+
+assert(jsonEncode(true) == "true");
+assert(jsonEncode(false) == "false");
+
+assert(jsonEncode(0) == "0");
+assert(jsonEncode(1) == "1");
+
+assert(jsonEncode(nil) == "null");
+
+assert(jsonEncode("null") == quote("null"));
+
+assert(jsonEncode([true,0,"2"]) == "[true, 0, #{quote("2")}]");
+assert(jsonEncode({"foo": 1, 2: "bar"}) == "{2: #{quote("bar")}, #{quote("foo")}: 1}");
+
+assert(jsonEncode(bool) == quote("bool"));
+assert(jsonEncode(num) == quote("num"));

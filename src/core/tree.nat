@@ -88,27 +88,30 @@ class Tree extends Object {
     this.children.map(x => x._pp(depth + 1));
   }
   pp() => this._pp(0);
-  texBracket() => {
-    let datum = () => {
-      if (this.data == nil) return "{}";
 
-      let type = TypeSystem.type(this.data);
+  hierarchy() => {
+    let name = nil, tex = nil;
 
+    if (this.data != nil) {
       if (vType(this.data) in [OFunction, OOverload]) {
         let ast <- this.data;
-        return "{#{this.data.name} \\ $#{ast.tex()}$ \\ $#{type.tex()}$}";
+
+        name = this.data.name;
+        tex = ast.tex();
+      } else {
+        tex = str(this.data);
       }
+    }
 
-      return "{#{this.data} \\ $#{type.tex()}$}";
+    return {
+      "name": name,
+      "tex": tex,
+      "type": TypeSystem.type(this.data).str(),
+      "children": this.children.map(node => node.json())
     };
-
-    if (this.leaf()) return datum();
-
-    let children = join(this.children.map(n => n.texBracket()), " ");
-    return "[.#{datum()} #{children} ]";
   }
 
-  tex() => "\tikz{{\Tree#{this.texBracket()}}}";
+  json() => this.hierarchy();
 }
 
 // Functions for building tree literals during compilation.

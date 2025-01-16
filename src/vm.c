@@ -63,6 +63,9 @@ void initCore(Core* core) {
   core->sVariadic = NULL;
   core->sValues = NULL;
   core->sSignature = NULL;
+  core->sQuote = NULL;
+  core->sBackslash = NULL;
+  core->sArgv = NULL;
 
   core->sName = intern("name");
   core->sArity = intern("arity");
@@ -72,6 +75,9 @@ void initCore(Core* core) {
   core->sSignature = intern("signature");
   core->sFunction = intern("function");
   core->sModule = intern("module");
+  core->sQuote = intern("\"");
+  core->sBackslash = intern("\\");
+  core->sArgv = intern("argv");
 
   core->base = NULL;
   core->object = NULL;
