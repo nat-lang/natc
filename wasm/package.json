@@ -1,0 +1,42 @@
+{
+  "name": "@nat-lang/nat",
+  "version": "0.1.9",
+  "description": "wasm compiler for nat",
+  "keywords": [
+    "natural",
+    "language",
+    "semantics"
+  ],
+  "homepage": "https://github.com/nat-lang/natc#readme",
+  "bugs": {
+    "url": "https://github.com/nat-lang/natc/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nat-lang/natc.git"
+  },
+  "license": "ISC",
+  "author": "alexander shilen",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "build": "npx tsc",
+    "clean": "rimraf dist types"
+  },
+  "files": [
+    "lib",
+    "types"
+  ],
+  "dependencies": {
+    "@types/emscripten": "^1.39.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.6",
+    "eslint": "^9.18.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  }
+}

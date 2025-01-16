@@ -119,7 +119,7 @@ void freeVM();
 void vmRuntimeError(const char* format, ...);
 
 InterpretResult vmInterpretExpr(char* path, char* expr);
-InterpretResult vmInterpreSource(char* path, char* source);
+InterpretResult vmInterpretSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
 ObjModule* vmCompileModule(Token path, ModuleType type);
 InterpretResult vmExecute(int baseFrame);

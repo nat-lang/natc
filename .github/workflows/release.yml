@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  release:
+  docker-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -23,3 +23,22 @@ jobs:
           file: ./build/Dockerfile
           push: true
           tags: ${{ secrets.ECR_REPOSITORY }}/nat:latest
+  npm-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Build wasm
+        run: NAT_BASE_DIR="./" emmake make wasm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Build & release npm
+        working-directory: "wasm"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm i
+          npm run build
+          npm publish --access public
