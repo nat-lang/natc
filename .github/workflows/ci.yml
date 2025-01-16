@@ -38,3 +38,16 @@ jobs:
           sudo make clean
           make debug-stress-gc
           make tests
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: mymindstorm/setup-emsdk@v14
+      - uses: actions/setup-node@v4
+      - name: Set base dir
+        run: |
+          echo "NAT_BASE_DIR=${{ github.workspace }}/" >> $GITHUB_ENV
+      - name: Build
+        run: make nat
+      - name: Test wasm
+        run: make test-wasm
