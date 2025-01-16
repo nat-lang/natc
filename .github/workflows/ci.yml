@@ -47,7 +47,5 @@ jobs:
       - name: Set base dir
         run: |
           echo "NAT_BASE_DIR=${{ github.workspace }}/" >> $GITHUB_ENV
-      - name: Build
-        run: make nat
       - name: Test wasm
-        run: make test-wasm
+        run: NAT_BASE_DIR="./" emmake make test-wasm

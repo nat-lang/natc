@@ -96,13 +96,13 @@ lib:
 	@ $(MAKE) nat
 	@ $(MAKE) -f $(BUILD_DIR)/c.make $(BUILD_DIR)/lib.so NAME=nat MODE=release SOURCE_DIR=src
 
-wasm:
+build-wasm:
 	@ $(MAKE) lib
 	@ emcc $(BUILD_DIR)/lib.so -o wasm/lib/nat.js -s EXPORT_ES6=1 -s MODULARIZE=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS -s EXPORTED_FUNCTIONS=_vmInterpretSource -s STACK_SIZE=5MB -sALLOW_MEMORY_GROWTH --embed-file src/core
 
 test-wasm:
 	@ $(MAKE) lib
-	@ emcc $(BUILD_DIR)/lib.so -o wasm/lib/nat.js -s EXPORT_ES6=1 -s MODULARIZE=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS -s EXPORTED_FUNCTIONS=_vmInterpretSource,_main -s STACK_SIZE=5MB -s NODERAWFS=1 -sALLOW_MEMORY_GROWTH
+	@ emcc $(BUILD_DIR)/lib.so -o wasm/lib/nat.js -s EXPORT_ES6=1 -s MODULARIZE=1 -s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS -s EXPORTED_FUNCTIONS=_main -s STACK_SIZE=5MB -s NODERAWFS=1 -sALLOW_MEMORY_GROWTH
 	@ npx tsx wasm/test
 
 release-wasm:
