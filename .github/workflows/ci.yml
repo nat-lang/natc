@@ -44,8 +44,5 @@ jobs:
       - uses: actions/checkout@v3
       - uses: mymindstorm/setup-emsdk@v14
       - uses: actions/setup-node@v4
-      - name: Set base dir
-        run: |
-          echo "NAT_BASE_DIR=${{ github.workspace }}/" >> $GITHUB_ENV
       - name: Test wasm
         run: NAT_BASE_DIR="./" emmake make test-wasm
