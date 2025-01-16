@@ -17,5 +17,6 @@ assert(jsonEncode("null") == quote("null"));
 assert(jsonEncode([true,0,"2"]) == "[true, 0, #{quote("2")}]");
 assert(jsonEncode({"foo": 1, 2: "bar"}) == "{2: #{quote("bar")}, #{quote("foo")}: 1}");
 
-assert(jsonEncode(bool) == quote("bool"));
+assert(jsonEncode(string) == quote("string"));
+assert(jsonEncode(void) == quote("void"));
 assert(jsonEncode(num) == quote("num"));
