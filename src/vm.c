@@ -644,17 +644,16 @@ bool vmOverload(CallFrame* frame) {
 
 bool vmImport(ObjModule* module, ObjMap* target) {
   ObjModule* enclosing = vm.module;
-
-  vmPush(OBJ_VAL(module));  // imported.
   vm.module = module;
+  vmPush(OBJ_VAL(module));  // [ObjModule].
 
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return false;
+  vmPop();  // nil.
 
   mapAddAll(&vm.module->namespace, target);
 
   vm.module = enclosing;
-  vmPop();  // imported.
   return true;
 }
 

@@ -126,6 +126,8 @@ InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
 ObjModule* vmCompileModule(Token path, ModuleType type);
+ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
+bool vmImport(ObjModule* module, ObjMap* target);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
