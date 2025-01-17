@@ -327,7 +327,7 @@ bool __compile__(int argCount, Value* args) {
                                          objSource->chars, module);
 
   if (closure == NULL) {
-    vmRuntimeError("Failed to compile.");
+    vmRuntimeError("Failed to compile module at '%s'.", objPath->chars);
     return false;
   }
 

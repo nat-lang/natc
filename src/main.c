@@ -1,3 +1,4 @@
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -21,19 +22,43 @@ static void repl() {
   }
 }
 
-int main(int argc, const char* argv[]) {
+static void uErr() {
+  fprintf(stderr,
+          "Usage: nat [file] \n [-a argument] call [file] with argument");
+  exit(64);
+}
+
+int main(int argc, char* argv[]) {
   if (!initVM()) exit(2);
 
   if (argc == 1) {
     repl();
-  } else if (argc == 2) {
-    InterpretResult result = vmInterpretModule((char*)argv[1]);
-
-    if (result == INTERPRET_COMPILE_ERROR) exit(65);
-    if (result == INTERPRET_RUNTIME_ERROR) exit(70);
   } else {
-    fprintf(stderr, "Usage: nat [path]\n");
-    exit(64);
+    int opt;
+
+    int paramc = 0;
+    char* paramv[10];  // max 10 params.
+
+    while ((opt = getopt(argc, argv, "a:")) != -1) {
+      switch (opt) {
+        case 'a':
+          paramv[paramc++] = optarg;
+          break;
+        default:
+          uErr();
+      }
+    }
+
+    if (argc - optind > 1) uErr();
+
+    InterpretResult status;
+    if (paramc > 0)
+      status = vmInterpretEntrypoint((char*)argv[optind], paramc, paramv);
+    else
+      status = vmInterpretModule((char*)argv[optind]);
+
+    if (status == INTERPRET_COMPILE_ERROR) exit(65);
+    if (status == INTERPRET_RUNTIME_ERROR) exit(70);
   }
 
   freeVM();

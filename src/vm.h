@@ -123,8 +123,12 @@ void freeVM();
 void vmRuntimeError(const char* format, ...);
 
 InterpretResult vmInterpretExpr(char* path, char* expr);
-InterpretResult vmInterpretSource(char* path, char* source);
 InterpretResult vmInterpretModule(char* path);
+InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]);
+
+InterpretResult vmInterpretModule_wasm(char* path, int argc, char* argv[]);
+InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]);
+
 ObjModule* vmCompileModule(Token path, ModuleType type);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
 bool vmImport(ObjModule* module, ObjMap* target);

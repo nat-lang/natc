@@ -1,6 +1,11 @@
-import main from './lib/nat.js';
-process.stdout.write("?");
-main({ arguments: ["test/integration/index"] });
-main({ arguments: ["test/regression/index"] });
-main({ arguments: ["test/trip/index"] });
+import init, { NatModule } from './lib/nat.js';
 
+let test = (path: string) => init().then(
+  (mod: NatModule) => {
+    mod.ccall("vmInterpretModule_wasm", "number", ["string"], [path])
+  }
+);
+
+test("test/integration/index");
+test("test/regression/index");
+test("test/trip/index");
