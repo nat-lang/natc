@@ -77,6 +77,8 @@ class Sequential extends Object {
       seq.push(raw[i]);
     return seq;
   }
+
+  join() => join(this, "");
 }
 
 class Tuple extends Sequential {

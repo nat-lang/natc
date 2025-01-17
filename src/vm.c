@@ -30,7 +30,7 @@ void vmRuntimeError(const char* format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
-  int leftOffset = 6;  // strlen("module").
+  int leftOffset = 0;
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame* frame = &vm.frames[i];
@@ -45,12 +45,18 @@ void vmRuntimeError(const char* format, ...) {
     ObjFunction* function = closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
 
-    char* name =
-        function->module->closure == closure ? "module" : function->name->chars;
+    // it's a script.
+    if (frame->closure->function->module->closure == frame->closure) {
+      fprintf(stderr, "        %*s %s%s:%d\n", leftOffset, "in",
+              function->module->path->chars, NAT_EXT,
+              function->chunk.lines[instruction]);
 
-    fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset, name,
-            function->module->path->chars, NAT_EXT,
-            function->chunk.lines[instruction]);
+    } else {
+      // it's a function.
+      fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset,
+              function->name->chars, function->module->path->chars, NAT_EXT,
+              function->chunk.lines[instruction]);
+    }
   }
 
   resetStack();
@@ -63,6 +69,10 @@ void initCore(Core* core) {
   core->sVariadic = NULL;
   core->sValues = NULL;
   core->sSignature = NULL;
+  core->sQuote = NULL;
+  core->sBackslash = NULL;
+  core->sArgv = NULL;
+  core->sMain = NULL;
 
   core->sName = intern("name");
   core->sArity = intern("arity");
@@ -72,6 +82,10 @@ void initCore(Core* core) {
   core->sSignature = intern("signature");
   core->sFunction = intern("function");
   core->sModule = intern("module");
+  core->sQuote = intern("\"");
+  core->sBackslash = intern("\\");
+  core->sArgv = intern("argv");
+  core->sMain = intern("main");
 
   core->base = NULL;
   core->object = NULL;

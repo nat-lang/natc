@@ -53,6 +53,16 @@ ObjClass* defineNativeClass(char* name) {
   return klass;
 }
 
+static void defineInstanceProperty(char* name, ObjInstance* instance,
+                                   Value property) {
+  ObjString* objName = intern(name);
+  vmPush(OBJ_VAL(objName));
+  vmPush(property);
+  mapSet(&instance->fields, vmPeek(1), vmPeek(0));
+  vmPop();
+  vmPop();
+}
+
 bool getGlobalObj(char* name, Value* obj, ObjType type) {
   if (!mapGet(&vm.globals, INTERN(name), obj)) {
     vmRuntimeError("Couldn't find global '%s'.", name);
@@ -571,9 +581,14 @@ InterpretResult initializeCore() {
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||
-      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL ||
-      (vm.core.grammar = getGlobalInstance(S_GRAMMAR)) == NULL)
+      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
+
+  ObjInstance* strings = getGlobalInstance("Strings");
+  if (strings == NULL) return INTERPRET_RUNTIME_ERROR;
+
+  defineInstanceProperty("quote", strings, OBJ_VAL(vm.core.sQuote));
+  defineInstanceProperty("backslash", strings, OBJ_VAL(vm.core.sBackslash));
 
   return INTERPRET_OK;
 }
