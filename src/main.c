@@ -68,3 +68,4 @@ int main(int argc, char* argv[]) {
     freeVM();
     return exitStatus;
   }
+}
