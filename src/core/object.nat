@@ -1,10 +1,10 @@
 
-let private = () => [
-  "__class__"
-];
-
 class Object extends Base {
-  keys() => super.keys().filter(x => x in private());
+  private() => [
+    "__class__"
+  ];
+
+  keys() => super.keys().filter(x => x in this.private());
   values() => [this[key] | key in this.keys()];
   entries() => [(key, this[key]) | key in this.keys()];
 

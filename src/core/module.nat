@@ -1,1 +1,5 @@
-class Module extends Object {}
+class Module extends Object {
+  private() => [
+    "__class__", "__module__"
+  ];
+}

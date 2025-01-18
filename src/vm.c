@@ -81,7 +81,7 @@ void initCore(Core* core) {
   core->sValues = intern("values");
   core->sSignature = intern("signature");
   core->sFunction = intern("function");
-  core->sModule = intern("module");
+  core->sModule = intern("__module__");
   core->sQuote = intern("\"");
   core->sBackslash = intern("\\");
   core->sArgv = intern("argv");
@@ -1514,14 +1514,18 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
   if (closure == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(closure));
-  callClosure(closure, 0);
+  if (!callClosure(closure, 0)) return INTERPRET_RUNTIME_ERROR;
 
   return vmExecute(vm.frameCount - 1);
 }
 
-InterpretResult vmInterpretSource(char* path, char* source) {
-  if (!initVM()) exit(2);
-  return vmInterpretExpr(path, source);
+InterpretResult vmExecuteModule(ObjModule* module) {
+  vmPush(OBJ_VAL(module));
+  vm.module = module;
+
+  if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
+
+  return vmExecute(vm.frameCount - 1);
 }
 
 InterpretResult vmInterpretModule(char* path) {
@@ -1529,10 +1533,47 @@ InterpretResult vmInterpretModule(char* path) {
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
-  vmPush(OBJ_VAL(module));
-  vm.module = module;
+  return vmExecuteModule(module);
+}
 
-  callModule(module);
+InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]) {
+  ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
+
+  if (module == NULL) return INTERPRET_COMPILE_ERROR;
+
+  InterpretResult status;
+  if ((status = vmExecuteModule(module)) != INTERPRET_OK) return status;
+
+  Value main;
+  if (!mapGet(&module->namespace, OBJ_VAL(vm.core.sMain), &main) ||
+      !IS_CLOSURE(main)) {
+    vmRuntimeError("Entrypoint requires a 'main' function.");
+    return INTERPRET_RUNTIME_ERROR;
+  }
+
+  vmPush(main);
+
+  for (int i = 0; i < argc; i++) vmPush(INTERN(argv[i]));
+
+  if (!callClosure(AS_CLOSURE(main), argc)) return INTERPRET_RUNTIME_ERROR;
 
   return vmExecute(vm.frameCount - 1);
+}
+
+// wasm api.
+
+InterpretResult vmInterpretModule_wasm(char* path, int argc, char* argv[]) {
+  if (!initVM()) exit(2);
+
+  InterpretResult status = vmInterpretModule(path);
+  freeVM();
+  return status;
+}
+
+InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]) {
+  if (!initVM()) exit(2);
+
+  InterpretResult status = vmInterpretEntrypoint(path, argc, argv);
+  freeVM();
+  return status;
 }
