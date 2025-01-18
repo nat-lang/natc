@@ -1,0 +1,8 @@
+
+let main = (path, source) => {
+  let module = compile(path, source);
+
+  let trees = [val | val in module.values(), val is Tree];
+
+  print jsonEncode({"success": true, "data": trees});
+};
