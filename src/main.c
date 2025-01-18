@@ -25,10 +25,13 @@ static void repl() {
 static void uErr() {
   fprintf(stderr,
           "Usage: nat [file] \n [-a argument] call [file] with argument");
+  freeVM();
   exit(64);
 }
 
 int main(int argc, char* argv[]) {
+  int exitStatus = 0;
+
   if (!initVM()) exit(2);
 
   if (argc == 1) {
@@ -44,8 +47,10 @@ int main(int argc, char* argv[]) {
         case 'a':
           paramv[paramc++] = optarg;
           break;
-        default:
+        default: {
+          freeVM();
           uErr();
+        }
       }
     }
 
@@ -57,11 +62,9 @@ int main(int argc, char* argv[]) {
     else
       status = vmInterpretModule((char*)argv[optind]);
 
-    if (status == INTERPRET_COMPILE_ERROR) exit(65);
-    if (status == INTERPRET_RUNTIME_ERROR) exit(70);
+    if (status == INTERPRET_COMPILE_ERROR) exitStatus = 65;
+    if (status == INTERPRET_RUNTIME_ERROR) exitStatus = 70;
+
+    freeVM();
+    return exitStatus;
   }
-
-  freeVM();
-
-  return 0;
-}
