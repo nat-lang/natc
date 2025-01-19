@@ -42,18 +42,13 @@ class Engine {
     this.stdErrHandlers = { console: console.error };
   }
 
-  print = (stdout: string) => {
-    process.stdout.write(`calling print handlers\n`);
-    Object.values(this.stdOutHandlers).forEach(handler => handler(stdout));
-  }
+  print = (stdout: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stdout));
   printErr = (stderr: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stderr));
 
   onStdout = (handler: OutputHandler) => {
     let uid = v4();
 
     this.stdOutHandlers[uid] = handler;
-
-    process.stdout.write(`adding handler: ${uid}\n`);
 
     return () => {
       delete this.stdOutHandlers[uid];
@@ -74,10 +69,7 @@ class Engine {
     const fn = runtime.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string', 'number', 'number']);
 
     let out = "";
-    const unregister = this.onStdout(stdout => {
-      process.stdout.write(`on stdout: ${stdout}`);
-      out += stdout;
-    });
+    const unregister = this.onStdout(stdout => out += stdout);
 
     // allocate memory for the array of pointers.
     const ptrArray = runtime._malloc(strings.length * 4); // 4 bytes for each pointer.
