@@ -1,17 +1,9 @@
 import { v4 } from 'uuid';
 import initialize, { NatModule } from "../lib/nat";
 
-export type CompilationNode = {
-  children: CompilationNode[];
-  name: string;
-  type: string;
-  tex: string;
-  html?: string;
-}
-
 export type Compilation = {
   success: boolean;
-  data: CompilationNode[];
+  tex: string;
 }
 
 export type CoreFile = {
@@ -38,7 +30,7 @@ class Engine {
 
   constructor() {
     this.runtime = undefined;
-    this.stdOutHandlers = { console: console.log };
+    this.stdOutHandlers = {};
     this.stdErrHandlers = { console: console.error };
   }
 
@@ -95,10 +87,11 @@ class Engine {
     return status === InterpretationStatus.OK ? JSON.parse(out) as Compilation : undefined;
   }
 
-  interpret = async (path: string): Promise<InterpretationStatus> => {
+  interpret = async (path: string, base = SRC_DIR): Promise<InterpretationStatus> => {
     const runtime = await this.loadRuntime();
     const fn = runtime.cwrap('vmInterpretModule_wasm', 'number', ['string']);
-    return fn(path);
+    const absPath = `/${base}/${path}`;
+    return fn(absPath);
   };
 
   getCoreFiles = async (dir = CORE_DIR) => {
@@ -131,8 +124,10 @@ class Engine {
   mkDir = async (path: string): Promise<void> => {
     const runtime = await this.loadRuntime();
     const absPath = `/${SRC_DIR}/${path}`;
+    const pathStat = runtime.FS.analyzePath(absPath);
 
-    runtime.FS.mkdir(absPath);
+    if (!pathStat.exists)
+      runtime.FS.mkdir(absPath);
   }
 
   getFile = async (path: string): Promise<CoreFile> => {

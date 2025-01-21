@@ -88,30 +88,6 @@ class Tree extends Object {
     this.children.map(x => x._pp(depth + 1));
   }
   pp() => this._pp(0);
-
-  hierarchy() => {
-    let name = nil, tex = nil;
-
-    if (this.data != nil) {
-      if (vType(this.data) in [OFunction, OOverload]) {
-        let ast <- this.data;
-
-        name = this.data.name;
-        tex = ast.tex();
-      } else {
-        tex = str(this.data);
-      }
-    }
-
-    return {
-      "name": name,
-      "tex": tex,
-      "type": TypeSystem.type(this.data).str(),
-      "children": this.children.map(node => node.json())
-    };
-  }
-
-  json() => this.hierarchy();
 }
 
 // Functions for building tree literals during compilation.

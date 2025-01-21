@@ -238,13 +238,23 @@ class ASTUpvalue extends ASTVariable {
     this.localId = localId;
     this.upvalue = upvalue;
   }
-  resolve() => resolveUpvalue(this.upvalue);
-  tex() => this.name;
 }
 
-class ASTExternalUpvalue extends ASTUpvalue {}
+class ASTExternalUpvalue extends ASTUpvalue {
+  resolve() => resolveUpvalue(this.upvalue);
+  tex() => {
+    let value = this.resolve();
+    if (vType(value) in [OFunction, OOverload]) {
+      let ast <- value;
+      return ast.tex();
+    }
+    return value;
+  }
+}
+
 class ASTInternalUpvalue extends ASTUpvalue {
   resolve() => { throw Error("Not resolvable."); }
+  tex() => this.name;
 }
 
 class ASTParameter extends ASTVariable {

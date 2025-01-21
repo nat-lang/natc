@@ -9,7 +9,7 @@ import test/integration/block
 import test/integration/class
 import test/integration/const
 import test/integration/closure
-import test/integration/destructure
+import test/integration/ast
 import test/integration/equality
 import test/integration/functional
 import test/integration/hash
