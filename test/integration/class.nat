@@ -23,6 +23,7 @@ let b = B();
 b.join("one", "two");
 
 assert(b.join("one", "two") == "onetwo");
+assert(b["join"]("one", "two") == "onetwo");
 
 // initialization.
 
