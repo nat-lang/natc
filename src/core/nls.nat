@@ -1,8 +1,18 @@
 
 let main = (path, source) => {
   let module = compile(path, source);
+  let moduleAst <- module.__module__;
+  
   module.__import__();
-  let trees = [val | val in module.values(), val is AnnotatedTree];
+
+  let trees = moduleAst.children.filter(
+    x => x is ASTGlobalValueAssignment 
+  ).map(
+    x => x[1].resolve()
+  ).filter(
+    x => x is AnnotatedTree
+  );
+
   let document = TreeDocument(trees);
 
   print jsonEncode({

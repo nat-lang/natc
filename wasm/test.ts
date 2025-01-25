@@ -18,15 +18,13 @@ let checkStatus = (status: InterpretationStatus) => {
   if (typeof compilation.tex !== "string")
     throw new Error("Complation failure: expecting instanceof data = String.");
 
-  engine.onStdout(console.log);
-
-  status = await engine.interpret("test/integration/index", "");
+  status = await engine.interpret("test/integration/index");
   checkStatus(status);
 
-  status = await engine.interpret("test/regression/index", "");
+  status = await engine.interpret("test/regression/index");
   checkStatus(status);
 
-  status = await engine.interpret("test/trip/index", "");
+  status = await engine.interpret("test/trip/index");
   checkStatus(status);
 })();
 

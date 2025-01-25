@@ -4,7 +4,7 @@ class Object extends Base {
     "__class__"
   ];
 
-  keys() => super.keys().filter(x => x in this.private());
+  keys() => super.keys().filter(x => x not in this.private());
   values() => [this[key] | key in this.keys()];
   entries() => [(key, this[key]) | key in this.keys()];
 

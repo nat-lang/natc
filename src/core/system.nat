@@ -3,11 +3,11 @@
 // Instantiate them here. Note that this module must be
 // executed after the rest of the core modules.
 
-import src/core/type/system
-import src/core/unification
-import src/core/composition
+import core/type/system
+import core/unification
+import core/composition
 
 // We keep the quantifiers in their own namespace
 // so that grammars can use the identifiers.
 
-import src/core/quantification as Quantification
+import core/quantification as Quantification
