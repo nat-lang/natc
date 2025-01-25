@@ -376,7 +376,7 @@ bool __moduleImport__(int argCount, Value* args) {
                                                         : &vm.module->namespace;
   mapAddAll(&AS_MODULE(module)->namespace, target);
   vmPop();
-  vmPop();
+  vmPush(NIL_VAL);
   return true;
 }
 

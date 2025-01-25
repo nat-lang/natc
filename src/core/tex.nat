@@ -5,8 +5,8 @@ let newline = "
 
 class TexDocument {
   init(documentClass, packages, blocks) => {
-    this.packages = packages;
     this.documentClass = documentClass;
+    this.packages = packages;
     this.blocks = blocks;
   }
 
@@ -14,8 +14,6 @@ class TexDocument {
 
   renderPreamble() => "\documentclass{#{this.documentClass}}
 \usepackage{#{join(this.packages, ",")}}
-\tikzset{aligned/.style={baseline=(current bounding box.center)}}
-\tikzset{every tree node/.style={align=center,anchor=north}}
   ";
 
   renderBlocks() => join([block.tex() | block in this.blocks], newline + newline);
@@ -32,6 +30,16 @@ class TexDocument {
 
 class TreeDocument extends TexDocument {
   init(blocks) => {
-    super.init("standalone", ["amsmath", "tikz", "tikz-qtree"], blocks);
+    super.init("article", [], blocks);
   }
+
+  renderPreamble() => "
+\documentclass{#{this.documentClass}}
+\usepackage{stmaryrd}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usepackage[linguistics]{forest}
+\usepackage{MnSymbol}
+\usepackage{gb4e}
+  ";
 }

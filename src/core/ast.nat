@@ -175,7 +175,7 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
-  str() => str(this.value);
+  str() => "ASTLiteral(#{str(this.value)})";
   tex() => this.str();
   resolve() => this.value;
   __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
@@ -229,6 +229,7 @@ class ASTLocal extends ASTVariable {
 class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
   tex() => str(this.id);
+  str() => "ASTGlobal(#{this.id})";
 }
 
 class ASTUpvalue extends ASTVariable {
@@ -238,13 +239,23 @@ class ASTUpvalue extends ASTVariable {
     this.localId = localId;
     this.upvalue = upvalue;
   }
-  resolve() => resolveUpvalue(this.upvalue);
-  tex() => this.name;
 }
 
-class ASTExternalUpvalue extends ASTUpvalue {}
+class ASTExternalUpvalue extends ASTUpvalue {
+  resolve() => resolveUpvalue(this.upvalue);
+  tex() => {
+    let value = this.resolve();
+    if (vType(value) in [OFunction, OOverload]) {
+      let ast <- value;
+      return ast.tex();
+    }
+    return value;
+  }
+}
+
 class ASTInternalUpvalue extends ASTUpvalue {
   resolve() => { throw Error("Not resolvable."); }
+  tex() => this.name;
 }
 
 class ASTParameter extends ASTVariable {
@@ -265,7 +276,6 @@ class ASTApp extends ASTExprStatement {
   evaluate() => {
     let fn = this[0].resolve();
     let args = this[1].resolve();
-
     if (len(args) > 0)
       return fn(..args);
     return fn();

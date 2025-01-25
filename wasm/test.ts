@@ -9,6 +9,14 @@ let checkStatus = (status: InterpretationStatus) => {
 (async () => {
   let engine = new Engine();
   let status: InterpretationStatus;
+  let compilation = await engine.compile("foo", "let z = [1 3 4];");
+
+  if (!compilation)
+    throw new Error("Complation failure: undefined.");
+  if (!compilation.success)
+    throw new Error("Complation failure: expecting success = true.");
+  if (typeof compilation.tex !== "string")
+    throw new Error("Complation failure: expecting instanceof data = String.");
 
   status = await engine.interpret("test/integration/index");
   checkStatus(status);
@@ -18,16 +26,6 @@ let checkStatus = (status: InterpretationStatus) => {
 
   status = await engine.interpret("test/trip/index");
   checkStatus(status);
-
-  let compilation = await engine.compile("foo", "let z = [1 3 4];");
-
-  if (!compilation)
-    throw new Error("Complation failure: undefined.");
-  if (!compilation.success)
-    throw new Error("Complation failure: expecting success=true.");
-  if (!(compilation.data instanceof Array))
-    throw new Error("Complation failure: expecting typeof data=Array.");
-
 })();
 
 

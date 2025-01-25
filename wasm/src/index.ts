@@ -1,17 +1,9 @@
 import { v4 } from 'uuid';
 import initialize, { NatModule } from "../lib/nat";
 
-export type CompilationNode = {
-  children: CompilationNode[];
-  name: string;
-  type: string;
-  tex: string;
-  html?: string;
-}
-
 export type Compilation = {
   success: boolean;
-  data: CompilationNode[];
+  tex: string;
 }
 
 export type CoreFile = {
@@ -24,6 +16,7 @@ type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
 export const CORE_DIR = "core", SRC_DIR = "src";
+const abs = (path: string) => `/${SRC_DIR}/${path}`;
 
 export enum InterpretationStatus {
   OK = 0,
@@ -82,7 +75,7 @@ class Engine {
       runtime.setValue(ptrArray + i * 4, strPtr, '*');
     }
 
-    const status = fn("src/core/nls", strings.length, ptrArray);
+    const status = fn("core/nls", strings.length, ptrArray);
 
     // free the allocated memory.
     for (let i = 0; i < strings.length; ++i) {
@@ -109,8 +102,6 @@ class Engine {
       content: ""
     }];
 
-    const abs = (path: string) => `/${SRC_DIR}/${path}`;
-
     runtime.FS.readdir(abs(dir)).forEach(async file => {
       if ([".", ".."].includes(file)) return;
 
@@ -130,24 +121,23 @@ class Engine {
 
   mkDir = async (path: string): Promise<void> => {
     const runtime = await this.loadRuntime();
-    const absPath = `/${SRC_DIR}/${path}`;
+    const pathStat = runtime.FS.analyzePath(abs(path));
 
-    runtime.FS.mkdir(absPath);
+    if (!pathStat.exists)
+      runtime.FS.mkdir(abs(path));
   }
 
   getFile = async (path: string): Promise<CoreFile> => {
     const runtime = await this.loadRuntime();
-    const absPath = `/${SRC_DIR}/${path}`;
-    const content = runtime.FS.readFile(absPath, { encoding: "utf8" });
+    const content = runtime.FS.readFile(abs(path), { encoding: "utf8" });
 
     return { path, content, type: "blob" };
   }
 
   setFile = async (path: string, content: string) => {
     const runtime = await this.loadRuntime();
-    const absPath = `/${SRC_DIR}/${path}`;
 
-    runtime.FS.writeFile(absPath, content, { flags: "w+" });
+    runtime.FS.writeFile(abs(path), content, { flags: "w+" });
   }
 }
 

@@ -1307,6 +1307,9 @@ InterpretResult vmExecute(int baseFrame) {
             Value value;
             if (mapGetHash(&instance->fields, key, &value, hash)) {
               vmPush(value);
+            } else if (mapGet(&instance->klass->fields, key, &value)) {
+              bindClosure(obj, &value);
+              vmPush(value);
             } else {
               // we don't throw an error if the property doesn't exist.
               vmPush(NIL_VAL);
