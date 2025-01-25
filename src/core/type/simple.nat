@@ -59,7 +59,7 @@ class Type extends Base {
   );
 
   str() => str(this);
-  tex() => { throw NotImplemented(this.__class__, this.tex); }
+  tex() => this.str();
   pp() => { print this.str(); }
   map(fn) => fn(this);
 }

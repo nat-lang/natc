@@ -101,8 +101,8 @@ build-wasm:
 	@ emcc $(BUILD_DIR)/lib.so -o wasm/lib/nat.js \
 		-s EXPORT_ES6=1 \
 		-s MODULARIZE=1 \
-		-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS \
-		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmInterpretModule_wasm \
+		-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS,stringToUTF8,setValue,getValue \
+		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmInterpretModule_wasm,_malloc,_free \
 		-s STACK_SIZE=5MB \
 		-sALLOW_MEMORY_GROWTH \
 		--embed-file src/core
@@ -112,11 +112,12 @@ test-wasm:
 	@ emcc $(BUILD_DIR)/lib.so -o wasm/lib/nat.js \
 		-s EXPORT_ES6=1 \
 		-s MODULARIZE=1 \
-		-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS \
-		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmInterpretModule_wasm \
+		-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS,stringToUTF8,setValue,getValue \
+		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmInterpretModule_wasm,_malloc,_free \
 		-s STACK_SIZE=5MB \
-		-s NODERAWFS=1 \
-		-sALLOW_MEMORY_GROWTH
+		-sALLOW_MEMORY_GROWTH \
+		--embed-file src/core \
+		--embed-file src/test
 	@ npx tsx wasm/test
 
 release-wasm:

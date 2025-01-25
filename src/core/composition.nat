@@ -1,12 +1,36 @@
 
 class CompositionError extends Error {}
 
-class TypedTree extends Tree {
+class AnnotatedTree extends Tree {
   init(data, children, type: Type) => {
     super.init(data, children);
     this.type = type;
   }
   str() => this.type.str();
+
+  texInterior() => {
+    let datum = () => {
+      if (this.data == nil) return "[]";
+
+      let type = TypeSystem.type(this.data);
+
+      if (vType(this.data) in [OFunction, OOverload]) {
+        let ast <- this.data;
+        return "{$#{type.tex()}$ \\ $#{ast.tex()}$ \\ #{this.data.name}}";
+      }
+
+      return "{$#{type.tex()}$ \\ #{this.data}}";
+    };
+
+    if (this.leaf()) return "[#{datum()}]";
+
+    let children = join(this.children.map(x => x.texInterior()), " ");
+    return "[#{datum()} #{children}]";
+  }
+
+  texRoot() => "\begin{exe} \ex \[ \begin{forest} #{this.texInterior()} \end{forest} \] \end{exe}";
+
+  tex() => this.texRoot();
 }
 
 class CompositionSystem {
@@ -29,14 +53,14 @@ class CompositionSystem {
       this.addRule(rule);
   }
 
-  // Map a Tree into a TypedTree.
+  // Map a Tree into an AnnotatedTree.
   type(node: Tree) => {
     if (node.leaf())
-      return TypedTree(node.data, [], TypeSystem.type(node.data));
+      return AnnotatedTree(node.data, [], TypeSystem.type(node.data));
 
     if (node.unary()) {
       let child = this.type(node[0]);
-      return TypedTree(child.data, [child], child.type);
+      return AnnotatedTree(child.data, [child], child.type);
     }
 
     if (node.binary()) {
@@ -47,10 +71,10 @@ class CompositionSystem {
         let data = rule(left.data, right.data);
 
         if (data != undefined)
-          return TypedTree(data, [left, right], TypeSystem.type(data));
+          return AnnotatedTree(data, [left, right], TypeSystem.type(data));
       }
 
-      return TypedTree(node.data, [left, right], nil);
+      return AnnotatedTree(node.data, [left, right], nil);
     }
 
     throw CompositionError("Nonbinary tree.");

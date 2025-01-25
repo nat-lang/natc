@@ -18,7 +18,7 @@ char* qualifyPath(const char* path) {
 char* pathToUri(const char* path) {
   static char buf[256];
 
-  snprintf(buf, sizeof(buf), "%s%s", NAT_BASE_DIR, path);
+  snprintf(buf, sizeof(buf), "%s%s", NAT_SRC_DIR, path);
 
   return buf;
 }
