@@ -1,5 +1,4 @@
 
-
 // types with variables can be generalized into
 // abstract types, functions from types to types.
 
@@ -50,8 +49,6 @@ typecheck(() => {
   id("string");
 });
 
-// or with implicit abstraction.
-
 // with either one type parameter.
 
 let id: w -> w = x => x;
@@ -81,7 +78,7 @@ typecheck(() => {
 
 // or n + 1 type parameters.
 
-let f: x -> (y -> (y -> y)) = a b c => c;
+let f: x -> y -> y -> y = a b c => c;
 
 let abstract = annotations(f)[0];
 let concrete = abstract(num, string);
@@ -160,7 +157,50 @@ typecheck(
 
 // and in parameter annotations.
 
-// ...
+let f = (x: w) => (y: w) => y;
+
+typecheck(() => f(1)(1));
+typecheck(() => f(true)(true));
+
+// fix me.
+// typefail(() => f(true)(1));
+// typefail(() => f(1)(true));
+
+// type parameters propagate to embedded type constructors.
+
+let t = type((x: w) => ({x}));
+
+assert(t is TAbstract);
+
+let concrete = t.instantiate();
+
+assert(concrete is ->);
+assert(concrete.domain is TVar);
+assert(concrete.range is TSet);
+
+let concrete = t(num);
+
+assert(concrete is ->);
+assert(concrete.domain == num);
+assert(concrete.range == TSet(num));
+
+let f = (x: u, y: v, z: w) => ({x,y,z});
+let t = type(f);
+
+assert(t is TAbstract);
+
+let concrete = t.instantiate();
+
+assert(concrete is ->);
+assert(concrete.domain is TProduct);
+assert(concrete.range is TSet);
+assert(concrete.range.element is TSum);
+
+let concrete = t(num, num, num);
+
+assert(concrete is ->);
+assert(concrete.domain == TProduct(num, num, num));
+assert(concrete.range == TSet(num));
 
 // the polymorphic type system types overloads
 // with implicit variables in their case signatures.
