@@ -10,9 +10,7 @@ class TSum extends Type {
   );
 
   substitute(c: Constraint) => {
-    let sum = TSum(
-      ..this.disjuncts.map(x => x.substitute(c))
-    );
+    let sum = TSum(..this.disjuncts.map(x => x.substitute(c)));
     if (len(sum) == 1) return sum.lower();
     return sum;
   }
