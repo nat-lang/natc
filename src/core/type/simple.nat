@@ -181,18 +181,16 @@ class TProduct extends TCollection {
     super.init(..elements);
   }
   fvs() => union(..[x.fvs() | x in this.elements]);
-  str() => "(#{join(this.elements.map(x => x.str()), ", ")})";
+  str() => "TProduct(#{join(this.elements.map(x => x.str()), ", ")})";
 }
 
 class TSet extends TCollection {
   init(*elements) => {
-    this.klass = Set;
-    super.init(..elements);
-  }
-  init(*elements) => {
     if (len(elements) != 1)
       throw TypeError("TSet requires one argument, got #{len(elements)}.");
-    super.init(..elements);
+    this.klass = Set;
+    this.element = elements[0];
+    super.init(this.element);
   }
   str() => "TSet(" + this.elements[0].str() + ")";
 }
