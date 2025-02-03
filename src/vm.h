@@ -132,6 +132,7 @@ InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]);
 ObjModule* vmCompileModule(Token path, ModuleType type);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
 bool vmImport(ObjModule* module, ObjMap* target);
+bool vmImportAsInstance(ObjModule* module);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();

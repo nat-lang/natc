@@ -322,7 +322,33 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(obj);
       OK_IF(vmExecuteMethod("opMember", 2));
     }
+    case OP_IMPORT: {
+      ObjModule* module = AS_MODULE(READ_CONSTANT());
 
+      vmPush(root);
+
+      FAIL_UNLESS(vmImportAsInstance(module));
+      frame = &vm.frames[vm.frameCount - 1];
+
+      if (!vmExecuteMethod("opImport", 1)) return AST_INSTRUCTION_FAIL;
+      vmPop();  // nil.
+
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_IMPORT_AS: {
+      ObjModule* module = AS_MODULE(READ_CONSTANT());
+      Value alias = READ_CONSTANT();
+      vmPush(root);
+
+      FAIL_UNLESS(vmImportAsInstance(module));
+      frame = &vm.frames[vm.frameCount - 1];
+
+      vmPush(alias);
+
+      if (!vmExecuteMethod("opImportAs", 2)) return AST_INSTRUCTION_FAIL;
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
     case OP_SET_TYPE_LOCAL: {
       uint8_t slot = READ_SHORT();
       Value type = vmPeek(0);

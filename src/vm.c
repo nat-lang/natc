@@ -657,6 +657,18 @@ bool vmImport(ObjModule* module, ObjMap* target) {
   return true;
 }
 
+bool vmImportAsInstance(ObjModule* module) {
+  vmPush(OBJ_VAL(vm.core.module));
+  if (!vmInitInstance(vm.core.module, 0)) return false;
+  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
+
+  if (!vmImport(module, &objModule->fields)) return false;
+
+  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+
+  return true;
+}
+
 static bool isFalsey(Value value) {
   return IS_NIL(value) || IS_UNDEF(value) ||
          (IS_BOOL(value) && !AS_BOOL(value));
@@ -1223,17 +1235,11 @@ InterpretResult vmExecute(int baseFrame) {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         Value alias = READ_CONSTANT();
 
-        vmPush(OBJ_VAL(vm.core.module));
-        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
+        if (!vmImportAsInstance(module)) return INTERPRET_RUNTIME_ERROR;
         ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
-
-        if (!vmImport(module, &objModule->fields))
-          return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
         mapSet(&vm.globals, alias, OBJ_VAL(objModule));
-        mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
-
         vmPop();  // objModule.
         break;
       }
