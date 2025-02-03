@@ -878,3 +878,32 @@ assert(q.resolve());
 assert(q.body is ASTClosure);
 assert(vType(q.body.function.signature) == OFunction);
 assert(q.body.sign() is ASTSignature);
+
+// modules.
+
+let f <- () => {
+  import test/integration/module/importable
+};
+
+assert(f == ASTClosureMock(
+  ASTImport(nil),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+assert(f[0].module.x == 1);
+
+let f <- () => {
+  import test/integration/module/importable as importable
+};
+
+assert(f == ASTClosureMock(
+  ASTImportAs(nil,nil),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+assert(f[0].module.x == nil);
+assert(f[0].alias == ASTLiteral("importable"));
