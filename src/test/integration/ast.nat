@@ -242,6 +242,28 @@ assert(f.children == [
   )
 ]);
 
+let f <- () => false && true;
+
+assert(f is ASTClosure);
+f.pp();
+assert(f.children == [
+  ASTConditional(
+    ASTLiteral(false),
+    ASTBlock(
+      f,
+      ASTReturn(
+        ASTLiteral(true)
+      )
+    )
+  ),
+  ASTReturn(
+    ASTLiteral(false)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+]);
+
 // or.
 
 let f <- () => true || false;
