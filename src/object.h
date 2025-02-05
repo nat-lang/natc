@@ -94,12 +94,23 @@ typedef struct {
   ObjString *name;
 } ObjVariable;
 
+typedef enum {
+  TYPE_ANONYMOUS,
+  TYPE_BOUND,
+  TYPE_COMPREHENSION,
+  TYPE_IMPLICIT,
+  TYPE_INITIALIZER,
+  TYPE_METHOD,
+  TYPE_MODULE,
+} FunctionType;
+
 typedef struct {
   Obj obj;
   int arity;
   bool variadic;
   bool patterned;
   int upvalueCount;
+  FunctionType type;
 
   Chunk chunk;
   Local locals[UINT8_COUNT];

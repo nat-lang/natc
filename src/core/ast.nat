@@ -134,6 +134,11 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
+  opLoop(block) => {
+    let node = ASTLoop(block);
+    this.children.push(node);
+  }
+
   opImport(module) => {
     let node = ASTImport(module);
     this.children.push(node);
@@ -396,6 +401,12 @@ class ASTClosure extends ASTExpr {
   }
 }
 
+class ASTComprehension extends ASTClosure {
+  init(enclosing, function, upvalues) => {
+    super.init(enclosing, function, upvalues);
+  }
+}
+
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {
     this.klass = klass;
@@ -447,3 +458,4 @@ class ASTImportAs extends ASTExpr {
     this.children = [];
   }
 }
+

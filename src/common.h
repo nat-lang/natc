@@ -49,6 +49,7 @@
 #define S_AST_MEMBERSHIP "ASTMembership"
 #define S_AST_BLOCK "ASTBlock"
 #define S_AST_QUANTIFICATION "ASTQuantification"
+#define S_AST_COMPREHENSION "ASTComprehension"
 
 #define S_CTYPE_UNIT "CUnit"
 #define S_CTYPE_BOOL "CBool"

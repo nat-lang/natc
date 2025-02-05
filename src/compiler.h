@@ -12,20 +12,11 @@ typedef struct {
   bool isLocal;
 } Upvalue;
 
-typedef enum {
-  TYPE_ANONYMOUS,
-  TYPE_IMPLICIT,
-  TYPE_BOUND,
-  TYPE_METHOD,
-  TYPE_MODULE,
-  TYPE_INITIALIZER,
-} FunctionType;
-
 typedef struct {
   // local slot of the bound variable.
   int var;
   // local slot of the object that implements the protocol.
-  int iter;
+  int obj;
   // stack offset of the first instruction of the body.
   int loopStart;
 } Iterator;
@@ -38,8 +29,6 @@ typedef struct Compiler {
   struct Compiler* enclosing;
   struct Compiler* signature;
   ObjFunction* function;
-  FunctionType functionType;
-
   Upvalue upvalues[UINT8_COUNT];
   int scopeDepth;
 } Compiler;

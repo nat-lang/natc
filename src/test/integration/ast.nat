@@ -223,6 +223,7 @@ assert(f[0][0][0][1] is ASTLocal);
 let f <- () => true && false;
 
 assert(f is ASTClosure);
+f.pp();
 assert(f.children == [
   ASTConditional(
     ASTLiteral(true),

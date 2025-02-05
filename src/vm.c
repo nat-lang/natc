@@ -106,6 +106,7 @@ void initCore(Core* core) {
   core->astMembership = NULL;
   core->astBlock = NULL;
   core->astQuantification = NULL;
+  core->astComprehension = NULL;
 
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
@@ -146,7 +147,7 @@ bool initVM() {
 
   initCore(&vm.core);
 
-  return initializeCore() == INTERPRET_OK;
+  return loadCore() == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -885,9 +886,12 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
-          default:
+          default: {
+            printValue(vmPeek(0));
+            printf("\n---");
             vmRuntimeError(error);
             return INTERPRET_RUNTIME_ERROR;
+          }
         }
 
         break;
@@ -1469,6 +1473,13 @@ InterpretResult vmExecute(int baseFrame) {
 
         break;
       }
+      case OP_COMPREHENSION_INIT:
+      case OP_COMPREHENSION_PRED:
+      case OP_COMPREHENSION_BODY:
+        break;
+      case OP_COMPREHENSION_ITER:
+        READ_SHORT();
+        break;
       default:
         vmRuntimeError("Unexpected op code: %i", instruction);
         return INTERPRET_RUNTIME_ERROR;

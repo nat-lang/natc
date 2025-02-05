@@ -55,6 +55,7 @@ typedef struct {
   ObjClass* astMembership;
   ObjClass* astBlock;
   ObjClass* astQuantification;
+  ObjClass* astComprehension;
 
   ObjClass* vTypeUnit;
   ObjClass* vTypeBool;

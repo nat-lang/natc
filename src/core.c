@@ -545,7 +545,7 @@ bool __annotations__(int argCount, Value* args) {
   return true;
 }
 
-InterpretResult initializeCore() {
+InterpretResult loadCore() {
   // native functions.
 
   defineNativeFnGlobal("len", 1, __length__);
@@ -610,6 +610,8 @@ InterpretResult initializeCore() {
       (vm.core.astMembership = getGlobalClass(S_AST_MEMBERSHIP)) == NULL ||
       (vm.core.astBlock = getGlobalClass(S_AST_BLOCK)) == NULL ||
       (vm.core.astQuantification = getGlobalClass(S_AST_QUANTIFICATION)) ==
+          NULL ||
+      (vm.core.astComprehension = getGlobalClass(S_AST_COMPREHENSION)) ==
           NULL ||
       (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
       (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
