@@ -102,6 +102,7 @@ ObjFunction* newFunction(ObjModule* module) {
   function->name = NULL;
   function->module = NULL;
   function->module = module;
+  function->type = -1;
   initMap(&function->fields);
   initChunk(&function->chunk);
   initMap(&function->constants);

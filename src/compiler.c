@@ -82,7 +82,7 @@ static void errorAtCurrent(Compiler* cmp, const char* message) {
 
 static void initIterator(Iterator* iter) {
   iter->var = 0;
-  iter->iter = 0;
+  iter->obj = 0;
   iter->loopStart = 0;
 }
 
@@ -126,10 +126,8 @@ static bool checkVariable() {
   return check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE);
 }
 
-// Keyword symbols that are also valid identifiers
-// aren't tokenized, so we need to check for the
-// bare string.
-
+// Keyword symbols that are also valid identifiers aren't
+// tokenized, so sometimes we need to check for the bare string.
 static bool checkStr(char* str) {
   return strncmp(parser.current.start, str, strlen(str)) == 0;
 }
@@ -274,7 +272,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->signature = signature;
   cmp->function = NULL;
   cmp->function = newFunction(currentModule);
-  cmp->functionType = functionType;
+  cmp->function->type = functionType;
   cmp->function->localCount = 0;
   cmp->scopeDepth = 0;
 
@@ -302,7 +300,7 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
 }
 
 static void emitDefaultReturn(Compiler* cmp) {
-  if (cmp->functionType == TYPE_INITIALIZER)
+  if (cmp->function->type == TYPE_INITIALIZER)
     emitConstInstr(cmp, OP_GET_LOCAL, 0);
   else
     emitByte(cmp, OP_NIL);
@@ -737,7 +735,7 @@ static int nativePostfix(Compiler* cmp, char* name, int argCount) {
 
 static void variable(Compiler* cmp, bool canAssign) {
   if (parser.previous.type == TOKEN_TYPE_VARIABLE &&
-      cmp->functionType == TYPE_IMPLICIT) {
+      cmp->function->type == TYPE_IMPLICIT) {
     int i = resolveLocal(cmp, &parser.previous);
 
     if (i == -1) {
@@ -1162,7 +1160,7 @@ static Iterator iterator(Compiler* cmp) {
   // turn the expression into an iterator instance and store it.
   getGlobalConstant(cmp, S_ITER);
   emitBytes(cmp, OP_CALL_POSTFIX, 1);
-  iter.iter = addLocal(cmp, syntheticToken("#iter"));
+  iter.obj = addLocal(cmp, syntheticToken("#iter"));
   markInitialized(cmp);
 
   iter.loopStart = cmp->function->chunk.count;
@@ -1172,17 +1170,17 @@ static Iterator iterator(Compiler* cmp) {
 
 static int iterationNext(Compiler* cmp, Iterator iter) {
   // more().
-  emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
+  emitConstInstr(cmp, OP_GET_LOCAL, iter.obj);
   getProperty(cmp, "more");
   emitBytes(cmp, OP_CALL, 0);
 
-  // jump out of the loop if more() false.
+  // jump out of the loop if more() is false.
   int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
   // condition.
   emitByte(cmp, OP_POP);
 
   // next().
-  emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
+  emitConstInstr(cmp, OP_GET_LOCAL, iter.obj);
   getProperty(cmp, "next");
   emitBytes(cmp, OP_CALL, 0);
   emitConstInstr(cmp, OP_SET_LOCAL, iter.var);
@@ -1257,10 +1255,13 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // bound variable and iterable to draw from.
     beginScope(cmp);
     iter = iterator(cmp);
+    emitConstInstr(cmp, OP_COMPREHENSION_ITER, iter.var);
     iterJump = iterationNext(cmp, iter);
+
   } else {
     // a predicate to test against.
     expression(cmp);
+    emitByte(cmp, OP_COMPREHENSION_PRED);
     predJump = emitJump(cmp, OP_JUMP_IF_FALSE);
     emitByte(cmp, OP_POP);
   }
@@ -1280,6 +1281,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
 
     // parse the expression, load the comprehension, and append.
     expression(cmp);
+    emitByte(cmp, OP_COMPREHENSION_BODY);
     emitConstInstr(cmp, OP_GET_LOCAL, var);
     getProperty(cmp, S_ADD);
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
@@ -1320,13 +1322,14 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
     advance(enclosing);  // eat the pipe.
 
     Compiler cmp;
-    initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS,
+    initCompiler(&cmp, enclosing, NULL, TYPE_COMPREHENSION,
                  syntheticToken("#comprehension"));
     beginScope(&cmp);
 
     // init the comprehension instance at local 0. we'll load
     // it when we hit the bottom of the condition clauses.
     nativeCall(&cmp, klass);
+    emitByte(&cmp, OP_COMPREHENSION_INIT);
     int var = addLocal(&cmp, syntheticToken("#comprehension"));
     markInitialized(&cmp);
 
@@ -1776,10 +1779,10 @@ static void printStatement(Compiler* cmp) {
 }
 
 static void returnStatement(Compiler* cmp) {
-  if (cmp->functionType == TYPE_MODULE) {
+  if (cmp->function->type == TYPE_MODULE) {
     error(cmp, "Can't return from top-level code.");
   }
-  if (cmp->functionType == TYPE_INITIALIZER) {
+  if (cmp->function->type == TYPE_INITIALIZER) {
     error(cmp, "Can't return from an initializer.");
   }
 

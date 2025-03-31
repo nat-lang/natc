@@ -137,7 +137,7 @@ class SubtypeState extends SimpleTypeState {
     // a -> b < c -> d iff a > c and b < d.
     if (left is TFunction and right is TFunction) {
       this.constraints.extend([
-      // fixme: the compiler fails when these are unparenthesized.
+        // fixme: the compiler fails when these are unparenthesized.
         (right.domain <| left.domain),
         (left.range <| right.range)
       ]);

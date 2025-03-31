@@ -22,7 +22,7 @@ static int simpleInstruction(const char* name, int offset) {
 
 static int byteInstruction(const char* name, Chunk* chunk, int offset) {
   uint8_t slot = chunk->code[offset + 1];
-  printf("%-16s %4d\n", name, slot);
+  printf("%-21s %4d\n", name, slot);
   return offset + 2;
 }
 
@@ -34,21 +34,21 @@ static uint16_t readShort(Chunk* chunk, int offset) {
 
 static int shortInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t slot = readShort(chunk, offset);
-  printf("%-16s %4d\n", name, slot);
+  printf("%-21s %4d\n", name, slot);
   return offset + 3;
 }
 
 static int jumpInstruction(const char* name, int sign, Chunk* chunk,
                            int offset) {
   uint16_t jump = readShort(chunk, offset);
-  printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+  printf("%-21s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
   return offset + 3;
 }
 
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t constant = readShort(chunk, offset);
 
-  printf("%-16s %4d '", name, constant);
+  printf("%-21s %4d '", name, constant);
   printValue(chunk->constants.values[constant]);
   printf("'\n");
   return offset + 3;
@@ -119,7 +119,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       uint16_t constant = readShort(chunk, offset);
       offset += 3;
 
-      printf("%-16s %4d ", "OP_SIGN", constant);
+      printf("%-21s %4d ", "OP_SIGN", constant);
       printValue(chunk->constants.values[constant]);
       printf("\n");
       return offset;
@@ -128,7 +128,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       uint16_t constant = readShort(chunk, offset);
       offset += 3;
 
-      printf("%-16s %4d ", "OP_CLOSURE", constant);
+      printf("%-21s %4d ", "OP_CLOSURE", constant);
       printValue(chunk->constants.values[constant]);
       printf("\n");
 
@@ -155,7 +155,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       uint8_t slot = chunk->code[offset + 1];
       uint16_t constant = readShort(chunk, offset + 1);
 
-      printf("%-16s %4d '", "OP_OVERLOAD", slot);
+      printf("%-21s %4d '", "OP_OVERLOAD", slot);
       printValue(chunk->constants.values[constant]);
       printf("'\n");
       return offset + 5;
@@ -172,11 +172,11 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_IMPORT", chunk, offset);
     case OP_IMPORT_AS: {
       uint16_t module = readShort(chunk, offset);
-      uint16_t alias = readShort(chunk, offset);
+      uint16_t alias = readShort(chunk, offset + 2);
 
-      printf("OP_IMPORT_AS %d '", module);
+      printf("%-21s %4d '", "OP_IMPORT_AS", module);
       printValue(chunk->constants.values[module]);
-      printf(" '");
+      printf("' '");
       printValue(chunk->constants.values[alias]);
       printf("'\n");
       return offset + 6;
@@ -200,6 +200,14 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_SPREAD", offset);
     case OP_QUANTIFY:
       return simpleInstruction("OP_QUANTIFY", offset);
+    case OP_COMPREHENSION_INIT:
+      return simpleInstruction("OP_COMPREHENSION_INIT", offset);
+    case OP_COMPREHENSION_ITER:
+      return constantInstruction("OP_COMPREHENSION_ITER", chunk, offset);
+    case OP_COMPREHENSION_PRED:
+      return simpleInstruction("OP_COMPREHENSION_PRED", offset);
+    case OP_COMPREHENSION_BODY:
+      return simpleInstruction("OP_COMPREHENSION_BODY", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;

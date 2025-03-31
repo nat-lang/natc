@@ -1,0 +1,4 @@
+
+let f <- () => true && false;
+
+f.pp();

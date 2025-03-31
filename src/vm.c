@@ -106,6 +106,7 @@ void initCore(Core* core) {
   core->astMembership = NULL;
   core->astBlock = NULL;
   core->astQuantification = NULL;
+  core->astComprehension = NULL;
 
   core->vTypeBool = NULL;
   core->vTypeNil = NULL;
@@ -146,7 +147,7 @@ bool initVM() {
 
   initCore(&vm.core);
 
-  return initializeCore() == INTERPRET_OK;
+  return loadCore() == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -657,6 +658,18 @@ bool vmImport(ObjModule* module, ObjMap* target) {
   return true;
 }
 
+bool vmImportAsInstance(ObjModule* module) {
+  vmPush(OBJ_VAL(vm.core.module));
+  if (!vmInitInstance(vm.core.module, 0)) return false;
+  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
+
+  if (!vmImport(module, &objModule->fields)) return false;
+
+  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+
+  return true;
+}
+
 static bool isFalsey(Value value) {
   return IS_NIL(value) || IS_UNDEF(value) ||
          (IS_BOOL(value) && !AS_BOOL(value));
@@ -873,9 +886,12 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
-          default:
+          default: {
+            printValue(vmPeek(0));
+            printf("\n---");
             vmRuntimeError(error);
             return INTERPRET_RUNTIME_ERROR;
+          }
         }
 
         break;
@@ -1223,17 +1239,11 @@ InterpretResult vmExecute(int baseFrame) {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         Value alias = READ_CONSTANT();
 
-        vmPush(OBJ_VAL(vm.core.module));
-        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
+        if (!vmImportAsInstance(module)) return INTERPRET_RUNTIME_ERROR;
         ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
-
-        if (!vmImport(module, &objModule->fields))
-          return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
         mapSet(&vm.globals, alias, OBJ_VAL(objModule));
-        mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
-
         vmPop();  // objModule.
         break;
       }
@@ -1463,6 +1473,13 @@ InterpretResult vmExecute(int baseFrame) {
 
         break;
       }
+      case OP_COMPREHENSION_INIT:
+      case OP_COMPREHENSION_PRED:
+      case OP_COMPREHENSION_BODY:
+        break;
+      case OP_COMPREHENSION_ITER:
+        READ_SHORT();
+        break;
       default:
         vmRuntimeError("Unexpected op code: %i", instruction);
         return INTERPRET_RUNTIME_ERROR;

@@ -133,6 +133,21 @@ class ASTNode extends Tree {
     let node = ASTConditional(condition, consequence);
     this.children.push(node);
   }
+
+  opLoop(block) => {
+    let node = ASTLoop(block);
+    this.children.push(node);
+  }
+
+  opImport(module) => {
+    let node = ASTImport(module);
+    this.children.push(node);
+  }
+
+  opImportAs(module, alias) => {
+    let node = ASTImportAs(ASTImport(module), ASTLiteral(alias));
+    this.children.push(node);
+  }
 }
 
 class ASTStatement extends ASTNode {}
@@ -386,6 +401,12 @@ class ASTClosure extends ASTExpr {
   }
 }
 
+class ASTComprehension extends ASTClosure {
+  init(enclosing, function, upvalues) => {
+    super.init(enclosing, function, upvalues);
+  }
+}
+
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {
     this.klass = klass;
@@ -422,3 +443,19 @@ class ASTQuantification extends ASTExpr {
     return qFn.tex(this.restriction, this.body);
   }
 }
+
+class ASTImport extends ASTExpr {
+  init(module: Module) => {
+    this.module = module;
+    this.children = [];
+  }
+}
+
+class ASTImportAs extends ASTExpr {
+  init(module: Module, alias: ASTLiteral) => {
+    this.module = module;
+    this.alias = alias;
+    this.children = [];
+  }
+}
+

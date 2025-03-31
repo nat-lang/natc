@@ -100,14 +100,11 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       uint16_t offset = READ_SHORT();
       frame->ip += offset;
 
+      Chunk chunk = frame->closure->function->chunk;
+
       // translate until the last two instructions: the implicit
       // return and its payload, which mark the end of the ast.
-      FAIL_UNLESS(astChunk(frame,
-                           frame->closure->function->chunk.code +
-                               frame->closure->function->chunk.count,
-                           root));
-
-      return AST_INSTRUCTION_OK;
+      OK_IF(astChunk(frame, chunk.code + chunk.count, root));
     }
     case OP_JUMP_IF_FALSE: {
       uint16_t offset = READ_SHORT();
@@ -119,12 +116,17 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(root);
       // 1) the condition itself.
       vmPush(condition);
-      // 2) the branch if the condition is true.
-      FAIL_UNLESS(astBlock(&root));
 
+      // 2) the branch if the condition is true. the compiler
+      // expects the condition to be on top of the stack. if
+      // it's a jump that exits a loop, it'll have to be there
+      // twice.
+      FAIL_UNLESS(astBlock(&root));
       Value branch = vmPeek(0);
       vmPush(condition);
+      if (*(frame->ip + offset - 3) == OP_LOOP) vmPush(condition);
       FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
+
       // push the conditional onto the tree.
       FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
       vmPop();  // nil.
@@ -134,6 +136,48 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
 
       return AST_INSTRUCTION_OK;
     }
+    case OP_LOOP: {
+      READ_SHORT();
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_COMPREHENSION_INIT:
+    case OP_COMPREHENSION_PRED:
+    case OP_COMPREHENSION_BODY:
+      return AST_INSTRUCTION_OK;
+    case OP_COMPREHENSION_ITER:
+      READ_SHORT();
+      return AST_INSTRUCTION_OK;
+    /*case OP_LOOP: {
+      uint16_t offset = READ_SHORT();
+      uint8_t* ip = frame->ip;
+      frame->ip -= offset;
+
+      // we translate this instruction as an [ASTLoop] node
+      // with a body consisting of the chunk that's looped
+      // over. note that this means we parse the chunk twice,
+      // and that the [ASTClosure] instance has the initially
+      // parsed nodes as children that precede the [ASTLoop].
+      vmPush(root);
+
+      FAIL_UNLESS(astBlock(&root));
+      Value loopBody = vmPeek(0);
+
+      printf("1\n");
+
+      // translate until the instruction directly before this
+      // op_loop, and then skip it, so that we don't loop.
+      FAIL_UNLESS(astChunk(frame, ip - 1, loopBody));
+
+      printf("2\n");
+      // push the conditional onto the tree.
+      FAIL_UNLESS(vmExecuteMethod("opLoop", 1));
+      printf("3\n");
+      vmPop();  // nil.
+
+      frame->ip += 2;
+      printf("4\n");
+      return AST_INSTRUCTION_OK;
+    }*/
     case OP_GET_GLOBAL: {
       ObjString* name = READ_STRING();
       vmPush(root);
@@ -322,7 +366,33 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(obj);
       OK_IF(vmExecuteMethod("opMember", 2));
     }
+    case OP_IMPORT: {
+      ObjModule* module = AS_MODULE(READ_CONSTANT());
 
+      vmPush(root);
+
+      FAIL_UNLESS(vmImportAsInstance(module));
+      frame = &vm.frames[vm.frameCount - 1];
+
+      if (!vmExecuteMethod("opImport", 1)) return AST_INSTRUCTION_FAIL;
+      vmPop();  // nil.
+
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_IMPORT_AS: {
+      ObjModule* module = AS_MODULE(READ_CONSTANT());
+      Value alias = READ_CONSTANT();
+      vmPush(root);
+
+      FAIL_UNLESS(vmImportAsInstance(module));
+      frame = &vm.frames[vm.frameCount - 1];
+
+      vmPush(alias);
+
+      if (!vmExecuteMethod("opImportAs", 2)) return AST_INSTRUCTION_FAIL;
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
     case OP_SET_TYPE_LOCAL: {
       uint8_t slot = READ_SHORT();
       Value type = vmPeek(0);
@@ -385,7 +455,6 @@ bool astBlock(Value* enclosing) {
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
   while (frame->ip <= ipEnd) {
-#ifdef DEBUG_TRACE_EXECUTION
     printf("          ");
     disassembleStack();
     printf("\n");
@@ -394,7 +463,6 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
     disassembleInstruction(
         &frame->closure->function->chunk,
         (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
         break;
@@ -412,7 +480,6 @@ bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
   for (;;) {
-#ifdef DEBUG_TRACE_EXECUTION
     printf("          ");
     disassembleStack();
     printf("\n");
@@ -420,7 +487,6 @@ bool astFrame(Value root) {
     disassembleInstruction(
         &frame->closure->function->chunk,
         (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
@@ -436,7 +502,7 @@ bool astFrame(Value root) {
     }
   }
 
-  vmRuntimeError("Supposedly unreachable.");
+  vmRuntimeError("This should be unreachable.");
   return false;
 }
 
@@ -467,32 +533,44 @@ bool astUpvalues(ObjClosure* closure, bool root) {
     vmPush(OBJ_VAL(closure->upvalues[i]));
     vmPush(OBJ_VAL(closure->upvalues[i]->name));
 
-    if (!vmInitInstance(astClass, 4)) return AST_INSTRUCTION_FAIL;
+    if (!vmInitInstance(astClass, 4)) return false;
   }
   return vmTuplify(closure->upvalueCount, true);
 }
 
+ObjClass* closureAstClass(ObjClosure* closure) {
+  switch (closure->function->type) {
+    case TYPE_COMPREHENSION:
+      return vm.core.astComprehension;
+    default:
+      break;
+  }
+  return vm.core.astClosure;
+}
+
 bool astClosure(Value* enclosing, ObjClosure* closure) {
+  ObjClass* astClass = closureAstClass(closure);
+
   vmInitFrame(closure, 0);
 
   // the root of the tree is an [ASTClosure] instance that
   // has three arguments.
-  vmPush(OBJ_VAL(vm.core.astClosure));
+  vmPush(OBJ_VAL(astClass));
   // (0) the enclosing function.
   vmPush(enclosing == NULL ? NIL_VAL : *enclosing);
   // (1) the function itself.
   vmPush(OBJ_VAL(closure));
   // (2) the closure's upvalues.
-  if (!astUpvalues(closure, enclosing == NULL)) return AST_INSTRUCTION_FAIL;
+  if (!astUpvalues(closure, enclosing == NULL)) return false;
 
-  if (!vmInitInstance(vm.core.astClosure, 3)) return AST_INSTRUCTION_FAIL;
-  Value astClosure = vmPeek(0);
+  if (!vmInitInstance(astClass, 3)) return false;
+  Value root = vmPeek(0);
 
   // the function's arguments are undefined values.
   // the [ASTClosure] instance occupies the reserved slot.
   for (int i = 0; i < closure->function->arity; i++) vmPush(UNDEF_VAL);
 
-  return astFrame(astClosure);
+  return astFrame(root);
 }
 
 bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
@@ -516,7 +594,7 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   vmPush(OBJ_VAL(obj));
   vmPush(obj->receiver);
   vmPush(OBJ_VAL(closure));
-  if (!astClosure(enclosing, closure)) return AST_INSTRUCTION_FAIL;
+  if (!astClosure(enclosing, closure)) return false;
 
   return vmInitInstance(vm.core.astMethod, 4);
 }
@@ -567,5 +645,5 @@ bool ast(Value value) {
   }
 
   vmRuntimeError("This should be unreachable.");
-  return false;  // unreachable.
+  return false;
 }
