@@ -20,6 +20,6 @@
     return true;                                            \
   }
 
-InterpretResult initializeCore();
+InterpretResult loadCore();
 
 #endif

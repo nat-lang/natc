@@ -146,7 +146,7 @@ bool initVM() {
 
   initCore(&vm.core);
 
-  return initializeCore() == INTERPRET_OK;
+  return loadCore() == INTERPRET_OK;
 }
 
 void freeVM() {
