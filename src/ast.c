@@ -100,14 +100,11 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       uint16_t offset = READ_SHORT();
       frame->ip += offset;
 
+      Chunk chunk = frame->closure->function->chunk;
+
       // translate until the last two instructions: the implicit
       // return and its payload, which mark the end of the ast.
-      FAIL_UNLESS(astChunk(frame,
-                           frame->closure->function->chunk.code +
-                               frame->closure->function->chunk.count,
-                           root));
-
-      return AST_INSTRUCTION_OK;
+      OK_IF(astChunk(frame, chunk.code + chunk.count, root));
     }
     case OP_JUMP_IF_FALSE: {
       uint16_t offset = READ_SHORT();
