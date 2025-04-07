@@ -433,7 +433,7 @@ bool astFrame(Value root) {
     }
   }
 
-  vmRuntimeError("Supposedly unreachable.");
+  vmRuntimeError("Expected to be unreachable.");
   return false;
 }
 
@@ -464,7 +464,7 @@ bool astUpvalues(ObjClosure* closure, bool root) {
     vmPush(OBJ_VAL(closure->upvalues[i]));
     vmPush(OBJ_VAL(closure->upvalues[i]->name));
 
-    if (!vmInitInstance(astClass, 4)) return AST_INSTRUCTION_FAIL;
+    if (!vmInitInstance(astClass, 4)) return false;
   }
   return vmTuplify(closure->upvalueCount, true);
 }
@@ -480,9 +480,9 @@ bool astClosure(Value* enclosing, ObjClosure* closure) {
   // (1) the function itself.
   vmPush(OBJ_VAL(closure));
   // (2) the closure's upvalues.
-  if (!astUpvalues(closure, enclosing == NULL)) return AST_INSTRUCTION_FAIL;
+  if (!astUpvalues(closure, enclosing == NULL)) return false;
 
-  if (!vmInitInstance(vm.core.astClosure, 3)) return AST_INSTRUCTION_FAIL;
+  if (!vmInitInstance(vm.core.astClosure, 3)) return false;
   Value astClosure = vmPeek(0);
 
   // the function's arguments are undefined values.
@@ -497,12 +497,12 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
 
   if (obj->type == BOUND_NATIVE) {
     vmRuntimeError("Undestructurable native.");
-    return AST_INSTRUCTION_FAIL;
+    return false;
   }
 
   if (!IS_INSTANCE(obj->receiver) && !IS_CLASS(obj->receiver)) {
     vmRuntimeError("Receiver not instance or class.");
-    return AST_INSTRUCTION_FAIL;
+    return false;
   }
 
   ObjClosure* closure = obj->bound.method;
@@ -513,7 +513,7 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   vmPush(OBJ_VAL(obj));
   vmPush(obj->receiver);
   vmPush(OBJ_VAL(closure));
-  if (!astClosure(enclosing, closure)) return AST_INSTRUCTION_FAIL;
+  if (!astClosure(enclosing, closure)) return false;
 
   return vmInitInstance(vm.core.astMethod, 4);
 }
