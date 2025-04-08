@@ -545,7 +545,7 @@ bool __annotations__(int argCount, Value* args) {
   return true;
 }
 
-InterpretResult initializeCore() {
+InterpretResult loadCore() {
   // native functions.
 
   defineNativeFnGlobal("len", 1, __length__);
