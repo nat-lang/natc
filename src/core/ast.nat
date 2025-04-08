@@ -133,6 +133,16 @@ class ASTNode extends Tree {
     let node = ASTConditional(condition, consequence);
     this.children.push(node);
   }
+
+  opImport(module) => {
+    let node = ASTImport(module);
+    this.children.push(node);
+  }
+
+  opImportAs(module, alias) => {
+    let node = ASTImportAs(ASTImport(module), ASTLiteral(alias));
+    this.children.push(node);
+  }
 }
 
 class ASTStatement extends ASTNode {}
@@ -420,5 +430,20 @@ class ASTQuantification extends ASTExpr {
     if (!qFn.tex)
       throw Error("Quantifier '#{qFn.name}' defines no tex() function.");
     return qFn.tex(this.restriction, this.body);
+  }
+}
+
+class ASTImport extends ASTStatement {
+  init(module: Module) => {
+    this.module = module;
+    this.children = [];
+  }
+}
+
+class ASTImportAs extends ASTStatement {
+  init(module: Module, alias: ASTLiteral) => {
+    this.module = module;
+    this.alias = alias;
+    this.children = [];
   }
 }

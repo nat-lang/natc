@@ -657,6 +657,18 @@ bool vmImport(ObjModule* module, ObjMap* target) {
   return true;
 }
 
+bool vmImportAsInstance(ObjModule* module) {
+  vmPush(OBJ_VAL(vm.core.module));
+  if (!vmInitInstance(vm.core.module, 0)) return false;
+  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
+
+  if (!vmImport(module, &objModule->fields)) return false;
+
+  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+
+  return true;
+}
+
 static bool isFalsey(Value value) {
   return IS_NIL(value) || IS_UNDEF(value) ||
          (IS_BOOL(value) && !AS_BOOL(value));

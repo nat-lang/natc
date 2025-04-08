@@ -282,7 +282,7 @@ class SimpleTypeSystem {
 class SimpleTypeState {
   init(system: SimpleTypeSystem, debug: bool) => {
     this.system = system;
-    // map from ast variables to types.
+    // map from ast variable uuids to types.
     this.typeEnv = Map();
     // constraint stack.
     this.constraints = [];
