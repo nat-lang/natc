@@ -146,7 +146,7 @@ bool initVM() {
 
   initCore(&vm.core);
 
-  return initializeCore() == INTERPRET_OK;
+  return loadCore() == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -654,6 +654,18 @@ bool vmImport(ObjModule* module, ObjMap* target) {
   mapAddAll(&vm.module->namespace, target);
 
   vm.module = enclosing;
+  return true;
+}
+
+bool vmImportAsInstance(ObjModule* module) {
+  vmPush(OBJ_VAL(vm.core.module));
+  if (!vmInitInstance(vm.core.module, 0)) return false;
+  ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
+
+  if (!vmImport(module, &objModule->fields)) return false;
+
+  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+
   return true;
 }
 

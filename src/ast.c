@@ -100,14 +100,11 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       uint16_t offset = READ_SHORT();
       frame->ip += offset;
 
+      Chunk chunk = frame->closure->function->chunk;
+
       // translate until the last two instructions: the implicit
       // return and its payload, which mark the end of the ast.
-      FAIL_UNLESS(astChunk(frame,
-                           frame->closure->function->chunk.code +
-                               frame->closure->function->chunk.count,
-                           root));
-
-      return AST_INSTRUCTION_OK;
+      OK_IF(astChunk(frame, chunk.code + chunk.count, root));
     }
     case OP_JUMP_IF_FALSE: {
       uint16_t offset = READ_SHORT();
@@ -322,7 +319,33 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(obj);
       OK_IF(vmExecuteMethod("opMember", 2));
     }
+    case OP_IMPORT: {
+      ObjModule* module = AS_MODULE(READ_CONSTANT());
 
+      vmPush(root);
+
+      FAIL_UNLESS(vmImportAsInstance(module));
+      frame = &vm.frames[vm.frameCount - 1];
+
+      if (!vmExecuteMethod("opImport", 1)) return AST_INSTRUCTION_FAIL;
+      vmPop();  // nil.
+
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_IMPORT_AS: {
+      ObjModule* module = AS_MODULE(READ_CONSTANT());
+      Value alias = READ_CONSTANT();
+      vmPush(root);
+
+      FAIL_UNLESS(vmImportAsInstance(module));
+      frame = &vm.frames[vm.frameCount - 1];
+
+      vmPush(alias);
+
+      if (!vmExecuteMethod("opImportAs", 2)) return AST_INSTRUCTION_FAIL;
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
     case OP_SET_TYPE_LOCAL: {
       uint8_t slot = READ_SHORT();
       Value type = vmPeek(0);
@@ -436,7 +459,7 @@ bool astFrame(Value root) {
     }
   }
 
-  vmRuntimeError("Supposedly unreachable.");
+  vmRuntimeError("Expected to be unreachable.");
   return false;
 }
 
@@ -467,7 +490,7 @@ bool astUpvalues(ObjClosure* closure, bool root) {
     vmPush(OBJ_VAL(closure->upvalues[i]));
     vmPush(OBJ_VAL(closure->upvalues[i]->name));
 
-    if (!vmInitInstance(astClass, 4)) return AST_INSTRUCTION_FAIL;
+    if (!vmInitInstance(astClass, 4)) return false;
   }
   return vmTuplify(closure->upvalueCount, true);
 }
@@ -483,9 +506,9 @@ bool astClosure(Value* enclosing, ObjClosure* closure) {
   // (1) the function itself.
   vmPush(OBJ_VAL(closure));
   // (2) the closure's upvalues.
-  if (!astUpvalues(closure, enclosing == NULL)) return AST_INSTRUCTION_FAIL;
+  if (!astUpvalues(closure, enclosing == NULL)) return false;
 
-  if (!vmInitInstance(vm.core.astClosure, 3)) return AST_INSTRUCTION_FAIL;
+  if (!vmInitInstance(vm.core.astClosure, 3)) return false;
   Value astClosure = vmPeek(0);
 
   // the function's arguments are undefined values.
@@ -500,12 +523,12 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
 
   if (obj->type == BOUND_NATIVE) {
     vmRuntimeError("Undestructurable native.");
-    return AST_INSTRUCTION_FAIL;
+    return false;
   }
 
   if (!IS_INSTANCE(obj->receiver) && !IS_CLASS(obj->receiver)) {
     vmRuntimeError("Receiver not instance or class.");
-    return AST_INSTRUCTION_FAIL;
+    return false;
   }
 
   ObjClosure* closure = obj->bound.method;
@@ -516,7 +539,7 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   vmPush(OBJ_VAL(obj));
   vmPush(obj->receiver);
   vmPush(OBJ_VAL(closure));
-  if (!astClosure(enclosing, closure)) return AST_INSTRUCTION_FAIL;
+  if (!astClosure(enclosing, closure)) return false;
 
   return vmInitInstance(vm.core.astMethod, 4);
 }
@@ -566,6 +589,6 @@ bool ast(Value value) {
       return false;
   }
 
-  vmRuntimeError("This should be unreachable.");
-  return false;  // unreachable.
+  vmRuntimeError("Expected to be unreachable.");
+  return false;
 }
