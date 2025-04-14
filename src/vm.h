@@ -16,6 +16,28 @@
   (frame->closure->function->chunk.constants.values[READ_SHORT()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
+#ifdef DEBUG_TRACE_EXECUTION
+#define TRACE_EXECUTION(tape)                                     \
+  \ 
+do {                                                              \
+    printf("          ");                                         \
+    disassembleStack();                                           \
+    printf("\n");                                                 \
+    printf("  (");                                                \
+    printf(tape);                                                 \
+    printf(")  ");                                                \
+    printf("  ");                                                 \
+    disassembleInstruction(                                       \
+        &frame->closure->function->chunk,                         \
+        (int)(frame->ip - frame->closure->function->chunk.code)); \
+  }                                                               \
+  while (0)
+#else
+#define TRACE_EXECUTION(tape) \
+  do {                        \
+  } while (0)
+#endif
+
 typedef struct {
   ObjClosure* closure;
   uint8_t* ip;

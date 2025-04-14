@@ -408,16 +408,8 @@ bool astBlock(Value* enclosing) {
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
   while (frame->ip <= ipEnd) {
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    disassembleStack();
-    printf("\n");
-    printf("  (ast chunk) ");
-    printf("  ");
-    disassembleInstruction(
-        &frame->closure->function->chunk,
-        (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
+    TRACE_EXECUTION("ast chunk");
+
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
         break;
@@ -435,15 +427,7 @@ bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
 
   for (;;) {
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    disassembleStack();
-    printf("\n");
-    printf("  (ast frame) ");
-    disassembleInstruction(
-        &frame->closure->function->chunk,
-        (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
+    TRACE_EXECUTION("ast frame");
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:

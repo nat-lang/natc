@@ -738,14 +738,7 @@ InterpretResult vmExecute(int baseFrame) {
   for (;;) {
     if (vm.frameCount == baseFrame) return INTERPRET_OK;
 
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    disassembleStack();
-    printf("\n");
-    disassembleInstruction(
-        &frame->closure->function->chunk,
-        (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
+    TRACE_EXECUTION("main loop");
 
     uint8_t instruction;
 
