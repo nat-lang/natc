@@ -121,14 +121,25 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
 
       Value branch = vmPeek(0);
       vmPush(condition);
-      FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
-      // push the conditional onto the tree.
-      FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
+
+      uint8_t* target = frame->ip + offset;
+      FAIL_UNLESS(astChunk(frame, target, branch));
+      printf("\n%i\n", *(target + 1));
+      if (*(target - 1) == OP_LOOP) {
+        FAIL_UNLESS(vmExecuteMethod("opLoop", 2));
+      } else {
+        FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
+      }
+
       vmPop();  // nil.
 
       // now resume the negative branch on the root.
       frame->ip = ip + offset;
 
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_LOOP: {
+      READ_SHORT();
       return AST_INSTRUCTION_OK;
     }
     case OP_GET_GLOBAL: {

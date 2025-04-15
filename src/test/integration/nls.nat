@@ -1,0 +1,8 @@
+
+
+import core/nls
+
+print main;
+
+main("foo", "import core/nls");
+
