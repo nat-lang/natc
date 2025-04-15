@@ -21,10 +21,8 @@
   do {                                                            \
     printf("          ");                                         \
     disassembleStack();                                           \
-    printf("\n");                                                 \
-    printf("  (");                                                \
     printf(tape);                                                 \
-    printf(")  ");                                                \
+    printf("\n");                                                 \
     printf("  ");                                                 \
     disassembleInstruction(                                       \
         &frame->closure->function->chunk,                         \

@@ -123,11 +123,16 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(condition);
 
       uint8_t* target = frame->ip + offset;
-      FAIL_UNLESS(astChunk(frame, target, branch));
-      printf("\n%i\n", *(target + 1));
-      if (*(target - 1) == OP_LOOP) {
+
+      printf("\n%i\n", *(target - 3));
+      if (*(target - 3) == OP_LOOP) {
+        FAIL_UNLESS(astChunk(frame, target - 3, branch));
+
+        disassembleStack();
+        printf("\n");
         FAIL_UNLESS(vmExecuteMethod("opLoop", 2));
       } else {
+        FAIL_UNLESS(astChunk(frame, target, branch));
         FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
       }
 
@@ -137,6 +142,8 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       frame->ip = ip + offset;
 
       return AST_INSTRUCTION_OK;
+    }
+    case OP_ITER: {
     }
     case OP_LOOP: {
       READ_SHORT();
@@ -418,8 +425,17 @@ bool astBlock(Value* enclosing) {
 // Append the segment of [frame]'s instructions
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
-  while (frame->ip <= ipEnd) {
-    TRACE_EXECUTION("ast chunk");
+  while (frame->ip < ipEnd) {
+    printf("          ");
+    disassembleStack();
+    printf("\n");
+    printf("  (");
+    printf("chunk");
+    printf(")  ");
+    printf("  ");
+    disassembleInstruction(
+        &frame->closure->function->chunk,
+        (int)(frame->ip - frame->closure->function->chunk.code));
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
@@ -436,9 +452,8 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
 // Translate a [CallFrame] into an [ASTNode].
 bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
-
   for (;;) {
-    TRACE_EXECUTION("ast frame");
+    TRACE_EXECUTION("\n  (ast frame)  ");
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:

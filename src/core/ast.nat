@@ -134,6 +134,12 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
+  opLoop(condition, body) => {
+    print this;
+    let node = ASTLoop(condition, body);
+    this.children.push(node);
+  }
+
   opImport(module) => {
     let node = ASTImport(module);
     this.children.push(node);
