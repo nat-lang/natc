@@ -414,17 +414,8 @@ bool astBlock(Value* enclosing) {
 // Append the segment of [frame]'s instructions
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
-  while (frame->ip < ipEnd) {
-    printf("          ");
-    disassembleStack();
-    printf("\n");
-    printf("  (");
-    printf("chunk");
-    printf(")  ");
-    printf("  ");
-    disassembleInstruction(
-        &frame->closure->function->chunk,
-        (int)(frame->ip - frame->closure->function->chunk.code));
+  while (frame->ip <= ipEnd) {
+    TRACE_EXECUTION("\n (ast chunk) ");
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:

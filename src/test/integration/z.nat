@@ -1,2 +1,20 @@
+let f <- () => true && false;
 
-for (x in [1,2,3]) print x;
+assert(f is ASTClosure);
+assert(f.children == [
+  ASTConditional(
+    ASTLiteral(true),
+    ASTBlock(
+      f,
+      ASTReturn(
+        ASTLiteral(false)
+      )
+    )
+  ),
+  ASTReturn(
+    ASTLiteral(true)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+]);
