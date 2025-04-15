@@ -1011,7 +1011,6 @@ InterpretResult vmExecute(int baseFrame) {
           if (!vmExecuteMethod("next", 0)) return INTERPRET_RUNTIME_ERROR;
           frame->slots[local] = vmPop();
         } else {
-          vmPop();  // the iterator.
           frame->ip += offset;
         }
         break;

@@ -120,22 +120,11 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       FAIL_UNLESS(astBlock(&root));
 
       Value branch = vmPeek(0);
+      // the true branch expects the condition on the stack.
       vmPush(condition);
 
-      uint8_t* target = frame->ip + offset;
-
-      printf("\n%i\n", *(target - 3));
-      if (*(target - 3) == OP_LOOP) {
-        FAIL_UNLESS(astChunk(frame, target - 3, branch));
-
-        disassembleStack();
-        printf("\n");
-        FAIL_UNLESS(vmExecuteMethod("opLoop", 2));
-      } else {
-        FAIL_UNLESS(astChunk(frame, target, branch));
-        FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
-      }
-
+      FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
+      FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
       vmPop();  // nil.
 
       // now resume the negative branch on the root.
