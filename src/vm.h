@@ -18,20 +18,16 @@
 
 #ifdef DEBUG_TRACE_EXECUTION
 #define TRACE_EXECUTION(tape)                                     \
-  \ 
-do {                                                              \
+  do {                                                            \
     printf("          ");                                         \
     disassembleStack();                                           \
-    printf("\n");                                                 \
-    printf("  (");                                                \
     printf(tape);                                                 \
-    printf(")  ");                                                \
+    printf("\n");                                                 \
     printf("  ");                                                 \
     disassembleInstruction(                                       \
         &frame->closure->function->chunk,                         \
         (int)(frame->ip - frame->closure->function->chunk.code)); \
-  }                                                               \
-  while (0)
+  } while (0)
 #else
 #define TRACE_EXECUTION(tape) \
   do {                        \

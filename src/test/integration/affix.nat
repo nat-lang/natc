@@ -15,7 +15,10 @@ assert(2 g 1);
 // callable as prefix.
 assert(+'(2,2) == 4);
 
-// as arguments.
+// as argument.
+assert((f => f(2,2))(+') == 4);
+
+// embedded in arguments.
 assert(+'(2 +' 2, 2 +' 2) == 8);
 
 // variable operands.

@@ -120,10 +120,35 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       FAIL_UNLESS(astBlock(&root));
 
       Value branch = vmPeek(0);
+      // the true branch expects the condition on the stack.
       vmPush(condition);
+
       FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
-      // push the conditional onto the tree.
       FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
+      vmPop();  // nil.
+
+      // now resume the negative branch on the root.
+      frame->ip = ip + offset;
+
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_ITER: {
+      uint16_t offset = READ_SHORT();
+      uint8_t* ip = frame->ip;
+      uint16_t local = READ_SHORT();
+      Value iterator = vmPeek(0);
+
+      vmPush(root);
+      // local slot.
+      FAIL_UNLESS(astLocal(local, frame->closure->function));
+      // iterator.
+      vmPush(iterator);
+      // body; translate up to OP_LOOP.
+      FAIL_UNLESS(astBlock(&root));
+      Value branch = vmPeek(0);
+      FAIL_UNLESS(astChunk(frame, ip + offset - 4, branch));
+
+      FAIL_UNLESS(vmExecuteMethod("opIter", 3));
       vmPop();  // nil.
 
       // now resume the negative branch on the root.
@@ -155,7 +180,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     case OP_GET_LOCAL:
       OK_IF(astLocal(READ_SHORT(), frame->closure->function));
     case OP_SET_LOCAL: {
-      uint8_t slot = READ_SHORT();
+      uint16_t slot = READ_SHORT();
       Value value = vmPeek(0);
 
       vmPush(root);
@@ -408,8 +433,7 @@ bool astBlock(Value* enclosing) {
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
   while (frame->ip <= ipEnd) {
-    TRACE_EXECUTION("ast chunk");
-
+    TRACE_EXECUTION("\n  (ast chunk)  ");
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
         break;
@@ -425,9 +449,8 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
 // Translate a [CallFrame] into an [ASTNode].
 bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
-
   for (;;) {
-    TRACE_EXECUTION("ast frame");
+    TRACE_EXECUTION("\n  (ast frame)  ");
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
