@@ -517,6 +517,9 @@ bool vmCallValue(Value caller, int argCount) {
     }
   }
 
+  printf("Tried to call ");
+  printValue(caller);
+  printf("\n");
   vmRuntimeError(
       "Can only call functions, classes, and objects with a 'call' method.");
   return false;
@@ -738,14 +741,7 @@ InterpretResult vmExecute(int baseFrame) {
   for (;;) {
     if (vm.frameCount == baseFrame) return INTERPRET_OK;
 
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    disassembleStack();
-    printf("\n");
-    disassembleInstruction(
-        &frame->closure->function->chunk,
-        (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
+    TRACE_EXECUTION("");
 
     uint8_t instruction;
 
@@ -996,6 +992,27 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_JUMP_IF_FALSE: {
         uint16_t offset = READ_SHORT();
         if (isFalsey(vmPeek(0))) frame->ip += offset;
+        break;
+      }
+      case OP_ITER: {
+        uint16_t offset = READ_SHORT();
+        uint8_t local = READ_SHORT();
+        Value iterator = vmPeek(0);
+
+        vmPush(iterator);
+        if (!vmExecuteMethod("more", 0)) return INTERPRET_RUNTIME_ERROR;
+        Value hasMore = vmPop();
+        if (!IS_BOOL(hasMore)) {
+          vmRuntimeError("more() must return a boolean value.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        if (AS_BOOL(hasMore)) {
+          vmPush(iterator);
+          if (!vmExecuteMethod("next", 0)) return INTERPRET_RUNTIME_ERROR;
+          frame->slots[local] = vmPop();
+        } else {
+          frame->ip += offset;
+        }
         break;
       }
       case OP_LOOP: {

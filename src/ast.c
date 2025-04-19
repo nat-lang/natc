@@ -120,15 +120,22 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       FAIL_UNLESS(astBlock(&root));
 
       Value branch = vmPeek(0);
+      // the true branch expects the condition on the stack.
       vmPush(condition);
+
       FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
-      // push the conditional onto the tree.
       FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
       vmPop();  // nil.
 
       // now resume the negative branch on the root.
       frame->ip = ip + offset;
 
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_ITER: {
+    }
+    case OP_LOOP: {
+      READ_SHORT();
       return AST_INSTRUCTION_OK;
     }
     case OP_GET_GLOBAL: {
@@ -408,16 +415,8 @@ bool astBlock(Value* enclosing) {
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
   while (frame->ip <= ipEnd) {
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    disassembleStack();
-    printf("\n");
-    printf("  (ast chunk) ");
-    printf("  ");
-    disassembleInstruction(
-        &frame->closure->function->chunk,
-        (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
+    TRACE_EXECUTION("\n (ast chunk) ");
+
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
         break;
@@ -433,17 +432,8 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
 // Translate a [CallFrame] into an [ASTNode].
 bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
-
   for (;;) {
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    disassembleStack();
-    printf("\n");
-    printf("  (ast frame) ");
-    disassembleInstruction(
-        &frame->closure->function->chunk,
-        (int)(frame->ip - frame->closure->function->chunk.code));
-#endif
+    TRACE_EXECUTION("\n  (ast frame)  ");
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
