@@ -1269,7 +1269,8 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     emitConstInstr(cmp, OP_GET_LOCAL, var);
     getProperty(cmp, S_ADD);
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
-    emitByte(cmp, OP_EXPR_STATEMENT);  // nil.
+    emitByte(cmp,
+             OP_EXPR_STATEMENT);  // nil, but the ast parser needs to track.
   }
 
   if (iterJump != -1) {
