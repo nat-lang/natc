@@ -189,7 +189,7 @@ class ASTIterate extends ASTStatement {
   init(local, iterator, body) => {
     this.children = [local, iterator, body];
   }
-  tex() => "loop #{this[0].tex()} then #{this[1].tex()}";
+  tex() => "for (#{this[0].name} in #{this[1].tex()}) #{this[2].tex()}";
 }
 
 class ASTLiteral extends ASTExpr {
