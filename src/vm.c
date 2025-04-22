@@ -1029,13 +1029,7 @@ InterpretResult vmExecute(int baseFrame) {
           for (int i = argCount; i > 0; i--) args[i - 1] = vmPop();
           Value caller = vmPop();
 
-          Value typeSystem;
-          if (!mapGet(&vm.globals, INTERN(S_TYPE_SYSTEM), &typeSystem)) {
-            vmRuntimeError("Couldn't find %s.", S_TYPE_SYSTEM);
-            return false;
-          }
-
-          vmPush(typeSystem);
+          vmPush(OBJ_VAL(vm.core.typeSystem));
           vmPush(caller);
           for (int i = 0; i < argCount; i++) vmPush(args[i]);
           if (!vmExecuteMethod("instantiate", argCount + 1))
@@ -1122,6 +1116,11 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_CLOSURE: {
         vmClosure(frame);
+        break;
+      }
+      case OP_COMPREHENSION: {
+        vmClosure(frame);
+
         break;
       }
       case OP_OVERLOAD: {
