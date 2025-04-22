@@ -1269,7 +1269,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     emitConstInstr(cmp, OP_GET_LOCAL, var);
     getProperty(cmp, S_ADD);
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
-    emitByte(cmp, OP_POP);  // comprehension instance.
+    emitByte(cmp, OP_EXPR_STATEMENT);  // nil.
   }
 
   if (iterJump != -1) {

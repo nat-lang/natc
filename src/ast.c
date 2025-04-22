@@ -99,9 +99,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     case OP_JUMP: {
       uint16_t offset = READ_SHORT();
       frame->ip += offset;
-
       Chunk chunk = frame->closure->function->chunk;
-
       // translate until the last two instructions: the implicit
       // return and its payload, which mark the end of the ast.
       OK_IF(astChunk(frame, chunk.code + chunk.count, root));
@@ -134,8 +132,8 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     }
     case OP_ITER: {
       uint16_t offset = READ_SHORT();
-      uint8_t* ip = frame->ip;
       uint16_t local = READ_SHORT();
+      uint8_t* ip = frame->ip;
       Value iterator = vmPeek(0);
 
       vmPush(root);
@@ -155,6 +153,11 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       frame->ip = ip + offset;
 
       return AST_INSTRUCTION_OK;
+    }
+    case OP_LOOP: {
+      READ_SHORT();
+      // here OP_LOOP just concludes a scope.
+      return AST_INSTRUCTION_COMPLETE;
     }
     case OP_GET_GLOBAL: {
       ObjString* name = READ_STRING();
