@@ -134,6 +134,11 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
+  opIter(local, iterator, body) => {
+    let node = ASTIterate(local, iterator, body);
+    this.children.push(node);
+  }
+
   opImport(module) => {
     let node = ASTImport(module);
     this.children.push(node);
@@ -178,6 +183,13 @@ class ASTConditional extends ASTStatement {
     this.children = [condition, consequence];
   }
   tex() => "if #{this[0].tex()} then #{this[1].tex()}";
+}
+
+class ASTIterate extends ASTStatement {
+  init(local, iterator, body) => {
+    this.children = [local, iterator, body];
+  }
+  tex() => "for (#{this[0].name} in #{this[1].tex()}) #{this[2].tex()}";
 }
 
 class ASTLiteral extends ASTExpr {
@@ -234,6 +246,7 @@ class ASTLocal extends ASTVariable {
   }
   str() => "ASTLocal(#{str(this.id)})";
   tex() => this.name;
+  __eq__(that) => this.name == that.name && super.__eq__(that);
 }
 
 class ASTGlobal extends ASTVariable {

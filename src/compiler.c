@@ -1171,22 +1171,8 @@ static Iterator iterator(Compiler* cmp) {
 }
 
 static int iterationNext(Compiler* cmp, Iterator iter) {
-  // more().
-  emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  getProperty(cmp, "more");
-  emitBytes(cmp, OP_CALL, 0);
-
-  // jump out of the loop if more() false.
-  int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
-  // condition.
-  emitByte(cmp, OP_POP);
-
-  // next().
-  emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  getProperty(cmp, "next");
-  emitBytes(cmp, OP_CALL, 0);
-  emitConstInstr(cmp, OP_SET_LOCAL, iter.var);
-  emitByte(cmp, OP_POP);
+  int exitJump = emitJump(cmp, OP_ITER);
+  emitConstant(cmp, iter.var);
 
   return exitJump;
 }
@@ -1194,8 +1180,8 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
 static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
   emitLoop(cmp, iter.loopStart);
   patchJump(cmp, exitJump);
-  // condition.
-  emitByte(cmp, OP_POP);
+  emitByte(cmp, OP_POP);  // the iterator.
+  emitByte(cmp, OP_POP);  // the bound local.
 }
 
 static void forInStatement(Compiler* cmp) {
@@ -1283,7 +1269,8 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     emitConstInstr(cmp, OP_GET_LOCAL, var);
     getProperty(cmp, S_ADD);
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
-    emitByte(cmp, OP_POP);  // comprehension instance.
+    emitByte(cmp,
+             OP_EXPR_STATEMENT);  // nil, but the ast parser needs to track.
   }
 
   if (iterJump != -1) {
