@@ -176,6 +176,7 @@ class ASTBlock extends ASTNode {
   }
   opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
   tex() => join(this.children.map(x => x.tex()), "");
+  str() => "#{this.__class__}(#{this.enclosing})";
 }
 
 class ASTConditional extends ASTStatement {
@@ -408,6 +409,8 @@ class ASTClosure extends ASTExpr {
     return this._signature;
   }
 }
+
+class ASTComprehension extends ASTClosure {}
 
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {

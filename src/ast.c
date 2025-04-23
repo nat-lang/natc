@@ -9,7 +9,7 @@
 #include "value.h"
 #include "vm.h"
 
-bool astClosure(Value* enclosing, ObjClosure* closure);
+bool astClosure(Value* enclosing, ObjClosure* closure, ObjClass* closureClass);
 bool astLocal(uint8_t slot, ObjFunction* function);
 bool astGlobal(ObjString* name);
 bool astOverload(ObjOverload* overload);
@@ -118,14 +118,14 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       FAIL_UNLESS(astBlock(&root));
 
       Value branch = vmPeek(0);
-      // the true branch expects the condition on the stack.
+      // the consequent branch expects the condition on the stack.
       vmPush(condition);
 
       FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
       FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
       vmPop();  // nil.
 
-      // now resume the negative branch on the root.
+      // now resume the alternative branch on the root.
       frame->ip = ip + offset;
 
       return AST_INSTRUCTION_OK;
@@ -144,7 +144,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       // body; translate up to OP_LOOP.
       FAIL_UNLESS(astBlock(&root));
       Value branch = vmPeek(0);
-      FAIL_UNLESS(astChunk(frame, ip + offset - 4, branch));
+      FAIL_UNLESS(astChunk(frame, ip + offset, branch));
 
       FAIL_UNLESS(vmExecuteMethod("opIter", 3));
       vmPop();  // nil.
@@ -297,7 +297,10 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     }
     case OP_CLOSURE:
       vmClosure(frame);
-      OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0))));
+      OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0)), vm.core.astClosure));
+    case OP_COMPREHENSION:
+      vmClosure(frame);
+      OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0)), vm.core.astComprehension));
     case OP_CALL: {
       int argCount = READ_BYTE();
       Value args[argCount];
@@ -436,7 +439,8 @@ bool astBlock(Value* enclosing) {
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
   while (frame->ip <= ipEnd) {
-    TRACE_EXECUTION("\n  (ast chunk)  ");
+    TRACE_EXECUTION("\n (ast chunk) ");
+
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
         break;
@@ -453,7 +457,7 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
 bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
   for (;;) {
-    TRACE_EXECUTION("\n  (ast frame)  ");
+    TRACE_EXECUTION("\n (ast frame) ");
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
@@ -505,12 +509,12 @@ bool astUpvalues(ObjClosure* closure, bool root) {
   return vmTuplify(closure->upvalueCount, true);
 }
 
-bool astClosure(Value* enclosing, ObjClosure* closure) {
+bool astClosure(Value* enclosing, ObjClosure* closure, ObjClass* closureClass) {
   vmInitFrame(closure, 0);
 
   // the root of the tree is an [ASTClosure] instance that
   // has three arguments.
-  vmPush(OBJ_VAL(vm.core.astClosure));
+  vmPush(OBJ_VAL(closureClass));
   // (0) the enclosing function.
   vmPush(enclosing == NULL ? NIL_VAL : *enclosing);
   // (1) the function itself.
@@ -518,7 +522,7 @@ bool astClosure(Value* enclosing, ObjClosure* closure) {
   // (2) the closure's upvalues.
   if (!astUpvalues(closure, enclosing == NULL)) return false;
 
-  if (!vmInitInstance(vm.core.astClosure, 3)) return false;
+  if (!vmInitInstance(closureClass, 3)) return false;
   Value astClosure = vmPeek(0);
 
   // the function's arguments are undefined values.
@@ -549,7 +553,7 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   vmPush(OBJ_VAL(obj));
   vmPush(obj->receiver);
   vmPush(OBJ_VAL(closure));
-  if (!astClosure(enclosing, closure)) return false;
+  if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
 
   return vmInitInstance(vm.core.astMethod, 4);
 }
@@ -574,20 +578,22 @@ bool ast(Value value) {
         case OBJ_BOUND_FUNCTION:
           return astBoundFunction(NULL, AS_BOUND_FUNCTION(value));
         case OBJ_CLOSURE:
-          return astClosure(NULL, AS_CLOSURE(value));
+          return astClosure(NULL, AS_CLOSURE(value), vm.core.astClosure);
         case OBJ_OVERLOAD: {
           ObjOverload* overload = AS_OVERLOAD(vmPeek(0));
 
           // wrap the cases in ast.
           for (int i = 0; i < overload->cases; i++) {
             vmPush(OBJ_VAL(overload->closures[i]));
-            if (!astClosure(NULL, overload->closures[i])) return false;
+            if (!astClosure(NULL, overload->closures[i], vm.core.astClosure))
+              return false;
           }
 
           return astOverload(AS_OVERLOAD(value));
         }
         case OBJ_MODULE:
-          return astClosure(NULL, AS_MODULE(value)->closure);
+          return astClosure(NULL, AS_MODULE(value)->closure,
+                            vm.core.astClosure);
         default:
           vmRuntimeError("Undestructurable object.");
           return false;

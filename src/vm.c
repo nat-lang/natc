@@ -97,6 +97,7 @@ void initCore(Core* core) {
   core->iterator = NULL;
 
   core->astClosure = NULL;
+  core->astComprehension = NULL;
   core->astMethod = NULL;
   core->astExternalUpvalue = NULL;
   core->astInternalUpvalue = NULL;
@@ -122,7 +123,6 @@ void initCore(Core* core) {
 
   core->unify = NULL;
   core->typeSystem = NULL;
-  core->grammar = NULL;
 }
 
 bool initVM() {
@@ -1120,7 +1120,8 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_COMPREHENSION: {
         vmClosure(frame);
-
+        if (!vmCallValue(vmPeek(0), 0)) return INTERPRET_RUNTIME_ERROR;
+        frame = &vm.frames[vm.frameCount - 1];
         break;
       }
       case OP_OVERLOAD: {

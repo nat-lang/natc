@@ -1,9 +1,12 @@
 
-let ASTClosureMock = (*children) => {
+let _ASTClosureMock = klass => (*children) => {
   let mock = ASTClosure(nil,nil,[]);
   mock.children = children;
   return mock;
 };
+
+let ASTClosureMock = _ASTClosureMock(ASTClosure);
+let ASTComprehensionMock = _ASTClosureMock(ASTComprehension);
 
 // constant function to literal.
 
@@ -370,7 +373,6 @@ let f <- () => {
   for (x in [1,2,3]) x;
 };
 
-print f[0][2].enclosing;
 assert(f == ASTClosureMock(
   ASTIterate(
     ASTLocal(1, "x"),
@@ -641,6 +643,72 @@ assert(f == ASTClosureMock(
     ASTLiteral(nil)
   )
 ));
+
+// comprehensions.
+
+let f <- () => ({ 1 | true });
+
+assert(f = ASTClosureMock(
+  ASTReturn(
+    ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal(Set),
+          ASTArgumentSequence
+        )
+      ),
+      ASTConditional(
+        ASTLiteral(true),
+        ASTBlock(
+          f[0][0],
+          ASTExprStatement(
+            ASTApp(
+              ASTPropertyAccess(
+                ASTLocal(1, "#comprehension-instance"),
+                ASTLiteral("add")
+              ),
+              ASTArgumentSequence(
+                ASTLiteral(1)
+              )
+            )
+          ),
+          ASTReturn(
+            ASTLocal(1, "#comprehension-instance")
+          ),
+          ASTImplicitReturn(
+            ASTLiteral(nil)
+          )
+        )
+      ),
+      ASTReturn(
+        ASTLocal(1, "#comprehension-instance")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- () => ({ 1 | x in [1,2] });
+
+let f <- () => ({ x | x in [1,2] });
+
+let f <- () => ({ x | true, x in [1,2] });
+
+let f <- () => ({ x | x in [1,2], true });
+
+let f <- () => ({x + 1 | true, x in [1,2,3], x == 1});
+
+// nested comprehensions.
+
+let f <- () => ({ x | x in { x | x in [1,2] } });
+
+f.pp();
 
 // property access.
 

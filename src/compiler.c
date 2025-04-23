@@ -1308,22 +1308,24 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
 
     Compiler cmp;
     initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS,
-                 syntheticToken("#comprehension"));
+                 syntheticToken("#comprehension-closure"));
     beginScope(&cmp);
 
-    // init the comprehension instance at local 0. we'll load
+    // init the local comprehension instance. we'll load
     // it when we hit the bottom of the condition clauses.
-    nativeCall(&cmp, klass);
-    int var = addLocal(&cmp, syntheticToken("#comprehension"));
+    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
     markInitialized(&cmp);
+    emitByte(&cmp, OP_UNDEFINED);
+    nativeCall(&cmp, klass);
+    setVariable(&cmp, var);
+    emitByte(&cmp, OP_POP);
 
     Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
 
-    // return the comprehension and call the closure immediately.
+    // return the comprehension instance.
+    emitConstInstr(&cmp, OP_GET_LOCAL, var);
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing, OP_CLOSURE);
-
-    emitBytes(enclosing, OP_CALL, 0);
+    closeFunction(&cmp, enclosing, OP_COMPREHENSION);
 
     // pick up at the end of the expression.
     gotoParser(checkpointB);
@@ -1690,7 +1692,7 @@ static void forConditionStatement(Compiler* cmp) {
 
   if (exitJump != -1) {
     patchJump(cmp, exitJump);
-    // Condition.
+    // condition.
     emitByte(cmp, OP_POP);
   }
 }

@@ -54,6 +54,26 @@ static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 3;
 }
 
+static int closureInstruction(const char* name, Chunk* chunk, int offset) {
+  uint16_t constant = readShort(chunk, offset);
+  offset += 3;
+
+  printf("%-16s %4d ", name, constant);
+  printValue(chunk->constants.values[constant]);
+  printf("\n");
+
+  ObjFunction* function = AS_FUNCTION(chunk->constants.values[constant]);
+
+  for (int j = 0; j < function->upvalueCount; j++) {
+    int isLocal = chunk->code[offset++];
+    int index = chunk->code[offset++];
+    printf("%04d      |                     %s %d\n", offset - 2,
+           isLocal ? "local" : "upvalue", index);
+  }
+
+  return offset;
+}
+
 int disassembleInstruction(Chunk* chunk, int offset) {
   printf("%04d ", offset);
 
@@ -133,25 +153,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       printf("\n");
       return offset;
     }
-    case OP_CLOSURE: {
-      uint16_t constant = readShort(chunk, offset);
-      offset += 3;
-
-      printf("%-16s %4d ", "OP_CLOSURE", constant);
-      printValue(chunk->constants.values[constant]);
-      printf("\n");
-
-      ObjFunction* function = AS_FUNCTION(chunk->constants.values[constant]);
-
-      for (int j = 0; j < function->upvalueCount; j++) {
-        int isLocal = chunk->code[offset++];
-        int index = chunk->code[offset++];
-        printf("%04d      |                     %s %d\n", offset - 2,
-               isLocal ? "local" : "upvalue", index);
-      }
-
-      return offset;
-    }
+    case OP_CLOSURE:
+      return closureInstruction("OP_CLOSURE", chunk, offset);
+    case OP_COMPREHENSION:
+      return closureInstruction("OP_COMPREHENSION", chunk, offset);
     case OP_VARIABLE:
       return constantInstruction("OP_VARIABLE", chunk, offset);
     case OP_CLOSE_UPVALUE:
@@ -181,7 +186,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_IMPORT", chunk, offset);
     case OP_IMPORT_AS: {
       uint16_t module = readShort(chunk, offset);
-      uint16_t alias = readShort(chunk, offset);
+      uint16_t alias = readShort(chunk, offset + 2);
 
       printf("OP_IMPORT_AS %d '", module);
       printValue(chunk->constants.values[module]);
