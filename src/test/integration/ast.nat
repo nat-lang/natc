@@ -370,7 +370,6 @@ let f <- () => {
   for (x in [1,2,3]) x;
 };
 
-print f[0][2].enclosing;
 assert(f == ASTClosureMock(
   ASTIterate(
     ASTLocal(1, "x"),

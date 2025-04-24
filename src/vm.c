@@ -993,6 +993,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_ITER: {
         uint16_t offset = READ_SHORT();
+        uint8_t* ip = frame->ip;
         uint16_t local = READ_SHORT();
         Value iterator = vmPeek(0);
 
@@ -1008,7 +1009,7 @@ InterpretResult vmExecute(int baseFrame) {
           if (!vmExecuteMethod("next", 0)) return INTERPRET_RUNTIME_ERROR;
           frame->slots[local] = vmPop();
         } else {
-          frame->ip += offset;
+          frame->ip = ip + offset;
         }
         break;
       }

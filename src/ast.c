@@ -132,8 +132,9 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     }
     case OP_ITER: {
       uint16_t offset = READ_SHORT();
-      uint16_t local = READ_SHORT();
       uint8_t* ip = frame->ip;
+      uint16_t local = READ_SHORT();
+
       Value iterator = vmPeek(0);
 
       vmPush(root);
@@ -144,7 +145,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       // body; translate up to OP_LOOP.
       FAIL_UNLESS(astBlock(&root));
       Value branch = vmPeek(0);
-      FAIL_UNLESS(astChunk(frame, ip + offset - 4, branch));
+      FAIL_UNLESS(astChunk(frame, ip + offset, branch));
 
       FAIL_UNLESS(vmExecuteMethod("opIter", 3));
       vmPop();  // nil.
