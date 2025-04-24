@@ -149,6 +149,21 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
+  //
+  opComprehensionPred(expr) => {
+    let node = ASTComprehensionPred(expr);
+    this.children.push(node);
+  }
+  opComprehensionIter() => {
+    let node = this.children.last();
+    this.children[len(this.children) - 1] = ASTComprehensionIter(
+      node
+    );
+  }
+  opComprehensionBody(expr) => {
+    let node = ASTComprehensionBody(expr);
+    this.children.push(node);
+  }
 }
 
 class ASTStatement extends ASTNode {}

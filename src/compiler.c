@@ -1245,6 +1245,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
   } else {
     // a predicate to test against.
     expression(cmp);
+    emitByte(cmp, OP_COMPREHENSION_PRED);
     predJump = emitJump(cmp, OP_JUMP_IF_FALSE);
     emitByte(cmp, OP_POP);
   }
@@ -1267,12 +1268,13 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     emitConstInstr(cmp, OP_GET_LOCAL, var);
     getProperty(cmp, S_ADD);
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
-    emitByte(cmp,
-             OP_EXPR_STATEMENT);  // nil, but the ast parser needs to track.
+    emitByte(cmp, OP_COMPREHENSION_BODY);
+    emitByte(cmp, OP_POP);
   }
 
   if (iterJump != -1) {
     iterationEnd(cmp, iter, iterJump);
+    emitByte(cmp, OP_COMPREHENSION_ITER);
     endScope(cmp);
   } else if (predJump != -1) {
     // we need to jump over this last condition.
@@ -1687,7 +1689,7 @@ static void forConditionStatement(Compiler* cmp) {
 
   if (exitJump != -1) {
     patchJump(cmp, exitJump);
-    // Condition.
+    // condition.
     emitByte(cmp, OP_POP);
   }
 }

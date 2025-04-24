@@ -302,10 +302,28 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     case OP_COMPREHENSION:
       vmClosure(frame);
       OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0)), vm.core.astComprehension));
-    case OP_COMPREHENSION_PRED:
-    case OP_COMPREHENSION_ITER:
-    case OP_COMPREHENSION_BODY:
+    case OP_COMPREHENSION_PRED: {
+      Value node = vmPeek(0);
+      vmPush(root);
+      vmPush(node);
+      FAIL_UNLESS(vmExecuteMethod("opComprehensionPred", 1));
+      vmPop();  // nil.
       return AST_INSTRUCTION_OK;
+    }
+    case OP_COMPREHENSION_ITER: {
+      vmPush(root);
+      FAIL_UNLESS(vmExecuteMethod("opComprehensionIter", 0));
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_COMPREHENSION_BODY: {
+      Value expr = vmPeek(0);
+      vmPush(root);
+      vmPush(expr);
+      FAIL_UNLESS(vmExecuteMethod("opComprehensionBody", 1));
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
     case OP_CALL: {
       int argCount = READ_BYTE();
       Value args[argCount];
