@@ -1180,8 +1180,8 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
 static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
   emitLoop(cmp, iter.loopStart);
   patchJump(cmp, exitJump);
-  // emitByte(cmp, OP_POP);  // the iterator.
-  // emitByte(cmp, OP_POP);  // the bound local.
+  emitByte(cmp, OP_POP);  // the iterator.
+  emitByte(cmp, OP_POP);  // the bound local.
 }
 
 static void forInStatement(Compiler* cmp) {
