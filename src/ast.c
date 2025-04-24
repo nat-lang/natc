@@ -132,8 +132,9 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     }
     case OP_ITER: {
       uint16_t offset = READ_SHORT();
-      uint16_t local = READ_SHORT();
       uint8_t* ip = frame->ip;
+      uint16_t local = READ_SHORT();
+
       Value iterator = vmPeek(0);
 
       vmPush(root);
@@ -301,6 +302,28 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     case OP_COMPREHENSION:
       vmClosure(frame);
       OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0)), vm.core.astComprehension));
+    case OP_COMPREHENSION_PRED: {
+      Value node = vmPeek(0);
+      vmPush(root);
+      vmPush(node);
+      FAIL_UNLESS(vmExecuteMethod("opComprehensionPred", 1));
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_COMPREHENSION_ITER: {
+      vmPush(root);
+      FAIL_UNLESS(vmExecuteMethod("opComprehensionIter", 0));
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
+    case OP_COMPREHENSION_BODY: {
+      Value expr = vmPeek(0);
+      vmPush(root);
+      vmPush(expr);
+      FAIL_UNLESS(vmExecuteMethod("opComprehensionBody", 1));
+      vmPop();  // nil.
+      return AST_INSTRUCTION_OK;
+    }
     case OP_CALL: {
       int argCount = READ_BYTE();
       Value args[argCount];
@@ -439,7 +462,14 @@ bool astBlock(Value* enclosing) {
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
   while (frame->ip <= ipEnd) {
-    TRACE_EXECUTION("\n (ast chunk) ");
+    printf("          ");
+    disassembleStack();
+    printf("\n chunk");
+    printf("\n");
+    printf("  ");
+    disassembleInstruction(
+        &frame->closure->function->chunk,
+        (int)(frame->ip - frame->closure->function->chunk.code));
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
@@ -457,7 +487,14 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
 bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
   for (;;) {
-    TRACE_EXECUTION("\n (ast frame) ");
+    printf("          ");
+    disassembleStack();
+    printf("\n frame");
+    printf("\n");
+    printf("  ");
+    disassembleInstruction(
+        &frame->closure->function->chunk,
+        (int)(frame->ip - frame->closure->function->chunk.code));
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:

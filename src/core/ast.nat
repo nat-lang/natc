@@ -148,6 +148,23 @@ class ASTNode extends Tree {
     let node = ASTImportAs(ASTImport(module), ASTLiteral(alias));
     this.children.push(node);
   }
+
+  //
+
+  opComprehensionPred(expr) => {
+    let node = ASTComprehensionPred(expr);
+    this.children.push(node);
+  }
+  opComprehensionIter() => {
+    let node = this.children.last();
+    this.children[len(this.children) - 1] = ASTComprehensionIter(
+      node
+    );
+  }
+  opComprehensionBody(expr) => {
+    let node = ASTComprehensionBody(expr);
+    this.children.push(node);
+  }
 }
 
 class ASTStatement extends ASTNode {}
@@ -350,8 +367,11 @@ class ASTClosure extends ASTExpr {
 
     if (enclosing == nil)
       this.upvalues = Map();
-    else
+    else {
+      print enclosing;
+      print enclosing.upvalues;
       this.upvalues = enclosing.upvalues.copy();
+    }
 
     for (val in upvalues) {
       if (!this.upvalues[val.id])
@@ -411,6 +431,10 @@ class ASTClosure extends ASTExpr {
 }
 
 class ASTComprehension extends ASTClosure {}
+class ASTComprehensionBody extends ASTExpr {}
+class ASTComprehensionCond extends ASTExpr {}
+class ASTComprehensionPred extends ASTComprehensionCond {}
+class ASTComprehensionIter extends ASTComprehensionCond {}
 
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {

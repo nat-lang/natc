@@ -24,7 +24,10 @@ class Set extends Object {
   __in__(key) => key in this.inner;
 
   // The compiler uses this method when building set comprehensions.
-  add(element) => this.__set__(element, true);
+  add(element) => {
+    // print element;
+    this.__set__(element, true);
+  }
 
   __len__() => len(this.elements());
 

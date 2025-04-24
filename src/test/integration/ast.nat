@@ -702,13 +702,28 @@ let f <- () => ({ x | true, x in [1,2] });
 
 let f <- () => ({ x | x in [1,2], true });
 
-let f <- () => ({x + 1 | true, x in [1,2,3], x == 1});
+let f <- () => ({ x + 1 | true, x in [1,2,3], x == 1 });
 
 // nested comprehensions.
 
 let f <- () => ({ x | x in { x | x in [1,2] } });
 
 f.pp();
+
+// iteration and jump in condition.
+
+let f <- () => ({ 1 | x in (() => {
+    let z = [];
+    for (x in [1,2])
+      if (x != 1) z.push(x);
+    return z;
+  })(),
+  true
+});
+
+// iteration and jump in body.
+
+
 
 // property access.
 

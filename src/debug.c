@@ -128,6 +128,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_JUMP_IF_FALSE:
       return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
     case OP_ITER: {
+      return jumpInstruction("OP_ITER", 1, chunk, offset) + 2;
       uint16_t jump = readShort(chunk, offset);
       uint16_t slot = readShort(chunk, offset + 2);
 
@@ -157,6 +158,12 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return closureInstruction("OP_CLOSURE", chunk, offset);
     case OP_COMPREHENSION:
       return closureInstruction("OP_COMPREHENSION", chunk, offset);
+    case OP_COMPREHENSION_PRED:
+      return simpleInstruction("OP_COMPREHENSION_COND", offset);
+    case OP_COMPREHENSION_ITER:
+      return simpleInstruction("OP_COMPREHENSION_ITER", offset);
+    case OP_COMPREHENSION_BODY:
+      return simpleInstruction("OP_COMPREHENSION_BODY", offset);
     case OP_VARIABLE:
       return constantInstruction("OP_VARIABLE", chunk, offset);
     case OP_CLOSE_UPVALUE:

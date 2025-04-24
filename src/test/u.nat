@@ -1,0 +1,5 @@
+let f = (node) => {
+    if (true)
+      let cond = ASTComprehensionIter(node);
+     
+  };

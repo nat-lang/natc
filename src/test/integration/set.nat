@@ -106,6 +106,15 @@ set = {[a | a in b] | b in [[1,2], [3,4]]};
 assert([3,4] in set);
 assert([1,2] in set);
 
+// closure, iteration, and jump in body.
+
+let set = {
+  (y => { for (x in [1,2])
+    if (y == x) return y; // semicolon
+  })(x) | x in [1,2,3],
+  true
+};
+
 // api.
 
 // powerset.
