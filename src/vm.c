@@ -97,6 +97,7 @@ void initCore(Core* core) {
   core->iterator = NULL;
 
   core->astClosure = NULL;
+  core->astComprehension = NULL;
   core->astMethod = NULL;
   core->astExternalUpvalue = NULL;
   core->astInternalUpvalue = NULL;
@@ -122,7 +123,6 @@ void initCore(Core* core) {
 
   core->unify = NULL;
   core->typeSystem = NULL;
-  core->grammar = NULL;
 }
 
 bool initVM() {
@@ -1030,13 +1030,7 @@ InterpretResult vmExecute(int baseFrame) {
           for (int i = argCount; i > 0; i--) args[i - 1] = vmPop();
           Value caller = vmPop();
 
-          Value typeSystem;
-          if (!mapGet(&vm.globals, INTERN(S_TYPE_SYSTEM), &typeSystem)) {
-            vmRuntimeError("Couldn't find %s.", S_TYPE_SYSTEM);
-            return false;
-          }
-
-          vmPush(typeSystem);
+          vmPush(OBJ_VAL(vm.core.typeSystem));
           vmPush(caller);
           for (int i = 0; i < argCount; i++) vmPush(args[i]);
           if (!vmExecuteMethod("instantiate", argCount + 1))
@@ -1125,6 +1119,16 @@ InterpretResult vmExecute(int baseFrame) {
         vmClosure(frame);
         break;
       }
+      case OP_COMPREHENSION: {
+        vmClosure(frame);
+        if (!vmCallValue(vmPeek(0), 0)) return INTERPRET_RUNTIME_ERROR;
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
+      case OP_COMPREHENSION_PRED:
+      case OP_COMPREHENSION_ITER:
+      case OP_COMPREHENSION_BODY:
+        break;
       case OP_OVERLOAD: {
         if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
         break;

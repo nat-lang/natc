@@ -64,6 +64,7 @@ typedef struct {
   ObjClass* iterator;
 
   ObjClass* astClosure;
+  ObjClass* astComprehension;
   ObjClass* astMethod;
   ObjClass* astExternalUpvalue;
   ObjClass* astInternalUpvalue;
@@ -91,7 +92,6 @@ typedef struct {
 
   ObjClosure* unify;
   ObjInstance* typeSystem;
-  ObjInstance* grammar;
 } Core;
 
 typedef struct {

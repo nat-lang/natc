@@ -1317,11 +1317,10 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
 
     Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
 
-    // return the comprehension and call the closure immediately.
+    // return the comprehension instance.
+    emitConstInstr(&cmp, OP_GET_LOCAL, var);
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing, OP_CLOSURE);
-
-    emitBytes(enclosing, OP_CALL, 0);
+    closeFunction(&cmp, enclosing, OP_COMPREHENSION);
 
     // pick up at the end of the expression.
     gotoParser(checkpointB);

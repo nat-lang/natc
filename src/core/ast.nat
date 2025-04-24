@@ -148,6 +148,7 @@ class ASTNode extends Tree {
     let node = ASTImportAs(ASTImport(module), ASTLiteral(alias));
     this.children.push(node);
   }
+
 }
 
 class ASTStatement extends ASTNode {}
@@ -408,6 +409,12 @@ class ASTClosure extends ASTExpr {
     return this._signature;
   }
 }
+
+class ASTComprehension extends ASTClosure {}
+class ASTComprehensionBody extends ASTExpr {}
+class ASTComprehensionCond extends ASTExpr {}
+class ASTComprehensionPred extends ASTComprehensionCond {}
+class ASTComprehensionIter extends ASTComprehensionCond {}
 
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {

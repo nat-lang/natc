@@ -9,7 +9,7 @@
 #include "value.h"
 #include "vm.h"
 
-bool astClosure(Value* enclosing, ObjClosure* closure);
+bool astClosure(Value* enclosing, ObjClosure* closure, ObjClass* closureClass);
 bool astLocal(uint8_t slot, ObjFunction* function);
 bool astGlobal(ObjString* name);
 bool astOverload(ObjOverload* overload);
@@ -298,7 +298,14 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     }
     case OP_CLOSURE:
       vmClosure(frame);
-      OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0))));
+      OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0)), vm.core.astClosure));
+    case OP_COMPREHENSION:
+      vmClosure(frame);
+      OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0)), vm.core.astComprehension));
+    case OP_COMPREHENSION_PRED:
+    case OP_COMPREHENSION_ITER:
+    case OP_COMPREHENSION_BODY:
+      return AST_INSTRUCTION_OK;
     case OP_CALL: {
       int argCount = READ_BYTE();
       Value args[argCount];
@@ -505,13 +512,12 @@ bool astUpvalues(ObjClosure* closure, bool root) {
   }
   return vmTuplify(closure->upvalueCount, true);
 }
-
-bool astClosure(Value* enclosing, ObjClosure* closure) {
+bool astClosure(Value* enclosing, ObjClosure* closure, ObjClass* closureClass) {
   vmInitFrame(closure, 0);
 
   // the root of the tree is an [ASTClosure] instance that
   // has three arguments.
-  vmPush(OBJ_VAL(vm.core.astClosure));
+  vmPush(OBJ_VAL(closureClass));
   // (0) the enclosing function.
   vmPush(enclosing == NULL ? NIL_VAL : *enclosing);
   // (1) the function itself.
@@ -519,7 +525,7 @@ bool astClosure(Value* enclosing, ObjClosure* closure) {
   // (2) the closure's upvalues.
   if (!astUpvalues(closure, enclosing == NULL)) return false;
 
-  if (!vmInitInstance(vm.core.astClosure, 3)) return false;
+  if (!vmInitInstance(closureClass, 3)) return false;
   Value astClosure = vmPeek(0);
 
   // the function's arguments are undefined values.
@@ -550,7 +556,7 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
   vmPush(OBJ_VAL(obj));
   vmPush(obj->receiver);
   vmPush(OBJ_VAL(closure));
-  if (!astClosure(enclosing, closure)) return false;
+  if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
 
   return vmInitInstance(vm.core.astMethod, 4);
 }
@@ -575,20 +581,22 @@ bool ast(Value value) {
         case OBJ_BOUND_FUNCTION:
           return astBoundFunction(NULL, AS_BOUND_FUNCTION(value));
         case OBJ_CLOSURE:
-          return astClosure(NULL, AS_CLOSURE(value));
+          return astClosure(NULL, AS_CLOSURE(value), vm.core.astClosure);
         case OBJ_OVERLOAD: {
           ObjOverload* overload = AS_OVERLOAD(vmPeek(0));
 
           // wrap the cases in ast.
           for (int i = 0; i < overload->cases; i++) {
             vmPush(OBJ_VAL(overload->closures[i]));
-            if (!astClosure(NULL, overload->closures[i])) return false;
+            if (!astClosure(NULL, overload->closures[i], vm.core.astClosure))
+              return false;
           }
 
           return astOverload(AS_OVERLOAD(value));
         }
         case OBJ_MODULE:
-          return astClosure(NULL, AS_MODULE(value)->closure);
+          return astClosure(NULL, AS_MODULE(value)->closure,
+                            vm.core.astClosure);
         default:
           vmRuntimeError("Undestructurable object.");
           return false;
