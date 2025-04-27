@@ -128,6 +128,8 @@ typedef enum {
   TOKEN_IMPORT,
   TOKEN_ERROR,
   TOKEN_EOF,
+  TOKEN_USER_PREFIX,
+  TOKEN_USER_INFIX,
 } TokenType;
 
 typedef struct {

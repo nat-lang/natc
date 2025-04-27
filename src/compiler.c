@@ -385,7 +385,7 @@ static void statement(Compiler* cmp);
 static void declaration(Compiler* cmp);
 static void declarations(Compiler* cmp);
 static void classDeclaration(Compiler* cmp);
-static ParseRule* getRule(Token token);
+static ParseRule* getPrefixRule(Compiler* cmp, Token token);
 static ParseRule* getInfixRule(Compiler* cmp, Token token);
 static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
                                      DelimitFn fn);
@@ -761,6 +761,12 @@ static void infix(Compiler* cmp, bool canAssign) {
   }
 }
 
+static void prefix(Compiler* cmp, bool canAssign) {
+  variable(cmp, canAssign);
+  parsePrecedence(cmp, PREC_UNARY);
+  emitBytes(cmp, OP_CALL, 1);
+}
+
 static void super_(Compiler* cmp, bool canAssign) {
   if (currentClass == NULL) {
     error(cmp, "Can't use 'super' outside of a class.");
@@ -788,10 +794,10 @@ static void this_(Compiler* cmp, bool canAssign) {
 static void unary(Compiler* cmp, bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
-  // Compile the operand.
+  // compile the operand.
   parsePrecedence(cmp, PREC_UNARY);
 
-  // Emit the operator instruction.
+  // emit the operator instruction.
   switch (operatorType) {
     case TOKEN_BANG:
       emitByte(cmp, OP_NOT);
@@ -966,6 +972,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
   Parser checkpoint = saveParser();
 
   Compiler cmp;
+
   initCompiler(&cmp, enclosing, NULL, TYPE_IMPLICIT,
                syntheticToken("implicit"));
   beginScope(&cmp);
@@ -1525,6 +1532,11 @@ static void classDeclaration(Compiler* cmp) {
   currentClass = currentClass->enclosing;
 }
 
+static bool checkInfix() {
+  return check(TOKEN_INFIX) || check(TOKEN_INFIX_LEFT) ||
+         check(TOKEN_INFIX_RIGHT);
+}
+
 static int infixPrecedence(Compiler* cmp) {
   int prec = 0;
   int sign;
@@ -1557,7 +1569,12 @@ static int infixPrecedence(Compiler* cmp) {
 }
 
 static void letDeclaration(Compiler* cmp) {
-  int infixPrec = infixPrecedence(cmp);
+  int infixPrec = 0, prefixPrec = 0;
+
+  if (match(cmp, TOKEN_PREFIX))
+    prefixPrec = 1;
+  else if (checkInfix())
+    infixPrec = infixPrecedence(cmp);
 
   uint16_t var = parseVariable(cmp, "Expect variable name.");
   Token name = parser.previous;
@@ -1589,10 +1606,12 @@ static void letDeclaration(Compiler* cmp) {
     emitByte(cmp, OP_POP);  // the type.
   }
 
-  if (infixPrec != 0) {
-    Value name = cmp->function->chunk.constants.values[var];
-    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrec));
-  }
+  if (prefixPrec == 1)
+    mapSet(&vm.prefixes, cmp->function->chunk.constants.values[var],
+           NUMBER_VAL(1));
+  else if (infixPrec != 0)
+    mapSet(&vm.infixes, cmp->function->chunk.constants.values[var],
+           NUMBER_VAL(infixPrec));
 }
 
 static void singleLetDeclaration(Compiler* cmp) {
@@ -1906,9 +1925,19 @@ ParseRule rules[] = {
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_USER_PREFIX] = {prefix, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_USER_INFIX] = {NULL, infix, PREC_NONE, PREC_NONE},
 };
 
-static ParseRule* getRule(Token token) { return &rules[token.type]; }
+static ParseRule* getPrefixRule(Compiler* cmp, Token token) {
+  if (token.type == TOKEN_IDENTIFIER) {
+    Value name = identifierToken(token);
+
+    if (mapHas(&vm.prefixes, name)) return &rules[TOKEN_USER_PREFIX];
+  }
+
+  return &rules[token.type];
+}
 
 int sign(int x) { return (x > 0) - (x < 0); }
 
@@ -1953,9 +1982,10 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
                                      DelimitFn delimit) {
   advance(cmp);
 
-  ParseFn prefixRule = getRule(parser.previous)->prefix;
+  ParseFn prefixRule = getPrefixRule(cmp, parser.previous)->prefix;
+
   if (prefixRule == NULL) {
-    error(cmp, "Expect expression.");
+    error(cmp, "Expect expression pre.");
     return;
   }
 
@@ -1970,7 +2000,7 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
     advance(cmp);
 
     if (infixRule->infix == NULL) {
-      error(cmp, "Expect expression.");
+      error(cmp, "Expect expression in.");
       return;
     }
 
