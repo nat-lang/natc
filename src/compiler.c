@@ -12,6 +12,8 @@
 #include "debug.h"
 #endif
 
+#define PREC_STEP 1
+
 typedef struct {
   Scanner scanner;
 
@@ -1882,8 +1884,6 @@ static void statement(Compiler* cmp) {
   }
 }
 
-#define PREC_STEP 1
-
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {parentheses, call, PREC_CALL, PREC_NONE},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE, PREC_NONE},
@@ -1967,11 +1967,8 @@ static ParseRule* getInfixRule(Compiler* cmp, Token token) {
 
     if (mapGet(&vm.infixes, name, &prec) ||
         mapGet(&vm.methodInfixes, name, &prec)) {
-      setPrecedence(cmp, &rules[TOKEN_IDENTIFIER], AS_NUMBER(prec));
-      rules[TOKEN_IDENTIFIER].infix = infix;
-    } else {
-      rules[TOKEN_IDENTIFIER].infix = NULL;
-      rules[TOKEN_IDENTIFIER].leftPrec = PREC_NONE;
+      setPrecedence(cmp, &rules[TOKEN_USER_INFIX], AS_NUMBER(prec));
+      return &rules[TOKEN_USER_INFIX];
     }
   }
 
