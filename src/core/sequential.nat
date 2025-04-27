@@ -63,6 +63,15 @@ class Sequential extends Object {
     }
   }
 
+  reverse() => {
+    let x = [];
+  
+    for (let i = len(this) - 1; i >= 0; i = i - 1)
+      x.push(this[i]);
+    
+    return x;
+  }
+
   find(predicate) => this.first(predicate);
 
   last() => this.values[len(this) - 1];

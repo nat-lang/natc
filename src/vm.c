@@ -285,10 +285,11 @@ bool vmInitInstance(ObjClass* klass, int argCount) {
   return true;
 }
 
-static bool checkArity(int paramCount, int argCount) {
-  if (argCount == paramCount) return true;
+static bool checkArity(ObjString* name, int arity, int argCount) {
+  if (argCount == arity) return true;
 
-  vmRuntimeError("Expected %d arguments but got %d.", paramCount, argCount);
+  vmRuntimeError("%s expected %d arguments but got %d.", name->chars, arity,
+                 argCount);
   return false;
 }
 
@@ -382,7 +383,8 @@ static bool callClosure(ObjClosure* closure, int argCount) {
   if (closure->function->variadic)
     if (!variadify(closure, &argCount)) return false;
 
-  if (!checkArity(closure->function->arity, argCount)) return false;
+  if (!checkArity(closure->function->name, closure->function->arity, argCount))
+    return false;
 
   if (vm.frameCount == FRAMES_MAX) {
     vmRuntimeError("Stack overflow.");
@@ -408,7 +410,8 @@ static bool callModule(ObjModule* module) {
 static bool callNative(ObjNative* native, int argCount) {
   if (!spread(&argCount)) return false;
 
-  if (!native->variadic && !checkArity(native->arity, argCount)) return false;
+  if (!native->variadic && !checkArity(native->name, native->arity, argCount))
+    return false;
 
   return (native->function)(argCount, vm.stackTop - argCount);
 }
@@ -986,12 +989,15 @@ InterpretResult vmExecute(int baseFrame) {
         frame->ip += offset;
         break;
       }
-      case OP_JUMP_IF_FALSE: {
+      case OP_JUMP_IF_FALSE:
+      case OP_COMPREHENSION_PRED: {
         uint16_t offset = READ_SHORT();
         if (isFalsey(vmPeek(0))) frame->ip += offset;
         break;
       }
-      case OP_ITER: {
+
+      case OP_ITER:
+      case OP_COMPREHENSION_ITER: {
         uint16_t offset = READ_SHORT();
         uint8_t* ip = frame->ip;
         uint16_t local = READ_SHORT();
@@ -1125,8 +1131,6 @@ InterpretResult vmExecute(int baseFrame) {
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
-      case OP_COMPREHENSION_PRED:
-      case OP_COMPREHENSION_ITER:
       case OP_COMPREHENSION_BODY:
         break;
       case OP_OVERLOAD: {

@@ -15,6 +15,8 @@ bool astGlobal(ObjString* name);
 bool astOverload(ObjOverload* overload);
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root);
 bool astBlock(Value* enclosing);
+bool astIter(CallFrame* frame, Value root, char* method);
+bool astConditional(CallFrame* frame, Value root, char* method);
 
 typedef enum {
   AST_INSTRUCTION_OK,
@@ -102,59 +104,12 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       Chunk chunk = frame->closure->function->chunk;
       // translate until the last two instructions: the implicit
       // return and its payload, which mark the end of the ast.
-      OK_IF(astChunk(frame, chunk.code + chunk.count, root));
+      OK_IF(astChunk(frame, chunk.code + chunk.count - 1, root));
     }
-    case OP_JUMP_IF_FALSE: {
-      uint16_t offset = READ_SHORT();
-      Value condition = vmPeek(0);
-      uint8_t* ip = frame->ip;
-
-      // we translate this instruction into an
-      // [ASTConditional] node with two children.
-      vmPush(root);
-      // 1) the condition itself.
-      vmPush(condition);
-      // 2) the branch if the condition is true.
-      FAIL_UNLESS(astBlock(&root));
-
-      Value branch = vmPeek(0);
-      // the true branch expects the condition on the stack.
-      vmPush(condition);
-
-      FAIL_UNLESS(astChunk(frame, frame->ip + offset, branch));
-      FAIL_UNLESS(vmExecuteMethod("opConditional", 2));
-      vmPop();  // nil.
-
-      // now resume the negative branch on the root.
-      frame->ip = ip + offset;
-
-      return AST_INSTRUCTION_OK;
-    }
-    case OP_ITER: {
-      uint16_t offset = READ_SHORT();
-      uint8_t* ip = frame->ip;
-      uint16_t local = READ_SHORT();
-
-      Value iterator = vmPeek(0);
-
-      vmPush(root);
-      // local slot.
-      FAIL_UNLESS(astLocal(local, frame->closure->function));
-      // iterator.
-      vmPush(iterator);
-      // body; translate up to OP_LOOP.
-      FAIL_UNLESS(astBlock(&root));
-      Value branch = vmPeek(0);
-      FAIL_UNLESS(astChunk(frame, ip + offset, branch));
-
-      FAIL_UNLESS(vmExecuteMethod("opIter", 3));
-      vmPop();  // nil.
-
-      // now resume the negative branch on the root.
-      frame->ip = ip + offset;
-
-      return AST_INSTRUCTION_OK;
-    }
+    case OP_JUMP_IF_FALSE:
+      OK_IF(astConditional(frame, root, "opConditional"));
+    case OP_ITER:
+      OK_IF(astIter(frame, root, "opIter"));
     case OP_LOOP: {
       READ_SHORT();
       // here OP_LOOP just concludes a scope.
@@ -245,6 +200,11 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmVariable(frame);
       OK_IF(vmExecuteMethod("opVariable", 1));
     }
+    case OP_CLOSE_UPVALUE: {
+      vmCloseUpvalues(vm.stackTop - 1);
+      vmPop();
+      return AST_INSTRUCTION_OK;
+    }
     case OP_SIGN: {
       vmClosure(frame);
       Value closure = vmPeek(1);
@@ -302,20 +262,10 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
     case OP_COMPREHENSION:
       vmClosure(frame);
       OK_IF(astClosure(&root, AS_CLOSURE(vmPeek(0)), vm.core.astComprehension));
-    case OP_COMPREHENSION_PRED: {
-      Value node = vmPeek(0);
-      vmPush(root);
-      vmPush(node);
-      FAIL_UNLESS(vmExecuteMethod("opComprehensionPred", 1));
-      vmPop();  // nil.
-      return AST_INSTRUCTION_OK;
-    }
-    case OP_COMPREHENSION_ITER: {
-      vmPush(root);
-      FAIL_UNLESS(vmExecuteMethod("opComprehensionIter", 0));
-      vmPop();  // nil.
-      return AST_INSTRUCTION_OK;
-    }
+    case OP_COMPREHENSION_PRED:
+      OK_IF(astConditional(frame, root, "opComprehensionPred"));
+    case OP_COMPREHENSION_ITER:
+      OK_IF(astIter(frame, root, "opComprehensionIter"));
     case OP_COMPREHENSION_BODY: {
       Value expr = vmPeek(0);
       vmPush(root);
@@ -452,6 +402,59 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
   return AST_INSTRUCTION_FAIL;
 }
 
+bool astIter(CallFrame* frame, Value root, char* method) {
+  uint16_t offset = READ_SHORT();
+  uint8_t* ip = frame->ip;
+  uint16_t local = READ_SHORT();
+
+  Value iterator = vmPeek(0);
+
+  vmPush(root);
+  // local slot.
+  if (!astLocal(local, frame->closure->function)) return false;
+  // iterator.
+  vmPush(iterator);
+  // body; translate up to OP_LOOP.
+  if (!astBlock(&root)) return false;
+  Value branch = vmPeek(0);
+  if (!astChunk(frame, ip + offset, branch)) return false;
+
+  if (!vmExecuteMethod(method, 3)) return false;
+  vmPop();  // nil.
+
+  // now resume the negative branch on the root.
+  frame->ip = ip + offset;
+
+  return true;
+}
+
+bool astConditional(CallFrame* frame, Value root, char* method) {
+  uint16_t offset = READ_SHORT();
+  uint8_t* ip = frame->ip;
+  Value condition = vmPeek(0);
+
+  // we translate this instruction into an
+  // [ASTConditional] node with two children.
+  vmPush(root);
+
+  // 1) the condition itself.
+  vmPush(condition);
+
+  // 2) the branch if the condition is true.
+  if (!astBlock(&root)) return false;
+  Value branch = vmPeek(0);
+  // the true branch expects the condition on the stack.
+  vmPush(condition);
+  if (!astChunk(frame, ip + offset, branch)) return false;
+  if (!vmExecuteMethod(method, 2)) return false;
+  vmPop();  // nil.
+
+  // now resume the negative branch on the root.
+  frame->ip = ip + offset;
+
+  return true;
+}
+
 bool astBlock(Value* enclosing) {
   vmPush(OBJ_VAL(vm.core.astBlock));
   vmPush(enclosing == NULL ? NIL_VAL : *enclosing);
@@ -462,7 +465,7 @@ bool astBlock(Value* enclosing) {
 // delimited by [ipEnd] to [root].
 bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
   while (frame->ip <= ipEnd) {
-    TRACE_EXECUTION("\n  (ast chunk)  ");
+    TRACE_EXECUTION("\n (ast chunk) ");
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
         break;
@@ -479,7 +482,7 @@ bool astChunk(CallFrame* frame, uint8_t* ipEnd, Value root) {
 bool astFrame(Value root) {
   CallFrame* frame = &vm.frames[vm.frameCount - 1];
   for (;;) {
-    TRACE_EXECUTION("\n  (ast frame)  ");
+    TRACE_EXECUTION("\n (ast frame) ");
 
     switch (astInstruction(frame, root)) {
       case AST_INSTRUCTION_OK:
@@ -530,6 +533,7 @@ bool astUpvalues(ObjClosure* closure, bool root) {
   }
   return vmTuplify(closure->upvalueCount, true);
 }
+
 bool astClosure(Value* enclosing, ObjClosure* closure, ObjClass* closureClass) {
   vmInitFrame(closure, 0);
 

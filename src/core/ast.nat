@@ -149,17 +149,16 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
-  //
-  opComprehensionPred(expr) => {
-    let node = ASTComprehensionPred(expr);
+  opComprehensionPred(condition, consequence) => {
+    let node = ASTComprehensionPred(condition, consequence);
     this.children.push(node);
   }
-  opComprehensionIter() => {
-    let node = this.children.last();
-    this.children[len(this.children) - 1] = ASTComprehensionIter(
-      node
-    );
+
+  opComprehensionIter(local, iterator, body) => {
+    let node = ASTComprehensionIter(local, iterator, body);
+    this.children.push(node);
   }
+
   opComprehensionBody(expr) => {
     let node = ASTComprehensionBody(expr);
     this.children.push(node);
@@ -189,8 +188,15 @@ class ASTBlock extends ASTNode {
   init(enclosing: ASTClosure, *children) => {
     this.enclosing = enclosing;
     this.children = children;
+
+    if (this.enclosing == nil)
+      this.upvalues = Map();
+    else
+      this.upvalues = enclosing.upvalues.copy();
   }
+
   opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
+  str() => "ASTBlock(#{this.enclosing})";
   tex() => join(this.children.map(x => x.tex()), "");
 }
 
@@ -260,7 +266,7 @@ class ASTLocal extends ASTVariable {
     this.name = name;
     super.init(id);
   }
-  str() => "ASTLocal(#{str(this.id)})";
+  str() => "ASTLocal(#{str(this.id)}, '#{this.name}')";
   tex() => this.name;
   __eq__(that) => this.name == that.name && super.__eq__(that);
 }
@@ -295,6 +301,7 @@ class ASTExternalUpvalue extends ASTUpvalue {
 class ASTInternalUpvalue extends ASTUpvalue {
   resolve() => { throw Error("Not resolvable."); }
   tex() => this.name;
+  str() => "ASTInternalUpvalue(#{this.id}, #{this.localId}, '#{this.name}')";
 }
 
 class ASTParameter extends ASTVariable {
@@ -365,8 +372,9 @@ class ASTClosure extends ASTExpr {
 
     if (enclosing == nil)
       this.upvalues = Map();
-    else
+    else {
       this.upvalues = enclosing.upvalues.copy();
+    }
 
     for (val in upvalues) {
       if (!this.upvalues[val.id])
@@ -427,9 +435,8 @@ class ASTClosure extends ASTExpr {
 
 class ASTComprehension extends ASTClosure {}
 class ASTComprehensionBody extends ASTExpr {}
-class ASTComprehensionCond extends ASTExpr {}
-class ASTComprehensionPred extends ASTComprehensionCond {}
-class ASTComprehensionIter extends ASTComprehensionCond {}
+class ASTComprehensionPred extends ASTConditional {}
+class ASTComprehensionIter extends ASTIterate {}
 
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {

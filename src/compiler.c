@@ -1241,12 +1241,12 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // bound variable and iterable to draw from.
     beginScope(cmp);
     iter = iterator(cmp);
-    iterJump = iterationNext(cmp, iter);
+    iterJump = emitJump(cmp, OP_COMPREHENSION_ITER);
+    emitConstant(cmp, iter.var);
   } else {
     // a predicate to test against.
     expression(cmp);
-    emitByte(cmp, OP_COMPREHENSION_PRED);
-    predJump = emitJump(cmp, OP_JUMP_IF_FALSE);
+    predJump = emitJump(cmp, OP_COMPREHENSION_PRED);
     emitByte(cmp, OP_POP);
   }
 
@@ -1274,7 +1274,6 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
 
   if (iterJump != -1) {
     iterationEnd(cmp, iter, iterJump);
-    emitByte(cmp, OP_COMPREHENSION_ITER);
     endScope(cmp);
   } else if (predJump != -1) {
     // we need to jump over this last condition.
@@ -1314,7 +1313,7 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
     // init the comprehension instance at local 0. we'll load
     // it when we hit the bottom of the condition clauses.
     nativeCall(&cmp, klass);
-    int var = addLocal(&cmp, syntheticToken("#comprehension"));
+    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
     markInitialized(&cmp);
 
     Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);

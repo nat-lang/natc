@@ -24,7 +24,7 @@ let iter = object => {
 
 
   if (vType(object) != OInstance)
-    throw IterationProtocolError("Only objects can be iterated over.");
+    throw IterationProtocolError("can't iterate over #{object}.");
 
   if ("__iter__" in object) return object.__iter__();
 
