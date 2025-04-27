@@ -45,6 +45,16 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk,
   return offset + 3;
 }
 
+static int iterInstruction(const char* name, Chunk* chunk, int offset) {
+  uint16_t jump = readShort(chunk, offset);
+  uint16_t slot = readShort(chunk, offset + 2);
+
+  printf("%-16s %4d -> %d (slot %d)\n", name, offset, offset + 3 + 1 * jump,
+         slot);
+
+  return offset + 3 + 2;
+}
+
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t constant = readShort(chunk, offset);
 
@@ -52,6 +62,26 @@ static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   printValue(chunk->constants.values[constant]);
   printf("'\n");
   return offset + 3;
+}
+
+static int closureInstruction(const char* name, Chunk* chunk, int offset) {
+  uint16_t constant = readShort(chunk, offset);
+  offset += 3;
+
+  printf("%-16s %4d ", name, constant);
+  printValue(chunk->constants.values[constant]);
+  printf("\n");
+
+  ObjFunction* function = AS_FUNCTION(chunk->constants.values[constant]);
+
+  for (int j = 0; j < function->upvalueCount; j++) {
+    int isLocal = chunk->code[offset++];
+    int index = chunk->code[offset++];
+    printf("%04d      |                     %s %d\n", offset - 2,
+           isLocal ? "local" : "upvalue", index);
+  }
+
+  return offset;
 }
 
 int disassembleInstruction(Chunk* chunk, int offset) {
@@ -107,15 +137,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return jumpInstruction("OP_JUMP", 1, chunk, offset);
     case OP_JUMP_IF_FALSE:
       return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
-    case OP_ITER: {
-      uint16_t jump = readShort(chunk, offset);
-      uint16_t slot = readShort(chunk, offset + 2);
-
-      printf("%-16s %4d -> %d (slot %d)\n", "OP_ITER", offset,
-             offset + 3 + 1 * jump, slot);
-
-      return offset + 3 + 2;
-    }
+    case OP_ITER:
+      return iterInstruction("OP_ITER", chunk, offset);
     case OP_LOOP:
       return jumpInstruction("OP_LOOP", -1, chunk, offset);
     case OP_CALL:
@@ -133,25 +156,16 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       printf("\n");
       return offset;
     }
-    case OP_CLOSURE: {
-      uint16_t constant = readShort(chunk, offset);
-      offset += 3;
-
-      printf("%-16s %4d ", "OP_CLOSURE", constant);
-      printValue(chunk->constants.values[constant]);
-      printf("\n");
-
-      ObjFunction* function = AS_FUNCTION(chunk->constants.values[constant]);
-
-      for (int j = 0; j < function->upvalueCount; j++) {
-        int isLocal = chunk->code[offset++];
-        int index = chunk->code[offset++];
-        printf("%04d      |                     %s %d\n", offset - 2,
-               isLocal ? "local" : "upvalue", index);
-      }
-
-      return offset;
-    }
+    case OP_CLOSURE:
+      return closureInstruction("OP_CLOSURE", chunk, offset);
+    case OP_COMPREHENSION:
+      return closureInstruction("OP_COMPREHENSION", chunk, offset);
+    case OP_COMPREHENSION_PRED:
+      return jumpInstruction("OP_COMPREHENSION_PRED", 1, chunk, offset);
+    case OP_COMPREHENSION_ITER:
+      return iterInstruction("OP_COMPREHENSION_ITER", chunk, offset);
+    case OP_COMPREHENSION_BODY:
+      return simpleInstruction("OP_COMPREHENSION_BODY", offset);
     case OP_VARIABLE:
       return constantInstruction("OP_VARIABLE", chunk, offset);
     case OP_CLOSE_UPVALUE:

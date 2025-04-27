@@ -1180,8 +1180,6 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
 static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
   emitLoop(cmp, iter.loopStart);
   patchJump(cmp, exitJump);
-  emitByte(cmp, OP_POP);  // the iterator.
-  emitByte(cmp, OP_POP);  // the bound local.
 }
 
 static void forInStatement(Compiler* cmp) {
@@ -1243,11 +1241,12 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // bound variable and iterable to draw from.
     beginScope(cmp);
     iter = iterator(cmp);
-    iterJump = iterationNext(cmp, iter);
+    iterJump = emitJump(cmp, OP_COMPREHENSION_ITER);
+    emitConstant(cmp, iter.var);
   } else {
     // a predicate to test against.
     expression(cmp);
-    predJump = emitJump(cmp, OP_JUMP_IF_FALSE);
+    predJump = emitJump(cmp, OP_COMPREHENSION_PRED);
     emitByte(cmp, OP_POP);
   }
 
@@ -1269,8 +1268,8 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     emitConstInstr(cmp, OP_GET_LOCAL, var);
     getProperty(cmp, S_ADD);
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
-    emitByte(cmp,
-             OP_EXPR_STATEMENT);  // nil, but the ast parser needs to track.
+    emitByte(cmp, OP_COMPREHENSION_BODY);
+    emitByte(cmp, OP_POP);
   }
 
   if (iterJump != -1) {
@@ -1314,16 +1313,15 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
     // init the comprehension instance at local 0. we'll load
     // it when we hit the bottom of the condition clauses.
     nativeCall(&cmp, klass);
-    int var = addLocal(&cmp, syntheticToken("#comprehension"));
+    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
     markInitialized(&cmp);
 
     Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
 
-    // return the comprehension and call the closure immediately.
+    // return the comprehension instance.
+    emitConstInstr(&cmp, OP_GET_LOCAL, var);
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing, OP_CLOSURE);
-
-    emitBytes(enclosing, OP_CALL, 0);
+    closeFunction(&cmp, enclosing, OP_COMPREHENSION);
 
     // pick up at the end of the expression.
     gotoParser(checkpointB);
@@ -1690,7 +1688,7 @@ static void forConditionStatement(Compiler* cmp) {
 
   if (exitJump != -1) {
     patchJump(cmp, exitJump);
-    // Condition.
+    // condition.
     emitByte(cmp, OP_POP);
   }
 }
