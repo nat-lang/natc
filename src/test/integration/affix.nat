@@ -53,19 +53,19 @@ assert(A().f() @ A().f() == 1);
 // associativity.
 
 let infixl left = (x,y) => [x y];
-let infixr right = (x, y) => [x y];
+let infixr right = (x,y) => [x y];
 
 let tree = 1 left 0 left 1;
-assert(tree = [[1 0] 1]);
+assert(tree == [[1 0] 1]);
 
 let tree = 1 right 0 right 1;
-assert(tree = [1 [0 1]]);
+assert(tree == [1 [0 1]]);
 
 let tree = 1 left 0 right 1;
-assert(tree = [[1 0] 1]);
+assert(tree == [[1 0] 1]);
 
 let tree = 1 right 0 left 1;
-assert(tree = [1 [0 1]]);
+assert(tree == [1 [0 1]]);
 
 // methods.
 
