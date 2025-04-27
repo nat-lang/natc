@@ -1570,10 +1570,17 @@ static int infixPrecedence(Compiler* cmp) {
   return prec * sign;
 }
 
+static bool checkPrefix(Compiler* cmp) {
+  if (match(cmp, TOKEN_PREFIX)) return true;
+
+  mapDelete(&vm.prefixes, identifierToken(parser.current));
+  return false;
+}
+
 static void letDeclaration(Compiler* cmp) {
   int infixPrec = 0, prefixPrec = 0;
 
-  if (match(cmp, TOKEN_PREFIX))
+  if (checkPrefix(cmp))
     prefixPrec = 1;
   else if (checkInfix())
     infixPrec = infixPrecedence(cmp);
