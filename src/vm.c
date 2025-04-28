@@ -1616,3 +1616,14 @@ InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]) {
   freeVM();
   return status;
 }
+
+char* vmExec_wasm(char* path, int argc, char* argv[]) {
+  if (!initVM()) exit(2);
+
+  InterpretResult status = vmInterpretModule(path);
+
+  if (status != INTERPRET_OK) exit(2);
+
+  freeVM();
+  return "";
+}

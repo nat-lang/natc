@@ -4,7 +4,6 @@
 // executed after the rest of the core modules.
 
 import core/type/system
-import core/unification
 import core/composition
 
 // We keep the quantifiers in their own namespace

@@ -1,4 +1,3 @@
-class Document {}
 
 let newline = "
 ";

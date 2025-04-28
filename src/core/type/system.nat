@@ -3,12 +3,55 @@ let TypeSystem = DenotationalTypeSystem();
 let TypeState = () => DenotationalTypeState(TypeSystem, false);
 
 let type = x => TypeSystem.type(x);
-let typecheck = x => assert(TypeSystem.typecheck(x).success());
-let typefail = x => assert(TypeSystem.typecheck(x).failure());
-
 let typify = TypeSystem.typify;
-let unify = (x, y) => TypeSystem.newState().unify(
-  typify(x) ~ typify(y)
-);
 
-let infix unifies = unify;
+// The vm uses this function to match overload cases with arguments.
+let unify = (function, arguments) => {
+  let signature;
+
+  // if the function's type is abstract then instantiate it.
+  if (function.signature.arity == 0)
+    signature = function.signature();
+  else
+    signature = function.signature(
+      ..[typeVar() | _ in range(0, function.signature.arity)]
+    );
+
+  if (len(signature.domain) != len(arguments))
+    return false;
+
+  let state = TypeSystem.TypeStateClass(TypeSystem, false);
+  let paramTypes = [];
+
+  for (let i = 0; i < len(arguments); i = i + 1) {
+    let param = signature.domain[i];
+
+    // if the parameter's type is undefined then it's either
+    // an unannotated variable or a literal value. if it's a
+    // variable then it unifies unconditionally. if it's a literal
+    // then it unifies by equality. we fail here just in case it's
+    // a literal and it fails to unify.
+    if (param.type == undefined) {
+      if (isVar(param.value) or param.value == arguments[i])
+        paramTypes.push(typeVar());
+      else
+        return false;
+    } else {
+      // otherwise register a type constraint.
+      paramTypes.push(
+        TypeSystem.typify(param.type)
+      );
+    }
+  }
+
+  let argTypes = arguments.map(state.type);
+
+  state.constraints.push(
+    TypeSystem.ConstraintClass(
+      TProduct(..argTypes),
+      TProduct(..paramTypes)
+    )
+  );
+
+  return state.solve();
+};
