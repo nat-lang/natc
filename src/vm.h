@@ -107,6 +107,7 @@ typedef struct {
   ObjMap strings;
   ObjMap globals;
   ObjMap typeEnv;
+  ObjMap prefixes;
   ObjMap infixes;
   ObjMap methodInfixes;
 

@@ -233,7 +233,22 @@ static TokenType identifierType() {
       }
       break;
     case 'p':
-      return checkpointKeyword(1, 4, "rint", TOKEN_PRINT);
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
+          case 'r': {
+            if (CURRENT - START > 2) {
+              switch (START[2]) {
+                case 'e':
+                  return checkpointKeyword(3, 3, "fix", TOKEN_PREFIX);
+                case 'i':
+                  return checkpointKeyword(3, 2, "nt", TOKEN_PRINT);
+              }
+            }
+            break;
+          }
+        }
+      }
+      break;
     case 'r':
       return checkpointKeyword(1, 5, "eturn", TOKEN_RETURN);
     case 's':
@@ -245,9 +260,9 @@ static TokenType identifierType() {
             if (CURRENT - START > 2) {
               switch (START[2]) {
                 case 'i':
-                  return checkpointKeyword(2, 2, "is", TOKEN_THIS);
+                  return checkpointKeyword(3, 1, "s", TOKEN_THIS);
                 case 'r':
-                  return checkpointKeyword(2, 3, "row", TOKEN_THROW);
+                  return checkpointKeyword(3, 2, "ow", TOKEN_THROW);
               }
             }
             break;

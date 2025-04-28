@@ -110,6 +110,7 @@ typedef enum {
   TOKEN_FOR,
   TOKEN_IF,
   TOKEN_IN,
+  TOKEN_PREFIX,
   TOKEN_INFIX,
   TOKEN_INFIX_LEFT,
   TOKEN_INFIX_RIGHT,
@@ -127,6 +128,8 @@ typedef enum {
   TOKEN_IMPORT,
   TOKEN_ERROR,
   TOKEN_EOF,
+  TOKEN_USER_PREFIX,
+  TOKEN_USER_INFIX,
 } TokenType;
 
 typedef struct {

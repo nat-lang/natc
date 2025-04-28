@@ -141,6 +141,7 @@ bool initVM() {
 
   initMap(&vm.globals);
   initMap(&vm.strings);
+  initMap(&vm.prefixes);
   initMap(&vm.infixes);
   initMap(&vm.methodInfixes);
 
