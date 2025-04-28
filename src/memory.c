@@ -269,6 +269,7 @@ static void markRoots() {
   }
 
   markMap(&vm.globals);
+  markMap(&vm.prefixes);
   markMap(&vm.infixes);
   markMap(&vm.methodInfixes);
 

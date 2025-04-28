@@ -134,6 +134,11 @@ class ASTNode extends Tree {
     this.children.push(node);
   }
 
+  opIter(local, iterator, body) => {
+    let node = ASTIterate(local, iterator, body);
+    this.children.push(node);
+  }
+
   opImport(module) => {
     let node = ASTImport(module);
     this.children.push(node);
@@ -141,6 +146,21 @@ class ASTNode extends Tree {
 
   opImportAs(module, alias) => {
     let node = ASTImportAs(ASTImport(module), ASTLiteral(alias));
+    this.children.push(node);
+  }
+
+  opComprehensionPred(condition, consequence) => {
+    let node = ASTComprehensionPred(condition, consequence);
+    this.children.push(node);
+  }
+
+  opComprehensionIter(local, iterator, body) => {
+    let node = ASTComprehensionIter(local, iterator, body);
+    this.children.push(node);
+  }
+
+  opComprehensionBody(expr) => {
+    let node = ASTComprehensionBody(expr);
     this.children.push(node);
   }
 }
@@ -168,8 +188,15 @@ class ASTBlock extends ASTNode {
   init(enclosing: ASTClosure, *children) => {
     this.enclosing = enclosing;
     this.children = children;
+
+    if (this.enclosing == nil)
+      this.upvalues = Map();
+    else
+      this.upvalues = enclosing.upvalues.copy();
   }
+
   opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
+  str() => "ASTBlock(#{this.enclosing})";
   tex() => join(this.children.map(x => x.tex()), "");
 }
 
@@ -178,6 +205,13 @@ class ASTConditional extends ASTStatement {
     this.children = [condition, consequence];
   }
   tex() => "if #{this[0].tex()} then #{this[1].tex()}";
+}
+
+class ASTIterate extends ASTStatement {
+  init(local, iterator, body) => {
+    this.children = [local, iterator, body];
+  }
+  tex() => "for (#{this[0].name} in #{this[1].tex()}) #{this[2].tex()}";
 }
 
 class ASTLiteral extends ASTExpr {
@@ -232,8 +266,9 @@ class ASTLocal extends ASTVariable {
     this.name = name;
     super.init(id);
   }
-  str() => "ASTLocal(#{str(this.id)})";
+  str() => "ASTLocal(#{str(this.id)}, '#{this.name}')";
   tex() => this.name;
+  __eq__(that) => this.name == that.name && super.__eq__(that);
 }
 
 class ASTGlobal extends ASTVariable {
@@ -266,6 +301,7 @@ class ASTExternalUpvalue extends ASTUpvalue {
 class ASTInternalUpvalue extends ASTUpvalue {
   resolve() => { throw Error("Not resolvable."); }
   tex() => this.name;
+  str() => "ASTInternalUpvalue(#{this.id}, #{this.localId}, '#{this.name}')";
 }
 
 class ASTParameter extends ASTVariable {
@@ -336,8 +372,9 @@ class ASTClosure extends ASTExpr {
 
     if (enclosing == nil)
       this.upvalues = Map();
-    else
+    else {
       this.upvalues = enclosing.upvalues.copy();
+    }
 
     for (val in upvalues) {
       if (!this.upvalues[val.id])
@@ -395,6 +432,11 @@ class ASTClosure extends ASTExpr {
     return this._signature;
   }
 }
+
+class ASTComprehension extends ASTClosure {}
+class ASTComprehensionBody extends ASTExpr {}
+class ASTComprehensionPred extends ASTConditional {}
+class ASTComprehensionIter extends ASTIterate {}
 
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {

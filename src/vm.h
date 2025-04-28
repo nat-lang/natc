@@ -16,6 +16,24 @@
   (frame->closure->function->chunk.constants.values[READ_SHORT()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
+#ifdef DEBUG_TRACE_EXECUTION
+#define TRACE_EXECUTION(tape)                                     \
+  do {                                                            \
+    printf("          ");                                         \
+    disassembleStack();                                           \
+    printf(tape);                                                 \
+    printf("\n");                                                 \
+    printf("  ");                                                 \
+    disassembleInstruction(                                       \
+        &frame->closure->function->chunk,                         \
+        (int)(frame->ip - frame->closure->function->chunk.code)); \
+  } while (0)
+#else
+#define TRACE_EXECUTION(tape) \
+  do {                        \
+  } while (0)
+#endif
+
 typedef struct {
   ObjClosure* closure;
   uint8_t* ip;
@@ -46,6 +64,7 @@ typedef struct {
   ObjClass* iterator;
 
   ObjClass* astClosure;
+  ObjClass* astComprehension;
   ObjClass* astMethod;
   ObjClass* astExternalUpvalue;
   ObjClass* astInternalUpvalue;
@@ -73,7 +92,6 @@ typedef struct {
 
   ObjClosure* unify;
   ObjInstance* typeSystem;
-  ObjInstance* grammar;
 } Core;
 
 typedef struct {
@@ -89,6 +107,7 @@ typedef struct {
   ObjMap strings;
   ObjMap globals;
   ObjMap typeEnv;
+  ObjMap prefixes;
   ObjMap infixes;
   ObjMap methodInfixes;
 

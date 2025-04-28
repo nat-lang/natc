@@ -12,6 +12,8 @@
 #include "debug.h"
 #endif
 
+#define PREC_STEP 1
+
 typedef struct {
   Scanner scanner;
 
@@ -385,7 +387,7 @@ static void statement(Compiler* cmp);
 static void declaration(Compiler* cmp);
 static void declarations(Compiler* cmp);
 static void classDeclaration(Compiler* cmp);
-static ParseRule* getRule(Token token);
+static ParseRule* getPrefixRule(Compiler* cmp, Token token);
 static ParseRule* getInfixRule(Compiler* cmp, Token token);
 static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
                                      DelimitFn fn);
@@ -761,6 +763,14 @@ static void infix(Compiler* cmp, bool canAssign) {
   }
 }
 
+static void prefix(Compiler* cmp, bool canAssign) {
+  variable(cmp, canAssign);
+  if (prevWhite()) {
+    parsePrecedence(cmp, PREC_UNARY);
+    emitBytes(cmp, OP_CALL, 1);
+  }
+}
+
 static void super_(Compiler* cmp, bool canAssign) {
   if (currentClass == NULL) {
     error(cmp, "Can't use 'super' outside of a class.");
@@ -788,10 +798,10 @@ static void this_(Compiler* cmp, bool canAssign) {
 static void unary(Compiler* cmp, bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
-  // Compile the operand.
+  // compile the operand.
   parsePrecedence(cmp, PREC_UNARY);
 
-  // Emit the operator instruction.
+  // emit the operator instruction.
   switch (operatorType) {
     case TOKEN_BANG:
       emitByte(cmp, OP_NOT);
@@ -966,6 +976,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
   Parser checkpoint = saveParser();
 
   Compiler cmp;
+
   initCompiler(&cmp, enclosing, NULL, TYPE_IMPLICIT,
                syntheticToken("implicit"));
   beginScope(&cmp);
@@ -1171,22 +1182,8 @@ static Iterator iterator(Compiler* cmp) {
 }
 
 static int iterationNext(Compiler* cmp, Iterator iter) {
-  // more().
-  emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  getProperty(cmp, "more");
-  emitBytes(cmp, OP_CALL, 0);
-
-  // jump out of the loop if more() false.
-  int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
-  // condition.
-  emitByte(cmp, OP_POP);
-
-  // next().
-  emitConstInstr(cmp, OP_GET_LOCAL, iter.iter);
-  getProperty(cmp, "next");
-  emitBytes(cmp, OP_CALL, 0);
-  emitConstInstr(cmp, OP_SET_LOCAL, iter.var);
-  emitByte(cmp, OP_POP);
+  int exitJump = emitJump(cmp, OP_ITER);
+  emitConstant(cmp, iter.var);
 
   return exitJump;
 }
@@ -1194,8 +1191,6 @@ static int iterationNext(Compiler* cmp, Iterator iter) {
 static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
   emitLoop(cmp, iter.loopStart);
   patchJump(cmp, exitJump);
-  // condition.
-  emitByte(cmp, OP_POP);
 }
 
 static void forInStatement(Compiler* cmp) {
@@ -1257,11 +1252,12 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // bound variable and iterable to draw from.
     beginScope(cmp);
     iter = iterator(cmp);
-    iterJump = iterationNext(cmp, iter);
+    iterJump = emitJump(cmp, OP_COMPREHENSION_ITER);
+    emitConstant(cmp, iter.var);
   } else {
     // a predicate to test against.
     expression(cmp);
-    predJump = emitJump(cmp, OP_JUMP_IF_FALSE);
+    predJump = emitJump(cmp, OP_COMPREHENSION_PRED);
     emitByte(cmp, OP_POP);
   }
 
@@ -1283,7 +1279,8 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     emitConstInstr(cmp, OP_GET_LOCAL, var);
     getProperty(cmp, S_ADD);
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
-    emitByte(cmp, OP_POP);  // comprehension instance.
+    emitByte(cmp, OP_COMPREHENSION_BODY);
+    emitByte(cmp, OP_POP);
   }
 
   if (iterJump != -1) {
@@ -1327,16 +1324,15 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
     // init the comprehension instance at local 0. we'll load
     // it when we hit the bottom of the condition clauses.
     nativeCall(&cmp, klass);
-    int var = addLocal(&cmp, syntheticToken("#comprehension"));
+    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
     markInitialized(&cmp);
 
     Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
 
-    // return the comprehension and call the closure immediately.
+    // return the comprehension instance.
+    emitConstInstr(&cmp, OP_GET_LOCAL, var);
     emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing, OP_CLOSURE);
-
-    emitBytes(enclosing, OP_CALL, 0);
+    closeFunction(&cmp, enclosing, OP_COMPREHENSION);
 
     // pick up at the end of the expression.
     gotoParser(checkpointB);
@@ -1540,6 +1536,11 @@ static void classDeclaration(Compiler* cmp) {
   currentClass = currentClass->enclosing;
 }
 
+static bool checkInfix() {
+  return check(TOKEN_INFIX) || check(TOKEN_INFIX_LEFT) ||
+         check(TOKEN_INFIX_RIGHT);
+}
+
 static int infixPrecedence(Compiler* cmp) {
   int prec = 0;
   int sign;
@@ -1571,8 +1572,20 @@ static int infixPrecedence(Compiler* cmp) {
   return prec * sign;
 }
 
+static bool checkPrefix(Compiler* cmp) {
+  if (match(cmp, TOKEN_PREFIX)) return true;
+
+  mapDelete(&vm.prefixes, identifierToken(parser.current));
+  return false;
+}
+
 static void letDeclaration(Compiler* cmp) {
-  int infixPrec = infixPrecedence(cmp);
+  int infixPrec = 0, prefixPrec = 0;
+
+  if (checkPrefix(cmp))
+    prefixPrec = 1;
+  else if (checkInfix())
+    infixPrec = infixPrecedence(cmp);
 
   uint16_t var = parseVariable(cmp, "Expect variable name.");
   Token name = parser.previous;
@@ -1604,10 +1617,12 @@ static void letDeclaration(Compiler* cmp) {
     emitByte(cmp, OP_POP);  // the type.
   }
 
-  if (infixPrec != 0) {
-    Value name = cmp->function->chunk.constants.values[var];
-    mapSet(&vm.infixes, name, NUMBER_VAL(infixPrec));
-  }
+  if (prefixPrec == 1)
+    mapSet(&vm.prefixes, cmp->function->chunk.constants.values[var],
+           NUMBER_VAL(1));
+  else if (infixPrec != 0)
+    mapSet(&vm.infixes, cmp->function->chunk.constants.values[var],
+           NUMBER_VAL(infixPrec));
 }
 
 static void singleLetDeclaration(Compiler* cmp) {
@@ -1703,7 +1718,7 @@ static void forConditionStatement(Compiler* cmp) {
 
   if (exitJump != -1) {
     patchJump(cmp, exitJump);
-    // Condition.
+    // condition.
     emitByte(cmp, OP_POP);
   }
 }
@@ -1878,8 +1893,6 @@ static void statement(Compiler* cmp) {
   }
 }
 
-#define PREC_STEP 1
-
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {parentheses, call, PREC_CALL, PREC_NONE},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE, PREC_NONE},
@@ -1921,9 +1934,19 @@ ParseRule rules[] = {
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_USER_PREFIX] = {prefix, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_USER_INFIX] = {NULL, infix, PREC_NONE, PREC_NONE},
 };
 
-static ParseRule* getRule(Token token) { return &rules[token.type]; }
+static ParseRule* getPrefixRule(Compiler* cmp, Token token) {
+  if (token.type == TOKEN_IDENTIFIER) {
+    Value name = identifierToken(token);
+
+    if (mapHas(&vm.prefixes, name)) return &rules[TOKEN_USER_PREFIX];
+  }
+
+  return &rules[token.type];
+}
 
 int sign(int x) { return (x > 0) - (x < 0); }
 
@@ -1953,11 +1976,8 @@ static ParseRule* getInfixRule(Compiler* cmp, Token token) {
 
     if (mapGet(&vm.infixes, name, &prec) ||
         mapGet(&vm.methodInfixes, name, &prec)) {
-      setPrecedence(cmp, &rules[TOKEN_IDENTIFIER], AS_NUMBER(prec));
-      rules[TOKEN_IDENTIFIER].infix = infix;
-    } else {
-      rules[TOKEN_IDENTIFIER].infix = NULL;
-      rules[TOKEN_IDENTIFIER].leftPrec = PREC_NONE;
+      setPrecedence(cmp, &rules[TOKEN_USER_INFIX], AS_NUMBER(prec));
+      return &rules[TOKEN_USER_INFIX];
     }
   }
 
@@ -1968,9 +1988,10 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
                                      DelimitFn delimit) {
   advance(cmp);
 
-  ParseFn prefixRule = getRule(parser.previous)->prefix;
+  ParseFn prefixRule = getPrefixRule(cmp, parser.previous)->prefix;
+
   if (prefixRule == NULL) {
-    error(cmp, "Expect expression.");
+    error(cmp, "Expect expression pre.");
     return;
   }
 
@@ -1985,7 +2006,7 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
     advance(cmp);
 
     if (infixRule->infix == NULL) {
-      error(cmp, "Expect expression.");
+      error(cmp, "Expect expression in.");
       return;
     }
 
