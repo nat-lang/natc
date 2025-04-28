@@ -765,8 +765,10 @@ static void infix(Compiler* cmp, bool canAssign) {
 
 static void prefix(Compiler* cmp, bool canAssign) {
   variable(cmp, canAssign);
-  parsePrecedence(cmp, PREC_UNARY);
-  emitBytes(cmp, OP_CALL, 1);
+  if (prevWhite()) {
+    parsePrecedence(cmp, PREC_UNARY);
+    emitBytes(cmp, OP_CALL, 1);
+  }
 }
 
 static void super_(Compiler* cmp, bool canAssign) {
