@@ -3,42 +3,25 @@ let newline = "
 ";
 
 class TexDocument {
-  init(documentClass, packages, blocks) => {
-    this.documentClass = documentClass;
-    this.packages = packages;
-    this.blocks = blocks;
+  init() => {
+    this.preamble = "";
+    this.blocks = [];
+    this.rendered = nil;
+  }
+
+  call() => {
+    this.rendered = this.render();
   }
 
   add(block) => this.blocks.push(block);
 
-  renderPreamble() => "\documentclass{#{this.documentClass}}
-\usepackage{#{join(this.packages, ",")}}
-  ";
-
   renderBlocks() => join([block.tex() | block in this.blocks], newline + newline);
 
-  renderBody() => "\begin{document}
+  render() => "#{this.preamble}
+\begin{document}
   #{this.renderBlocks()}
 \end{document}
   ";
-
-  render() => "#{this.renderPreamble()}
-#{this.renderBody()}
-  ";
 }
 
-class TreeDocument extends TexDocument {
-  init(blocks) => {
-    super.init("article", [], blocks);
-  }
-
-  renderPreamble() => "
-\documentclass{#{this.documentClass}}
-\usepackage{stmaryrd}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usepackage[linguistics]{forest}
-\usepackage{MnSymbol}
-\usepackage{gb4e}
-  ";
-}
+let document = TexDocument();

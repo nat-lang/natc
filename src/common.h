@@ -69,6 +69,8 @@
 #define S_GRAMMAR "Grammar"
 #define S_TYPE_SYSTEM "TypeSystem"
 #define S_UNIFY "unify"
+#define S_DOCUMENT "document"
+#define S_RENDERED "rendered"
 
 typedef enum {
   // Single-character tokens.

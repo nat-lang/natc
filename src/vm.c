@@ -123,6 +123,7 @@ void initCore(Core* core) {
 
   core->unify = NULL;
   core->typeSystem = NULL;
+  core->document = NULL;
 }
 
 bool initVM() {
@@ -1601,14 +1602,6 @@ InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]) {
 
 // wasm api.
 
-InterpretResult vmInterpretModule_wasm(char* path, int argc, char* argv[]) {
-  if (!initVM()) exit(2);
-
-  InterpretResult status = vmInterpretModule(path);
-  freeVM();
-  return status;
-}
-
 InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]) {
   if (!initVM()) exit(2);
 
@@ -1617,13 +1610,37 @@ InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]) {
   return status;
 }
 
-char* vmExec_wasm(char* path, int argc, char* argv[]) {
+InterpretResult vmInterpretModule_wasm(char* path) {
+  if (!initVM()) exit(2);
+
+  InterpretResult status = vmInterpretModule(path);
+  freeVM();
+  return status;
+}
+
+char* vmTypesetModule_wasm(char* path) {
   if (!initVM()) exit(2);
 
   InterpretResult status = vmInterpretModule(path);
 
   if (status != INTERPRET_OK) exit(2);
 
-  freeVM();
-  return "";
+  vmPush(OBJ_VAL(vm.core.document));
+
+  if (!vmCallValue(vmPeek(0), 0)) exit(2);
+  if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) exit(2);
+
+  Value rendered;
+  if (!mapGet(&vm.core.document->fields, INTERN(S_RENDERED), &rendered)) {
+    vmRuntimeError("failed to render.");
+    exit(2);
+  }
+  if (!IS_STRING(rendered)) {
+    vmRuntimeError("document.%s must be a string", S_RENDERED);
+    exit(2);
+  }
+
+  return AS_STRING(rendered)->chars;
 }
+
+void vmFree_wasm() { freeVM(); }
