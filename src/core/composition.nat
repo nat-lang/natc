@@ -6,11 +6,15 @@ class AnnotatedTree extends Tree {
     super.init(data, children);
     this.type = type;
   }
-  str() => this.type.str();
+  str() => {
+    if (this.type)
+      return this.type.str();
+    return "";
+  }
 
   texInterior() => {
     let datum = () => {
-      if (this.data == nil) return "[]";
+      if (this.data == nil) return "";
 
       let type = TypeSystem.type(this.data);
 
