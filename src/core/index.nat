@@ -18,5 +18,4 @@ import core/type/adhoc
 import core/type/poly
 import core/type/denotational
 import core/quantification
-import core/tex
 import core/json

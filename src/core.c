@@ -636,7 +636,8 @@ InterpretResult loadCore() {
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||
-      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL)
+      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL ||
+      (vm.core.document = getGlobalInstance(S_DOCUMENT)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   ObjInstance* strings = getGlobalInstance("Strings");

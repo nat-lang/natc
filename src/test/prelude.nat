@@ -1,0 +1,39 @@
+
+// Define the boolean domain.
+dom t = {true, false};
+
+// Let the compiler know that the native
+// boolean type [bool] now has an extension.
+bool = t;
+
+// Define the [grammar] object, which will keep
+// track of our composition rules and lexical entries.
+let grammar = CompositionSystem();
+
+// Define some basic composition rules.
+
+// The grammar will know to apply this rule to unary
+// children because it is a unary function.
+let NonBranchingNodes = x => x;
+
+// Similarly, the grammar will know to apply this rule
+// to binary branching children because it is a binary function.
+// The pipe syntax '|' is used to define type driven application.
+let FunctionApplication = (a: x -> y, b: x) => a(b) | (a: x, b: x -> y) => b(a);
+
+grammar.addRules(FunctionApplication, NonBranchingNodes);
+
+document.preamble = "
+\documentclass{article}
+\usepackage{stmaryrd}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usepackage[linguistics]{forest}
+\usepackage{MnSymbol}
+\usepackage{gb4e}
+";
+
+let prefix ex = tree => {
+  let typedTree = grammar.evaluate(tree);
+  document.add(typedTree);
+};

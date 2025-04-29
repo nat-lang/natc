@@ -5,3 +5,9 @@ let begin = () => {
     print name + " ok " + "(" + str(end) + "s)";
   };
 };
+
+let typecheck = x => assert(TypeSystem.typecheck(x).success());
+let typefail = x => assert(TypeSystem.typecheck(x).failure());
+let infix unifies = (x, y) => TypeSystem.newState().unify(
+  typify(x) ~ typify(y)
+);

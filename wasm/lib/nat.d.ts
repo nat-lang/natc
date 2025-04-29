@@ -8,6 +8,7 @@ export interface NatModule extends EmscriptenModule {
   setValue: typeof setValue;
   getValue: typeof getValue;
   FS: typeof FS;
+  wasmMemory: typeof wasmMemory;
 }
 
 export = EmscriptenModuleFactory<NatModule>;
