@@ -9,14 +9,14 @@ let checkStatus = (status: InterpretationStatus) => {
 (async () => {
   let engine = new Engine();
   let status: InterpretationStatus;
-  let compilation = await engine.compile("foo", "let z = [1 3 4];");
+  let resp = await engine.typeset("test/integration/composition");
 
-  if (!compilation)
+  if (!resp)
     throw new Error("Complation failure: undefined.");
-  if (!compilation.success)
+  if (!resp.success)
     throw new Error("Complation failure: expecting success = true.");
-  if (typeof compilation.tex !== "string")
-    throw new Error("Complation failure: expecting instanceof data = String.");
+  if (typeof resp.tex !== "string")
+    throw new Error("Complation failure: expecting instanceof resp.tex = String.");
 
   status = await engine.interpret("test/integration/index");
   checkStatus(status);

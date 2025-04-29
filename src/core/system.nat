@@ -4,8 +4,8 @@
 // executed after the rest of the core modules.
 
 import core/type/system
-import core/unification
 import core/composition
+import core/tex
 
 // We keep the quantifiers in their own namespace
 // so that grammars can use the identifiers.

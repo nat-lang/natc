@@ -56,36 +56,32 @@ class Engine {
     return this.runtime as NatModule;
   }
 
-  compile = async (path: string, source: string) => {
+  readStrMem = async (pointer: number) => {
     const runtime = await this.loadRuntime();
-    const strings = [path, source];
-    const fn = runtime.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string', 'number', 'number']);
+    const memBuff = new Uint8Array(runtime.wasmMemory.buffer);
 
-    let out = "";
-    const unregister = this.onStdout(stdout => out += stdout);
+    let str = "";
 
-    // allocate memory for the array of pointers.
-    const ptrArray = runtime._malloc(strings.length * 4); // 4 bytes for each pointer.
+    while (memBuff[pointer] !== 0)
+      str += String.fromCharCode(memBuff[pointer++]);
 
-    // populate the array of pointers.
-    for (let i = 0; i < strings.length; ++i) {
-      const length = strings[i].length + 1;
-      const strPtr = runtime._malloc(length); // +1 for null terminator.
-      runtime.stringToUTF8(strings[i], strPtr, length);
-      runtime.setValue(ptrArray + i * 4, strPtr, '*');
+    return str;
+  }
+
+  typeset = async (path: string) => {
+    const runtime = await this.loadRuntime();
+    const interpret = runtime.cwrap('vmTypesetModule_wasm', 'number', ['string']);
+    const free = runtime.cwrap('vmFree_wasm', null, []);
+
+    const respPtr = interpret(path);
+    const resp = await this.readStrMem(respPtr);
+
+    free();
+
+    return {
+      success: true,
+      tex: resp
     }
-
-    const status = fn("core/nls", strings.length, ptrArray);
-
-    // free the allocated memory.
-    for (let i = 0; i < strings.length; ++i) {
-      runtime._free(runtime.getValue(ptrArray + i * 4, '*'));
-    }
-    runtime._free(ptrArray);
-
-    // release the stdout handler.
-    unregister();
-    return status === InterpretationStatus.OK ? JSON.parse(out) as Compilation : undefined;
   }
 
   interpret = async (path: string): Promise<InterpretationStatus> => {

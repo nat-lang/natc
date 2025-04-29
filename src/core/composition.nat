@@ -54,18 +54,18 @@ class CompositionSystem {
   }
 
   // Map a Tree into an AnnotatedTree.
-  type(node: Tree) => {
+  evaluate(node: Tree) => {
     if (node.leaf())
       return AnnotatedTree(node.data, [], TypeSystem.type(node.data));
 
     if (node.unary()) {
-      let child = this.type(node[0]);
+      let child = this.evaluate(node[0]);
       return AnnotatedTree(child.data, [child], child.type);
     }
 
     if (node.binary()) {
-      let left = this.type(node[0]),
-          right = this.type(node[1]);
+      let left = this.evaluate(node[0]),
+          right = this.evaluate(node[1]);
 
       for (rule in this.binaryRules) {
         let data = rule(left.data, right.data);
@@ -79,17 +79,4 @@ class CompositionSystem {
 
     throw CompositionError("Nonbinary tree.");
   }
-
-  interpret(node: Tree) => this.type(node).data;
-  typecheck(node: Tree) => {
-    if (this.type(node).type == nil)
-      throw TypeError("Expected to succeed but failed.");
-  }
-  typefail(node: Tree) => {
-    if (this.type(node).type != nil)
-      throw TypeError("Expected to fail but succeeded.");
-  }
 }
-
-// The global [Grammar] object.
-let Grammar = CompositionSystem();

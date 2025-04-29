@@ -92,6 +92,7 @@ typedef struct {
 
   ObjClosure* unify;
   ObjInstance* typeSystem;
+  ObjInstance* document;
 } Core;
 
 typedef struct {
@@ -144,8 +145,11 @@ void vmRuntimeError(const char* format, ...);
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretModule(char* path);
 InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]);
-InterpretResult vmInterpretModule_wasm(char* path, int argc, char* argv[]);
-InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]);
+
+InterpretResult vmInterpretModule_wasm(char* path);
+char* vmTypesetModule_wasm(char* path);
+void vmFree_wasm();
+
 ObjModule* vmCompileModule(Token path, ModuleType type);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
 bool vmImport(ObjModule* module, ObjMap* target);

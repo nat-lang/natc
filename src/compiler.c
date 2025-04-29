@@ -1665,6 +1665,7 @@ static void domainDeclaration(Compiler* cmp) {
   emitBytes(cmp, OP_CALL, 2);
 
   setVariable(cmp, var);
+  emitByte(cmp, OP_POP);
   consume(cmp, TOKEN_SEMICOLON, "Expect ';' after domain declaration.");
 }
 

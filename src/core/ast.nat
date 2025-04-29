@@ -220,7 +220,7 @@ class ASTLiteral extends ASTExpr {
     super.init();
   }
   str() => "ASTLiteral(#{str(this.value)})";
-  tex() => this.str();
+  tex() => this.value;
   resolve() => this.value;
   __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
 }
