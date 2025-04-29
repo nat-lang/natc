@@ -10,7 +10,10 @@ class Quantifier {
   tex(restriction: ASTNode, body: ASTClosure) => {
     let signature = body.signature();
     let params = join(signature.params.map(p => p.var.name), ", ");
-    return "#{this.texSym} #{params} \in #{restriction.tex()}. #{body.nakedBody().tex()}";
+    let restrTex = restriction.tex();
+    if (restriction.resolve() is Domain)
+      restrTex = "D_{#{restrTex}}";
+    return "#{this.texSym} #{params} \in #{restrTex}. #{body.nakedBody().tex()}";
   }
 }
 
