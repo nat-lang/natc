@@ -15,7 +15,7 @@ class TexDocument {
 
   add(block) => this.blocks.push(block);
 
-  renderBlocks() => join([block.tex() | block in this.blocks], newline + newline);
+  renderBlocks() => join([block | block in this.blocks], newline + newline);
 
   render() => "#{this.preamble}
 \begin{document}
