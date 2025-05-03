@@ -85,11 +85,13 @@ class ASTNode extends Tree {
     }, VarEnv(Map()));
   }
 
+  rename() => this.uniquelyIdentifyVariables(NameSupply());
+
   betaReduce() => this.__class__(..this.children.map(x => x.betaReduce()));
 
   simplify() => {
     this.unroll();
-    this.uniquelyIdentifyVariables(NameSupply());
+    this.rename();
     return this.betaReduce();
   }
 
@@ -367,6 +369,9 @@ class ASTApp extends ASTExprStatement {
 
     // now substitute.
     let params = fn.signature().params;
+    if (params.some(x => x.uuid == nil))
+      throw Error("Call rename() before beta reducing.");
+
     let reduct = fn[0][0].map(x => {
       if (x is not ASTLocal && x is not ASTInternalUpvalue)
         return x;
