@@ -3,7 +3,6 @@ class NameSupply {
     this.next = 0;
   }
   fresh() => {
-    // print this.next;
     this.next = this.next + 1;
     return this.next;
   }
@@ -282,6 +281,8 @@ class ASTVariable extends ASTExpr {
 
     return hash(this.uuid);
   }
+
+  str() => "#{this.__class__}(#{this.id})";
 }
 
 class ASTLocal extends ASTVariable {
@@ -290,10 +291,9 @@ class ASTLocal extends ASTVariable {
     super.init(id);
   }
 
-  resolve() => this;
   betaReduce() => this;
 
-  str() => "ASTLocal(#{str(this.id)}, '#{this.name}')";
+  str() => "ASTLocal(#{this.id}, '#{this.name}')";
   tex() => this.name;
 
   __eq__(that) => this.name == that.name && super.__eq__(that);
@@ -314,6 +314,7 @@ class ASTUpvalue extends ASTVariable {
     this.name = name;
   }
   betaReduce() => this;
+  str() => "#{this.__class__}('#{this.name}')";
 }
 
 class ASTExternalUpvalue extends ASTUpvalue {
@@ -400,7 +401,19 @@ class ASTApp extends ASTExprStatement {
     }
   }
 
-  tex() => this.resolveTex() || "(#{this[0].tex()})(#{this[1].tex()})";
+  tex() => {
+    let tex = this.resolveTex();
+
+    if (tex) return tex;
+
+    let fn = this[0].tex(),
+        args = this[1].tex();
+
+    if (this[0] is ASTApp || this[0] is ASTClosure)
+      fn = "(#{fn})";
+
+    return "#{fn}(#{args})";
+  }
 }
 
 class ASTAppInfix extends ASTApp {
@@ -446,17 +459,13 @@ class ASTClosure extends ASTExpr {
         this.upvalues[val.id] = val;
     }
   }
-  str() => "ASTClosure(#{address(this)})";
 
   opSignature(signature) => {
     this.function.signature = signature;
   }
 
   // The first explicit return of a naked function.
-  nakedBody() => {
-    // print this.children.values;
-    return this.children[0];
-  }
+  nakedBody() => this.children[0];
   tex() => {
     let body = this.nakedBody();
 

@@ -8,7 +8,8 @@ let _ASTClosureMock = klass => (*children) => {
 let ASTClosureMock = _ASTClosureMock(ASTClosure);
 let ASTComprehensionMock = _ASTClosureMock(ASTComprehension);
 let ASTBlockMock = (*children) => ASTBlock(nil, ..children);
-let ASTInternalUpvalueMock = name => ASTInternalUpvalue(nil,nil,nil, name);
+let ASTInternalUpvalueMock = name => ASTInternalUpvalue(nil,nil,nil,name);
+let ASTExternalUpvalueMock = name => ASTExternalUpvalue(nil,nil,nil,name);
 
 // constant function to literal.
 
@@ -1509,7 +1510,7 @@ assert(f.children == [
     ASTLocal(1, "x"),
     ASTBlockMock(
       ASTReturn(
-        ASTExternalUpvalue(undefined,undefined,undefined, "up")
+        ASTExternalUpvalueMock("up")
       )
     )
   ),
@@ -1781,3 +1782,82 @@ assert(f == ASTClosureMock(
 
 assert(f[0].module.x == nil);
 assert(f[0].alias == ASTLiteral("importable"));
+
+// unrolling resolves external upvalues that point to closures.
+
+let f <- (() => {
+  let x = x => x;
+  return () => x;
+})();
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTExternalUpvalueMock("x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f' = f.unroll();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTReturn(
+        ASTLocal(1, "x")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// unrolling unrolls resolved closures.
+
+let f <- (() => {
+  let y = y => 1;
+  let x = () => y;
+  return () => x;
+})();
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTExternalUpvalueMock("x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f' = f.unroll();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTReturn(
+        ASTClosureMock(
+          ASTReturn(
+            ASTLiteral(1)
+          ),
+          ASTImplicitReturn(
+            ASTLiteral(nil)
+          )
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// beta reduction.
+

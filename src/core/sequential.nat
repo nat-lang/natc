@@ -26,7 +26,6 @@ class Sequential extends Object {
   hash() => hash(join(this.map(str), ""));
 
   map(fn) => [fn(x) | x in this];
-  fold(fn) => [x.fold(fn) | x in this];
 
   reduce(fn, acc) => {
     for (x in this)
