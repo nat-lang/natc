@@ -20,9 +20,9 @@ assert(vType(f.function.signature) == OFunction);
 assert(f.upvalues is Map);
 
 assert(f.signature() is ASTSignature);
-assert(len(f.signature().params) == 1);
+assert(len(f.signature().children) == 1);
 
-let p = f.signature().params[0];
+let p = f.signature().children[0];
 
 assert(p is ASTParameter);
 assert(p.id == 1);
@@ -1295,7 +1295,7 @@ let f <- k x => k;
 
 f.rename();
 
-let k = f.signature().params[0];
+let k = f.signature().children[0];
 let k_up = f[0][0][0][0];
 
 assert(k_up is ASTInternalUpvalue);
@@ -1308,8 +1308,8 @@ let f <- k j x => +(k, j);
 
 f.rename();
 
-let k = f.signature().params[0];
-let j = f[0][0].signature().params[0];
+let k = f.signature().children[0];
+let j = f[0][0].signature().children[0];
 
 let app = f[0][0][0][0][0][0],
     args = app[1];
@@ -1335,8 +1335,8 @@ let f <- x y => {
 
 f.rename();
 
-let x = f.signature().params[0];
-let y = f[0][0].signature().params[0];
+let x = f.signature().children[0];
+let y = f[0][0].signature().children[0];
 let z = f[0][0][0][0];
 
 let r = f[0][0][1][0][0],
@@ -1374,8 +1374,8 @@ let f <- (x,z) => {
 
 f.rename();
 
-let x = f.signature().params[0];
-let z = f.signature().params[1];
+let x = f.signature().children[0];
+let z = f.signature().children[1];
 let y = f[0][0];
 
 let g = f[1][1];
@@ -1450,8 +1450,8 @@ let h = m k x => (k . m)(x);
 
 let f <- h(m);
 
-let k = f.signature().params[0];
-let x = f[0][0].signature().params[0];
+let k = f.signature().children[0];
+let x = f[0][0].signature().children[0];
 
 let r = f[0][0][0],
     app = r[0],
@@ -1566,9 +1566,9 @@ assert(vType(f[0].function) == OFunction);
 assert(vType(f[0].function.signature) == OFunction);
 assert(f[0].upvalues is Map);
 assert(f[0].signature() is ASTSignature);
-assert(len(f[0].signature().params) == 1);
+assert(len(f[0].signature().children) == 1);
 
-let p = f[0].signature().params[0];
+let p = f[0].signature().children[0];
 
 assert(p is ASTParameter);
 assert(p.id == 1);
@@ -1627,7 +1627,7 @@ let k = f[0][1];
 assert(k is ASTClosure);
 assert(k.signature() is ASTSignature);
 
-let a = k.signature().params[0];
+let a = k.signature().children[0];
 
 assert(a is ASTParameter);
 assert(a.type is TFunction);
@@ -1645,9 +1645,9 @@ let k = f[0][1];
 assert(k is ASTClosure);
 assert(vType(k.function.signature) == OFunction);
 assert(k.signature() is ASTSignature);
-assert(len(k.signature().params) == 1);
+assert(len(k.signature().children) == 1);
 
-let p = k.signature().params[0];
+let p = k.signature().children[0];
 
 assert(p is ASTParameter);
 assert(p.id == 1);
@@ -1939,7 +1939,7 @@ assert(f' == ASTClosureMock(
 // reduction of an application:
 //  a) reduces arguments,
 //  b) reduces applicand if it's an application itself,
-//  c) performs substitution,
+//  c) performs substitution, and
 //  d) reduces the reduct if any argument is a function.
 
 // (c)
@@ -2121,11 +2121,23 @@ assert(f' == ASTClosureMock(
   )
 ));
 
-// reduction of any other node is reduction of its children.
+let f <- () => ((x => x(x)))(x => x);
 
-// functions:
-let f <- () => (x => x)(1);
+f.rename();
+let f' = f.betaReduce();
 
-// returns:
-// blocks:
-// conditionals:
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTReturn(
+        ASTLocal(1, "x")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));

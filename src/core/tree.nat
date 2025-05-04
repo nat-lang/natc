@@ -45,11 +45,8 @@ class Tree extends Object {
 
   // Map the nodes.
   map(fn) => {
-    let node = fn(this);
-
-    node.children = [x.map(fn) | x in node.children];
-
-    return node;
+    this.children = [x.map(fn) | x in this.children];
+    return fn(this);
   }
 
   reduce(fn, acc) => {
