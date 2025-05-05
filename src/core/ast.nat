@@ -23,6 +23,23 @@ class ASTNode extends Tree {
   str() => str(this.__class__);
   tex() => { throw NotImplemented(this.__class__, this.tex); }
 
+  // Resolve any upvalues pointing to closures.
+  unroll() => {
+    this.children = this.children.map(
+      node => {
+        if (node is ASTExternalUpvalue) {
+          let v = node.resolve();
+          if (vType(v) == OFunction) {
+            let node' <- v;
+            return node'.unroll();
+          }
+        }
+        return node.unroll();
+      }
+    );
+    return this;
+  }
+
   // Give the tree's variables uuids. Identify upvalues
   // with the locals they close over. 
   uniquelyIdentifyVariables(uuids) => {
@@ -38,7 +55,7 @@ class ASTNode extends Tree {
       if (node is ASTClosure) {
         let closureEnv = VarEnv(varEnv.upvalues);
 
-        for (param in node.signature().params)
+        for (param in node.signature().children)
           rename(param, closureEnv.locals);
 
         for (v in node.upvalues.values()) {
@@ -68,6 +85,16 @@ class ASTNode extends Tree {
     }, VarEnv(Map()));
   }
 
+  rename() => this.uniquelyIdentifyVariables(NameSupply());
+
+  betaReduce() => this.__class__(..this.children.map(x => x.betaReduce()));
+
+  simplify() => {
+    this.unroll();
+    this.rename();
+    return this.betaReduce();
+  }
+
   // expressions.
 
   opLiteral(value) => ASTLiteral(value);
@@ -83,10 +110,6 @@ class ASTNode extends Tree {
   opMember(element, collection) => ASTMembership(element, collection);
 
   // statements.
-
-  opSignature(signature) => {
-    this.function.signature = signature;
-  }
 
   opExprStatement(expr) => {
     let node = ASTExprStatement(expr);
@@ -221,7 +244,9 @@ class ASTLiteral extends ASTExpr {
   }
   str() => "ASTLiteral(#{str(this.value)})";
   tex() => this.value;
+
   resolve() => this.value;
+  betaReduce() => this;
   __eq__(that) => this.__class__ == that.__class__ and this.value == that.value;
 }
 
@@ -259,6 +284,8 @@ class ASTVariable extends ASTExpr {
 
     return hash(this.uuid);
   }
+
+  str() => "#{this.__class__}(#{this.id})";
 }
 
 class ASTLocal extends ASTVariable {
@@ -266,8 +293,12 @@ class ASTLocal extends ASTVariable {
     this.name = name;
     super.init(id);
   }
-  str() => "ASTLocal(#{str(this.id)}, '#{this.name}')";
+
+  betaReduce() => this;
+
+  str() => "ASTLocal(#{this.id}, '#{this.name}')";
   tex() => this.name;
+
   __eq__(that) => this.name == that.name && super.__eq__(that);
 }
 
@@ -275,19 +306,23 @@ class ASTGlobal extends ASTVariable {
   resolve() => globals()[this.id];
   tex() => str(this.id);
   str() => "ASTGlobal(#{this.id})";
+  betaReduce() => this;
 }
 
 class ASTUpvalue extends ASTVariable {
   init(id, localId, upvalue, name) => {
     super.init(id);
-    this.name = name;
     this.localId = localId;
     this.upvalue = upvalue;
+    this.name = name;
   }
+  betaReduce() => this;
+  str() => "#{this.__class__}('#{this.name}')";
 }
 
 class ASTExternalUpvalue extends ASTUpvalue {
   resolve() => resolveUpvalue(this.upvalue);
+
   tex() => {
     let value = this.resolve();
     if (vType(value) in [OFunction, OOverload]) {
@@ -314,11 +349,48 @@ class ASTParameter extends ASTVariable {
 }
 
 class ASTArgumentSequence extends ASTExpr {
-  resolve() => this.children.map(node => node.resolve());
+  resolve() => this.children.map(node => node.resolve()); 
   tex() => join([arg.tex() | arg in this.children], ", ");
 }
 
 class ASTApp extends ASTExprStatement {
+  // we could have the interpreter do this,
+  // but we only want to reach normal form - 1.
+  betaReduce() => {
+    let fn = this[0],
+        args = this[1].betaReduce();
+
+    if (fn is ASTApp)
+      fn = fn.betaReduce();
+
+    // if the applicand is not a function then we
+    // can't reduce.
+    if (fn is not ASTClosure)
+      return this.__class__(fn, args);
+
+    // have the variables been uniquely identified?
+    let params = fn.signature().children;
+    if (params.some(x => x.uuid == nil))
+      throw Error("Call rename() before beta reducing.");
+
+    // now substitute.
+    let reduct = fn[0][0].map(x => {
+      if (x is not ASTLocal && x is not ASTInternalUpvalue)
+        return x;
+      for (let i = 0; i < len(args); i = i + 1) {
+        if (params[i].uuid == x.uuid)
+          return args[i];
+      }
+      return x;
+    });
+
+    // one final reduction if any argument is a function.
+    if (args.children.some(x => x is ASTClosure))
+      reduct = reduct.betaReduce();
+
+    return reduct;
+  }
+
   evaluate() => {
     let fn = this[0].resolve();
     let args = this[1].resolve();
@@ -336,7 +408,19 @@ class ASTApp extends ASTExprStatement {
     }
   }
 
-  tex() => this.resolveTex() || "#{this[0].tex()}(#{this[1].tex()})";
+  tex() => {
+    let tex = this.resolveTex();
+
+    if (tex) return tex;
+
+    let fn = this[0].tex(),
+        args = this[1].tex();
+
+    if (this[0] is ASTApp || this[0] is ASTClosure)
+      fn = "(#{fn})";
+
+    return "#{fn}(#{args})";
+  }
 }
 
 class ASTAppInfix extends ASTApp {
@@ -359,16 +443,14 @@ class ASTMembership extends ASTExpr {
 }
 
 class ASTSignature extends ASTNode {
-  init(params) => {
-    this.params = params;
-  }
-  tex() => join([p.tex() | p in this.params], "");
+  tex() => join([p.tex() | p in this.children], "");
 }
 
 class ASTClosure extends ASTExpr {
-  init(enclosing, function, upvalues) => {
+  init(enclosing, function, upvalues, *children) => {
+    this.enclosing = enclosing;
     this.function = function;
-    this.children = [];
+    this.children = children;
 
     if (enclosing == nil)
       this.upvalues = Map();
@@ -380,6 +462,10 @@ class ASTClosure extends ASTExpr {
       if (!this.upvalues[val.id])
         this.upvalues[val.id] = val;
     }
+  }
+
+  opSignature(signature) => {
+    this.function.signature = signature;
   }
 
   // The first explicit return of a naked function.
@@ -396,9 +482,16 @@ class ASTClosure extends ASTExpr {
 
   resolve() => this.function;
 
+  betaReduce() => {
+    let children = this.children.map(x => x.betaReduce());
+    let node = this.__class__(this.enclosing, this.function, this.upvalues, ..children);
+    node._signature = this._signature;
+    return node;
+  }
+
   // Wrap [this] function's signature in ast.
   sign() => {
-    if (!this.function.signature) return ASTSignature([]);
+    if (!this.function.signature) return ASTSignature();
 
     let ast = signature => {
       let params = [];
@@ -410,7 +503,7 @@ class ASTClosure extends ASTExpr {
         params.push(ASTParameter(i + 1, param.value, param.type));
       }
 
-      return ASTSignature(params);
+      return ASTSignature(..params);
     };
 
     if (this.function.signature.arity == 0) {

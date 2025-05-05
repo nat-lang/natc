@@ -1,15 +1,10 @@
 import test/prelude
 
-// constants.
+// individuals.
 
-const Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel;
+const Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel, Ursula, Sebastian, Sam;
 
-// types.
-
-dom e = {Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel};
-dom t = {true, false};
-
-bool = t;
+dom e = {Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel, Ursula, Sebastian, Sam};
 
 // common nouns.
 
@@ -22,18 +17,37 @@ let millionaire: e -> t = x => x in Millionaire;
 let Norwegian = {};
 let norwegian: e -> t = x => x in Norwegian;
 
+let Guy = {};
+let guy: e -> t = x => x in Guy;
+
 // intransitive verbs.
 
 let Smile = {};
 let smiled: e -> t = x => x in Smile;
 
+let Smoke = {};
+let smokes: e -> t = x => x in Smoke;
+
+let Drink = {};
+let drinks: e -> t = x => x in Drink;
+
 // transitive verbs.
+
+// fixme.
+// let TransitiveVerb
+//   : {(e,e)} -> e -> e -> t
+//   = relation x y => (x,y) in relation;
+// let Love = {(Agnetha, Agnetha)};
+// let loves = TransitiveVerb(Love);
 
 let Love = {(Agnetha, Agnetha)};
 let loves: e -> e -> t = x y => (x,y) in Love;
 
 let Shave = {};
 let shaves: e -> e -> t = x y => (x,y) in Shave;
+
+let Like = {(Agnetha, Agnetha)};
+let likes: e -> e -> t = x y => (x,y) in Like;
 
 // ditransitive verbs.
 
@@ -81,20 +95,33 @@ let afraid: e -> e -> t = x y => (x,y) in Afraid;
 // copula.
 
 let is': (e -> t) -> e -> t = p => p;
+let does = x => x;
 
 // negation.
+
 // quantifiers.
 
-let everybody: (e -> t) -> t = p => e.each(p);
-let somebody: (e -> t) -> t = p => e.some(p);
-let nobody: (e -> t) -> t = p => !e.some(p);
+let everybody: (e -> t) -> t = p => for all (x in e) p(x);
+let somebody: (e -> t) -> t = p => for some (x in e) p(x);
+let nobody: (e -> t) -> t = p => for no (x in e) p(x);
 
 // determiners.
 
-let a: (e -> t) -> e -> t = p => p;
-let some: (e -> t) -> (e -> t) -> t = p q => e.some(x => p(x) and q(x));
-let no: (e -> t) -> (e -> t) -> t = p q => !e.some(x => p(x) and q(x));
-let every: (e -> t) -> (e -> t) -> t = p q => e.each(x => !p(x) or q(x));
+let a : (e -> t) -> e -> t
+      = p => p;
+
+let some : (e -> t) -> (e -> t) -> t
+         = p q => for some (x in e) p(x) and q(x);
+
+let no : (e -> t) -> (e -> t) -> t
+       = p q => for no (x in e) p(x) and q(x);
+
+let every : (e -> t) -> (e -> t) -> t
+          = p q => for all (x in e) !p(x) or q(x);
+
+// coordination.
+
+let or': (e -> t) -> (e -> t) -> (e -> t) = p q x => p(x) or q(x);
 
 // composition rules.
 
@@ -107,5 +134,23 @@ grammar.addRules(QuantificationalObject);
 // examples.
 
 ex [Agnetha smiled];
-
 ex [Agnetha [loves Bjorn]];
+ex [Benny [[introduced Agnetha] [to Bjorn]]];
+ex [Carlos [self1 shaves]];
+ex [Carlos [[self2 introduced] Paco]];
+ex [Carlos [[self3 introduced] Paco]];
+ex [Bjorn [is' kind]];
+ex [Frida [is' [with Benny]]];
+ex [Benny [is' [proud [of Frida]]]];
+ex [Agnetha [is' [a singer]]];
+ex [Frida [is' [a [norwegian millionaire]]]];
+ex [[every singer] smiled];
+ex [[a singer] smiled];
+ex [everybody snores];
+ex [somebody [hugged Ariel]];
+ex [everybody [is' [afraid [of Ariel]]]];
+ex [nobody [likes Ursula]];
+ex [[some guy] [hugged Sebastian]];
+ex [Sam [smokes [or' drinks]]];
+ex [everybody [smokes [or' drinks]]];
+ex [Agnetha [likes nobody]];

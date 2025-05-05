@@ -54,8 +54,6 @@ assert("a #{(() => "b")()} c" == "a b c");
 
 assert("a #{(() => "#{(() => "b")()}")()} c" == "a b c");
 
-// fixme
-
 assert("#{nil} #{nil}" == "nil nil");
 
 // fixme

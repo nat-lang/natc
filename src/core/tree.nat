@@ -33,7 +33,7 @@ class Tree extends Object {
   leaves() => {
     if (this.leaf()) return [this.data];
 
-    return [leaf | child in this.children, leaf in child.leaves()];
+    return [leaf | x in this.children, leaf in x.leaves()];
   }
 
   each(fn) => {
@@ -41,28 +41,17 @@ class Tree extends Object {
   }
 
   // Map the data.
-  dmap(fn) => {
-    let tree = Tree(fn(this.data), []);
-
-    for (child in this.children)
-      tree.children.push(child.dmap(fn));
-
-    return tree;
-  }
+  dmap(fn) => Tree(fn(this.data), [x.dmap(fn) | x in this.children]);
 
   // Map the nodes.
   map(fn) => {
-    let tree = fn(this);
-
-    for (child in this.children)
-      tree.children.push(child.map(fn));
-
-    return tree;
+    this.children = [x.map(fn) | x in this.children];
+    return fn(this);
   }
 
   reduce(fn, acc) => {
-    for (child in this.depthFirst())
-      acc = fn(acc, child.data);
+    for (x in this.depthFirst())
+      acc = fn(acc, x.data);
 
     return acc;
   }
@@ -71,9 +60,8 @@ class Tree extends Object {
     acc = fn(this, acc);
 
     // accumulate vertically, but not horizontally.
-    for (child in this.children) {
+    for (child in this.children)
       child.visit(fn, acc);
-    }
   }
 
   find(predicate) => this.depthFirst().find(predicate);

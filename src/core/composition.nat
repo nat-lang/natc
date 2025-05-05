@@ -6,17 +6,26 @@ class AnnotatedTree extends Tree {
     super.init(data, children);
     this.type = type;
   }
-  str() => this.type.str();
+  str() => {
+    if (this.type)
+      return this.type.str();
+    return "";
+  }
 
-  texInterior() => {
+  innerTex() => {
     let datum = () => {
-      if (this.data == nil) return "[]";
+      if (this.data == nil) return "";
 
       let type = TypeSystem.type(this.data);
 
       if (vType(this.data) in [OFunction, OOverload]) {
         let ast <- this.data;
-        return "{$#{type.tex()}$ \\ $#{ast.tex()}$ \\ #{this.data.name}}";
+        ast = ast.simplify();
+        let tex = "$#{type.tex()}$ \\ $#{ast.tex()}$";
+
+        if (this.leaf())
+          return "{#{tex} \\ #{this.data.name}}";
+        return "{#{tex}}";
       }
 
       return "{$#{type.tex()}$ \\ #{this.data}}";
@@ -24,13 +33,11 @@ class AnnotatedTree extends Tree {
 
     if (this.leaf()) return "[#{datum()}]";
 
-    let children = join(this.children.map(x => x.texInterior()), " ");
+    let children = join(this.children.map(x => x.innerTex()), " ");
     return "[#{datum()} #{children}]";
   }
 
-  texRoot() => "\begin{exe} \ex \[ \begin{forest} #{this.texInterior()} \end{forest} \] \end{exe}";
-
-  tex() => this.texRoot();
+  tex() => "\begin{exe} \ex \[ \begin{forest} #{this.innerTex()} \end{forest} \] \end{exe}";
 }
 
 class CompositionSystem {
