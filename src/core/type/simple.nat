@@ -335,7 +335,7 @@ class SimpleTypeState {
 
   constrainFnDomain(node: ASTClosure) => {
     // map the parameter annotations into types.
-    let parameters = node.signature().params;
+    let parameters = node.signature().children;
     let paramTypes = parameters.map(p => this.system.typify(p.type));
 
     // since the params and their types are keyed by uuid

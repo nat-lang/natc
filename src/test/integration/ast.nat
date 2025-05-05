@@ -8,7 +8,8 @@ let _ASTClosureMock = klass => (*children) => {
 let ASTClosureMock = _ASTClosureMock(ASTClosure);
 let ASTComprehensionMock = _ASTClosureMock(ASTComprehension);
 let ASTBlockMock = (*children) => ASTBlock(nil, ..children);
-let ASTInternalUpvalueMock = name => ASTInternalUpvalue(nil,nil,nil, name);
+let ASTInternalUpvalueMock = name => ASTInternalUpvalue(nil,nil,nil,name);
+let ASTExternalUpvalueMock = name => ASTExternalUpvalue(nil,nil,nil,name);
 
 // constant function to literal.
 
@@ -19,9 +20,9 @@ assert(vType(f.function.signature) == OFunction);
 assert(f.upvalues is Map);
 
 assert(f.signature() is ASTSignature);
-assert(len(f.signature().params) == 1);
+assert(len(f.signature().children) == 1);
 
-let p = f.signature().params[0];
+let p = f.signature().children[0];
 
 assert(p is ASTParameter);
 assert(p.id == 1);
@@ -1292,9 +1293,9 @@ assert(r[1].resolve() == [1,2]);
 
 let f <- k x => k;
 
-f.uniquelyIdentifyVariables(NameSupply());
+f.rename();
 
-let k = f.signature().params[0];
+let k = f.signature().children[0];
 let k_up = f[0][0][0][0];
 
 assert(k_up is ASTInternalUpvalue);
@@ -1305,10 +1306,10 @@ assert(k.uuid == k_up.uuid);
 
 let f <- k j x => +(k, j);
 
-f.uniquelyIdentifyVariables(NameSupply());
+f.rename();
 
-let k = f.signature().params[0];
-let j = f[0][0].signature().params[0];
+let k = f.signature().children[0];
+let j = f[0][0].signature().children[0];
 
 let app = f[0][0][0][0][0][0],
     args = app[1];
@@ -1332,10 +1333,10 @@ let f <- x y => {
   return () => (x, y, z);
 };
 
-f.uniquelyIdentifyVariables(NameSupply());
+f.rename();
 
-let x = f.signature().params[0];
-let y = f[0][0].signature().params[0];
+let x = f.signature().children[0];
+let y = f[0][0].signature().children[0];
 let z = f[0][0][0][0];
 
 let r = f[0][0][1][0][0],
@@ -1371,10 +1372,10 @@ let f <- (x,z) => {
   };
 };
 
-f.uniquelyIdentifyVariables(NameSupply());
+f.rename();
 
-let x = f.signature().params[0];
-let z = f.signature().params[1];
+let x = f.signature().children[0];
+let z = f.signature().children[1];
 let y = f[0][0];
 
 let g = f[1][1];
@@ -1449,8 +1450,8 @@ let h = m k x => (k . m)(x);
 
 let f <- h(m);
 
-let k = f.signature().params[0];
-let x = f[0][0].signature().params[0];
+let k = f.signature().children[0];
+let x = f[0][0].signature().children[0];
 
 let r = f[0][0][0],
     app = r[0],
@@ -1509,7 +1510,7 @@ assert(f.children == [
     ASTLocal(1, "x"),
     ASTBlockMock(
       ASTReturn(
-        ASTExternalUpvalue(undefined,undefined,undefined, "up")
+        ASTExternalUpvalueMock("up")
       )
     )
   ),
@@ -1565,9 +1566,9 @@ assert(vType(f[0].function) == OFunction);
 assert(vType(f[0].function.signature) == OFunction);
 assert(f[0].upvalues is Map);
 assert(f[0].signature() is ASTSignature);
-assert(len(f[0].signature().params) == 1);
+assert(len(f[0].signature().children) == 1);
 
-let p = f[0].signature().params[0];
+let p = f[0].signature().children[0];
 
 assert(p is ASTParameter);
 assert(p.id == 1);
@@ -1626,7 +1627,7 @@ let k = f[0][1];
 assert(k is ASTClosure);
 assert(k.signature() is ASTSignature);
 
-let a = k.signature().params[0];
+let a = k.signature().children[0];
 
 assert(a is ASTParameter);
 assert(a.type is TFunction);
@@ -1644,9 +1645,9 @@ let k = f[0][1];
 assert(k is ASTClosure);
 assert(vType(k.function.signature) == OFunction);
 assert(k.signature() is ASTSignature);
-assert(len(k.signature().params) == 1);
+assert(len(k.signature().children) == 1);
 
-let p = k.signature().params[0];
+let p = k.signature().children[0];
 
 assert(p is ASTParameter);
 assert(p.id == 1);
@@ -1781,3 +1782,362 @@ assert(f == ASTClosureMock(
 
 assert(f[0].module.x == nil);
 assert(f[0].alias == ASTLiteral("importable"));
+
+// unrolling resolves external upvalues that point to closures.
+
+let f <- (() => {
+  let x = x => x;
+  return () => x;
+})();
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTExternalUpvalueMock("x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f' = f.unroll();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTReturn(
+        ASTLocal(1, "x")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// unrolling unrolls resolved closures.
+
+let f <- (() => {
+  let y = y => 1;
+  let x = () => y;
+  return () => x;
+})();
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTExternalUpvalueMock("x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f' = f.unroll();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTReturn(
+        ASTClosureMock(
+          ASTReturn(
+            ASTLiteral(1)
+          ),
+          ASTImplicitReturn(
+            ASTLiteral(nil)
+          )
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// beta reduction.
+
+// reduction for literals, locals, globals, and upvalues is identity.
+
+let f <- () => 1;
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTLiteral(1)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => x;
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTLocal(1, "x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let x = 1;
+let f <- () => x;
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTGlobal("x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// external.
+let f <- (() => {
+  let x = 1;
+  return () => x;
+})();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTExternalUpvalueMock("x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// internal.
+let f <- x y => x;
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTReturn(
+        ASTInternalUpvalueMock("x")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// reduction of an application:
+//  a) reduces arguments,
+//  b) reduces applicand if it's an application itself,
+//  c) performs substitution, and
+//  d) reduces the reduct if any argument is a function.
+
+// (c)
+let f <- () => (x => x)(1);
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTApp(
+      ASTClosureMock(
+        ASTReturn(
+          ASTLocal(1, "x")
+        ),
+        ASTImplicitReturn(
+          ASTLiteral(nil)
+        )
+      ),
+      ASTArgumentSequence(
+        ASTLiteral(1)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTLiteral(1)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// (b)
+
+let f <- () => ((x => x)(y))(1);
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTApp(
+      ASTApp(
+        ASTClosureMock(
+          ASTReturn(
+            ASTLocal(1, "x")
+          ),
+          ASTImplicitReturn(
+            ASTLiteral(nil)
+          )
+        ),
+        ASTArgumentSequence(
+          ASTGlobal("y")
+        )
+      ),
+      ASTArgumentSequence(
+        ASTLiteral(1)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTApp(
+      ASTGlobal("y"),
+      ASTArgumentSequence(
+        ASTLiteral(1)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// (a)
+
+let f <- () => y((x => x)(1));
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTApp(
+      ASTGlobal("y"),
+      ASTArgumentSequence(
+        ASTApp(
+          ASTClosureMock(
+            ASTReturn(
+              ASTLocal(1, "x")
+            ),
+            ASTImplicitReturn(
+              ASTLiteral(nil)
+            )
+          ),
+          ASTArgumentSequence(
+            ASTLiteral(1)
+          )
+        )
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTApp(
+      ASTGlobal("y"),
+      ASTArgumentSequence(
+        ASTLiteral(1)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// (d)
+
+let f <- () => ((x => x(y)))(x => x);
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTApp(
+      ASTClosureMock(
+        ASTReturn(
+          ASTApp(
+            ASTLocal(1, "x"),
+            ASTArgumentSequence(
+              ASTGlobal("y")
+            )
+          )
+        ),
+        ASTImplicitReturn(
+          ASTLiteral(nil)
+        )
+      ),
+      ASTArgumentSequence(
+        ASTClosureMock(
+          ASTReturn(
+            ASTLocal(1, "x")
+          ),
+          ASTImplicitReturn(
+            ASTLiteral(nil)
+          )
+        )
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTGlobal("y")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- () => ((x => x(x)))(x => x);
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTReturn(
+        ASTLocal(1, "x")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
