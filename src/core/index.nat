@@ -8,7 +8,6 @@ import core/sequential
 import core/map
 import core/set
 import core/tree
-import core/assertion
 import core/functional
 import core/string
 import core/ast

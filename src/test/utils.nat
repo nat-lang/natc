@@ -1,9 +1,15 @@
 let begin = () => {
   let start = clock();
-  return (name) => {
+  return name => {
     let end = clock() - start;
-    print name + " ok " + "(" + str(end) + "s)";
+    print "#{name} ok (#{end}s)";
   };
+};
+
+class AssertionFailure extends Error {}
+
+let assert = condition => {
+  if (!condition) throw AssertionFailure("");
 };
 
 let typecheck = x => assert(TypeSystem.typecheck(x).success());
