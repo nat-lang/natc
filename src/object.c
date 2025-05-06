@@ -441,9 +441,12 @@ void printObject(Value value) {
       printf("<function %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
-    case OBJ_OVERLOAD:
-      printf("<overload at %p>", AS_OVERLOAD(value));
+    case OBJ_OVERLOAD: {
+      ObjOverload* obj = AS_OVERLOAD(value);
+      printf("<overload %s at %p>", obj->closures[0]->function->name->chars,
+             obj);
       break;
+    }
     case OBJ_VARIABLE:
       printf("<var %s>", AS_VARIABLE(value)->name->chars);
       break;
