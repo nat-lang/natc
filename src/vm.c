@@ -139,6 +139,8 @@ bool initVM() {
 
   vm.compiler = NULL;
   vm.module = NULL;
+  vm.comprehensions = NULL;
+  vm.comprehensionDepth = 0;
 
   initMap(&vm.globals);
   initMap(&vm.strings);
@@ -154,6 +156,8 @@ bool initVM() {
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
+
+  // freeValueArray(&vm.comprehension);
 
   initCore(&vm.core);
 
@@ -997,13 +1001,14 @@ InterpretResult vmExecute(int baseFrame) {
         if (isFalsey(vmPeek(0))) frame->ip += offset;
         break;
       }
-
       case OP_ITER:
       case OP_COMPREHENSION_ITER: {
         uint16_t offset = READ_SHORT();
         uint8_t* ip = frame->ip;
         uint16_t local = READ_SHORT();
-        Value iterator = vmPeek(0);
+        uint8_t iter = READ_SHORT();
+
+        Value iterator = frame->slots[iter];
 
         vmPush(iterator);
         if (!vmExecuteMethod("more", 0)) return INTERPRET_RUNTIME_ERROR;
@@ -1128,13 +1133,35 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_COMPREHENSION: {
+        ValueArray comp;
+        initValueArray(&comp);
+        vm.comprehensions = &comp;
+
+        Value klass = vmPeek(0);
         vmClosure(frame);
         if (!vmCallValue(vmPeek(0), 0)) return INTERPRET_RUNTIME_ERROR;
+        if (vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+          return INTERPRET_RUNTIME_ERROR;
+        vmPop();  // nil.
+
+        int count = comp.count;
+
+        while (comp.count > 0) {
+          Value el = shiftValueArray(&comp);
+
+          vmPush(el);
+        }
+
+        vmCallValue(klass, count);
+
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
-      case OP_COMPREHENSION_BODY:
+      case OP_COMPREHENSION_BODY: {
+        Value element = vmPop();
+        writeValueArray(&vm.comprehensions[vm.comprehensionDepth - 1], element);
         break;
+      }
       case OP_OVERLOAD: {
         if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
         break;

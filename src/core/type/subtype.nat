@@ -96,7 +96,7 @@ class SubtypeState extends SimpleTypeState {
       return void;
     }
 
-    if (node is ASTConditional) {
+    if (node is ASTConditional || node is ASTComprehensionPred) {
       let condition = node[0],
           consequent = node[1];
       
@@ -104,6 +104,22 @@ class SubtypeState extends SimpleTypeState {
           tConsequent = this.principal(consequent);
 
       this.constraints.push(tCondition <| bool);
+      return void;
+    }
+
+    if (node is ASTComprehensionBody)
+      return this.constrain(node[0]);
+
+    if (node is ASTComprehensionIter) {
+      let var = node[0],
+          iter = node[1], // ASTApp
+          args = iter[1], // ASTArgumentSequence
+          obj = args[0];
+  
+      let tVar = this.principal(var);
+      let tObj = this.principal(obj);
+
+      this.constraints.push(tObj <| TCollection(tVar));
       return void;
     }
 
@@ -157,7 +173,19 @@ class SubtypeState extends SimpleTypeState {
   );
 }
 
-class SubtypeSystem extends SimpleTypeSystem {}
+class SubtypeSystem extends SimpleTypeSystem {
+  _typecheck(expr, debug) => {
+    let node <- expr;
+    let state = this.TypeStateClass(this, debug);
+
+    node = state.transform(node);
+
+    state.constrain(node);
+    state.solve();
+
+    return state;
+  }
+}
 
 SubtypeSystem.ConstraintClass = SubtypeConstraint;
 SubtypeSystem.TypeStateClass = SubtypeState;

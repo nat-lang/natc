@@ -75,6 +75,7 @@ class CompositionSystem {
           right = this.evaluate(node[1]);
 
       for (rule in this.binaryRules) {
+
         let data = rule(left.data, right.data);
 
         if (data != undefined)

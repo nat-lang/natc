@@ -25,7 +25,7 @@ typedef struct {
   // local slot of the bound variable.
   int var;
   // local slot of the object that implements the protocol.
-  int iter;
+  uint8_t obj;
   // stack offset of the first instruction of the body.
   int loopStart;
 } Iterator;

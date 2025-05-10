@@ -127,6 +127,10 @@ typedef struct {
 
   // currently executing module.
   ObjModule* module;
+  // comprehension under construction.
+
+  ValueArray* comprehensions;
+  int comprehensionDepth;
 } VM;
 
 typedef enum {

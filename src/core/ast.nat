@@ -242,7 +242,7 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
-  str() => "ASTLiteral(#{str(this.value)})";
+  str() => "ASTLiteral(#{this.value})";
   tex() => this.value;
 
   resolve() => this.value;
@@ -526,10 +526,22 @@ class ASTClosure extends ASTExpr {
   }
 }
 
-class ASTComprehension extends ASTClosure {}
 class ASTComprehensionBody extends ASTExpr {}
 class ASTComprehensionPred extends ASTConditional {}
 class ASTComprehensionIter extends ASTIterate {}
+
+class ASTComprehension extends ASTClosure {
+  iterator() => {
+
+  }
+  predicates() => {
+
+  }
+  body() => {
+    
+  }
+}
+
 
 class ASTMethod extends ASTExpr {
   init(klass, method, receiver, closure) => {

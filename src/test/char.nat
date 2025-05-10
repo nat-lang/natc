@@ -1,0 +1,43 @@
+import test/prelude
+
+// The universe.
+
+const Katy, Perry, Mick, Jagger;
+
+dom e = {Katy, Perry, Mick, Jagger};
+
+let Linguist = {Perry, Jagger};
+let Met = {(Katy, Jagger), (Perry, Mick)};
+
+// Type constructor for characteristic
+// function of a set of x's.
+
+let S = x => x -> t;
+
+// Type shifters. The Grammar already has
+// function application, predicate modification,
+// and predicate abstraction.
+
+let +wh : ((e -> t) -> t) -> (e -> S(t)) -> S(t)
+        = q f p => q(x => p in f(x));
+
+// Here 'v' and 'w' are type variables.
+
+let eta: v -> S(v) = x y => x == y;
+
+let infix >>= : (S(v), (v -> S(w))) -> S(w)
+              = (m, f) => union({f(x) | x in m});
+
+let lower : S(t) -> t
+          = m => true in m;
+
+grammar.addRules(eta, >>=);
+
+// Lexical denotations.
+
+let a-linguist = Linguist;
+let met = x y f => f(x)(y) == (x,y) in Met;
+
+// Examples.
+
+ex [a-linguist [1 [met Mick]]];

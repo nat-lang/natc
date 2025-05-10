@@ -406,8 +406,9 @@ bool astIter(CallFrame* frame, Value root, char* method) {
   uint16_t offset = READ_SHORT();
   uint8_t* ip = frame->ip;
   uint16_t local = READ_SHORT();
+  uint8_t iter = READ_SHORT();
 
-  Value iterator = vmPeek(0);
+  Value iterator = frame->slots[iter];
 
   vmPush(root);
   // local slot.

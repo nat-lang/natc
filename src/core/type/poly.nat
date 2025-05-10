@@ -57,6 +57,11 @@ class TGeneralization extends TAbstract {
 
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
+    if (node is ASTComprehension) {
+      print "hey what about me?";
+      return this.constrainFnRange(node).apply(this.solution);
+    }
+
     if (node is ASTClosure) {
       let tParams = this.constrainFnDomain(node),
           tReturns = this.constrainFnRange(node);
@@ -136,6 +141,8 @@ class PolyTypeSystem extends AdhocTypeSystem {
     if (value == Tuple)
       return TAbstract((*types) => TProduct(..types) -> TProduct(..types));
 
+    // in lieu of the generality required to reconstruct
+    // element type from Set.__init__ and its arguments.
     if (value == Set) {
       return TAbstract((*types) => {
         let element;

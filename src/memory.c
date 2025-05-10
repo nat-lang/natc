@@ -274,6 +274,8 @@ static void markRoots() {
   markMap(&vm.methodInfixes);
 
   markObject((Obj*)vm.module);
+  for (int i = 0; i < vm.comprehensionDepth; i++)
+    markArray(&vm.comprehensions[i]);
 
   markObject((Obj*)vm.core.sName);
   markObject((Obj*)vm.core.sArity);

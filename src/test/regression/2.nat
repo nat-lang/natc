@@ -1,0 +1,141 @@
+import test/prelude
+
+const Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel, Ursula, Sebastian, Sam;
+
+dom e = {Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel, Ursula, Sebastian, Sam};
+
+// common nouns.
+
+let Singer = {};
+let singer: e -> t = x => x in Singer;
+
+let Millionaire = {};
+let millionaire: e -> t = x => x in Millionaire;
+
+let Norwegian = {};
+let norwegian: e -> t = x => x in Norwegian;
+
+let Guy = {};
+let guy: e -> t = x => x in Guy;
+
+// intransitive verbs.
+
+let Smile = {};
+let smiled: e -> t = x => x in Smile;
+
+let Smoke = {};
+let smokes: e -> t = x => x in Smoke;
+
+let Drink = {};
+let drinks: e -> t = x => x in Drink;
+
+// transitive verbs.
+
+// fixme.
+// let TransitiveVerb
+//   : {(e,e)} -> e -> e -> t
+//   = relation x y => (x,y) in relation;
+// let Love = {(Agnetha, Agnetha)};
+// let loves = TransitiveVerb(Love);
+
+let Love = {(Agnetha, Agnetha)};
+let loves: e -> e -> t = x y => (x,y) in Love;
+
+let Shave = {};
+let shaves: e -> e -> t = x y => (x,y) in Shave;
+
+let Like = {(Agnetha, Agnetha)};
+let likes: e -> e -> t = x y => (x,y) in Like;
+
+// ditransitive verbs.
+
+let Introduce = {(Benny,Agnetha,Bjorn)};
+let introduced: e -> e -> e -> t = x y z => (x,y,z) in Introduce;
+
+// prepositions.
+
+let to : e -> (e -> e -> t) -> e -> t
+       = x p y => p(x)(y);
+
+let self1 : (e -> e -> t) -> e -> t
+          = p x => p(x)(x);
+
+let self2 : (e -> e -> e -> t) -> e -> e -> t
+          = p x y => p(x)(y)(y);
+
+let self3 : (e -> e -> e -> t) -> e -> e -> t
+          = p x y => p(x)(y)(x);
+
+let With = {};
+let with: e -> e -> t = x y => (x,y) in With;
+
+let of: e -> e = x => x;
+
+// 1-place adjectives.
+
+let Kind = {};
+let kind: e -> t = x => x in Kind;
+
+let Snore = {};
+let snores: e -> t = x => x in Snore;
+
+// 2-place adjectives.
+
+let Proud = {};
+let proud: e -> e -> t = x y => (x,y) in Proud;
+
+let Hug = {};
+let hugged: e -> e -> t = x y => (x,y) in Hug;
+
+let Afraid = {};
+let afraid: e -> e -> t = x y => (x,y) in Afraid;
+
+// copula.
+
+let is': (e -> t) -> e -> t = p => p;
+let does = x => x;
+
+// negation.
+
+// quantifiers.
+
+let everybody: (e -> t) -> t = p => for all (x in e) p(x);
+let somebody: (e -> t) -> t = p => for some (x in e) p(x);
+let nobody: (e -> t) -> t = p => for no (x in e) p(x);
+
+// determiners.
+
+let a : (e -> t) -> e -> t
+      = p => p;
+
+let some : (e -> t) -> (e -> t) -> t
+         = p q => for some (x in e) p(x) and q(x);
+
+let no : (e -> t) -> (e -> t) -> t
+       = p q => for no (x in e) p(x) and q(x);
+
+let every : (e -> t) -> (e -> t) -> t
+          = p q => for all (x in e) !p(x) or q(x);
+
+// coordination.
+
+let or': (e -> t) -> (e -> t) -> (e -> t) = p q x => p(x) or q(x);
+
+// composition rules.
+
+let QuantificationalObject = (r, q) => x => q(z => r(z)(x));
+
+grammar.addRules(QuantificationalObject);
+
+let infix * = QuantificationalObject;
+
+// let z <- x => nobody(z => likes(z)(x)); // likes * nobody;
+
+let z <- likes * nobody;
+
+print z.tex();
+
+let z' = z.simplify();
+z'.pp();
+print z'.tex();
+// [Benny [[introduced Agnetha] [to Bjorn]]];

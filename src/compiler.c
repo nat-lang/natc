@@ -84,7 +84,7 @@ static void errorAtCurrent(Compiler* cmp, const char* message) {
 
 static void initIterator(Iterator* iter) {
   iter->var = 0;
-  iter->iter = 0;
+  iter->obj = 0;
   iter->loopStart = 0;
 }
 
@@ -669,7 +669,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   emitBytes(cmp, OP_CALL, 1);
   emitBytes(cmp, OP_CALL, 2);
 
-  // pretend the
+  // pretend the next token is an opening string literal.
   rewindScanner(parser.current);
   parser.next = scanVirtualToken('"');
 
@@ -798,16 +798,14 @@ static void this_(Compiler* cmp, bool canAssign) {
 static void unary(Compiler* cmp, bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
-  // compile the operand.
   parsePrecedence(cmp, PREC_UNARY);
 
-  // emit the operator instruction.
   switch (operatorType) {
     case TOKEN_BANG:
       emitByte(cmp, OP_NOT);
       break;
     default:
-      return;  // Unreachable.
+      return;  // unreachable.
   }
 }
 
@@ -1173,7 +1171,7 @@ static Iterator iterator(Compiler* cmp) {
   // turn the expression into an iterator instance and store it.
   getGlobalConstant(cmp, S_ITER);
   emitBytes(cmp, OP_CALL_POSTFIX, 1);
-  iter.iter = addLocal(cmp, syntheticToken("#iter"));
+  iter.obj = addLocal(cmp, syntheticToken("#iter"));
   markInitialized(cmp);
 
   iter.loopStart = cmp->function->chunk.count;
@@ -1181,9 +1179,10 @@ static Iterator iterator(Compiler* cmp) {
   return iter;
 }
 
-static int iterationNext(Compiler* cmp, Iterator iter) {
-  int exitJump = emitJump(cmp, OP_ITER);
+static int iterationNext(Compiler* cmp, Iterator iter, OpCode instr) {
+  int exitJump = emitJump(cmp, instr);
   emitConstant(cmp, iter.var);
+  emitConstant(cmp, iter.obj);
 
   return exitJump;
 }
@@ -1196,7 +1195,7 @@ static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
 static void forInStatement(Compiler* cmp) {
   Iterator iter = iterator(cmp);
   consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
-  int exitJump = iterationNext(cmp, iter);
+  int exitJump = iterationNext(cmp, iter, OP_ITER);
   statement(cmp);
   iterationEnd(cmp, iter, exitJump);
 }
@@ -1239,8 +1238,8 @@ static void forQuantification(Compiler* enclosing, bool canAssign) {
 // Parse a comprehension, given a [Parser] that points at the body,
 // the stack address [var] of the object under construction, and the
 // type of [closingToken].
-Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
-                     TokenType closingToken) {
+Parser comprehension(Compiler* cmp, Parser checkpointA, TokenType closingToken,
+                     char* klass) {
   Iterator iter;
 
   int iterJump = -1;
@@ -1252,8 +1251,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // bound variable and iterable to draw from.
     beginScope(cmp);
     iter = iterator(cmp);
-    iterJump = emitJump(cmp, OP_COMPREHENSION_ITER);
-    emitConstant(cmp, iter.var);
+    iterJump = iterationNext(cmp, iter, OP_COMPREHENSION_ITER);
   } else {
     // a predicate to test against.
     expression(cmp);
@@ -1267,20 +1265,15 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // variables will be in scope in every condition
     // to their right, and all we have to do is conclude
     // each scope at the end of this function.
-    checkpointB = comprehension(cmp, checkpointA, var, closingToken);
+    checkpointB = comprehension(cmp, checkpointA, closingToken, klass);
   } else if (check(closingToken)) {
     // now we parse the body, first saving the point
-    // where the generator ends.
+    // where the generating clauses end.
     checkpointB = saveParser();
     gotoParser(checkpointA);
 
-    // parse the expression, load the comprehension, and append.
     expression(cmp);
-    emitConstInstr(cmp, OP_GET_LOCAL, var);
-    getProperty(cmp, S_ADD);
-    emitBytes(cmp, OP_CALL_POSTFIX, 1);
     emitByte(cmp, OP_COMPREHENSION_BODY);
-    emitByte(cmp, OP_POP);
   }
 
   if (iterJump != -1) {
@@ -1308,30 +1301,25 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
                              TokenType openingToken, TokenType closingToken) {
   // we need to save our location for two reasons:
   // (a) if it *is* a comprehension, we can't parse the body
-  //  until we've parsed the conditions;
-  // (b) if it *isn't*, we need to rewind after we've looked ahead
-  //  and established that it isn't.
+  //  until we've parsed the conditions, since they introduce
+  //  variables that are in scope in the body;
+  // (b) if it *isn't*, we need to rewind and parse something else.
   Parser checkpointA = saveParser();
 
+  // the disambiguating feature of the comprehension is its pipe.
   if (advanceTo(enclosing, TOKEN_PIPE, closingToken, 1)) {
     advance(enclosing);  // eat the pipe.
+
+    getGlobalConstant(enclosing, klass);
+    addLocal(enclosing, syntheticToken("#comprehension-class"));
+    markInitialized(enclosing);
 
     Compiler cmp;
     initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS,
                  syntheticToken("#comprehension"));
     beginScope(&cmp);
 
-    // init the comprehension instance at local 0. we'll load
-    // it when we hit the bottom of the condition clauses.
-    nativeCall(&cmp, klass);
-    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
-    markInitialized(&cmp);
-
-    Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
-
-    // return the comprehension instance.
-    emitConstInstr(&cmp, OP_GET_LOCAL, var);
-    emitByte(&cmp, OP_RETURN);
+    Parser checkpointB = comprehension(&cmp, checkpointA, closingToken, klass);
     closeFunction(&cmp, enclosing, OP_COMPREHENSION);
 
     // pick up at the end of the expression.

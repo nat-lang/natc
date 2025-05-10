@@ -31,6 +31,11 @@ void freeValueArray(ValueArray* array) {
 
 Value popValueArray(ValueArray* array) { return array->values[--array->count]; }
 
+Value shiftValueArray(ValueArray* array) {
+  array->count--;
+  return *array->values++;
+}
+
 bool findInValueArray(ValueArray* array, Value value) {
   for (int i = 0; i < array->count; i++) {
     if (valuesEqual(array->values[i], value)) return true;

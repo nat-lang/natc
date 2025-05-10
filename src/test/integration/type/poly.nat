@@ -377,3 +377,19 @@ assert(t == num -> (num -> num));
 
 let t = instantiate(f, 1, true);
 assert(t == bool -> (num -> bool));
+
+// the poly type system types tuples and sets.
+
+// ...
+
+// iteration.
+
+typecheck(() => ({1 | true}));
+typecheck(() => ({1 | false}));
+
+typefail(() => ({x | x in false}));
+typefail(() => ({x | x in nil}));
+typefail(() => ({x | x in 1}));
+
+typecheck(() => ({x | x in [1,2]}));
+typecheck(() => ({x | x in {1,2}}));

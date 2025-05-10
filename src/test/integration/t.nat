@@ -1,0 +1,8 @@
+import test/utils
+
+typecheck(() => ({x | x in [1,2]}));
+
+
+let z = SubtypeSystem.typecheck(() => ({x | x in {1,2}}));
+
+print z;

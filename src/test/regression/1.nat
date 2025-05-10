@@ -1,0 +1,8 @@
+const Agnetha;
+dom e = {Agnetha};
+dom t = {true,false};
+let T2
+  : TSet(TProduct(e,e)) -> e -> e -> t
+  = relation x y => (x,y) in relation;
+let Love = {(Agnetha, Agnetha)};
+let loves = T2(Love);

@@ -44,7 +44,7 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk,
   printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
   return offset + 3;
 }
-
+/*
 static int iterInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t jump = readShort(chunk, offset);
   uint16_t slot = readShort(chunk, offset + 2);
@@ -53,6 +53,18 @@ static int iterInstruction(const char* name, Chunk* chunk, int offset) {
          slot);
 
   return offset + 3 + 2;
+}
+*/
+
+static int iterInstruction(const char* name, Chunk* chunk, int offset) {
+  uint16_t jump = readShort(chunk, offset);
+  uint16_t varSlot = readShort(chunk, offset + 2);
+  uint8_t objSlot = readShort(chunk, offset + 4);
+
+  printf("%-16s %4d -> %d (var: %d, obj: %d)\n", name, offset,
+         offset + 3 + 1 * jump, varSlot, objSlot);
+
+  return offset + 3 + 2 + 2;
 }
 
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {

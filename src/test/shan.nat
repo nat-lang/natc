@@ -1,0 +1,12 @@
+import test/prelude
+
+let M = a => a -> t;
+let unit: u -> M(u) = a => ({a});
+
+let infix >>=
+    : (M(u), v -> M(v)) -> M(v) 
+    = (m, k) => union({k(a) | a in m});
+
+print type(unit).str();
+
+

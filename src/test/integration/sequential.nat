@@ -126,6 +126,12 @@ assert(seq == [
   [3,3],[3,2],[3,1]
 ]);
 
+// vacuous iterable condition.
+
+seq = [x | x in [1,2,3,4], y in [1,2]];
+
+assert(seq == [1,2,3,4]);
+
 // vacuous condition.
 
 seq = [a | a in [1,2,3], true];
