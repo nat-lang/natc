@@ -548,15 +548,14 @@ class SimpleTypeState {
     }
 
     // collection types of equal length become pairwise sequences of constraints.
-    if (left is TCollection and right is TCollection) {
-      if (len(left) == len(right)) {
-        this.constraints.extend(
-          zip(left.elements, right.elements).map(x => x[0] ~ x[1])
-        );
-        return this.solve();
-      }
-      
-      return false;
+    if (left is TCollection && right is TCollection) {
+      if (len(left) != len(right))
+        return false;
+
+      this.constraints.extend(
+        zip(left.elements, right.elements).map(x => x[0] ~ x[1])
+      );
+      return this.solve();
     }
 
     return left == right;

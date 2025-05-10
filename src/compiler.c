@@ -84,7 +84,7 @@ static void errorAtCurrent(Compiler* cmp, const char* message) {
 
 static void initIterator(Iterator* iter) {
   iter->var = 0;
-  iter->iter = 0;
+  iter->obj = 0;
   iter->loopStart = 0;
 }
 
@@ -669,7 +669,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   emitBytes(cmp, OP_CALL, 1);
   emitBytes(cmp, OP_CALL, 2);
 
-  // pretend the
+  // pretend the next token is an opening string literal.
   rewindScanner(parser.current);
   parser.next = scanVirtualToken('"');
 
@@ -807,7 +807,7 @@ static void unary(Compiler* cmp, bool canAssign) {
       emitByte(cmp, OP_NOT);
       break;
     default:
-      return;  // Unreachable.
+      return;  // unreachable.
   }
 }
 
@@ -1173,7 +1173,7 @@ static Iterator iterator(Compiler* cmp) {
   // turn the expression into an iterator instance and store it.
   getGlobalConstant(cmp, S_ITER);
   emitBytes(cmp, OP_CALL_POSTFIX, 1);
-  iter.iter = addLocal(cmp, syntheticToken("#iter"));
+  iter.obj = addLocal(cmp, syntheticToken("#iter"));
   markInitialized(cmp);
 
   iter.loopStart = cmp->function->chunk.count;
@@ -1323,9 +1323,13 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
 
     // init the comprehension instance at local 0. we'll load
     // it when we hit the bottom of the condition clauses.
-    nativeCall(&cmp, klass);
+
     int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
-    markInitialized(&cmp);
+    emitByte(&cmp, OP_UNDEFINED);
+    defineVariable(&cmp, var);
+    nativeCall(&cmp, klass);
+    setVariable(&cmp, var);
+    emitByte(&cmp, OP_POP);
 
     Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
 

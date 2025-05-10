@@ -57,6 +57,28 @@ class TGeneralization extends TAbstract {
 
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
+    if (node is ASTComprehension) {
+      print "hey what about me?";
+      node.pp();
+      return this.constrainFnRange(node).apply(this.solution);
+    }
+
+    if (node is ASTComprehensionBody)
+      return this.constrain(node[0]);
+
+    if (node is ASTComprehensionIter) {
+      let var = node[0],
+          iter = node[1], // ASTApp
+          args = iter[1], // ASTArgumentSequence
+          obj = args[0];
+
+      let tVar = this.principal(var);
+      let tObj = this.principal(obj);
+
+      this.constraints.push(tObj <| TCollection(tVar));
+      return void;
+    }
+  
     if (node is ASTClosure) {
       let tParams = this.constrainFnDomain(node),
           tReturns = this.constrainFnRange(node);
