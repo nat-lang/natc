@@ -668,6 +668,13 @@ let f <- () => ({ 1 | true });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionPred(
         ASTLiteral(true),
         ASTBlockMock(
@@ -708,6 +715,13 @@ let f <- () => ({ 1 | x in [1,2] });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
         ASTApp(
@@ -754,6 +768,13 @@ let f <- () => ({ x | x in [1,2] });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
         ASTApp(
@@ -800,6 +821,13 @@ let f <- () => ({ x | true, x in [1,2] });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionPred(
         ASTLiteral(true),
         ASTBlockMock(
@@ -857,6 +885,13 @@ let f <- () => ({ x | x in [1,2], true });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
         ASTApp(
@@ -908,6 +943,13 @@ let f <- () => ({ x | true, x in [1,2], false });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionPred(
         ASTLiteral(true),
         ASTBlockMock(
@@ -972,12 +1014,26 @@ let f <- () => ({ x | x in { x | x in z}});
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
         ASTApp(
           ASTGlobal("iter"),
           ASTArgumentSequence(
             ASTComprehensionMock(
+              ASTLocalValueAssignment(
+                ASTLocal(2, "#comprehension-instance"),
+                ASTApp(
+                  ASTGlobal("Set"),
+                  ASTArgumentSequence()
+                )
+              ),
               ASTComprehensionIter(
                 ASTLocal(2, "x"),
                 ASTApp(
@@ -1041,6 +1097,13 @@ let f <- () => ({{ y | y in x} | x in z});
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
         ASTApp(
@@ -1058,6 +1121,13 @@ assert(f == ASTClosureMock(
               ),
               ASTArgumentSequence(
                 ASTComprehensionMock(
+                  ASTLocalValueAssignment(
+                    ASTLocal(1, "#comprehension-instance"),
+                    ASTApp(
+                      ASTGlobal("Set"),
+                      ASTArgumentSequence()
+                    )
+                  ),
                   ASTComprehensionIter(
                     ASTLocal(2, "y"),
                     ASTApp(
@@ -1112,6 +1182,13 @@ let f <- () => ({ 1 | (() => { for (x in y) if (z) k; })() });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionPred(
         ASTApp(
           ASTClosureMock(
@@ -1180,6 +1257,13 @@ let f <- () => ({ (() => { for (x in y) if (z) k; })() | true });
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTComprehensionMock(
+      ASTLocalValueAssignment(
+        ASTLocal(1, "#comprehension-instance"),
+        ASTApp(
+          ASTGlobal("Set"),
+          ASTArgumentSequence()
+        )
+      ),
       ASTComprehensionPred(
         ASTLiteral(true),
         ASTBlockMock(
@@ -2136,6 +2220,19 @@ assert(f' == ASTClosureMock(
         ASTLiteral(nil)
       )
     )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// exceptions.
+
+let f <- () => { throw z; };
+
+assert(f == ASTClosureMock(
+  ASTThrow(
+    ASTGlobal("z")
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)

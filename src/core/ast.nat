@@ -142,6 +142,11 @@ class ASTNode extends Tree {
     this.children.push(assignment);
   }
 
+  opThrow(exc) => {
+    let node = ASTThrow(exc);
+    this.children.push(node);
+  }
+
   opReturn(expr) => {
     let node = ASTReturn(expr);
     this.children.push(node);
@@ -198,6 +203,8 @@ class ASTLocalValueAssignment extends ASTAssignment {}
 class ASTLocalTypeAssignment extends ASTTypeAssignment {}
 class ASTGlobalValueAssignment extends ASTAssignment {}
 class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
+
+class ASTThrow extends ASTStatement {}
 
 class ASTReturn extends ASTStatement {
   tex() => join([n.tex() | n in this.children], " ");

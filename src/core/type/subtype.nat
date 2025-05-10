@@ -47,6 +47,9 @@ let infix(6) <| = SubtypeConstraint;
 class SubtypeState extends SimpleTypeState {
   constrain(node: ASTNode) => {
     if (node is ASTApp) {
+      // method invocation.
+      if (node[0] is ASTPropertyAccess) {}
+
       let func = node[0];
       let args = node[1];
 

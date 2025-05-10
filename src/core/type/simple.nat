@@ -355,7 +355,6 @@ class SimpleTypeState {
     let returnTypes = node.children.reduce(
       (types, node) => {
         let tNode = this.principal(node);
-
         if (node is ASTReturn) types.push(tNode);
 
         return types;
@@ -482,6 +481,12 @@ class SimpleTypeState {
     if (node is ASTExprStatement)
       return this.principal(node[0]);
 
+    if (node is ASTThrow) {
+      let exc = node[0];
+      let tExc = this.principal(exc);
+      this.constraints.push(tExc ~ TClass(Error));
+      return void;
+    }
     if (node is ASTReturn) 
       return this.principal(node[0]);
     

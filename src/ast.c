@@ -323,6 +323,14 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(obj);
       OK_IF(vmExecuteMethod("opMember", 2));
     }
+    case OP_THROW: {
+      Value exc = vmPop();
+      vmPush(root);
+      vmPush(exc);
+      FAIL_UNLESS(vmExecuteMethod("opThrow", 1));
+      vmPop();
+      return AST_INSTRUCTION_OK;
+    }
     case OP_IMPORT: {
       ObjModule* module = AS_MODULE(READ_CONSTANT());
 
@@ -406,7 +414,6 @@ bool astIter(CallFrame* frame, Value root, char* method) {
   uint16_t offset = READ_SHORT();
   uint8_t* ip = frame->ip;
   uint16_t local = READ_SHORT();
-
   Value iterator = vmPeek(0);
 
   vmPush(root);
