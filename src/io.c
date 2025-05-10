@@ -1,13 +1,15 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
 #include "vm.h"
 
-char* qualifyPath(const char* path) {
+char* withNatExt(const char* path) {
   static char buf[256];
 
   snprintf(buf, sizeof(buf), "%s%s", path, NAT_EXT);
@@ -52,10 +54,16 @@ char* readFile(const char* path) {
   return buffer;
 }
 
+bool fileExists(const char* filename) {
+  struct stat buffer;
+  return (stat(filename, &buffer) == 0);
+}
+
 char* readSource(const char* path) {
-  char* qualifiedPath = qualifyPath(path);
-  char* source = readFile(qualifiedPath);
-  return source;
+  if (fileExists(path))
+    return readFile(path);
+  else
+    return readFile(withNatExt(path));
 }
 
 char* readRelativeSource(const char* path) {

@@ -47,14 +47,14 @@ void vmRuntimeError(const char* format, ...) {
 
     // it's a script.
     if (frame->closure->function->module->closure == frame->closure) {
-      fprintf(stderr, "        %*s %s%s:%d\n", leftOffset, "in",
-              function->module->path->chars, NAT_EXT,
+      fprintf(stderr, "        %*s %s:%d\n", leftOffset, "in",
+              function->module->path->chars,
               function->chunk.lines[instruction]);
 
     } else {
       // it's a function.
-      fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset,
-              function->name->chars, function->module->path->chars, NAT_EXT,
+      fprintf(stderr, "  in %-*s at %s:%d\n", leftOffset, function->name->chars,
+              function->module->path->chars,
               function->chunk.lines[instruction]);
     }
   }
