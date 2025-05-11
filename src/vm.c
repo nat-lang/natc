@@ -139,7 +139,9 @@ bool initVM() {
 
   vm.compiler = NULL;
   vm.module = NULL;
+  vm.comprehensionDepth = 0;
 
+  initMap(&vm.comprehensions);
   initMap(&vm.globals);
   initMap(&vm.strings);
   initMap(&vm.prefixes);
@@ -1128,13 +1130,37 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_COMPREHENSION: {
+        Value obj = vmPeek(0);
+        mapSet(&vm.comprehensions, NUMBER_VAL(++vm.comprehensionDepth), obj);
+
         vmClosure(frame);
-        if (!vmCallValue(vmPeek(0), 0)) return INTERPRET_RUNTIME_ERROR;
-        frame = &vm.frames[vm.frameCount - 1];
+        if (!vmCallValue(vmPeek(0), 0) ||
+            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+          return INTERPRET_RUNTIME_ERROR;
+        vmPop();  // nil.
+
+        vm.comprehensionDepth--;
+
         break;
       }
-      case OP_COMPREHENSION_BODY:
+      case OP_COMPREHENSION_BODY: {
+        Value comp;
+        if (!mapGet(&vm.comprehensions, NUMBER_VAL(vm.comprehensionDepth),
+                    &comp)) {
+          vmRuntimeError("Missing comprehension at depth %d.",
+                         vm.comprehensionDepth);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        Value el = vmPeek(0);
+        vmPush(comp);
+        vmPush(el);
+
+        if (!vmExecuteMethod("add", 1)) return INTERPRET_RUNTIME_ERROR;
+
+        vmPop();
         break;
+      }
       case OP_OVERLOAD: {
         if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
         break;

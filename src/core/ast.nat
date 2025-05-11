@@ -461,9 +461,8 @@ class ASTClosure extends ASTExpr {
 
     if (enclosing == nil)
       this.upvalues = Map();
-    else {
+    else
       this.upvalues = enclosing.upvalues.copy();
-    }
 
     for (val in upvalues) {
       if (!this.upvalues[val.id])
@@ -533,7 +532,13 @@ class ASTClosure extends ASTExpr {
   }
 }
 
-class ASTComprehension extends ASTClosure {}
+class ASTComprehension extends ASTClosure {
+  init(instance, enclosing, function, upvalues, *children) => {
+    this.instance = instance;
+    super.init(enclosing, function, upvalues, ..children);
+  }
+  __eq__(that) => this.instance == that.instance && super.__eq__(that);
+}
 class ASTComprehensionBody extends ASTExpr {}
 class ASTComprehensionPred extends ASTConditional {}
 class ASTComprehensionIter extends ASTIterate {}

@@ -127,6 +127,9 @@ typedef struct {
 
   // currently executing module.
   ObjModule* module;
+
+  int comprehensionDepth;
+  ObjMap comprehensions;
 } VM;
 
 typedef enum {

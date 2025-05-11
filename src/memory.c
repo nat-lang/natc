@@ -268,6 +268,7 @@ static void markRoots() {
     markObject((Obj*)upvalue);
   }
 
+  markMap(&vm.comprehensions);
   markMap(&vm.globals);
   markMap(&vm.prefixes);
   markMap(&vm.infixes);

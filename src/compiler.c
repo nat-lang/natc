@@ -1239,7 +1239,7 @@ static void forQuantification(Compiler* enclosing, bool canAssign) {
 // Parse a comprehension, given a [Parser] that points at the body,
 // the stack address [var] of the object under construction, and the
 // type of [closingToken].
-Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
+Parser comprehension(Compiler* cmp, Parser checkpointA,
                      TokenType closingToken) {
   Iterator iter;
 
@@ -1267,7 +1267,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // variables will be in scope in every condition
     // to their right, and all we have to do is conclude
     // each scope at the end of this function.
-    checkpointB = comprehension(cmp, checkpointA, var, closingToken);
+    checkpointB = comprehension(cmp, checkpointA, closingToken);
   } else if (check(closingToken)) {
     // now we parse the body, first saving the point
     // where the generator ends.
@@ -1276,9 +1276,6 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
 
     // parse the expression, load the comprehension, and append.
     expression(cmp);
-    emitConstInstr(cmp, OP_GET_LOCAL, var);
-    getProperty(cmp, S_ADD);
-    emitBytes(cmp, OP_CALL_POSTFIX, 1);
     emitByte(cmp, OP_COMPREHENSION_BODY);
     emitByte(cmp, OP_POP);
   }
@@ -1321,22 +1318,14 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
                  syntheticToken("#comprehension"));
     beginScope(&cmp);
 
-    // init the comprehension instance at local 0. we'll load
-    // it when we hit the bottom of the condition clauses.
+    Parser checkpointB = comprehension(&cmp, checkpointA, closingToken);
 
-    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
-    emitByte(&cmp, OP_UNDEFINED);
-    defineVariable(&cmp, var);
-    nativeCall(&cmp, klass);
-    setVariable(&cmp, var);
-    emitByte(&cmp, OP_POP);
+    nativeCall(enclosing, klass);
 
-    Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
-
-    // return the comprehension instance.
-    emitConstInstr(&cmp, OP_GET_LOCAL, var);
-    emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing, OP_COMPREHENSION);
+    ObjFunction* function = endCompiler(&cmp);
+    emitConstInstr(enclosing, OP_COMPREHENSION,
+                   makeConstant(enclosing, OBJ_VAL(function)));
+    closeUpvalues(function, &cmp, enclosing);
 
     // pick up at the end of the expression.
     gotoParser(checkpointB);
