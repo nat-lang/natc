@@ -1,0 +1,12 @@
+
+
+let a = TSum(TClass(Error));
+let b = TSum(TInstance(Error));
+
+let z = a.disjuncts.elements().values[0];
+let z' = b.disjuncts.elements().values[0];
+
+print hash(z);
+print hash(z');
+print hash(z) == hash(z');
+print z == z';

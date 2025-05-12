@@ -1,0 +1,7 @@
+
+
+let q <- () => { throw Error(""); };
+
+q.pp();
+
+print q[0][0][0].resolve();

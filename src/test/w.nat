@@ -1,0 +1,8 @@
+
+import test/utils
+
+TypeSystem._typecheck(() => { throw Error(""); }, true);
+
+// print PolyTypeSystem._typecheck(() => { let z = 1; return Error.init("foo"); }, true);
+
+// print PolyTypeSystem.type(Error.init).str();

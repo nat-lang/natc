@@ -1,0 +1,2 @@
+let d = {x | x in {1,2}};
+print d.elements().values;

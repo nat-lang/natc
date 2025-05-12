@@ -1,0 +1,7 @@
+
+let k <- () => ({x | x in {1,2}});
+k.pp();
+
+let z = type(() => ({x | x in {1,2}}));
+
+print z.str();

@@ -41,6 +41,7 @@
 
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_COMPREHENSION "ASTComprehension"
+#define S_AST_CLASS_METHOD "ASTClassMethod"
 #define S_AST_METHOD "ASTMethod"
 #define S_AST_EXTERNAL_UPVALUE "ASTExternalUpvalue"
 #define S_AST_INTERNAL_UPVALUE "ASTInternalUpvalue"

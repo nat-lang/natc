@@ -300,7 +300,7 @@ typefail(() => C(true));
 // returns TInstance.
 
 typecheck(() => ((x: A) => {})(A()));
-typecheck(() => ((x: B) => {})(B(1)));
+SimpleTypeSystem._typecheck(() => ((x: B) => {})(B(1)), true);
 
 // fixme: requires class typing.
 // typefail(() => ((x: B) => {})(A()));
@@ -403,3 +403,8 @@ let t = type(@);
 
 assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
 assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
+
+// exceptions.
+
+typecheck(() => { throw Error(""); });
+typefail(() => { throw 1; });

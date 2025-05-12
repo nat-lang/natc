@@ -601,6 +601,7 @@ InterpretResult loadCore() {
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astComprehension = getGlobalClass(S_AST_COMPREHENSION)) ==
           NULL ||
+      (vm.core.astClassMethod = getGlobalClass(S_AST_CLASS_METHOD)) == NULL ||
       (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
       (vm.core.astExternalUpvalue = getGlobalClass(S_AST_EXTERNAL_UPVALUE)) ==
           NULL ||

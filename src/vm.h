@@ -65,7 +65,9 @@ typedef struct {
 
   ObjClass* astClosure;
   ObjClass* astComprehension;
+  ObjClass* astClassMethod;
   ObjClass* astMethod;
+
   ObjClass* astExternalUpvalue;
   ObjClass* astInternalUpvalue;
   ObjClass* astLocal;

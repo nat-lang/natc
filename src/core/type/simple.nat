@@ -148,7 +148,7 @@ class TClassy extends Type {
     this.klass = klass;
   }
   hash() => hash(this.klass);
-  __eq__(that) => this.klass == that.klass;
+  __eq__(that) => this.__class__ == that.__class__ && this.klass == that.klass;
 }
 
 class TClass extends TClassy {
@@ -377,9 +377,6 @@ class SimpleTypeState {
   }
 
   constrain(node: ASTNode) => {
-    if (node is ASTMethod)
-      return this.constrain(node[0]);
-
     if (node is ASTClosure) {
       let tDomain = this.constrainFnDomain(node),
           tRange = this.constrainFnRange(node);
@@ -387,6 +384,18 @@ class SimpleTypeState {
       return (tDomain -> tRange).apply(this.solution);
     }
 
+    if (node is ASTClassMethod) {
+      let clo = node[0];
+      if (node.method.name == "init") {
+        let ret = clo[len(clo.children) - 1], _this = ret[0];
+        this.typeEnv[_this] = TInstance(node.klass);
+      }
+      return this.constrain(clo);
+    }
+  
+    if (node is ASTMethod)
+      return this.constrain(clo);
+  
     if (node is ASTLiteral)
       return this.system.literalType(node.value);
     
@@ -424,10 +433,6 @@ class SimpleTypeState {
     if (node is ASTVariable)
       return this.lookup(node);
 
-      // punt: requires proper class typing.
-    if (node is ASTPropertyAccess)
-      return typeVar();
-
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
 
@@ -463,7 +468,7 @@ class SimpleTypeState {
 
       return void;
     }
-
+  
     if (node is ASTAssignment) {
       let var = node[0];
       let val = node[1];
@@ -481,17 +486,18 @@ class SimpleTypeState {
     if (node is ASTExprStatement)
       return this.principal(node[0]);
 
-    if (node is ASTThrow) {
-      let exc = node[0];
-      let tExc = this.principal(exc);
-      this.constraints.push(tExc ~ TClass(Error));
-      return void;
-    }
     if (node is ASTReturn) 
       return this.principal(node[0]);
     
     if (node is ASTBlock) {
       node.children.map(this.principal);
+      return void;
+    }
+
+    if (node is ASTThrow) {
+      let exc = node[0];
+      let tExc = this.principal(exc);
+      this.constraints.push(tExc ~ TInstance(Error));
       return void;
     }
 
@@ -607,7 +613,7 @@ class SimpleTypeState {
     let node <- expr;
 
     node = this.transform(node);
-    
+
     return this.principal(node);
   }
 
@@ -632,6 +638,7 @@ class SimpleTypeState {
   // Calculate the type of [value], inferring it if necessary.
   type(value) => {
     let type = this.system.literalType(value);
+
     if (type) return type;
 
     type = this.infer(value);

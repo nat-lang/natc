@@ -1466,7 +1466,7 @@ assert(f is ASTMethod);
 
 assert(f.klass == A);
 assert(vType(f.method) == OBoundFunction);
-assert(f.receiver == a);
+assert(f.instance == a);
 assert(f[0] is ASTClosure);
 
 assert(vType(f[0].function) == OFunction);

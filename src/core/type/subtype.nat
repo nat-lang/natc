@@ -80,6 +80,19 @@ class SubtypeState extends SimpleTypeState {
       return bool;
     }
 
+    if (node is ASTThrow) {
+      let exc = node[0];
+      let tExc = this.principal(exc);
+      this.constraints.push(tExc <| TInstance(Error));
+      return void;
+    }
+
+    // punt: requires proper class typing.
+    if (node is ASTPropertyAccess)
+      return typeVar();
+    if (node is ASTPropertyAssignment)
+      return typeVar();
+
     if (node is ASTNegation) {
       let tArg = this.principal(node[0]);
       this.constraints.push(tArg <| (bool % void % undef));
@@ -114,12 +127,13 @@ class SubtypeState extends SimpleTypeState {
   }
 
   _unify(constraint: Constraint) => {
+
     if (constraint is not SubtypeConstraint)
       return super._unify(constraint);
 
     let left = constraint.left,
         right = constraint.right;
-    
+
     if (left is TVar or right is TVar)
       return super._unify(constraint);
 

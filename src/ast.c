@@ -605,22 +605,37 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
     return false;
   }
 
-  if (!IS_INSTANCE(obj->receiver) && !IS_CLASS(obj->receiver)) {
-    vmRuntimeError("Receiver not instance or class.");
-    return false;
+  switch (OBJ_TYPE(obj->receiver)) {
+    case OBJ_INSTANCE: {
+      ObjClosure* closure = obj->bound.method;
+      ObjClass* klass = AS_INSTANCE(obj->receiver)->klass;
+
+      vmPush(OBJ_VAL(vm.core.astMethod));
+      vmPush(OBJ_VAL(klass));
+      vmPush(OBJ_VAL(obj));
+      vmPush(obj->receiver);
+
+      vmPush(OBJ_VAL(closure));
+      if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
+
+      return vmInitInstance(vm.core.astMethod, 4);
+    }
+
+    case OBJ_CLASS: {
+      ObjClosure* closure = obj->bound.method;
+
+      vmPush(OBJ_VAL(vm.core.astClassMethod));
+      vmPush(obj->receiver);
+      vmPush(OBJ_VAL(obj));
+      vmPush(OBJ_VAL(closure));
+      if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
+
+      return vmInitInstance(vm.core.astClassMethod, 3);
+    }
+    default:
+      vmRuntimeError("Receiver not instance or class.");
+      return false;
   }
-
-  ObjClosure* closure = obj->bound.method;
-  ObjClass* klass = AS_INSTANCE(obj->receiver)->klass;
-
-  vmPush(OBJ_VAL(vm.core.astMethod));
-  vmPush(OBJ_VAL(klass));
-  vmPush(OBJ_VAL(obj));
-  vmPush(obj->receiver);
-  vmPush(OBJ_VAL(closure));
-  if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
-
-  return vmInitInstance(vm.core.astMethod, 4);
 }
 
 bool astOverload(ObjOverload* overload) {
