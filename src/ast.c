@@ -270,14 +270,13 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(closure);
       vmInitFrame(AS_CLOSURE(closure), 0);
 
-      // the root of the tree is an [ASTComprehension] instance
-      // that has four arguments.
+      // an [ASTComprehension] instance has four arguments.
       vmPush(OBJ_VAL(vm.core.astComprehension));
-      // (0) the comprehension instance
+      // (0) the object language comprehension instance.
       vmPush(instance);
       // (1) the enclosing function.
       vmPush(root);
-      // (2) the function itself.
+      // (2) the closure that wraps the comprehension construction.
       vmPush(closure);
       // (3) the closure's upvalues.
       if (!astUpvalues(AS_CLOSURE(closure), false)) return AST_INSTRUCTION_FAIL;
@@ -287,7 +286,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       Value astClosure = vmPeek(0);
 
       // the function's arguments are undefined values.
-      // the [ASTClosure] instance occupies the reserved slot.
+      // the [ASTComprehension] instance occupies the reserved slot.
       for (int i = 0; i < AS_CLOSURE(closure)->function->arity; i++)
         vmPush(UNDEF_VAL);
 
@@ -588,6 +587,7 @@ bool astClosure(Value* enclosing, ObjClosure* closure, ObjClass* closureClass) {
   if (!astUpvalues(closure, enclosing == NULL)) return false;
 
   if (!vmInitInstance(closureClass, 3)) return false;
+
   Value astClosure = vmPeek(0);
 
   // the function's arguments are undefined values.
@@ -605,22 +605,37 @@ bool astBoundFunction(Value* enclosing, ObjBoundFunction* obj) {
     return false;
   }
 
-  if (!IS_INSTANCE(obj->receiver) && !IS_CLASS(obj->receiver)) {
-    vmRuntimeError("Receiver not instance or class.");
-    return false;
+  switch (OBJ_TYPE(obj->receiver)) {
+    case OBJ_INSTANCE: {
+      ObjClosure* closure = obj->bound.method;
+      ObjClass* klass = AS_INSTANCE(obj->receiver)->klass;
+
+      vmPush(OBJ_VAL(vm.core.astMethod));
+      vmPush(OBJ_VAL(klass));
+      vmPush(OBJ_VAL(obj));
+      vmPush(obj->receiver);
+
+      vmPush(OBJ_VAL(closure));
+      if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
+
+      return vmInitInstance(vm.core.astMethod, 4);
+    }
+
+    case OBJ_CLASS: {
+      ObjClosure* closure = obj->bound.method;
+
+      vmPush(OBJ_VAL(vm.core.astClassMethod));
+      vmPush(obj->receiver);
+      vmPush(OBJ_VAL(obj));
+      vmPush(OBJ_VAL(closure));
+      if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
+
+      return vmInitInstance(vm.core.astClassMethod, 3);
+    }
+    default:
+      vmRuntimeError("Receiver not instance or class.");
+      return false;
   }
-
-  ObjClosure* closure = obj->bound.method;
-  ObjClass* klass = AS_INSTANCE(obj->receiver)->klass;
-
-  vmPush(OBJ_VAL(vm.core.astMethod));
-  vmPush(OBJ_VAL(klass));
-  vmPush(OBJ_VAL(obj));
-  vmPush(obj->receiver);
-  vmPush(OBJ_VAL(closure));
-  if (!astClosure(enclosing, closure, vm.core.astClosure)) return false;
-
-  return vmInitInstance(vm.core.astMethod, 4);
 }
 
 bool astOverload(ObjOverload* overload) {

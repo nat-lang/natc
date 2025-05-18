@@ -17,3 +17,6 @@ let join = (seq: Sequential, sep: string) => {
 let indent = (x: num) => join([" " | _ in range(0, x)], "");
 
 let quote = string => Strings.quote + string + Strings.quote;
+
+let newline = "
+";

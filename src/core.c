@@ -137,6 +137,10 @@ bool __sequencePop__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
   Value seq;
   if (!vmSequenceValueField(obj, &seq)) return false;
+  if (AS_SEQUENCE(seq)->values.count == 0) {
+    vmRuntimeError("Can't pop from sequence with length 0.");
+    return false;
+  }
   Value value = popValueArray(&AS_SEQUENCE(seq)->values);
 
   vmPop();
@@ -601,6 +605,7 @@ InterpretResult loadCore() {
       (vm.core.astClosure = getGlobalClass(S_AST_CLOSURE)) == NULL ||
       (vm.core.astComprehension = getGlobalClass(S_AST_COMPREHENSION)) ==
           NULL ||
+      (vm.core.astClassMethod = getGlobalClass(S_AST_CLASS_METHOD)) == NULL ||
       (vm.core.astMethod = getGlobalClass(S_AST_METHOD)) == NULL ||
       (vm.core.astExternalUpvalue = getGlobalClass(S_AST_EXTERNAL_UPVALUE)) ==
           NULL ||

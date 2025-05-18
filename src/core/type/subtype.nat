@@ -47,9 +47,6 @@ let infix(6) <| = SubtypeConstraint;
 class SubtypeState extends SimpleTypeState {
   constrain(node: ASTNode) => {
     if (node is ASTApp) {
-      // method invocation.
-      if (node[0] is ASTPropertyAccess) {}
-
       let func = node[0];
       let args = node[1];
 
@@ -57,7 +54,7 @@ class SubtypeState extends SimpleTypeState {
       let tArgs = this.constrain(args);
       let tApp = typeVar();
       
-      this.constraints.push(tFunc <| tArgs -> tApp);
+      this.pushConstraint(node, tFunc <| tArgs -> tApp);
       
       return tApp;
     }
@@ -69,20 +66,33 @@ class SubtypeState extends SimpleTypeState {
       let tElement = this.principal(element);
       let tCollection =  this.principal(collection);
 
-      this.constraints.push(tCollection <| TCollection(tElement));
+      this.pushConstraint(node, tCollection <| TCollection(tElement));
 
       if (tCollection is TInstance && "__in__" in tCollection.klass) {
         let tIn = this.type(tCollection.klass.__in__);
 
-        this.constraints.push(tIn <| tElement -> bool);
+        this.pushConstraint(node, tIn <| tElement -> bool);
       }
 
       return bool;
     }
 
+    if (node is ASTThrow) {
+      let exc = node[0];
+      let tExc = this.principal(exc);
+      this.pushConstraint(node, tExc <| TInstance(Error));
+      return void;
+    }
+
+    // punt: requires proper class typing.
+    if (node is ASTPropertyAccess)
+      return typeVar();
+    if (node is ASTPropertyAssignment)
+      return typeVar();
+
     if (node is ASTNegation) {
       let tArg = this.principal(node[0]);
-      this.constraints.push(tArg <| (bool % void % undef));
+      this.pushConstraint(node, tArg <| (bool % void % undef));
       return bool;
     }
 
@@ -94,7 +104,7 @@ class SubtypeState extends SimpleTypeState {
       let tVal = this.system.typify(val.resolve());
 
       // value must be subtype of its annotation.
-      this.constraints.push(tVar <| tVal);
+      this.pushConstraint(node, tVar <| tVal);
 
       return void;
     }
@@ -106,7 +116,7 @@ class SubtypeState extends SimpleTypeState {
       let tCondition = this.principal(condition),
           tConsequent = this.principal(consequent);
 
-      this.constraints.push(tCondition <| bool);
+      this.pushConstraint(node, tCondition <| bool);
       return void;
     }
 
@@ -119,7 +129,7 @@ class SubtypeState extends SimpleTypeState {
 
     let left = constraint.left,
         right = constraint.right;
-    
+
     if (left is TVar or right is TVar)
       return super._unify(constraint);
 

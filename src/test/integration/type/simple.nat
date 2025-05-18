@@ -403,3 +403,8 @@ let t = type(@);
 
 assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
 assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
+
+// exceptions.
+
+typecheck(() => { throw Error(""); });
+typefail(() => { throw 1; });

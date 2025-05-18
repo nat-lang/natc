@@ -98,6 +98,7 @@ void initCore(Core* core) {
 
   core->astClosure = NULL;
   core->astComprehension = NULL;
+  core->astClassMethod = NULL;
   core->astMethod = NULL;
   core->astExternalUpvalue = NULL;
   core->astInternalUpvalue = NULL;
@@ -174,10 +175,10 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
-bool vmGetMethod(ObjString* name, int argCount, Value* method) {
+bool vmGetProperty(ObjString* name, int argCount, Value* method) {
   Value receiver = vmPeek(argCount);
 
-  char* error = "Only instances and classes have methods.";
+  char* error = "Only instances, classes, and functions have properties.";
 
   ObjMap* fields;
   switch (OBJ_TYPE(receiver)) {
@@ -207,7 +208,7 @@ bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
   Value method = NIL_VAL;
 
-  if (!vmGetMethod(name, argCount, &method)) return false;
+  if (!vmGetProperty(name, argCount, &method)) return false;
 
   vm.stackTop[-argCount - 1] = receiver;
   return vmCallValue(method, argCount);
@@ -216,7 +217,7 @@ bool vmInvoke(ObjString* name, int argCount) {
 bool vmExecuteMethod(char* name, int argCount) {
   Value receiver = vmPeek(argCount);
   Value method = NIL_VAL;
-  if (!vmGetMethod(intern(name), argCount, &method)) return false;
+  if (!vmGetProperty(intern(name), argCount, &method)) return false;
   vm.stackTop[-argCount - 1] = receiver;
   if (!vmCallValue(method, argCount)) return false;
 

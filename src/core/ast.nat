@@ -20,6 +20,8 @@ class ASTNode extends Tree {
     this.children = children;
   }
 
+  hash() => (hash . address)(this);
+
   str() => str(this.__class__);
   tex() => { throw NotImplemented(this.__class__, this.tex); }
 
@@ -186,11 +188,6 @@ class ASTNode extends Tree {
     let node = ASTComprehensionIter(local, iterator, body);
     this.children.push(node);
   }
-
-  opComprehensionBody(expr) => {
-    let node = ASTComprehensionBody(expr);
-    this.children.push(node);
-  }
 }
 
 class ASTStatement extends ASTNode {}
@@ -226,7 +223,18 @@ class ASTBlock extends ASTNode {
   }
 
   opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
-  str() => "ASTBlock(#{this.enclosing})";
+  opComprehensionBody(expr) => {
+    let root = this.enclosing;
+    while (root is not ASTComprehension) {
+      root = root.enclosing;
+      if (root == nil)
+        throw Error("Missing root for comprehension body.");
+    }
+    let node = ASTComprehensionBody(root, expr);
+    this.children.push(node);
+  }
+
+  str() => "ASTBlock(#{this.enclosing.str()})";
   tex() => join(this.children.map(x => x.tex()), "");
 }
 
@@ -303,7 +311,7 @@ class ASTLocal extends ASTVariable {
 
   betaReduce() => this;
 
-  str() => "ASTLocal(#{this.id}, '#{this.name}')";
+  str() => "ASTLocal(#{this.id}, '#{this.name}', #{this.uuid})";
   tex() => this.name;
 
   __eq__(that) => this.name == that.name && super.__eq__(that);
@@ -361,8 +369,8 @@ class ASTArgumentSequence extends ASTExpr {
 }
 
 class ASTApp extends ASTExprStatement {
-  // we could have the interpreter do this,
-  // but we only want to reach normal form - 1.
+  // we only want to reach normal form - 1, otherwise
+  // we'd just let the interpreter do this.
   betaReduce() => {
     let fn = this[0],
         args = this[1].betaReduce();
@@ -534,20 +542,33 @@ class ASTClosure extends ASTExpr {
 
 class ASTComprehension extends ASTClosure {
   init(instance, enclosing, function, upvalues, *children) => {
-    this.instance = instance;
-    super.init(enclosing, function, upvalues, ..children);
+    super.init(enclosing, function, upvalues, instance, ..children);
   }
-  __eq__(that) => this.instance == that.instance && super.__eq__(that);
+  body() => this.find(x => x is ASTComprehensionBody && x.root == this);
 }
-class ASTComprehensionBody extends ASTExpr {}
+
+class ASTComprehensionBody extends ASTExpr {
+  init(root, *children) => {
+    this.root = root;
+    super.init(..children);
+  }
+}
 class ASTComprehensionPred extends ASTConditional {}
 class ASTComprehensionIter extends ASTIterate {}
 
-class ASTMethod extends ASTExpr {
-  init(klass, method, receiver, closure) => {
+class ASTClassMethod extends ASTExpr {
+  init(klass, method, closure) => {
     this.klass = klass;
     this.method = method;
-    this.receiver = receiver;
+    this.children = [closure];
+  }
+}
+
+class ASTMethod extends ASTExpr {
+  init(klass, method, instance, closure) => {
+    this.klass = klass;
+    this.method = method;
+    this.instance = instance;
     this.children = [closure];
   }
 }

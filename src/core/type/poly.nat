@@ -58,20 +58,34 @@ class TGeneralization extends TAbstract {
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
     if (node is ASTComprehension) {
-      return this.constrainFnRange(node).apply(this.solution);
+      let instance = node[0], body = node.body(), element = body[0];
+
+      let tInstance = this.principal(instance),
+          tElement = this.principal(element);
+
+      this.pushConstraint(node, TCollection(tElement) <| tInstance);
+      this.constrainFnRange(node);
+
+      return tInstance;
     }
 
     if (node is ASTComprehensionBody)
-      return this.constrain(node[0]);
+      return this.principal(node[0]);
 
     if (node is ASTComprehensionIter) {
-      let var = node[0], iter = node[1], body = node[2];
+      let var = node[0], iterApp = node[1], body = node[2];
+
+      // each ASTComprehensionIter has an application of the [iter]
+      // function to a potential iterable as its second child. we don't
+      // have everything necessary to type the [iter] function itself
+      // right now, so in the meantime just type the potential iterable.
+      let iter = iterApp[1][0];
 
       let tVar = this.principal(var);
       let tIter = this.principal(iter);
 
-      this.constraints.push(tIter <| TCollection(tVar));
-      this.constrain(body);
+      this.pushConstraint(node, tIter <| TCollection(tVar));
+      this.principal(body);
 
       return void;
     }
@@ -101,9 +115,9 @@ class PolyTypeState extends AdhocTypeState {
       let tB = this.principal(node.body);
       let tV = typeVar();
 
-      this.constraints.push(tR ~ TSet(tV));
-      this.constraints.push(tQ <| TProduct(tR, tB) -> bool);
-      this.constraints.push(tB <| tV -> bool);
+      this.pushConstraint(node, tR ~ TSet(tV));
+      this.pushConstraint(node, tQ <| TProduct(tR, tB) -> bool);
+      this.pushConstraint(node, tB <| tV -> bool);
 
       return bool;
     }
@@ -164,14 +178,12 @@ class PolyTypeSystem extends AdhocTypeSystem {
             return unit -> TSet(typeVar());
           else
             return types[0] -> TSet(types[0]);
-        } else {
-          return TProduct(..types) -> TSet(TSum(..types));
         }
 
-        throw TypeError("Can't type set.");
+        return TProduct(..types) -> TSet(TSum(..types));
       });
     }
-    
+
     return super.literalType(value);
   }
 

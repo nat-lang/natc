@@ -391,6 +391,10 @@ typefail(() => ({x | x in false}));
 typefail(() => ({x | x in nil}));
 typefail(() => ({x | x in 1}));
 
-typecheck(() => ({x | x in [1,2]}));
 typecheck(() => ({x | x in {1,2}}));
+typecheck(() => ({x | x in {1,2}, true}));
+typecheck(() => ({x | false, x in {1,2}}));
+
+typecheck(() => ({((z: num) => z)(x) | x in {1,2}}));
+typefail(() => ({((z: string) => z)(x) | x in {1,2}}));
 

@@ -7,6 +7,8 @@ class Constraint {
     this.right = right;
   }
 
+  hash() => (hash . address)(this);
+
   str() => this.left.str() + " ~ " + this.right.str();
 }
 
@@ -44,7 +46,7 @@ class Substitution extends Map {
 }
 
 class Type extends Base {
-  substitute(c) => {
+  substitute(c: Constraint) => {
     if (this == c.left)
       return c.right;
     return this;
@@ -148,7 +150,7 @@ class TClassy extends Type {
     this.klass = klass;
   }
   hash() => hash(this.klass);
-  __eq__(that) => this.klass == that.klass;
+  __eq__(that) => this.__class__ == that.__class__ && this.klass == that.klass;
 }
 
 class TClass extends TClassy {
@@ -166,7 +168,7 @@ class TCollection extends TInstance {
     this.elements = elements;
   }
   fvs() => union(..[x.fvs() | x in this.elements]);
-  str() => "(" + join(this.elements.map(x => x.str()), ", ") + ")";
+  str() => "TCollection(" + join(this.elements.map(x => x.str()), ", ") + ")";
   map(fn) => this.__class__(..this.elements.map(fn));
   substitute(c: Constraint) => this.map(x => x.substitute(c));
   hash() => this.elements.hash();
@@ -264,10 +266,10 @@ class SimpleTypeSystem {
     state.constrain(node);
     state.solve();
 
-    return state;
+    return (node, state);
   }
 
-  typecheck(expr) => this._typecheck(expr, false);
+  typecheck(expr) => this._typecheck(expr, false)[1];
 
   newState() => this.TypeStateClass(this, false);
   dNewState() => this.TypeStateClass(this, true);
@@ -283,7 +285,8 @@ class SimpleTypeState {
   init(system: SimpleTypeSystem, debug: bool) => {
     this.system = system;
     // map from ast variable uuids to types.
-    this.typeEnv = Map();
+    this.varEnv = Map();
+    this.uuids = NameSupply();
     // constraint stack.
     this.constraints = [];
     this.insoluble = [];
@@ -291,39 +294,51 @@ class SimpleTypeState {
     this.solution = Substitution();
     // print debugging information?
     this.debug = debug;
-    this.uuids = NameSupply();
+    // map from ast nodes to their principal types.
+    this.typeEnv = Map();
+    // map from ast nodes to the constraints they generate.
+    this.consEnv = Map();
+    // map from constraints to the nodes that generated them.
+    this.tcEnv = Map();
+  }
+
+  pushConstraint(node, constraint) => {
+    if (node not in this.consEnv)
+      this.consEnv[node] = [];
+    this.consEnv[node].push(constraint);
+    this.tcEnv[constraint] = node;
+    this.constraints.push(constraint);
+  }
+
+  extendConstraints(node, constraints) => {
+    for (x in constraints)
+      this.pushConstraint(node, x);
   }
 
   copy() => {
     let state = this.__class__(this.system, this.debug);
 
-    state.typeEnv = this.typeEnv.copy();
+    state.varEnv = this.varEnv.copy();
     state.constraints = this.constraints.copy();
     state.insoluble = this.insoluble.copy();
     state.solution = this.solution.copy();
     state.uuids = this.uuids;
+    state.typeEnv = this.typeEnv.copy();
+    state.tcEnv = this.tcEnv.copy();
+    state.consEnv = this.consEnv.copy();
 
     return state;
   }
 
-  // Look up the node in the [typeEnv]. If there's an entry,
+  // Look up the node in the [varEnv]. If there's an entry,
   // apply the current solution. Otherwise mint a fresh type
   // variable.
   lookup(node: ASTVariable) => {
-    if (this.typeEnv[node])
-      return this.typeEnv[node].apply(this.solution);
+    if (this.varEnv[node])
+      return this.varEnv[node].apply(this.solution);
 
-    this.typeEnv[node] = typeVar();
-    return this.typeEnv[node];
-  }
-
-  // Look up the type of a variable by its id
-  // and apply the current solution to it.
-  find(id) => {
-    let type = this.typeEnv.find(n => n.id == id);
-
-    if (type)
-      return type.apply(this.solution);
+    this.varEnv[node] = typeVar();
+    return this.varEnv[node];
   }
 
   // Give [node]'s variables unique identifiers.
@@ -340,7 +355,7 @@ class SimpleTypeState {
 
     // since the params and their types are keyed by uuid
     // we can just update the global type env.
-    this.typeEnv.extend(Map(..zip(parameters, paramTypes)));
+    this.varEnv.extend(Map(..zip(parameters, paramTypes)));
 
     if (node.function.arity == 0)
       return unit;
@@ -361,10 +376,8 @@ class SimpleTypeState {
       }, []
     );
   
-    // there's always an implicit return. for now, if there are
-    // explicit returns as well, we'll just ignore the implicit
-    // one. once we have ast nodes for conditionals we can be
-    // more discriminating.
+    // there's always an implicit return. if there are explicit
+    // returns as well, we'll just ignore the implicit one.
     let tImplicitReturn = returnTypes.pop();
 
     if (len(returnTypes) == 0)
@@ -377,16 +390,22 @@ class SimpleTypeState {
   }
 
   constrain(node: ASTNode) => {
-    if (node is ASTMethod)
-      return this.constrain(node[0]);
-
     if (node is ASTClosure) {
       let tDomain = this.constrainFnDomain(node),
           tRange = this.constrainFnRange(node);
-
-      return (tDomain -> tRange).apply(this.solution);
+  
+      return tDomain -> tRange;
     }
 
+    if (node is ASTClassMethod) {
+      let fn = node[0];
+      if (node.method.name == "init") {
+        let ret = fn[len(fn.children) - 1], _this = ret[0];
+        this.varEnv[_this] = TInstance(node.klass);
+      }
+      return this.principal(fn);
+    }
+  
     if (node is ASTLiteral)
       return this.system.literalType(node.value);
     
@@ -394,7 +413,7 @@ class SimpleTypeState {
       let tArg = this.principal(node[0]);
       // falsiness is constrained correctly by the
       // subtype system as tArg <| (bool | void | undef)
-      this.constraints.push(tArg ~ bool);
+      this.pushConstraint(node, tArg ~ bool);
       return bool;
     }
     
@@ -404,7 +423,7 @@ class SimpleTypeState {
       let tLeft = this.principal(left),
           tRight = this.principal(right);
 
-      this.constraints.push(tLeft ~ tRight);
+      this.pushConstraint(node, tLeft ~ tRight);
 
       return bool;
     }
@@ -423,10 +442,6 @@ class SimpleTypeState {
 
     if (node is ASTVariable)
       return this.lookup(node);
-
-      // punt: requires proper class typing.
-    if (node is ASTPropertyAccess)
-      return typeVar();
 
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
@@ -447,7 +462,7 @@ class SimpleTypeState {
       let tArgs = this.principal(args);
       let tApp = typeVar();
 
-      this.constraints.push(tFunc ~ tArgs -> tApp);
+      this.pushConstraint(node, tFunc ~ tArgs -> tApp);
 
       return tApp;
     }
@@ -459,11 +474,11 @@ class SimpleTypeState {
       let tVar = this.lookup(var);
       let tVal = this.system.typify(val.resolve());
 
-      this.constraints.push(tVar ~ tVal);
+      this.pushConstraint(node, tVar ~ tVal);
 
       return void;
     }
-
+  
     if (node is ASTAssignment) {
       let var = node[0];
       let val = node[1];
@@ -471,7 +486,7 @@ class SimpleTypeState {
       let tVar = this.lookup(var);
       let tVal = this.principal(val);
 
-      this.constraints.push(tVar ~ tVal);
+      this.pushConstraint(node, tVar ~ tVal);
 
       // this should eventually respect a possibly user
       // defined __set__ method that returns something.
@@ -481,17 +496,18 @@ class SimpleTypeState {
     if (node is ASTExprStatement)
       return this.principal(node[0]);
 
-    if (node is ASTThrow) {
-      let exc = node[0];
-      let tExc = this.principal(exc);
-      this.constraints.push(tExc ~ TClass(Error));
-      return void;
-    }
     if (node is ASTReturn) 
       return this.principal(node[0]);
     
     if (node is ASTBlock) {
       node.children.map(this.principal);
+      return void;
+    }
+
+    if (node is ASTThrow) {
+      let exc = node[0];
+      let tExc = this.principal(exc);
+      this.pushConstraint(node, tExc ~ TInstance(Error));
       return void;
     }
 
@@ -543,7 +559,7 @@ class SimpleTypeState {
     
     // function constraints become domain/domain range/range constraints.
     if (left is TFunction and right is TFunction) {
-      this.constraints.extend([
+      this.extendConstraints(this.tcEnv[constraint], [
         // fixme: the compiler fails when these are unparenthesized.
         (left.domain ~ right.domain),
         (left.range ~ right.range)
@@ -557,7 +573,7 @@ class SimpleTypeState {
       if (len(left) != len(right))
         return false;
 
-      this.constraints.extend(
+      this.extendConstraints(this.tcEnv[constraint],
         zip(left.elements, right.elements).map(x => x[0] ~ x[1])
       );
       return this.solve();
@@ -581,7 +597,7 @@ class SimpleTypeState {
 
       if (!unifiable)
         this.insoluble.push(constraint);
-
+ 
       i = i + 1;
     }
 
@@ -597,6 +613,8 @@ class SimpleTypeState {
   principal(node: ASTNode) => {
     let type = this.constrain(node);
 
+    this.typeEnv[node] = type;
+
     if (this.solve())
       return type.apply(this.solution);
 
@@ -607,11 +625,11 @@ class SimpleTypeState {
     let node <- expr;
 
     node = this.transform(node);
-    
+
     return this.principal(node);
   }
 
-  constrainAnnotation(annotation, type) => this.constraints.push(
+  constrainAnnotation(annotation, type) => this.constraints.push( 
     annotation ~ type
   );
 
@@ -632,6 +650,7 @@ class SimpleTypeState {
   // Calculate the type of [value], inferring it if necessary.
   type(value) => {
     let type = this.system.literalType(value);
+
     if (type) return type;
 
     type = this.infer(value);
@@ -651,7 +670,8 @@ class SimpleTypeState {
   }
   ppInsoluble() => {
     for (let i = 0; i < len(this.insoluble); i = i + 1) {
-      print str(i) + ") " + this.insoluble[i].str();
+      let c = this.insoluble[i];
+      print "#{i}) #{c.str()}";
     }
   }
   ppSolution() => {

@@ -1,18 +1,8 @@
 
-let _ASTClosureMock = klass => (*children) => {
-  let mock = klass(nil,nil,[]);
-  mock.children = children;
-  return mock;
-};
+let ASTClosureMock = (*children) => ASTClosure(nil,nil,[],..children);
+let ASTComprehensionMock = (instance, *children) => ASTComprehension(instance,nil,nil,[],..children);
+let ASTComprehensionBodyMock = (*children) => ASTComprehensionBody(nil, ..children);
 
-let ASTClosureMock = _ASTClosureMock(ASTClosure);
-let ASTComprehensionMock = (instance, *children) => {
-  let mock = ASTComprehension(instance,nil,nil,[]);
-  mock.children = children;
-  return mock;
-};
-
-_ASTClosureMock(ASTComprehension);
 let ASTBlockMock = (*children) => ASTBlock(nil, ..children);
 let ASTInternalUpvalueMock = name => ASTInternalUpvalue(nil,nil,nil,name);
 let ASTExternalUpvalueMock = name => ASTExternalUpvalue(nil,nil,nil,name);
@@ -681,7 +671,7 @@ assert(f == ASTClosureMock(
       ASTComprehensionPred(
         ASTLiteral(true),
         ASTBlockMock(
-          ASTComprehensionBody(
+          ASTComprehensionBodyMock(
             ASTLiteral(1)
           ),
           ASTImplicitReturn(
@@ -723,7 +713,7 @@ assert(f == ASTClosureMock(
           )
         ),
         ASTBlockMock(
-          ASTComprehensionBody(
+          ASTComprehensionBodyMock(
             ASTLiteral(1)
           )
         )
@@ -762,7 +752,7 @@ assert(f == ASTClosureMock(
           )
         ),
         ASTBlockMock(
-          ASTComprehensionBody(
+          ASTComprehensionBodyMock(
             ASTLocal(2, "x")
           )
         )
@@ -804,7 +794,7 @@ assert(f == ASTClosureMock(
               )
             ),
             ASTBlockMock(
-              ASTComprehensionBody(
+              ASTComprehensionBodyMock(
                 ASTLocal(2, "x")
               )
             )
@@ -851,7 +841,7 @@ assert(f == ASTClosureMock(
           ASTComprehensionPred(
             ASTLiteral(true),
             ASTBlockMock(
-              ASTComprehensionBody(
+              ASTComprehensionBodyMock(
                 ASTLocal(2, "x")
               )
             )
@@ -898,7 +888,7 @@ assert(f == ASTClosureMock(
               ASTComprehensionPred(
                 ASTLiteral(false),
                 ASTBlockMock(
-                  ASTComprehensionBody(
+                  ASTComprehensionBodyMock(
                     ASTLocal(2, "x")
                   )
                 )
@@ -950,7 +940,7 @@ assert(f == ASTClosureMock(
                   )
                 ),
                 ASTBlockMock(
-                  ASTComprehensionBody(
+                  ASTComprehensionBodyMock(
                     ASTLocal(2, "x")
                   )
                 )
@@ -962,7 +952,7 @@ assert(f == ASTClosureMock(
           )
         ),
         ASTBlockMock(
-          ASTComprehensionBody(
+          ASTComprehensionBodyMock(
             ASTLocal(2, "x")
           )
         )
@@ -995,7 +985,7 @@ assert(f == ASTClosureMock(
           )
         ),
         ASTBlockMock(
-          ASTComprehensionBody(
+          ASTComprehensionBodyMock(
             ASTComprehensionMock(
               ASTApp(
                 ASTGlobal("Set"),
@@ -1010,7 +1000,7 @@ assert(f == ASTClosureMock(
                   )
                 ),
                 ASTBlockMock(
-                  ASTComprehensionBody(
+                  ASTComprehensionBodyMock(
                     ASTLocal(2, "y")
                   )
                 )
@@ -1072,7 +1062,7 @@ assert(f == ASTClosureMock(
           ASTArgumentSequence()
         ),
         ASTBlockMock(
-          ASTComprehensionBody(
+          ASTComprehensionBodyMock(
             ASTLiteral(1)
           ),
           ASTImplicitReturn(
@@ -1104,7 +1094,7 @@ assert(f == ASTClosureMock(
       ASTComprehensionPred(
         ASTLiteral(true),
         ASTBlockMock(
-          ASTComprehensionBody(
+          ASTComprehensionBodyMock(
             ASTApp(
               ASTClosureMock(
                 ASTIterate(
@@ -1466,7 +1456,7 @@ assert(f is ASTMethod);
 
 assert(f.klass == A);
 assert(vType(f.method) == OBoundFunction);
-assert(f.receiver == a);
+assert(f.instance == a);
 assert(f[0] is ASTClosure);
 
 assert(vType(f[0].function) == OFunction);
