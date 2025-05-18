@@ -268,7 +268,9 @@ static void markRoots() {
     markObject((Obj*)upvalue);
   }
 
-  markMap(&vm.comprehensions);
+  for (int i = 0; i < vm.comprehensionDepth; i++)
+    markObject(vm.comprehensions[i]);
+
   markMap(&vm.globals);
   markMap(&vm.prefixes);
   markMap(&vm.infixes);

@@ -140,9 +140,10 @@ bool initVM() {
 
   vm.compiler = NULL;
   vm.module = NULL;
-  vm.comprehensionDepth = 0;
 
-  initMap(&vm.comprehensions);
+  vm.comprehensionDepth = 0;
+  for (int i = 0; i < UINT8_MAX; i++) vm.comprehensions[i] = NULL;
+
   initMap(&vm.globals);
   initMap(&vm.strings);
   initMap(&vm.prefixes);
@@ -1132,7 +1133,12 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_COMPREHENSION: {
         Value obj = vmPeek(0);
-        mapSet(&vm.comprehensions, NUMBER_VAL(++vm.comprehensionDepth), obj);
+        if (vm.comprehensionDepth == COMPREHENSION_DEPTH_MAX) {
+          vmRuntimeError("Comprehension overflow.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        vm.comprehensions[vm.comprehensionDepth++] = AS_OBJ(obj);
 
         vmClosure(frame);
         if (!vmCallValue(vmPeek(0), 0) ||
@@ -1140,21 +1146,19 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         vmPop();  // nil.
 
-        vm.comprehensionDepth--;
-
+        vm.comprehensions[--vm.comprehensionDepth] = NULL;
         break;
       }
       case OP_COMPREHENSION_BODY: {
-        Value comp;
-        if (!mapGet(&vm.comprehensions, NUMBER_VAL(vm.comprehensionDepth),
-                    &comp)) {
+        Obj* comp;
+        if ((comp = vm.comprehensions[vm.comprehensionDepth - 1]) == NULL) {
           vmRuntimeError("Missing comprehension at depth %d.",
                          vm.comprehensionDepth);
           return INTERPRET_RUNTIME_ERROR;
         }
 
         Value el = vmPeek(0);
-        vmPush(comp);
+        vmPush(OBJ_VAL(comp));
         vmPush(el);
 
         if (!vmExecuteMethod("add", 1)) return INTERPRET_RUNTIME_ERROR;

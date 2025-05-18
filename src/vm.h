@@ -8,6 +8,7 @@
 
 #define FRAMES_MAX 2000
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
+#define COMPREHENSION_DEPTH_MAX UINT8_MAX
 
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() \
@@ -131,7 +132,7 @@ typedef struct {
   ObjModule* module;
 
   int comprehensionDepth;
-  ObjMap comprehensions;
+  Obj* comprehensions[COMPREHENSION_DEPTH_MAX];
 } VM;
 
 typedef enum {
