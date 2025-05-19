@@ -188,6 +188,29 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(object);
       return AST_INSTRUCTION_OK;
     }
+    case OP_SUBSCRIPT_GET: {
+      Value key = vmPop();
+      Value obj = vmPop();
+
+      vmPush(root);
+      vmPush(obj);
+      vmPush(key);
+      OK_IF(vmExecuteMethod("opSubscriptGet", 2));
+    }
+    case OP_SUBSCRIPT_SET: {
+      Value value = vmPop();
+      Value key = vmPop();
+      Value object = vmPop();
+
+      vmPush(root);
+      vmPush(object);
+      vmPush(key);
+      vmPush(value);
+
+      FAIL_UNLESS(vmExecuteMethod("opSubscriptSet", 3));
+      vmPush(object);
+      return AST_INSTRUCTION_OK;
+    }
     case OP_EQUAL: {
       Value left = vmPop();
       Value right = vmPop();
