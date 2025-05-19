@@ -14,15 +14,15 @@ class Domain extends Type {
   some(predicate) => this.elements.some(predicate);
 
   __iter__() => iter(this.elements);
-  // functions are not hashable atm. guard against them.
-  __in__(value) => hashable(value) and value in this.elements;
+  // functions are not hashable atm
+  __in__(value) => hashable(value) && value in this.elements;
   __eq__(that) => this.elements == that.elements;
 }
 
 class DenotationalTypeState extends PolyTypeState {
   _unify(constraint: Constraint) => {
     if (constraint is SubtypeConstraint) {
-      if (constraint.left is Domain and constraint.right is Domain) {
+      if (constraint.left is Domain && constraint.right is Domain) {
         return constraint.left.elements.subsetEq(constraint.right.elements);
       }
     }
@@ -48,7 +48,7 @@ class DenotationalTypeSystem extends PolyTypeSystem {
   }
 
   literalType(value) => {
-    if (hashable(value) && value in this.literals)
+    if (hashable(value) && value in this.literals && hashable(this.literals[value]))
       return this.domains[this.literals[value]];
     if (value is Domain)
       return TSet(value);

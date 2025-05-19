@@ -195,6 +195,11 @@ typefail(() => {
   let x: C = A();
 });
 
-// ------------------------
+// exceptions.
 
+typecheck(() => { throw Error(""); });
+typefail(() => { throw 1; });
 
+class Error' extends Error {}
+
+typecheck(() => { throw Error'(""); });

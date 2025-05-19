@@ -70,12 +70,14 @@ class Tree extends Object {
 
   str() => str(this.__class__);
 
-  ppAt(depth) => {
-    let indent = join([" " | _ in range(0, depth)], "");
-    print indent + this.str();
-    this.children.map(x => x.ppAt(depth + 1));
+  ppAt(depth, repr) => {
+    repr(this, depth);
+    this.children.map(x => x.ppAt(depth + 2, repr));
   }
-  pp() => this.ppAt(0);
+
+  ppRepr(repr) => this.ppAt(0, repr);
+
+  pp() => this.ppAt(0, (x, depth) => { print indent(depth) + x.str(); });
 }
 
 // Functions for building tree literals during compilation.

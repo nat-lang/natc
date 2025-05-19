@@ -84,7 +84,7 @@ static void errorAtCurrent(Compiler* cmp, const char* message) {
 
 static void initIterator(Iterator* iter) {
   iter->var = 0;
-  iter->iter = 0;
+  iter->obj = 0;
   iter->loopStart = 0;
 }
 
@@ -669,7 +669,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   emitBytes(cmp, OP_CALL, 1);
   emitBytes(cmp, OP_CALL, 2);
 
-  // pretend the
+  // pretend the next token is an opening string literal.
   rewindScanner(parser.current);
   parser.next = scanVirtualToken('"');
 
@@ -807,7 +807,7 @@ static void unary(Compiler* cmp, bool canAssign) {
       emitByte(cmp, OP_NOT);
       break;
     default:
-      return;  // Unreachable.
+      return;  // unreachable.
   }
 }
 
@@ -1173,7 +1173,7 @@ static Iterator iterator(Compiler* cmp) {
   // turn the expression into an iterator instance and store it.
   getGlobalConstant(cmp, S_ITER);
   emitBytes(cmp, OP_CALL_POSTFIX, 1);
-  iter.iter = addLocal(cmp, syntheticToken("#iter"));
+  iter.obj = addLocal(cmp, syntheticToken("#iter"));
   markInitialized(cmp);
 
   iter.loopStart = cmp->function->chunk.count;
@@ -1239,7 +1239,7 @@ static void forQuantification(Compiler* enclosing, bool canAssign) {
 // Parse a comprehension, given a [Parser] that points at the body,
 // the stack address [var] of the object under construction, and the
 // type of [closingToken].
-Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
+Parser comprehension(Compiler* cmp, Parser checkpointA,
                      TokenType closingToken) {
   Iterator iter;
 
@@ -1267,7 +1267,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // variables will be in scope in every condition
     // to their right, and all we have to do is conclude
     // each scope at the end of this function.
-    checkpointB = comprehension(cmp, checkpointA, var, closingToken);
+    checkpointB = comprehension(cmp, checkpointA, closingToken);
   } else if (check(closingToken)) {
     // now we parse the body, first saving the point
     // where the generator ends.
@@ -1276,9 +1276,6 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
 
     // parse the expression, load the comprehension, and append.
     expression(cmp);
-    emitConstInstr(cmp, OP_GET_LOCAL, var);
-    getProperty(cmp, S_ADD);
-    emitBytes(cmp, OP_CALL_POSTFIX, 1);
     emitByte(cmp, OP_COMPREHENSION_BODY);
     emitByte(cmp, OP_POP);
   }
@@ -1321,18 +1318,14 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
                  syntheticToken("#comprehension"));
     beginScope(&cmp);
 
-    // init the comprehension instance at local 0. we'll load
-    // it when we hit the bottom of the condition clauses.
-    nativeCall(&cmp, klass);
-    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
-    markInitialized(&cmp);
+    Parser checkpointB = comprehension(&cmp, checkpointA, closingToken);
 
-    Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
+    nativeCall(enclosing, klass);
 
-    // return the comprehension instance.
-    emitConstInstr(&cmp, OP_GET_LOCAL, var);
-    emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing, OP_COMPREHENSION);
+    ObjFunction* function = endCompiler(&cmp);
+    emitConstInstr(enclosing, OP_COMPREHENSION,
+                   makeConstant(enclosing, OBJ_VAL(function)));
+    closeUpvalues(function, &cmp, enclosing);
 
     // pick up at the end of the expression.
     gotoParser(checkpointB);

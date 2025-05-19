@@ -50,7 +50,7 @@ class AdhocTypeState extends SubtypeState {
       if (left is TVar or right is TVar)
         return super._unify(constraint);
 
-      if (left is TOverload or right is TOverload) {
+      if (left is TOverload || right is TOverload) {
         left = TOverload.lift(left);
         right = TOverload.lift(right);
 
@@ -75,7 +75,7 @@ class AdhocTypeState extends SubtypeState {
     }
 
     // left ~ right iff left <| right & right <| left
-    if (left is TOverload or right is TOverload) {
+    if (left is TOverload || right is TOverload) {
       left = TOverload.lift(left);
       right = TOverload.lift(right);
 

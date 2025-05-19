@@ -98,6 +98,7 @@ void initCore(Core* core) {
 
   core->astClosure = NULL;
   core->astComprehension = NULL;
+  core->astClassMethod = NULL;
   core->astMethod = NULL;
   core->astExternalUpvalue = NULL;
   core->astInternalUpvalue = NULL;
@@ -140,6 +141,9 @@ bool initVM() {
   vm.compiler = NULL;
   vm.module = NULL;
 
+  vm.comprehensionDepth = 0;
+  for (int i = 0; i < UINT8_MAX; i++) vm.comprehensions[i] = NULL;
+
   initMap(&vm.globals);
   initMap(&vm.strings);
   initMap(&vm.prefixes);
@@ -172,10 +176,10 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
-bool vmGetMethod(ObjString* name, int argCount, Value* method) {
+bool vmGetProperty(ObjString* name, int argCount, Value* method) {
   Value receiver = vmPeek(argCount);
 
-  char* error = "Only instances and classes have methods.";
+  char* error = "Only instances, classes, and functions have properties.";
 
   ObjMap* fields;
   switch (OBJ_TYPE(receiver)) {
@@ -205,7 +209,7 @@ bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
   Value method = NIL_VAL;
 
-  if (!vmGetMethod(name, argCount, &method)) return false;
+  if (!vmGetProperty(name, argCount, &method)) return false;
 
   vm.stackTop[-argCount - 1] = receiver;
   return vmCallValue(method, argCount);
@@ -214,7 +218,7 @@ bool vmInvoke(ObjString* name, int argCount) {
 bool vmExecuteMethod(char* name, int argCount) {
   Value receiver = vmPeek(argCount);
   Value method = NIL_VAL;
-  if (!vmGetMethod(intern(name), argCount, &method)) return false;
+  if (!vmGetProperty(intern(name), argCount, &method)) return false;
   vm.stackTop[-argCount - 1] = receiver;
   if (!vmCallValue(method, argCount)) return false;
 
@@ -1128,13 +1132,40 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_COMPREHENSION: {
+        Value obj = vmPeek(0);
+        if (vm.comprehensionDepth == COMPREHENSION_DEPTH_MAX) {
+          vmRuntimeError("Comprehension overflow.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        vm.comprehensions[vm.comprehensionDepth++] = AS_OBJ(obj);
+
         vmClosure(frame);
-        if (!vmCallValue(vmPeek(0), 0)) return INTERPRET_RUNTIME_ERROR;
-        frame = &vm.frames[vm.frameCount - 1];
+        if (!vmCallValue(vmPeek(0), 0) ||
+            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+          return INTERPRET_RUNTIME_ERROR;
+        vmPop();  // nil.
+
+        vm.comprehensions[--vm.comprehensionDepth] = NULL;
         break;
       }
-      case OP_COMPREHENSION_BODY:
+      case OP_COMPREHENSION_BODY: {
+        Obj* comp;
+        if ((comp = vm.comprehensions[vm.comprehensionDepth - 1]) == NULL) {
+          vmRuntimeError("Missing comprehension at depth %d.",
+                         vm.comprehensionDepth);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        Value el = vmPeek(0);
+        vmPush(OBJ_VAL(comp));
+        vmPush(el);
+
+        if (!vmExecuteMethod("add", 1)) return INTERPRET_RUNTIME_ERROR;
+
+        vmPop();
         break;
+      }
       case OP_OVERLOAD: {
         if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
         break;
