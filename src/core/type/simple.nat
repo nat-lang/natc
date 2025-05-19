@@ -22,9 +22,8 @@ class Substitution extends Map {
   update(var: TVar, type: Type) => {
     this[var] = type;
 
-    for (sub in this) {
+    for (sub in this)
       this[sub.left] = sub.right.substitute(var ~ type);
-    }
   }
 
   apply(c: Constraint) => {

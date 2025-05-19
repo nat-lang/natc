@@ -382,7 +382,7 @@ assert(t == bool -> (num -> bool));
 
 // ...
 
-// iteration.
+// comprehensions.
 
 typecheck(() => ({1 | true}));
 typecheck(() => ({1 | false}));
@@ -398,3 +398,62 @@ typecheck(() => ({x | false, x in {1,2}}));
 typecheck(() => ({((z: num) => z)(x) | x in {1,2}}));
 typefail(() => ({((z: string) => z)(x) | x in {1,2}}));
 
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({1 | true});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({"1" | true});
+});
+
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({x | x in {1,2}});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({x | x in {"1","2"}});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({x | x in {"1",2}});
+});
+
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+  let z = {x | x in {1,2}};
+  f({x | x in z});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+  let z = {x | x in {"1","2"}};
+  f({x | x in z});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+  let z = {x | x in {"1",2}};
+  f({x | x in z});
+});
+
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+  let g = x => 1;
+  f({g(true) | true});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+  let g = x => "1";
+  f({g(true) | true});
+});
