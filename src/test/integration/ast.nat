@@ -2051,3 +2051,107 @@ assert(f == ASTClosureMock(
     ASTLiteral(nil)
   )
 ));
+
+let f <- x => { x[1]; };
+
+assert(f == ASTClosureMock(
+  ASTExprStatement(
+    ASTSubscriptGet(
+      ASTLocal(1, "x"),
+      ASTLiteral(1)
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => { x[1] = true; };
+
+assert(f == ASTClosureMock(
+  ASTSubscriptSet(
+    ASTLocal(1, "x"),
+    ASTLiteral(1),
+    ASTLiteral(true)
+  ),
+  ASTExprStatement(
+    ASTLocal(1, "x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => { x["1"]; };
+
+assert(f == ASTClosureMock(
+  ASTExprStatement(
+    ASTSubscriptGet(
+      ASTLocal(1, "x"),
+      ASTLiteral("1")
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => { x["1"] = true; };
+
+assert(f == ASTClosureMock(
+  ASTSubscriptSet(
+    ASTLocal(1, "x"),
+    ASTLiteral("1"),
+    ASTLiteral(true)
+  ),
+  ASTExprStatement(
+    ASTLocal(1, "x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x y => { x[y]; };
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTExprStatement(
+        ASTSubscriptGet(
+          ASTInternalUpvalueMock("x"),
+          ASTLocal(1, "y")
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x y => { x[y] = true; };
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTSubscriptSet(
+        ASTInternalUpvalueMock("x"),
+        ASTLocal(1, "y"),
+        ASTLiteral(true)
+      ),
+      ASTExprStatement(
+        ASTInternalUpvalueMock("x")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
