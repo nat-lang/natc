@@ -142,7 +142,7 @@ bool initVM() {
   vm.module = NULL;
 
   vm.comprehensionDepth = 0;
-  for (int i = 0; i < UINT8_MAX; i++) vm.comprehensions[i] = NULL;
+  for (int i = 0; i < COMPREHENSION_DEPTH_MAX; i++) vm.comprehensions[i] = NULL;
 
   initMap(&vm.globals);
   initMap(&vm.strings);
@@ -1134,7 +1134,8 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_COMPREHENSION: {
         Value obj = vmPeek(0);
         if (vm.comprehensionDepth == COMPREHENSION_DEPTH_MAX) {
-          vmRuntimeError("Comprehension overflow.");
+          vmRuntimeError("Can't next comprehensions deeper than %s.",
+                         COMPREHENSION_DEPTH_MAX);
           return INTERPRET_RUNTIME_ERROR;
         }
 
