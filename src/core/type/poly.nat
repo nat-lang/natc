@@ -57,6 +57,19 @@ class TGeneralization extends TAbstract {
 
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
+    if (node is ASTApp) {
+      let func = node[0];
+      let args = node[1];
+
+      let tFunc = this.principal(func);
+      let tArgs = this.principal(args);
+      let tApp = typeVar();
+      
+      this.pushConstraint(node, tFunc <| tArgs -> tApp);
+      
+      return tApp;
+    }
+  
     if (node is ASTComprehension) {
       let instance = node[0], body = node.body();
 
@@ -109,6 +122,25 @@ class PolyTypeState extends AdhocTypeState {
       return type;
     }
 
+    if (node is ASTOverload) {
+      let tCases = node.children.map(this.principal);
+
+      // push case abstractions to left edge.
+      let abstract = false;
+      tCases = tCases.map(x => {
+        if (x is TGeneralization) {
+          abstract = true;
+          return x.concrete;
+        }
+        return x;
+      });
+
+      if (abstract)
+        return TGeneralization(TOverload(..tCases));
+
+      return TOverload(..tCases);
+    }
+
     if (node is ASTQuantification) {
       let tQ = this.principal(node.quantifier);
       let tR = this.principal(node.restriction);
@@ -138,6 +170,7 @@ class PolyTypeState extends AdhocTypeState {
       } else if (right is not TVar) {
         left = left.instantiate();
       }
+
     }
 
     if (right is TAbstract) {
@@ -179,8 +212,19 @@ class PolyTypeSystem extends AdhocTypeSystem {
           else
             return types[0] -> TSet(types[0]);
         }
-
         return TProduct(..types) -> TSet(TSum(..types));
+      });
+    }
+
+    if (value == Map) {
+      return TAbstract((*types) => {
+        if (len(types) == 1) {
+          if (types[0] == unit)
+            return unit -> TMap(typeVar());
+          else
+            return types[0] -> TMap(types[0]);
+        }
+        return TProduct(..types) -> TMap(..types);
       });
     }
 

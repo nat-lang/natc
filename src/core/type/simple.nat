@@ -14,8 +14,6 @@ class Constraint {
 
 let infix(6) ~ = Constraint;
 
-class AppConstraint extends Constraint {}
-
 class Substitution extends Map {
   entries() => super.entries().map(e => e[0] ~ e[1]);
 
@@ -62,7 +60,6 @@ class Type extends Base {
   str() => str(this);
   tex() => this.str();
   pp() => { print this.str(); }
-  map(fn) => fn(this);
 }
 
 class TFunction extends Type {
@@ -137,13 +134,6 @@ class TString extends Type {
   str() => "string";
 }
 
-class TOverload extends Type {
-  init(functions) => {
-    this.functions = functions;
-  }
-  map(fn) => TOverload(this.functions.map(fn));
-}
-
 class TClassy extends Type {
   init(klass) => {
     this.klass = klass;
@@ -193,7 +183,7 @@ class TSet extends TCollection {
     this.element = elements[0];
     super.init(this.element);
   }
-  str() => "TSet(" + this.elements[0].str() + ")";
+  str() => "TSet(#{this.elements[0].str()})";
 }
 
 let unit = TUnit();

@@ -203,3 +203,4 @@ typefail(() => { throw 1; });
 class Error' extends Error {}
 
 typecheck(() => { throw Error'(""); });
+

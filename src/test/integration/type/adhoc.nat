@@ -100,6 +100,7 @@ let f = (x: num) => nil | (x: void) => true;
 let g = (x: bool) => x;
 
 typefail((x: num % void) => g(f(x)));
+typefail((x: void % num) => g(f(x)));
 typefail((x: num) => g(f(x)));
 
 typecheck((x: void) => g(f(x)));

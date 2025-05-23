@@ -227,15 +227,27 @@ typefail(() => f(f("x", g), h));
 
 // the polymorphic type system types quantification.
 
-typecheck(() => for all (x in {1,2,3}) x in {1,2});
+typecheck(() => for all (x in {true,false}) x);
 typecheck(() => for some (x in {true,false}) x);
+typecheck(() => for no (x in {true,false}) x);
+
+typefail(() => for all (x in {"true","false"}) x);
+typefail(() => for some (x in {"true","false"}) x);
+typefail(() => for no (x in {"true","false"}) x);
+
+typecheck(() => for all (x in {1,2,3}) x in {1,2});
+typecheck(() => for some (x in {1,2,3}) x in {1,2});
+typecheck(() => for no (x in {1,2,3}) x in {1,2});
+
+typefail(() => for all (x in {1,2,3}) x);
+typefail(() => for some (x in {1,2,3}) x);
 typefail(() => for no (x in {1,2,3}) x);
 
 typecheck(() => for some (x in {1,2,3}) x > 1 and x < 3);
 
 // reconstruction.
 
-let a = Type(), b = Type(), c = Type();
+let a = Type(), b = Type(), c = Type(), d = Type();
 
 // the type of identity is inferrable in first order context.
 
@@ -346,6 +358,16 @@ assert(t unifies (b -> (b -> b)));
 assert(!(t unifies (a -> (b -> a))));
 assert(!(t unifies (a -> (a -> b))));
 
+// nested abstract cases normalize to a single abstract overload.
+
+let f = (a: x -> y, b: x) => a(b)
+      | (a: x, b: x -> y) => b(a);
+
+let t = type(f);
+
+assert(t is TGeneralization);
+assert(t unifies (TProduct(a -> b, a) -> b) & (TProduct(d, c -> d) -> d));
+
 // the poly type system exposes an api for instantiating
 // the annotations of applied abstract functions.
 
@@ -378,9 +400,16 @@ assert(t == num -> (num -> num));
 let t = instantiate(f, 1, true);
 assert(t == bool -> (num -> bool));
 
-// the poly type system types tuples and sets.
+// maps.
 
-// ...
+typecheck((x: num) => ({1: true, 2: false})[x]);
+typecheck((x: bool) => ({1: true, false: 3})[x]);
+
+typecheck((x: bool % num) => ({1: true, false: 3})[x]);
+
+typecheck((x: bool % num) => ({1: true, false: 3})[x]).str();
+
+typefail((x: string) => ({1: true, 2: false, false: 3})[x]);
 
 // comprehensions.
 
