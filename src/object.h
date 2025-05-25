@@ -122,6 +122,7 @@ typedef struct {
   bool variadic;
   ObjString *name;
   NativeFn function;
+  ObjMap fields;
 } ObjNative;
 
 typedef struct ObjUpvalue {

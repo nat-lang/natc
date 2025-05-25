@@ -157,7 +157,7 @@ class TCollection extends TInstance {
     this.elements = elements;
   }
   fvs() => union(..[x.fvs() | x in this.elements]);
-  str() => "TCollection(" + join(this.elements.map(x => x.str()), ", ") + ")";
+  str() => "#{this.__class__}(#{join(this.elements.map(x => x.str()), ", ")})";
   map(fn) => this.__class__(..this.elements.map(fn));
   substitute(c: Constraint) => this.map(x => x.substitute(c));
   hash() => this.elements.hash();
@@ -172,7 +172,6 @@ class TProduct extends TCollection {
     super.init(..elements);
   }
   fvs() => union(..[x.fvs() | x in this.elements]);
-  str() => "TProduct(#{join(this.elements.map(x => x.str()), ", ")})";
 }
 
 class TSet extends TCollection {
@@ -183,7 +182,6 @@ class TSet extends TCollection {
     this.element = elements[0];
     super.init(this.element);
   }
-  str() => "TSet(#{this.elements[0].str()})";
 }
 
 let unit = TUnit();
@@ -432,9 +430,15 @@ class SimpleTypeState {
     if (node is ASTVariable)
       return this.lookup(node);
 
+    if (node is ASTVariadicArgumentSequence) {
+      let tArgs = node.children.map(this.constrain);
+      if (len(tArgs) == 0)
+        return unit;
+      return TProduct(..tArgs);
+    }
+
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
-
       if (len(tArgs) == 0)
         return unit;
       else if (len(tArgs) == 1)
@@ -667,6 +671,20 @@ class SimpleTypeState {
     for (c in this.solution)
       print c.left.str() + " = " + c.right.str();
   }
+  ppAST(tree: ASTNode) => tree.ppRepr(
+    (x, depth) => {
+      let s;
+      if (this.typeEnv[x])
+        s = "#{indent(depth)}#{x.str()}: #{this.typeEnv[x].apply(this.solution).str()}";
+      else
+        s = indent(depth) + x.str();
+
+      if (x in this.consEnv) {
+        s = s + " / [#{join([c.str() | c in this.consEnv[x]], ", ")}]";
+      }
+      print s;
+    }
+  );
 }
 
 SimpleTypeSystem.ConstraintClass = Constraint;

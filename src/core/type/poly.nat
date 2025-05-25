@@ -163,14 +163,15 @@ class PolyTypeState extends AdhocTypeState {
 
     if (left is TAbstract) {
       if (left.variadic and right is ->) {
+                
         if (right.domain is TProduct)
           left = left(..right.domain.elements);
         else
           left = left(right.domain);
       } else if (right is not TVar) {
         left = left.instantiate();
-      }
 
+      }
     }
 
     if (right is TAbstract) {
@@ -218,12 +219,8 @@ class PolyTypeSystem extends AdhocTypeSystem {
 
     if (value == Map) {
       return TAbstract((*types) => {
-        if (len(types) == 1) {
-          if (types[0] == unit)
-            return unit -> TMap(typeVar());
-          else
-            return types[0] -> TMap(types[0]);
-        }
+        if (len(types) == 1 && types[0] == unit)
+          return unit -> TMap(typeVar());
         return TProduct(..types) -> TMap(..types);
       });
     }

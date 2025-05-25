@@ -6,8 +6,6 @@ class TOverload extends Type {
     this.cases = cases.map(TypeSystem.typify);
   }
 
-  range() => TSum(..[x.range | x in this.cases]);
-
   unit(type) => {
     if (type is TOverload)
       return type;

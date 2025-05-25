@@ -122,6 +122,7 @@ ObjNative* newNative(int arity, bool variadic, ObjString* name,
   native->variadic = variadic;
   native->name = name;
   native->function = function;
+  initMap(&native->fields);
   return native;
 }
 

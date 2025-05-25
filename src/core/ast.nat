@@ -107,7 +107,11 @@ class ASTNode extends Tree {
   opGetUpvalue(address) => this.upvalues[address];
   opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
   opSubscriptGet(obj, key) => ASTSubscriptGet(obj, key);
-  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
+  opCall(fn, *args) => {
+    if (fn is ASTGlobal && fn.variadic())
+      return ASTApp(fn, ASTVariadicArgumentSequence(..args));
+    return ASTApp(fn, ASTArgumentSequence(..args));
+  }
   opCallInfix(fn, left, right) => ASTAppInfix(fn, ASTArgumentSequence(left, right));
   opVariable(var) => ASTPatternVariable(var);
   opMember(element, collection) => ASTMembership(element, collection);
@@ -328,6 +332,15 @@ class ASTGlobal extends ASTVariable {
   tex() => str(this.id);
   str() => "ASTGlobal(#{this.id})";
   betaReduce() => this;
+  variadic() => {
+    let value = this.resolve();
+    let type = vType(value);
+    if (type == OClass)
+      return value.init && value.init.variadic;
+    if (type == OFunction || type == OBoundFunction || type == ONative)
+      return value.variadic;
+    return false;
+  }
 }
 
 class ASTUpvalue extends ASTVariable {
@@ -355,7 +368,6 @@ class ASTExternalUpvalue extends ASTUpvalue {
 }
 
 class ASTInternalUpvalue extends ASTUpvalue {
-  resolve() => { throw Error("Not resolvable."); }
   tex() => this.name;
   str() => "ASTInternalUpvalue(#{this.id}, #{this.localId}, '#{this.name}')";
 }
@@ -373,6 +385,8 @@ class ASTArgumentSequence extends ASTExpr {
   resolve() => this.children.map(node => node.resolve()); 
   tex() => join([arg.tex() | arg in this.children], ", ");
 }
+
+class ASTVariadicArgumentSequence extends ASTArgumentSequence {}
 
 class ASTApp extends ASTExprStatement {
   // we only want to reach normal form - 1, otherwise
@@ -396,11 +410,11 @@ class ASTApp extends ASTExprStatement {
 
     // now substitute.
     let reduct = fn[0][0].map(x => {
-      if (x is not ASTLocal && x is not ASTInternalUpvalue)
-        return x;
-      for (let i = 0; i < len(args); i = i + 1) {
-        if (params[i].uuid == x.uuid)
-          return args[i];
+      if (x is ASTLocal || x is ASTInternalUpvalue) {
+        for (let i = 0; i < len(args); i = i + 1) {
+          if (params[i].uuid == x.uuid)
+            return args[i];
+        }
       }
       return x;
     });
@@ -464,8 +478,7 @@ class ASTSubscriptGet extends ASTExpr {
   tex() => "#{this[0].tex()}[#{this[1].tex()}]";
 }
 
-class ASTSubscriptSet extends ASTAssignment {
-}
+class ASTSubscriptSet extends ASTAssignment {}
 
 class ASTMembership extends ASTExpr {
   init(element, collection) => {

@@ -402,14 +402,31 @@ assert(t == bool -> (num -> bool));
 
 // maps.
 
-typecheck((x: num) => ({1: true, 2: false})[x]);
+// instantiation.
+
+typecheck(() => ({"1": true}));
+
+// key type.
+
+typecheck((x: string) => ({"1": true})[x]);
 typecheck((x: bool) => ({1: true, false: 3})[x]);
+typecheck((x: num) => ({1: true, 2: false, 3: false})[x]);
+
+// key types.
 
 typecheck((x: bool % num) => ({1: true, false: 3})[x]);
+typefail((x: string) => ({1: true, false: 3})[x]);
 
-typecheck((x: bool % num) => ({1: true, false: 3})[x]).str();
+// val type.
 
-typefail((x: string) => ({1: true, 2: false, false: 3})[x]);
+typecheck((x: num) => ((x: bool) => {})({1: true}[x]));
+
+// val types.
+
+typecheck((x: num) => ((x: bool) => {})({1: true, true: 1}[x]));
+typefail((x: num % bool) => ((x: bool) => {})({1: true, true: 1})[x]);
+
+typecheck((x: num % bool) => ((x: num % bool) => {})({1: true, true: 1}[x]));
 
 // comprehensions.
 

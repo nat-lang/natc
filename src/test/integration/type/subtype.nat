@@ -4,7 +4,7 @@
 let f: num -> void;
 let g: bool -> void;
 
-typefail((x: num % bool) => f(x));
+typefail((x: num or bool) => f(x));
 typefail((x: num % bool) => g(x));
 
 let f: (bool % string) -> void = x => {};

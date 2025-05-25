@@ -42,14 +42,6 @@ class TMap extends TCollection {
     this.klass = Map;
     super.init(..elements);
   }
-  str() => "TMap()";
-}
-
-class TKeyVal extends Type {
-  init(key, val) => {
-    this.key = key;
-    this.val = val;
-  }
 }
 
 let infix(9) % = (a, b) => TSum.lift(a) & TSum.lift(b);
@@ -112,14 +104,10 @@ class SubtypeState extends SimpleTypeState {
           tObj = this.principal(obj),
           tKey = this.principal(key);
 
-      let tGet = typeVar();
-      this.pushConstraint(node, TKeyVal(tKey, tGet) <| tObj);
+      let tVal = typeVar();
+      this.pushConstraint(node, TMap(TProduct(tKey,tVal)) <| tObj);
 
-      return tGet;
-    }
-
-    if (node is ASTSubscriptSet) {
-
+      return tVal;
     }
   
     if (node is ASTNegation) {
@@ -165,18 +153,22 @@ class SubtypeState extends SimpleTypeState {
     if (left is TVar || right is TVar)
       return super._unify(constraint);
 
-    if (left is TKeyVal && right is TMap) {
-      for (x in right) {
-        let substate = this.copy();
-        let unified = substate.unify(y <| x);
-        // if ()
-      }
-
+    if (left is TMap && right is TMap) {
       return left.elements.all(
-        x => right.elements.some(
-          y => {
+        l => right.elements.some(
+          r => {
             let substate = this.copy();
-            let unified = substate.unify(y <| x);
+
+            let lKey = typeVar(), rKey = typeVar(),
+                lVal = typeVar(), rVal = typeVar();
+
+            substate.constraints.extend([
+              (l ~ TProduct(lKey, lVal)),
+              (r ~ TProduct(rKey, rVal)),
+              (r <| l)
+            ]);
+
+            let unified = substate.solve();
             if (unified)
               this.solution = substate.solution;
             return unified;
