@@ -60,6 +60,8 @@ class Type extends Base {
   str() => str(this);
   tex() => this.str();
   pp() => { print this.str(); }
+
+  infix or (that) => (TSum.lift(this) & TSum.lift(that));
 }
 
 class TFunction extends Type {

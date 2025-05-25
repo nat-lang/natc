@@ -17,17 +17,17 @@ assert(f.cases[0] == num -> void);
 // functions with disjunctive domains map into overloads
 // with one case per disjunct and uniform range.
 
-let f = TOverload.lift((num % string) -> void);
+let f = TOverload.lift((num or string) -> void);
 
 assert(len(f.cases) == 2);
 assert(num -> void in f.cases);
 assert(string -> void in f.cases);
 
-let f = TOverload.lift((num % string) -> (void % bool));
+let f = TOverload.lift((num or string) -> (void or bool));
 
 assert(len(f.cases) == 2);
-assert(num -> (void % bool) in f.cases);
-assert(string -> (void % bool) in f.cases);
+assert(num -> (void or bool) in f.cases);
+assert(string -> (void or bool) in f.cases);
 
 // concatenating overload types preserves the order of their cases.
 
@@ -58,13 +58,13 @@ typecheck((x: num) => f(x));
 // (num -> void & bool -> void) <| bool -> w
 typecheck((x: bool) => f(x));
 
-// (num -> void & bool -> void) <| (num % bool) -> w
+// (num -> void & bool -> void) <| (num or bool) -> w
 // (num -> void & bool -> void) <| (num -> w & bool -> w)
-typecheck((x: num % bool) => f(x));
+typecheck((x: num or bool) => f(x));
 
-// (num -> void & bool -> void) <| (num % bool % string) -> w
+// (num -> void & bool -> void) <| (num or bool or string) -> w
 // (num -> void & bool -> void) <| (num -> w & bool -> w & string -> w)
-typefail((x: num % bool % string) => f(x));
+typefail((x: num or bool or string) => f(x));
 
 // order of the cases doesn't matter.
 
@@ -72,9 +72,9 @@ let f = (x: bool) => nil | (x: num) => nil;
 
 typecheck((x: num) => f(x));
 typecheck((x: bool) => f(x));
-typecheck((x: num % bool) => f(x));
+typecheck((x: num or bool) => f(x));
 
-typefail((x: num % bool % string) => f(x));
+typefail((x: num or bool or string) => f(x));
 
 // heterogenous range.
 
@@ -86,45 +86,45 @@ typecheck((x: num) => f(x));
 // (num -> bool & bool -> void) <| bool -> w
 typecheck((x: bool) => f(x));
 
-// (num -> bool & bool -> void) <| (num % bool) -> w
+// (num -> bool & bool -> void) <| (num or bool) -> w
 // (num -> bool & bool -> void) <| (num -> w & bool -> w)
-typecheck((x: bool % num) => f(x));
+typecheck((x: bool or num) => f(x));
 
-// (num -> bool & bool -> void) <| (num % bool % string) -> w
+// (num -> bool & bool -> void) <| (num or bool or string) -> w
 // (num -> bool & bool -> void) <| (num -> w & bool -> w & string -> w)
-typefail((x: num % bool % string) => f(x));
+typefail((x: num or bool or string) => f(x));
 
 // constraints on range.
 
 let f = (x: num) => nil | (x: void) => true;
 let g = (x: bool) => x;
 
-typefail((x: num % void) => g(f(x)));
-typefail((x: void % num) => g(f(x)));
+typefail((x: num or void) => g(f(x)));
+typefail((x: void or num) => g(f(x)));
 typefail((x: num) => g(f(x)));
 
 typecheck((x: void) => g(f(x)));
 
 let h = (x: void) => x;
 
-typefail((x: num % void) => h(f(x)));
+typefail((x: num or void) => h(f(x)));
 typefail((x: void) => h(f(x)));
 
 typecheck((x: num) => h(f(x)));
 
-let k = (x: bool % void) => x;
+let k = (x: bool or void) => x;
 
-typefail((x: num % void % string) => k(f(x)));
+typefail((x: num or void or string) => k(f(x)));
 
-typecheck((x: num % void) => k(f(x)));
+typecheck((x: num or void) => k(f(x)));
 typecheck((x: void) => k(f(x)));
 typecheck((x: num) => k(f(x)));
 
-let j = (x: bool % void % string) => x;
+let j = (x: bool or void or string) => x;
 
-typefail((x: num % void % string) => j(f(x)));
+typefail((x: num or void or string) => j(f(x)));
 
-typecheck((x: num % void) => j(f(x)));
+typecheck((x: num or void) => j(f(x)));
 typecheck((x: void) => j(f(x)));
 typecheck((x: num) => j(f(x)));
 
@@ -138,9 +138,9 @@ typecheck((x: num) => j(f(x)));
 let g : (num -> bool & string -> bool) -> void
       = f => nil;
 
-typecheck((f: (num % string) -> bool) => g(f));
+typecheck((f: (num or string) -> bool) => g(f));
 
-typefail((f: (num % string) -> (bool % void)) => g(f));
+typefail((f: (num or string) -> (bool or void)) => g(f));
 typefail((f: num -> bool) => g(f));
 typefail((f: string -> bool) => g(f));
 
@@ -149,8 +149,8 @@ typefail((f: string -> bool) => g(f));
 let g : (num -> bool & string -> string) -> void
       = f => nil;
 
-typefail((f: (num % string) -> (bool % string)) => g(f));
-typefail((f: (num % string) -> (bool % string)) => g(f));
+typefail((f: (num or string) -> (bool or string)) => g(f));
+typefail((f: (num or string) -> (bool or string)) => g(f));
 
 // overload is subtype of overload.
 // --------------------------------------
@@ -171,7 +171,7 @@ typecheck((f: string -> bool & num -> bool & bool -> void) => g(f));
 
 let f = (x: num) => true | (x: bool) => nil;
 
-typefail((x: num % bool) => f(f(x)));
+typefail((x: num or bool) => f(f(x)));
 typefail((x: bool) => f(f(x)));
 
 typecheck((x: num) => f(f(x)));

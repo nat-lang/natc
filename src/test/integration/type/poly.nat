@@ -414,7 +414,7 @@ typecheck((x: num) => ({1: true, 2: false, 3: false})[x]);
 
 // key types.
 
-typecheck((x: bool % num) => ({1: true, false: 3})[x]);
+typecheck((x: bool or num) => ({1: true, false: 3})[x]);
 typefail((x: string) => ({1: true, false: 3})[x]);
 
 // val type.
@@ -424,9 +424,13 @@ typecheck((x: num) => ((x: bool) => {})({1: true}[x]));
 // val types.
 
 typecheck((x: num) => ((x: bool) => {})({1: true, true: 1}[x]));
-typefail((x: num % bool) => ((x: bool) => {})({1: true, true: 1})[x]);
+typefail((x: num or bool) => ((x: bool) => {})({1: true, true: 1})[x]);
 
-typecheck((x: num % bool) => ((x: num % bool) => {})({1: true, true: 1}[x]));
+typecheck((x: num or bool) => ((x: num or bool) => {})({1: true, true: 1}[x]));
+
+// assignment.
+
+
 
 // comprehensions.
 

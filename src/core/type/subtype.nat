@@ -44,8 +44,6 @@ class TMap extends TCollection {
   }
 }
 
-let infix(9) % = (a, b) => TSum.lift(a) & TSum.lift(b);
-
 class SubtypeConstraint extends Constraint {
   str() => this.left.str() + " <| " + this.right.str();
 }
@@ -112,7 +110,7 @@ class SubtypeState extends SimpleTypeState {
   
     if (node is ASTNegation) {
       let tArg = this.principal(node[0]);
-      this.pushConstraint(node, tArg <| (bool % void % undef));
+      this.pushConstraint(node, tArg <| (bool or void or undef));
       return bool;
     }
 
