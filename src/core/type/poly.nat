@@ -218,11 +218,7 @@ class PolyTypeSystem extends AdhocTypeSystem {
     }
 
     if (value == Map) {
-      return TAbstract((*types) => {
-        if (len(types) == 1 && types[0] == unit)
-          return unit -> TMap(typeVar());
-        return TProduct(..types) -> TMap(..types);
-      });
+      return TAbstract((*types) => TProduct(..types) -> TMap(..types));
     }
 
     return super.literalType(value);

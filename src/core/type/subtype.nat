@@ -97,17 +97,37 @@ class SubtypeState extends SimpleTypeState {
       return typeVar();
 
     if (node is ASTSubscriptGet) {
-      let obj = node[0],
-          key = node[1],
-          tObj = this.principal(obj),
-          tKey = this.principal(key);
+      let obj = node[0], tObj = this.principal(obj),
+          key = node[1], tKey = this.principal(key);
+
+      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
+          tObjVal = TSum(..tObj.elements.map(x => x[1]));
 
       let tVal = typeVar();
-      this.pushConstraint(node, TMap(TProduct(tKey,tVal)) <| tObj);
 
+      this.extendConstraints(node, [
+        (tKey <| tObjKey),
+        (tVal <| tObjVal)
+      ]);
       return tVal;
     }
-  
+
+    if (node is ASTSubscriptSet) {
+      let obj = node[0], tObj = this.principal(obj),
+          key = node[1], tKey = this.principal(key),
+          val = node[2], tVal = this.principal(val);
+
+      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
+          tObjVal = TSum(..tObj.elements.map(x => x[1]));
+
+      this.extendConstraints(node, [
+        (tKey <| tObjKey),
+        (tVal <| tObjVal)
+      ]);
+
+      return tObj;
+    }
+
     if (node is ASTNegation) {
       let tArg = this.principal(node[0]);
       this.pushConstraint(node, tArg <| (bool or void or undef));
@@ -150,30 +170,6 @@ class SubtypeState extends SimpleTypeState {
 
     if (left is TVar || right is TVar)
       return super._unify(constraint);
-
-    if (left is TMap && right is TMap) {
-      return left.elements.all(
-        l => right.elements.some(
-          r => {
-            let substate = this.copy();
-
-            let lKey = typeVar(), rKey = typeVar(),
-                lVal = typeVar(), rVal = typeVar();
-
-            substate.constraints.extend([
-              (l ~ TProduct(lKey, lVal)),
-              (r ~ TProduct(rKey, rVal)),
-              (r <| l)
-            ]);
-
-            let unified = substate.solve();
-            if (unified)
-              this.solution = substate.solution;
-            return unified;
-          }
-        )
-      );
-    }
 
     if (left is TCollection && right is TCollection) {
       if (len(left) == len(right)) {

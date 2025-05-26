@@ -404,7 +404,10 @@ assert(t == bool -> (num -> bool));
 
 // instantiation.
 
-typecheck(() => ({"1": true}));
+typecheck(() => ({1: true}));
+typecheck(() => ({1: true, true: 1}));
+typecheck(() => ({1: {true: 1}}));
+typecheck(() => ({1: {true: {1: true}}}));
 
 // key type.
 
@@ -423,14 +426,50 @@ typecheck((x: num) => ((x: bool) => {})({1: true}[x]));
 
 // val types.
 
-typecheck((x: num) => ((x: bool) => {})({1: true, true: 1}[x]));
-typefail((x: num or bool) => ((x: bool) => {})({1: true, true: 1})[x]);
+typecheck(() => ((x: num) => {})({1: 1}[1]));
+typecheck(() => ((x: num or bool) => {})({1: true, true: 1}[1]));
+typecheck(() => ((x: num or bool) => {})({1: true, true: 1}[true]));
+typecheck(() => ((x: num or bool or string) => {})({1: true, true: 1}[1]));
+typecheck(() => ((x: num or bool or string) => {})({1: true, true: 1}[true]));
 
-typecheck((x: num or bool) => ((x: num or bool) => {})({1: true, true: 1}[x]));
+typefail(() => ((x: bool) => {})({1: 1}[1]));
+typefail(() => ((x: bool) => {})({1: true, true: 1}[1]));
+typefail(() => ((x: bool) => {})({1: true, true: 1}[true]));
+
+typefail(() => ((x: num) => {})({1: true, true: 1}[1]));
+typefail(() => ((x: num) => {})({1: true, true: 1}[true]));
 
 // assignment.
 
+typecheck(() => {
+  let x = {1: true};
+  x[1] = false;
+});
 
+typecheck(() => {
+  let x = {1: true, true: 1};
+  x[1] = false;
+});
+
+typecheck(() => {
+  let x = {1: true, true: 1};
+  x[true] = 1;
+});
+
+typecheck((z: num or bool) => {
+  let x = {1: true, true: 1};
+  x[z] = 1;
+});
+
+typefail(() => {
+  let x = {1: true};
+  x[true] = false;
+});
+
+typefail((z: num or bool or string) => {
+  let x = {1: true, true: 1};
+  x[z] = 1;
+});
 
 // comprehensions.
 

@@ -166,6 +166,7 @@ class TCollection extends TInstance {
   __iter__() => iter(this.elements);
   __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
+  __get__(key) => this.elements[key];
 }
 
 class TProduct extends TCollection {
