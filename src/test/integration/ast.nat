@@ -666,7 +666,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionPred(
         ASTLiteral(true),
@@ -696,7 +696,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
@@ -735,7 +735,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
@@ -774,7 +774,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionPred(
         ASTLiteral(true),
@@ -821,7 +821,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
@@ -865,7 +865,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionPred(
         ASTLiteral(true),
@@ -919,7 +919,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
@@ -929,7 +929,7 @@ assert(f == ASTClosureMock(
             ASTComprehensionMock(
               ASTApp(
                 ASTGlobal("Set"),
-                ASTArgumentSequence()
+                ASTVariadicArgumentSequence()
               ),
               ASTComprehensionIter(
                 ASTLocal(2, "x"),
@@ -974,7 +974,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionIter(
         ASTLocal(2, "x"),
@@ -989,7 +989,7 @@ assert(f == ASTClosureMock(
             ASTComprehensionMock(
               ASTApp(
                 ASTGlobal("Set"),
-                ASTArgumentSequence()
+                ASTVariadicArgumentSequence()
               ),
               ASTComprehensionIter(
                 ASTLocal(2, "y"),
@@ -1031,7 +1031,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionPred(
         ASTApp(
@@ -1089,7 +1089,7 @@ assert(f == ASTClosureMock(
     ASTComprehensionMock(
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence()
+        ASTVariadicArgumentSequence()
       ),
       ASTComprehensionPred(
         ASTLiteral(true),
@@ -1591,7 +1591,7 @@ assert(f == ASTClosureMock(
       ),
       ASTApp(
         ASTGlobal("Set"),
-        ASTArgumentSequence(
+        ASTVariadicArgumentSequence(
           ASTLiteral(1),
           ASTLiteral(2),
           ASTLiteral(3)
@@ -1604,7 +1604,7 @@ assert(f == ASTClosureMock(
               ASTLocal(1, "x"),
               ASTApp(
                 ASTGlobal("Set"),
-                ASTArgumentSequence(
+                ASTVariadicArgumentSequence(
                   ASTLiteral(4),
                   ASTLiteral(5),
                   ASTLiteral(6)
@@ -2046,6 +2046,110 @@ let f <- () => { throw z; };
 assert(f == ASTClosureMock(
   ASTThrow(
     ASTGlobal("z")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => { x[1]; };
+
+assert(f == ASTClosureMock(
+  ASTExprStatement(
+    ASTSubscriptGet(
+      ASTLocal(1, "x"),
+      ASTLiteral(1)
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => { x[1] = true; };
+
+assert(f == ASTClosureMock(
+  ASTSubscriptSet(
+    ASTLocal(1, "x"),
+    ASTLiteral(1),
+    ASTLiteral(true)
+  ),
+  ASTExprStatement(
+    ASTLocal(1, "x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => { x["1"]; };
+
+assert(f == ASTClosureMock(
+  ASTExprStatement(
+    ASTSubscriptGet(
+      ASTLocal(1, "x"),
+      ASTLiteral("1")
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x => { x["1"] = true; };
+
+assert(f == ASTClosureMock(
+  ASTSubscriptSet(
+    ASTLocal(1, "x"),
+    ASTLiteral("1"),
+    ASTLiteral(true)
+  ),
+  ASTExprStatement(
+    ASTLocal(1, "x")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x y => { x[y]; };
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTExprStatement(
+        ASTSubscriptGet(
+          ASTInternalUpvalueMock("x"),
+          ASTLocal(1, "y")
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- x y => { x[y] = true; };
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTClosureMock(
+      ASTSubscriptSet(
+        ASTInternalUpvalueMock("x"),
+        ASTLocal(1, "y"),
+        ASTLiteral(true)
+      ),
+      ASTExprStatement(
+        ASTInternalUpvalueMock("x")
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)

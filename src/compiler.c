@@ -1962,7 +1962,7 @@ static void setPrecedence(Compiler* cmp, ParseRule* rule, int prec) {
 
 // Look up the rule for the [token]'s type, unless the
 // [token] is an identifier, in which case check the vm's
-// infix table for a user-defined infixation precedence.
+// infix tables for a user-defined infixation precedence.
 static ParseRule* getInfixRule(Compiler* cmp, Token token) {
   if (token.type == TOKEN_IDENTIFIER) {
     Value name = identifierToken(token);

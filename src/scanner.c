@@ -54,8 +54,8 @@ static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 static bool isSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
-          c == '+' || c == '-' || c == '/' || c == '*' || c == '|' ||
-          c == '=' || c == '_' || c == '%');
+          c == '+' || c == '-' || c == '/' || c == '\\' || c == '*' ||
+          c == '|' || c == '=' || c == '_' || c == '%');
 }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }

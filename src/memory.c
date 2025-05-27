@@ -88,11 +88,11 @@ static void blackenObject(Obj* object) {
       markValue(obj->receiver);
 
       switch (obj->type) {
-        case BOUND_METHOD: {
+        case BOUND_METHOD:
           markObject((Obj*)obj->bound.method);
           break;
-        }
         case BOUND_NATIVE:
+          markObject((Obj*)obj->bound.native);
           break;
       }
       break;
@@ -147,7 +147,11 @@ static void blackenObject(Obj* object) {
       markMap(map);
       break;
     }
-    case OBJ_NATIVE:
+    case OBJ_NATIVE: {
+      ObjNative* native = (ObjNative*)object;
+      markMap(&native->fields);
+      break;
+    }
     case OBJ_STRING:
       break;
     case OBJ_SEQUENCE: {

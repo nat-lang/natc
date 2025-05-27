@@ -14,8 +14,6 @@ class Constraint {
 
 let infix(6) ~ = Constraint;
 
-class AppConstraint extends Constraint {}
-
 class Substitution extends Map {
   entries() => super.entries().map(e => e[0] ~ e[1]);
 
@@ -62,7 +60,8 @@ class Type extends Base {
   str() => str(this);
   tex() => this.str();
   pp() => { print this.str(); }
-  map(fn) => fn(this);
+
+  infix or (that) => (TSum.lift(this) & TSum.lift(that));
 }
 
 class TFunction extends Type {
@@ -137,13 +136,6 @@ class TString extends Type {
   str() => "string";
 }
 
-class TOverload extends Type {
-  init(functions) => {
-    this.functions = functions;
-  }
-  map(fn) => TOverload(this.functions.map(fn));
-}
-
 class TClassy extends Type {
   init(klass) => {
     this.klass = klass;
@@ -167,13 +159,14 @@ class TCollection extends TInstance {
     this.elements = elements;
   }
   fvs() => union(..[x.fvs() | x in this.elements]);
-  str() => "TCollection(" + join(this.elements.map(x => x.str()), ", ") + ")";
+  str() => "#{this.__class__}(#{join(this.elements.map(x => x.str()), ", ")})";
   map(fn) => this.__class__(..this.elements.map(fn));
   substitute(c: Constraint) => this.map(x => x.substitute(c));
   hash() => this.elements.hash();
   __iter__() => iter(this.elements);
   __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
+  __get__(key) => this.elements[key];
 }
 
 class TProduct extends TCollection {
@@ -182,7 +175,6 @@ class TProduct extends TCollection {
     super.init(..elements);
   }
   fvs() => union(..[x.fvs() | x in this.elements]);
-  str() => "TProduct(#{join(this.elements.map(x => x.str()), ", ")})";
 }
 
 class TSet extends TCollection {
@@ -193,7 +185,6 @@ class TSet extends TCollection {
     this.element = elements[0];
     super.init(this.element);
   }
-  str() => "TSet(" + this.elements[0].str() + ")";
 }
 
 let unit = TUnit();
@@ -442,9 +433,15 @@ class SimpleTypeState {
     if (node is ASTVariable)
       return this.lookup(node);
 
+    if (node is ASTVariadicArgumentSequence) {
+      let tArgs = node.children.map(this.constrain);
+      if (len(tArgs) == 0)
+        return unit;
+      return TProduct(..tArgs);
+    }
+
     if (node is ASTArgumentSequence) {
       let tArgs = node.children.map(this.constrain);
-
       if (len(tArgs) == 0)
         return unit;
       else if (len(tArgs) == 1)
@@ -677,6 +674,20 @@ class SimpleTypeState {
     for (c in this.solution)
       print c.left.str() + " = " + c.right.str();
   }
+  ppAST(tree: ASTNode) => tree.ppRepr(
+    (x, depth) => {
+      let s;
+      if (this.typeEnv[x])
+        s = "#{indent(depth)}#{x.str()}: #{this.typeEnv[x].apply(this.solution).str()}";
+      else
+        s = indent(depth) + x.str();
+
+      if (x in this.consEnv) {
+        s = s + " / [#{join([c.str() | c in this.consEnv[x]], ", ")}]";
+      }
+      print s;
+    }
+  );
 }
 
 SimpleTypeSystem.ConstraintClass = Constraint;

@@ -1,3 +1,4 @@
+class SubtypeError extends SimpleTypeError {}
 
 class TSum extends Type {
   init(*types) => {
@@ -36,7 +37,12 @@ class TSum extends Type {
   __len__() => len(this.disjuncts);
 }
 
-let infix(9) % = (a, b) => TSum.lift(a) & TSum.lift(b);
+class TMap extends TCollection {
+  init(*elements) => {
+    this.klass = Map;
+    super.init(..elements);
+  }
+}
 
 class SubtypeConstraint extends Constraint {
   str() => this.left.str() + " <| " + this.right.str();
@@ -90,9 +96,41 @@ class SubtypeState extends SimpleTypeState {
     if (node is ASTPropertyAssignment)
       return typeVar();
 
+    if (node is ASTSubscriptGet) {
+      let obj = node[0], tObj = this.principal(obj),
+          key = node[1], tKey = this.principal(key);
+
+      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
+          tObjVal = TSum(..tObj.elements.map(x => x[1]));
+
+      let tVal = typeVar();
+
+      this.extendConstraints(node, [
+        (tKey <| tObjKey),
+        (tVal <| tObjVal)
+      ]);
+      return tVal;
+    }
+
+    if (node is ASTSubscriptSet) {
+      let obj = node[0], tObj = this.principal(obj),
+          key = node[1], tKey = this.principal(key),
+          val = node[2], tVal = this.principal(val);
+
+      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
+          tObjVal = TSum(..tObj.elements.map(x => x[1]));
+
+      this.extendConstraints(node, [
+        (tKey <| tObjKey),
+        (tVal <| tObjVal)
+      ]);
+
+      return tObj;
+    }
+
     if (node is ASTNegation) {
       let tArg = this.principal(node[0]);
-      this.pushConstraint(node, tArg <| (bool % void % undef));
+      this.pushConstraint(node, tArg <| (bool or void or undef));
       return bool;
     }
 
@@ -130,10 +168,10 @@ class SubtypeState extends SimpleTypeState {
     let left = constraint.left,
         right = constraint.right;
 
-    if (left is TVar or right is TVar)
+    if (left is TVar || right is TVar)
       return super._unify(constraint);
 
-    if (left is TCollection and right is TCollection) {
+    if (left is TCollection && right is TCollection) {
       if (len(left) == len(right)) {
         this.constraints.extend([
           x[0] <| x[1] | x in zip(left.elements, right.elements)
@@ -144,11 +182,11 @@ class SubtypeState extends SimpleTypeState {
       return false;
     }
 
-    if (left is TInstance and right is TInstance)
+    if (left is TInstance && right is TInstance)
       return isSubclass(left.klass, right.klass);
 
     // a -> b < c -> d iff a > c and b < d.
-    if (left is TFunction and right is TFunction) {
+    if (left is TFunction && right is TFunction) {
       this.constraints.extend([
       // fixme: the compiler fails when these are unparenthesized.
         (right.domain <| left.domain),

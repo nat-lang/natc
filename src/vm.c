@@ -858,12 +858,21 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
+          case OBJ_NATIVE: {
+            ObjNative* native = AS_NATIVE(vmPeek(0));
+            mapGet(&native->fields, name, &value);
+
+            vmPop();  // native.
+            vmPush(value);
+            break;
+          }
           case OBJ_BOUND_FUNCTION: {
             ObjBoundFunction* obj = AS_BOUND_FUNCTION(vmPop());
 
             if (obj->type == BOUND_NATIVE) {
-              vmRuntimeError("Natives have no properties.");
-              return INTERPRET_RUNTIME_ERROR;
+              mapGet(&obj->bound.native->fields, name, &value);
+              vmPush(value);
+              break;
             }
 
             vmPush(OBJ_VAL(obj->bound.method));

@@ -28,6 +28,9 @@ class TOverload extends Type {
   str() => "TOverload(#{join([x.str() | x in this.cases], ", ")})";
   tex() => join([case.tex() | case in this.cases], " \mid ");
   pp() => { print this.str(); }
+  fvs() => union(..[case.fvs() | case in this.cases]);
+
+  substitute(sub) => TOverload(..this.cases.map(x => x.substitute(sub)));
 }
 
 let infix(7) & = (a, b) => TOverload.unit(a).concat(TOverload.unit(b));
@@ -47,30 +50,39 @@ class AdhocTypeState extends SubtypeState {
         right = constraint.right;
 
     if (constraint is SubtypeConstraint) {
-      if (left is TVar or right is TVar)
+      if (left is TVar || right is TVar)
         return super._unify(constraint);
 
       if (left is TOverload || right is TOverload) {
-        left = TOverload.lift(left);
-        right = TOverload.lift(right);
+        let oLeft = TOverload.lift(left);
+        let oRight = TOverload.lift(right);
 
-        // ∀x in right. ∃y in left. y <| x
-        return right.cases.all(
-          x => left.cases.some(
-            y => {
+        let tRange = [];
+
+        // ∀r in right. ∃l in left. l <| r
+        let unified = oRight.cases.all(
+          r => oLeft.cases.some(
+            l => {
               // we only want to propagate information for a
               // successful case, so typecheck in a local copy
               // of the state.
               let substate = this.copy();
-              let unified = substate.unify(y <| x);
+              let unified = substate.unify(l <| r);
 
               if (unified)
-                this.solution = substate.solution;
+                tRange.push(l.range);
 
               return unified;
             }
           )
         );
+
+        if (unified && right is ->)
+          this.constraints.push(
+            TSum(..tRange) <| right.range
+          );
+
+        return unified;
       }
     }
 
