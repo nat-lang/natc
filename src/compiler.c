@@ -711,9 +711,6 @@ static int namedVariable(Compiler* cmp, Token name, bool canAssign) {
   if (canAssign && match(cmp, TOKEN_EQUAL)) {
     boundExpression(cmp, name);
     emitConstInstr(cmp, setOp, arg);
-  } else if (canAssign && match(cmp, TOKEN_COLON)) {
-    expression(cmp);
-    defineType(cmp, arg);
   } else if (canAssign && match(cmp, TOKEN_ARROW_LEFT)) {
     expression(cmp);
     emitByte(cmp, OP_DESTRUCTURE);
