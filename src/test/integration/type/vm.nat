@@ -1,0 +1,8 @@
+
+class A {}
+
+class B extends A {}
+class C extends A {}
+
+assert(lca(B,C) == A);
+assert(lca(C,B) == A);

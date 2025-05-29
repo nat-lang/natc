@@ -1,3 +1,4 @@
+import test/integration/type/vm
 
 let _ts = TypeSystem;
 

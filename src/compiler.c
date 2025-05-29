@@ -1601,8 +1601,7 @@ static void letDeclaration(Compiler* cmp) {
   emitByte(cmp, OP_POP);
 
   if (annotated) {
-    // after the value assignment so that we're setting
-    // the type of the value.
+    // after the value assignment so that we annotate the value.
     defineType(cmp, var);
     emitByte(cmp, OP_POP);  // the type.
   }

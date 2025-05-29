@@ -200,6 +200,8 @@ class PolyTypeState extends AdhocTypeState {
 
 class PolyTypeSystem extends AdhocTypeSystem {
   literalType(value) => {
+    let type = vType(value);
+  
     if (value == Tuple)
       return TAbstract((*types) => TProduct(..types) -> TProduct(..types));
 
@@ -218,7 +220,14 @@ class PolyTypeSystem extends AdhocTypeSystem {
     }
 
     if (value == Map) {
-      return TAbstract((*types) => TProduct(..types) -> TMap(..types));
+      return TAbstract((*types) => {
+
+        if (len(types) == 1 && types[0] == unit)
+          return unit -> TMap(
+            TProduct(typeVar(), typeVar())
+          );
+        return TProduct(..types) -> TMap(..types);
+      });
     }
 
     return super.literalType(value);

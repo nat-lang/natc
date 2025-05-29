@@ -471,6 +471,43 @@ typefail((z: num or bool or string) => {
   x[z] = 1;
 });
 
+// annotation.
+
+typecheck(() => {
+  let x: {bool: bool} = Map();
+  x[true] = false;
+});
+
+typefail(() => {
+  let x: {bool: bool} = Map();
+  x[true] = 1;
+});
+
+typefail(() => {
+  let x: {bool: bool} = Map();
+  x[1] = true;
+});
+
+typecheck(() => {
+  let x: {bool: bool or num} = Map();
+  x[true] = 1;
+});
+
+typefail(() => {
+  let x: {bool: bool or num} = Map();
+  x[1] = true;
+});
+
+typefail(() => {
+  let x: {bool: bool or num} = Map();
+  x["true"] = 1;
+});
+
+typefail(() => {
+  let x: {bool: bool or num} = Map();
+  x[true] = "1";
+});
+
 // comprehensions.
 
 typecheck(() => ({1 | true}));

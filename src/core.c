@@ -414,11 +414,16 @@ bool __address__(int argCount, Value* args) {
 
   return true;
 }
+
 bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
 
   switch (value.vType) {
+    case VAL_UNIT: {
+      string = copyString("()", 2);
+      break;
+    }
     case VAL_NUMBER: {
       double num = AS_NUMBER(value);
 

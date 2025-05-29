@@ -1363,6 +1363,20 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(OBJ_VAL(character));
             break;
           }
+          case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(obj);
+            uint32_t hash;
+            if (!vmHashValue(key, &hash)) return INTERPRET_RUNTIME_ERROR;
+
+            Value value;
+            if (mapGetHash(&klass->fields, key, &value, hash)) {
+              vmPush(value);
+            } else {
+              // we don't throw an error if the property doesn't exist.
+              vmPush(NIL_VAL);
+            }
+            break;
+          }
           case OBJ_INSTANCE: {
             // classes may define their own subscript access operator.
             ObjInstance* instance = AS_INSTANCE(obj);
@@ -1396,7 +1410,8 @@ InterpretResult vmExecute(int baseFrame) {
           }
           default: {
             vmRuntimeError(
-                "Only objects, sequences, and instances with a '%s' method "
+                "Only objects, sequences, classes, and instances with a '%s' "
+                "method "
                 "support access by subscript.",
                 S_SUBSCRIPT_GET);
             return INTERPRET_RUNTIME_ERROR;
@@ -1503,7 +1518,6 @@ InterpretResult vmExecute(int baseFrame) {
           Obj* obj = AS_OBJ(global);
           writeValueArray(&obj->annotations, vmPeek(0));
         }
-
         break;
       }
       case OP_SPREAD: {

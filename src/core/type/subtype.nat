@@ -23,6 +23,17 @@ class TSum extends Type {
     return TSum(type);
   }
   lower() => this.disjuncts.elements()[0];
+  liftSeq(seq) => {
+    seq = seq.reduce((acc, x) => {
+      if (x is TSum)
+        acc.extend(x.disjuncts.elements());
+      else
+        acc.push(x);
+      return acc;
+    }, []);
+
+    return TSum(..seq);
+  }
 
   fvs() => union(..[x.fvs() | x in this]);
   join(sep) => join(this.elements().map(x => x.str()), sep);
@@ -100,8 +111,8 @@ class SubtypeState extends SimpleTypeState {
       let obj = node[0], tObj = this.principal(obj),
           key = node[1], tKey = this.principal(key);
 
-      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
-          tObjVal = TSum(..tObj.elements.map(x => x[1]));
+      let tObjKV = unzip(tObj.elements).map(TSum.liftSeq);
+      let tObjKey = tObjKV[0], tObjVal = tObjKV[1];
 
       let tVal = typeVar();
 
@@ -117,8 +128,8 @@ class SubtypeState extends SimpleTypeState {
           key = node[1], tKey = this.principal(key),
           val = node[2], tVal = this.principal(val);
 
-      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
-          tObjVal = TSum(..tObj.elements.map(x => x[1]));
+      let tObjKV = unzip(tObj.elements).map(TSum.liftSeq);
+      let tObjKey = tObjKV[0], tObjVal = tObjKV[1];
 
       this.extendConstraints(node, [
         (tKey <| tObjKey),
@@ -136,13 +147,13 @@ class SubtypeState extends SimpleTypeState {
 
     if (node is ASTLocalTypeAssignment) {
       let var = node[0];
-      let val = node[1];
+      let ano = node[1];
 
       let tVar = this.lookup(var);
-      let tVal = this.system.typify(val.resolve());
+      let tAno = this.system.typify(ano.resolve());
 
       // value must be subtype of its annotation.
-      this.pushConstraint(node, tVar <| tVal);
+      this.pushConstraint(node, tVar <| tAno);
 
       return void;
     }
