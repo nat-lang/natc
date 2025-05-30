@@ -31,8 +31,6 @@ assert(_check.failure());
 // but the polymorphic type system can, with the
 // aid of abstract types.
 
-// with either explicit abstraction.
-
 typecheck(() => {
   let id: (a => a -> a) = x => x;
 
@@ -556,6 +554,62 @@ typefail(() => {
 typefail(() => {
   let x: {bool: bool or num} = Map();
   x[true] = "1";
+});
+
+// maps unify with functions.
+
+typecheck(() => {
+  let x: num -> bool = {1: true};
+});
+
+typefail(() => {
+  let x: num -> bool = {true: 1};
+});
+
+// key |> domain.
+
+typecheck(() => {
+  let x: num -> bool = {1: true, true: false};
+});
+
+typefail(() => {
+  let x: num -> bool = {1: true, 1: 1};
+});
+
+typecheck(() => {
+  let x: (num or bool) -> bool = {1: true, true: false};
+});
+
+typefail(() => {
+  let x: (num or bool or string) -> bool = {1: true, true: false};
+});
+
+// val <| range.
+
+typecheck(() => {
+  let x: num -> (bool or num) = {1: true};
+});
+
+typecheck(() => {
+  let x: num -> (bool or num) = {1: true, 1: 1};
+});
+
+typefail(() => {
+  let x: num -> (bool or num) = {1: true, 1: 1, 2: "foo"};
+});
+
+// assignment with -> annotation.
+
+typecheck(() => {
+  let x: num -> bool = Map();
+
+  x[1] = true;
+});
+
+typefail(() => {
+  let x: num -> bool = Map();
+
+  x[true] = 1;
 });
 
 // comprehensions.
