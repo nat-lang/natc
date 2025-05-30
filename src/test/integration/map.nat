@@ -59,6 +59,21 @@ assert(map[x] == 3);
 assert(map[y] == 4);
 assert(map[z] == 5);
 
+// expression keys.
+
+map = {1 + 1: 2};
+
+assert(map[2] == 2);
+
+map = {true and false: false};
+
+assert(map[false] == false);
+
+map = {true and false: false, true and true: true};
+
+assert(map[false] == false);
+assert(map[true] == true);
+
 // api.
 
 map = {"a":1, "b": 2};
