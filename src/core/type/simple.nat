@@ -244,8 +244,9 @@ class SimpleTypeSystem {
     if (value is Map) {
       if (len(value) != 1)
         throw SimpleTypeError("TMap expects single key/value pair.");
+      let entry = value.entries()[0];
       return TMap(
-        this.typify(value.entries()[0])
+        this.typify(entry[0]), this.typify(entry[1])
       );
     }
 

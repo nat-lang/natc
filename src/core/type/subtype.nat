@@ -2,6 +2,7 @@ class SubtypeError extends SimpleTypeError {}
 
 class TSum extends Type {
   init(*types) => {
+    if (types.some(x => x == nil)) throw Error("!");
     let typified = types.map(TypeSystem.typify);
     this.disjuncts = Set.fromSeq(typified);
   }
@@ -49,9 +50,9 @@ class TSum extends Type {
 }
 
 class TMap extends TCollection {
-  init(*elements) => {
+  init(key, val) => {
     this.klass = Map;
-    super.init(..elements);
+    super.init(key, val);
   }
 }
 
@@ -111,8 +112,7 @@ class SubtypeState extends SimpleTypeState {
       let obj = node[0], tObj = this.principal(obj),
           key = node[1], tKey = this.principal(key);
 
-      let tObjKV = unzip(tObj.elements).map(TSum.liftSeq);
-      let tObjKey = tObjKV[0], tObjVal = tObjKV[1];
+      let tObjKey = tObj.elements[0], tObjVal = tObj.elements[1];
 
       let tVal = typeVar();
 
@@ -128,8 +128,7 @@ class SubtypeState extends SimpleTypeState {
           key = node[1], tKey = this.principal(key),
           val = node[2], tVal = this.principal(val);
 
-      let tObjKV = unzip(tObj.elements).map(TSum.liftSeq);
-      let tObjKey = tObjKV[0], tObjVal = tObjKV[1];
+      let tObjKey = tObj.elements[0], tObjVal = tObj.elements[1];
 
       this.extendConstraints(node, [
         (tKey <| tObjKey),

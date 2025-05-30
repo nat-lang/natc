@@ -17,6 +17,10 @@ let zip = (x, y) => {
 };
 
 let unzip = x => {
-  let left = x.map(y => y[0]), right = x.map(y => y[1]);
+  let left = [], right = [];
+  for (y in x) {
+    left.push(y[0]);
+    right.push(y[1]);
+  }
   return (left, right);
 };

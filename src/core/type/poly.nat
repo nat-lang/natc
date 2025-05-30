@@ -55,6 +55,40 @@ class TGeneralization extends TAbstract {
   }
 }
 
+class TMapAbstract extends TAbstract {
+  // Map is constructed from pairs of keys and values,
+  // but TMap is constructed from a single pair of possibly
+  // disjunctive key and value types. We have to handle the
+  // former case when unifying Map.init constraints, but the
+  // latter is the most convenient normal form for typing
+  // access and assignment. Here we translate the pairwise
+  // to the normal form.
+  init() => {
+    this.arity = 2;
+    this.variadic = true;
+  }
+  fn(*types) => {
+    // three cases:
+  
+    // (1) for an empty map -- i.e. Map() -- we delay
+    // instantiation of the key/val types.
+    if (len(types) == 1 && types[0] == unit)
+      return unit -> TMap(typeVar(), typeVar());
+    // (2) TAbstract.instantiate will pass this function
+    // two type variables.
+    if (len(types) == 2 && types.all(x => x is TVar))
+      return TProduct(..types) -> TMap(..types);
+    // (3) unification with pairwise Map.init arguments.
+    if(types.all(x => x is TProduct && len(x) == 2)) {
+      let kvs = unzip(types), keys = kvs[0], vals = kvs[1];
+
+      return TProduct(..types) -> TMap(TSum(..keys), TSum(..vals));
+    }
+
+    throw SubtypeError("Can't construct TMap.");
+  }
+}
+
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
     if (node is ASTApp) {
@@ -219,16 +253,7 @@ class PolyTypeSystem extends AdhocTypeSystem {
       });
     }
 
-    if (value == Map) {
-      return TAbstract((*types) => {
-
-        if (len(types) == 1 && types[0] == unit)
-          return unit -> TMap(
-            TProduct(typeVar(), typeVar())
-          );
-        return TProduct(..types) -> TMap(..types);
-      });
-    }
+    if (value == Map) return TMapAbstract();
 
     return super.literalType(value);
   }
