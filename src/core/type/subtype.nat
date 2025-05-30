@@ -35,7 +35,10 @@ class TSum extends Type {
     return TSum(..seq);
   }
 
-  fvs() => union(..[x.fvs() | x in this]);
+  fvs() => {
+              for (x in this) print x;
+    return union(..[x.fvs() | x in this]);
+  }
   join(sep) => join(this.elements().map(x => x.str()), sep);
   str() => "TSum(" + this.join(", ") + ")";
   tex() => this.join(" \mid ");
@@ -49,9 +52,16 @@ class TSum extends Type {
 }
 
 class TMap extends TCollection {
-  init(*elements) => {
+  init(key, val) => {
     this.klass = Map;
-    super.init(..elements);
+    super.init(key, val);
+  }
+  fromPairs(*pairs) => {
+    let kvs = unzip(pairs), keys = kvs[0], vals = kvs[1];
+    print pairs.values;
+    let z = TMap(TSum(..keys), TSum(..vals));
+    print z.str();
+    return z;
   }
 }
 
@@ -110,7 +120,8 @@ class SubtypeState extends SimpleTypeState {
     if (node is ASTSubscriptGet) {
       let obj = node[0], tObj = this.principal(obj),
           key = node[1], tKey = this.principal(key);
-
+      this.ppAST(obj);
+      print tObj.str();
       let tObjKV = unzip(tObj.elements).map(TSum.liftSeq);
       let tObjKey = tObjKV[0], tObjVal = tObjKV[1];
 
@@ -183,14 +194,13 @@ class SubtypeState extends SimpleTypeState {
       return super._unify(constraint);
 
     if (left is TCollection && right is TCollection) {
-      if (len(left) == len(right)) {
-        this.constraints.extend([
-          x[0] <| x[1] | x in zip(left.elements, right.elements)
-        ]);
-        return this.solve();
-      }
+      if (len(left) != len(right))
+        return false;
 
-      return false;
+      this.constraints.extend([
+        x[0] <| x[1] | x in zip(left.elements, right.elements)
+      ]);
+      return this.solve();
     }
 
     if (left is TInstance && right is TInstance)
@@ -205,6 +215,15 @@ class SubtypeState extends SimpleTypeState {
       ]);
 
       return this.solve();
+    }
+    if (left is TMap && right is TMap) {
+
+    }
+    if (left is -> && right is TMap) {
+      print "? left";
+    }
+    if (left is TMap && right is ->) {
+      print "? right";
     }
 
     let a = TSum.lift(left);

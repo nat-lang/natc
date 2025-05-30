@@ -471,7 +471,14 @@ typefail((z: num or bool or string) => {
   x[z] = 1;
 });
 
-// annotation.
+
+// annotation
+
+typecheck(() => {
+  let x: {bool: bool or num} = {true: 1, false: true};
+});
+
+// annotation and assignment.
 
 typecheck(() => {
   let x: {bool: bool} = Map();
@@ -506,6 +513,15 @@ typefail(() => {
 typefail(() => {
   let x: {bool: bool or num} = Map();
   x[true] = "1";
+});
+
+// annotation and access.
+
+// maps unify with functions.
+
+typecheck(() => {
+  let x: num -> bool = {1: true, 2: false};
+  x[true] = false;
 });
 
 // comprehensions.
@@ -582,4 +598,20 @@ typefail(() => {
   let f = (x: TSet(num)) => {};
   let g = x => "1";
   f({g(true) | true});
+});
+
+
+typecheck(() => {
+  let f = (x: num or bool) => {};
+  f({x | x in {1, true}});
+});
+
+typefail(() => {
+  let f = (x: num or bool) => {};
+  f({x | x in {1, true, "string"}});
+});
+
+typecheck(() => {
+  let f = (x: num or bool or string) => {};
+  f({x | x in {1, true, "string"}});
 });

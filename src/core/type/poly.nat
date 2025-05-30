@@ -67,6 +67,8 @@ class PolyTypeState extends AdhocTypeState {
       
       this.pushConstraint(node, tFunc <| tArgs -> tApp);
       
+        print "->";
+        print tApp.str();
       return tApp;
     }
   
@@ -221,12 +223,16 @@ class PolyTypeSystem extends AdhocTypeSystem {
 
     if (value == Map) {
       return TAbstract((*types) => {
+        if (len(types) == 1) {
+          if (types[0] == unit)
+            return unit -> TMap(
+              TProduct(typeVar(), typeVar())
+            );
 
-        if (len(types) == 1 && types[0] == unit)
-          return unit -> TMap(
-            TProduct(typeVar(), typeVar())
-          );
-        return TProduct(..types) -> TMap(..types);
+        }
+        for (x in types) print x.str();
+        print "^";
+        return TProduct(..types) -> TMap.fromPairs(..types);
       });
     }
 
