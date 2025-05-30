@@ -474,6 +474,56 @@ typefail((z: num or bool or string) => {
 // annotation.
 
 typecheck(() => {
+  let x: {bool: bool} = {false: true};
+});
+
+typefail(() => {
+  let x: {bool: bool} = {false: 1};
+});
+
+typefail(() => {
+  let x: {bool: bool} = {1: false};
+});
+
+typecheck(() => {
+  let x: {bool: bool or num} = {false: true};
+});
+
+typefail(() => {
+ let x: {bool: bool or num} = {false: true, 1: false};
+});
+
+typecheck(() => {
+  let x: {bool: bool or num} = {false: true, true: 1};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool} = {false: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool} = {false: true, 1: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true, 1: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true, 1: true, true: 1};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true, 1: true, true: 1, 1: 1};
+});
+
+// annotation and assignment.
+
+typecheck(() => {
   let x: {bool: bool} = Map();
   x[true] = false;
 });
