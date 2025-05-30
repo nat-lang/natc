@@ -633,3 +633,18 @@ typefail(() => {
   let g = x => "1";
   f({g(true) | true});
 });
+
+typecheck(() => {
+  let f = (x: num or bool) => {};
+  let y = {f(x) | x in {1, true}};
+});
+
+typefail(() => {
+  let f = (x: num or bool) => {};
+  let y = {f(x) | x in {1, true, "string"}};
+});
+
+typecheck(() => {
+  let f = (x: num or bool or string) => {};
+  let y = {f(x) | x in {1, true, "string"}};
+});
