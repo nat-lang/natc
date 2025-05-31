@@ -15,7 +15,6 @@
 #define IS_VARIABLE(value) isObjType(value, OBJ_VARIABLE)
 #define IS_PATTERN(value) isObjType(value, OBJ_PATTERN)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
-#define IS_MAP(value) isObjType(value, OBJ_MAP)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
@@ -31,7 +30,6 @@
 #define AS_VARIABLE(value) (((ObjVariable *)AS_OBJ(value)))
 #define AS_PATTERN(value) (((ObjPattern *)AS_OBJ(value)))
 #define AS_INSTANCE(value) ((ObjInstance *)AS_OBJ(value))
-#define AS_MAP(value) ((ObjMap *)AS_OBJ(value))
 #define AS_NATIVE(value) (((ObjNative *)AS_OBJ(value)))
 #define AS_STRING(value) ((ObjString *)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
@@ -51,7 +49,6 @@ typedef enum {
   OBJ_FUNCTION,
   OBJ_OVERLOAD,
   OBJ_INSTANCE,
-  OBJ_MAP,
   OBJ_NATIVE,
   OBJ_SEQUENCE,
   OBJ_STRING,
@@ -61,6 +58,17 @@ typedef enum {
   OBJ_MODULE,
 } ObjType;
 
+typedef struct {
+  Value key;
+  Value value;
+} MapEntry;
+
+typedef struct {
+  int count;
+  int capacity;
+  MapEntry *entries;
+} Map;
+
 typedef struct ObjModule ObjModule;
 
 struct Obj {
@@ -69,19 +77,8 @@ struct Obj {
   uint32_t hash;
   struct Obj *next;
   ValueArray annotations;
+  Map fields;
 };
-
-typedef struct {
-  Value key;
-  Value value;
-} MapEntry;
-
-typedef struct {
-  Obj obj;
-  int count;
-  int capacity;
-  MapEntry *entries;
-} ObjMap;
 
 typedef struct {
   Obj obj;
@@ -105,13 +102,12 @@ typedef struct {
   Local locals[UINT8_COUNT];
   int localCount;
 
-  ObjMap fields;
   ObjString *name;
   ObjModule *module;
 
   // cache from values to constant indices
   // in the function's chunk.constants.
-  ObjMap constants;
+  Map constants;
 } ObjFunction;
 
 typedef bool (*NativeFn)(int argCount, Value *args);
@@ -122,7 +118,6 @@ typedef struct {
   bool variadic;
   ObjString *name;
   NativeFn function;
-  ObjMap fields;
 } ObjNative;
 
 typedef struct ObjUpvalue {
@@ -147,20 +142,17 @@ typedef struct {
   Obj obj;
   int cases;
   ObjClosure **closures;
-  ObjMap fields;
 } ObjOverload;
 
 typedef struct ObjClass {
   Obj obj;
   ObjString *name;
-  ObjMap fields;
   struct ObjClass *super;
 } ObjClass;
 
 typedef struct {
   Obj obj;
   ObjClass *klass;
-  ObjMap fields;
 } ObjInstance;
 
 typedef enum { BOUND_METHOD, BOUND_NATIVE } BoundFunctionType;
@@ -183,7 +175,7 @@ struct ObjModule {
   ObjString *path;
   ObjString *source;
   ObjClosure *closure;
-  ObjMap namespace;
+  Map namespace;
 };
 
 typedef struct {
@@ -221,20 +213,20 @@ static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->oType == type;
 }
 
-void initMap(ObjMap *map);
-void freeMap(ObjMap *map);
-bool mapHas(ObjMap *map, Value key);
-bool mapHasHash(ObjMap *map, Value key, uint32_t hash);
-bool mapGet(ObjMap *map, Value key, Value *value);
-bool mapGetHash(ObjMap *map, Value key, Value *value, uint32_t hash);
-bool mapSet(ObjMap *map, Value key, Value value);
-bool mapSetHash(ObjMap *map, Value key, Value value, uint32_t hash);
-bool mapDelete(ObjMap *map, Value key);
-void mapAddAll(ObjMap *from, ObjMap *to);
+void initMap(Map *map);
+void freeMap(Map *map);
+bool mapHas(Map *map, Value key);
+bool mapHasHash(Map *map, Value key, uint32_t hash);
+bool mapGet(Map *map, Value key, Value *value);
+bool mapGetHash(Map *map, Value key, Value *value, uint32_t hash);
+bool mapSet(Map *map, Value key, Value value);
+bool mapSetHash(Map *map, Value key, Value value, uint32_t hash);
+bool mapDelete(Map *map, Value key);
+void mapAddAll(Map *from, Map *to);
 void setStringChar(ObjString *string, ObjString *character, int idx);
-ObjString *mapFindString(ObjMap *map, const char *chars, int length,
+ObjString *mapFindString(Map *map, const char *chars, int length,
                          uint32_t hash);
-void mapRemoveWhite(ObjMap *map);
-void markMap(ObjMap *map);
+void mapRemoveWhite(Map *map);
+void markMap(Map *map);
 bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
 #endif

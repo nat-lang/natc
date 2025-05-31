@@ -64,7 +64,6 @@ class CompositionSystem {
   evaluate(node: Tree) => {
     if (node.leaf()) {
       for (rule in this.unaryRules) {
-        print rule;
         let data = rule(node.data);
         if (data != undefined)
           return AnnotatedTree(data, [

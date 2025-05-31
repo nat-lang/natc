@@ -1,4 +1,4 @@
-#include <libgen.h>
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,22 +70,4 @@ char* readSource(const char* path) {
 char* readRelativeSource(const char* path) {
   char* absolutePath = pathToUri(path);
   return readSource(absolutePath);
-}
-
-int pathDir(const char* relPath, char* outDir) {
-  char* dir;
-
-  // Create a copy of the path since dirname might modify it
-  char* pathCopy = strdup(relPath);
-  if (pathCopy == NULL) {
-    perror("strdup failed");
-    return 1;
-  }
-
-  dir = dirname(pathCopy);
-
-  printf("Directory: %s\n", dir);
-  *outDir = *dir;
-
-  return 0;
 }

@@ -81,6 +81,7 @@ static void blackenObject(Obj* object) {
 #endif
 
   markArray(&object->annotations);
+  markMap(&object->fields);
 
   switch (object->oType) {
     case OBJ_BOUND_FUNCTION: {
@@ -101,7 +102,6 @@ static void blackenObject(Obj* object) {
       ObjClass* klass = (ObjClass*)object;
       markObject((Obj*)klass->name);
       markObject((Obj*)klass->super);
-      markMap(&klass->fields);
       break;
     }
     case OBJ_CLOSURE: {
@@ -115,13 +115,11 @@ static void blackenObject(Obj* object) {
       ObjOverload* overload = (ObjOverload*)object;
       for (int i = 0; i < overload->cases; i++)
         markObject((Obj*)overload->closures[i]);
-      markMap(&overload->fields);
       break;
     }
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
       markObject((Obj*)instance->klass);
-      markMap(&instance->fields);
       break;
     }
     case OBJ_UPVALUE: {
@@ -133,7 +131,6 @@ static void blackenObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
-      markMap(&function->fields);
       markArray(&function->chunk.constants);
       markObject((Obj*)function->module);
       break;
@@ -142,16 +139,7 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)((ObjVariable*)object)->name);
       break;
     }
-    case OBJ_MAP: {
-      ObjMap* map = (ObjMap*)object;
-      markMap(map);
-      break;
-    }
-    case OBJ_NATIVE: {
-      ObjNative* native = (ObjNative*)object;
-      markMap(&native->fields);
-      break;
-    }
+    case OBJ_NATIVE:
     case OBJ_STRING:
       break;
     case OBJ_SEQUENCE: {
@@ -181,6 +169,7 @@ static void freeObject(Obj* object) {
 #endif
 
   freeValueArray(&object->annotations);
+  freeMap(&object->fields);
 
   switch (object->oType) {
     case OBJ_BOUND_FUNCTION:
@@ -189,7 +178,6 @@ static void freeObject(Obj* object) {
     case OBJ_CLASS: {
       ObjClass* klass = (ObjClass*)object;
       klass->super = NULL;
-      freeMap(&klass->fields);
       FREE(ObjClass, object);
       break;
     }
@@ -202,27 +190,19 @@ static void freeObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
-      freeMap(&function->fields);
       freeMap(&function->constants);
       FREE(ObjFunction, object);
       break;
     }
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
-      freeMap(&instance->fields);
-      FREE(ObjInstance, object);
+      FREE(ObjInstance, instance);
       break;
     }
     case OBJ_OVERLOAD: {
       ObjOverload* overload = (ObjOverload*)object;
-      freeMap(&overload->fields);
       FREE_ARRAY(ObjOverload*, overload->closures, overload->cases);
       FREE(ObjOverload, object);
-      break;
-    }
-    case OBJ_MAP: {
-      ObjMap* map = (ObjMap*)object;
-      freeMap(map);
       break;
     }
     case OBJ_MODULE: {

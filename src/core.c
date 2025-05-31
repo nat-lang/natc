@@ -10,7 +10,7 @@
 #include "io.h"
 
 static void defineNativeFn(char* name, int arity, bool variadic,
-                           NativeFn function, ObjMap* dest) {
+                           NativeFn function, Map* dest) {
   // keep the values on the stack so they're
   // not gc'd if/when the [dest] map is recapacitated.
   ObjString* objName = intern(name);
@@ -39,7 +39,7 @@ static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
 
 static void defineNativeFnMethod(char* name, int arity, bool variadic,
                                  NativeFn function, ObjClass* klass) {
-  defineNativeFn(name, arity, variadic, function, &klass->fields);
+  defineNativeFn(name, arity, variadic, function, &klass->obj.fields);
 }
 
 ObjClass* defineNativeClass(char* name) {
@@ -58,7 +58,7 @@ static void defineInstanceProperty(char* name, ObjInstance* instance,
   ObjString* objName = intern(name);
   vmPush(OBJ_VAL(objName));
   vmPush(property);
-  mapSet(&instance->fields, vmPeek(1), vmPeek(0));
+  mapSet(&instance->obj.fields, vmPeek(1), vmPeek(0));
   vmPop();
   vmPop();
 }
@@ -106,7 +106,7 @@ ObjSequence* __sequentialInit__(int argCount) {
 
   ObjSequence* seq = newSequence();
   vmPush(OBJ_VAL(seq));
-  mapSet(&obj->fields, OBJ_VAL(vm.core.sValues), vmPeek(0));
+  mapSet(&obj->obj.fields, OBJ_VAL(vm.core.sValues), vmPeek(0));
   vmPop();
 
   int i = argCount;
@@ -161,8 +161,8 @@ bool __objKeys__(int argCount, Value* args) {
   vmPush(OBJ_VAL(vm.core.sequence));
   if (!vmCallValue(vmPeek(0), 0)) return false;
 
-  for (int i = 0; i < obj->fields.capacity; i++) {
-    MapEntry* entry = &obj->fields.entries[i];
+  for (int i = 0; i < obj->obj.fields.capacity; i++) {
+    MapEntry* entry = &obj->obj.fields.entries[i];
     if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
 
     // add to sequence. seq's 'push' method
@@ -204,13 +204,13 @@ bool __length__(int argCount, Value* args) {
     case OBJ_INSTANCE: {
       ObjInstance* instance = AS_INSTANCE(obj);
       Value method;
-      if (mapGet(&instance->klass->fields, INTERN(S_LEN), &method)) {
+      if (mapGet(&instance->klass->obj.fields, INTERN(S_LEN), &method)) {
         vmPush(OBJ_VAL(instance));  // receiver.
         return vmCallValue(method, 0);
       }
 
       // otherwise default to the instance's field count.
-      vmPush(NUMBER_VAL(instance->fields.count));
+      vmPush(NUMBER_VAL(instance->obj.fields.count));
       return true;
     }
     case OBJ_STRING: {
@@ -345,12 +345,12 @@ bool __compile__(int argCount, Value* args) {
 
   ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
 
-  if (!vmImport(module, &objModule->fields)) {
+  if (!vmImport(module, &objModule->obj.fields)) {
     vmRuntimeError("Failed to import.");
     return false;
   }
 
-  mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
+  mapSet(&objModule->obj.fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
   vmPop();  // objModule.
   vmPop();  // module.
@@ -366,7 +366,7 @@ bool __moduleImport__(int argCount, Value* args) {
   ObjInstance* obj = AS_INSTANCE(vmPeek(0));
 
   Value module;
-  if (!mapGet(&obj->fields, OBJ_VAL(vm.core.sModule), &module)) {
+  if (!mapGet(&obj->obj.fields, OBJ_VAL(vm.core.sModule), &module)) {
     vmRuntimeError("Module instance missing its module field!");
     return false;
   }
@@ -376,8 +376,8 @@ bool __moduleImport__(int argCount, Value* args) {
     return false;
   }
 
-  ObjMap* target = vm.module->type == MODULE_ENTRYPOINT ? &vm.globals
-                                                        : &vm.module->namespace;
+  Map* target = vm.module->type == MODULE_ENTRYPOINT ? &vm.globals
+                                                     : &vm.module->namespace;
   mapAddAll(&AS_MODULE(module)->namespace, target);
   vmPop();
   vmPush(NIL_VAL);
@@ -389,8 +389,8 @@ bool __globals__(int argCount, Value* args) {
 
   vmPush(OBJ_VAL(vm.core.map));
   vmInitInstance(vm.core.map, 0);
-  mapAddAll(&vm.globals, &AS_INSTANCE(vmPeek(0))->fields);
-  mapAddAll(&vm.module->namespace, &AS_INSTANCE(vmPeek(0))->fields);
+  mapAddAll(&vm.globals, &AS_OBJ(vmPeek(0))->fields);
+  mapAddAll(&vm.module->namespace, &AS_OBJ(vmPeek(0))->fields);
 
   return true;
 }

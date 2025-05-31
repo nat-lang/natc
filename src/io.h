@@ -6,6 +6,5 @@
 char* pathToUri(char* path);
 char* readSource(const char* path);
 char* readRelativeSource(const char* path);
-int pathDir(const char* relPath, char* outDir);
 
 #endif
