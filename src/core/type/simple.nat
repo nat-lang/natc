@@ -638,6 +638,8 @@ class SimpleTypeState {
   );
 
   unifyAnnotations(expr, type) => {
+    print "-->";
+    print this.system.typify;
     let tAnnotations = annotations(expr).map(this.system.typify);
 
     if (len(tAnnotations) > 0) {

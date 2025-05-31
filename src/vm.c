@@ -179,10 +179,35 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
+static void bindClosure(Value receiver, Value* value) {
+  if (IS_CLOSURE(*value)) {
+    ObjBoundFunction* obj = newBoundMethod(receiver, AS_CLOSURE(*value));
+    *value = OBJ_VAL(obj);
+  } else if (IS_NATIVE(*value)) {
+    ObjBoundFunction* obj = newBoundNative(receiver, AS_NATIVE(*value));
+    *value = OBJ_VAL(obj);
+  }
+}
+
 bool vmGetProperty(Value source, ObjString* name, Value* property) {
   if (!IS_OBJ(source)) {
-    vmRuntimeError("Only objects have properties");
+    vmRuntimeError("Only objects have properties.");
     return false;
+  }
+
+  if (IS_INSTANCE(source)) {
+    if (!mapGet(&AS_OBJ(source)->fields, OBJ_VAL(name), property)) {
+      if (mapGet(&AS_INSTANCE(source)->klass->obj.fields, OBJ_VAL(name),
+                 property))
+        bindClosure(source, property);
+    }
+    return true;
+  }
+
+  if (IS_CLASS(source)) {
+    if (mapGet(&AS_OBJ(source)->fields, OBJ_VAL(name), property))
+      bindClosure(source, property);
+    return true;
   }
 
   mapGet(&AS_OBJ(source)->fields, OBJ_VAL(name), property);
@@ -191,7 +216,7 @@ bool vmGetProperty(Value source, ObjString* name, Value* property) {
 
 bool vmSetProperty(Value source, ObjString* name, Value property) {
   if (!IS_OBJ(source)) {
-    vmRuntimeError("Only objects have properties");
+    vmRuntimeError("Can only set property of an object.");
     return false;
   }
 
@@ -201,9 +226,9 @@ bool vmSetProperty(Value source, ObjString* name, Value property) {
 
 bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
-  Value method = NIL_VAL;
+  Value method;
 
-  if (!vmGetProperty(vmPeek(argCount), name, &method)) return false;
+  if (!vmGetProperty(receiver, name, &method)) return false;
 
   vm.stackTop[-argCount - 1] = receiver;
   return vmCallValue(method, argCount);
@@ -349,7 +374,6 @@ static bool variadify(ObjClosure* closure, int* argCount) {
 
     vmPush(seq);
     vmPush(arg);
-
     if (!vmInvoke(intern(S_PUSH), 1)) return false;
     i--;
   }
@@ -378,21 +402,19 @@ void vmInitFrame(ObjClosure* closure, int offset) {
 }
 
 static bool callClosure(ObjClosure* closure, int argCount) {
-  printf("00000\n");
   if (!spread(&argCount)) return false;
-  printf("00001\n");
+
   if (closure->function->variadic)
     if (!variadify(closure, &argCount)) return false;
-  printf("00002\n");
+
   if (!checkArity(closure->function->name, closure->function->arity, argCount))
     return false;
-  printf("00003\n");
+
   if (vm.frameCount == FRAMES_MAX) {
     vmRuntimeError("Stack overflow.");
     return false;
   }
 
-  printf("00004\n");
   vmInitFrame(closure, argCount + 1);
 
   return true;
@@ -473,8 +495,6 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
 }
 
 bool vmCallValue(Value caller, int argCount) {
-  printValue(caller);
-  printf("\n");
   if (IS_OBJ(caller)) {
     switch (OBJ_TYPE(caller)) {
       case OBJ_BOUND_FUNCTION: {
@@ -500,7 +520,7 @@ bool vmCallValue(Value caller, int argCount) {
 
         if (closure->function->patterned)
           return callCases(&closure, 1, argCount);
-        printf("calling lcosure../\n");
+
         return callClosure(AS_CLOSURE(caller), argCount);
       }
       case OBJ_OVERLOAD: {
@@ -528,16 +548,6 @@ bool vmCallValue(Value caller, int argCount) {
   vmRuntimeError(
       "Can only call functions, classes, and objects with a 'call' method.");
   return false;
-}
-
-static void bindClosure(Value receiver, Value* value) {
-  if (IS_CLOSURE(*value)) {
-    ObjBoundFunction* obj = newBoundMethod(receiver, AS_CLOSURE(*value));
-    *value = OBJ_VAL(obj);
-  } else if (IS_NATIVE(*value)) {
-    ObjBoundFunction* obj = newBoundNative(receiver, AS_NATIVE(*value));
-    *value = OBJ_VAL(obj);
-  }
 }
 
 ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot, ObjString* name) {
@@ -1024,8 +1034,6 @@ InterpretResult vmExecute(int baseFrame) {
         vmPush(postfix);
         while (++i < argCount) vmPush(args[i]);
 
-        disassembleStack();
-        printf("\n");
         if (!vmCallValue(postfix, argCount)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
         break;
