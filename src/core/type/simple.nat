@@ -241,6 +241,14 @@ class SimpleTypeSystem {
       return TInstance(value);
     if (value is TFunction)
       return this.typify(value.domain) -> this.typify(value.range);
+    if (value is Map) {
+      if (len(value) != 1)
+        throw SimpleTypeError("TMap expects single key/value pair.");
+      let entry = value.entries()[0];
+      return TMap(
+        this.typify(entry[0]), this.typify(entry[1])
+      );
+    }
 
     return value;
   }
@@ -465,12 +473,12 @@ class SimpleTypeState {
 
     if (node is ASTLocalTypeAssignment) {
       let var = node[0];
-      let val = node[1];
+      let ano = node[1];
 
       let tVar = this.lookup(var);
-      let tVal = this.system.typify(val.resolve());
+      let tAno = this.system.typify(ano.resolve());
 
-      this.pushConstraint(node, tVar ~ tVal);
+      this.pushConstraint(node, tVar ~ tAno);
 
       return void;
     }

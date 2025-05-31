@@ -37,6 +37,16 @@ let isSubclass = (a, b) => {
   return false;
 };
 
+let lca = (a, b) => {
+  let k = a;
+
+  while (k) {
+    if (isSubclass(b, k))
+      return k;
+    k = k.__superclass__;
+  }
+};
+
 let isVar = x => vType(x) == OVariable;
 
 // Is [a] an instance of [b]?

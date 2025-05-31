@@ -15,3 +15,12 @@ let zip = (x, y) => {
 
   return seq;
 };
+
+let unzip = x => {
+  let left = [], right = [];
+  for (y in x) {
+    left.push(y[0]);
+    right.push(y[1]);
+  }
+  return (left, right);
+};

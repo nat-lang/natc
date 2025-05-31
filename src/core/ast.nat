@@ -267,7 +267,7 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
-  str() => "ASTLiteral(#{str(this.value)})";
+  str() => "ASTLiteral(#{this.value})";
   tex() => this.value;
 
   resolve() => this.value;
@@ -460,6 +460,23 @@ class ASTApp extends ASTExprStatement {
 
 class ASTAppInfix extends ASTApp {
   tex() => this.resolveTex() || "#{this[1][0].tex()} #{this[0].tex()} #{this[1][1].tex()}";
+  evaluate() => {
+    let fn = this[0].resolve();
+    let args = this[1].resolve();
+
+    // check if this is a method infix.
+    let lhs = args[0], rhs = args[1],
+        tLhs = vType(lhs), tRhs = vType(rhs);
+    if (tLhs == OInstance && tRhs == OInstance) {
+      let sup = lca(lhs.__class__, rhs.__class__);
+      if (sup && args[0][fn.name])
+        return args[0][fn.name](args[1]);
+    }
+
+    if (len(args) > 0)
+      return fn(..args);
+    return fn();
+  }
 }
 
 class ASTPropertyAccess extends ASTExpr {

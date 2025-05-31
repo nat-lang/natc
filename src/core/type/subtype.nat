@@ -2,6 +2,7 @@ class SubtypeError extends SimpleTypeError {}
 
 class TSum extends Type {
   init(*types) => {
+    if (types.some(x => x == nil)) throw Error("!");
     let typified = types.map(TypeSystem.typify);
     this.disjuncts = Set.fromSeq(typified);
   }
@@ -23,6 +24,17 @@ class TSum extends Type {
     return TSum(type);
   }
   lower() => this.disjuncts.elements()[0];
+  liftSeq(seq) => {
+    seq = seq.reduce((acc, x) => {
+      if (x is TSum)
+        acc.extend(x.disjuncts.elements());
+      else
+        acc.push(x);
+      return acc;
+    }, []);
+
+    return TSum(..seq);
+  }
 
   fvs() => union(..[x.fvs() | x in this]);
   join(sep) => join(this.elements().map(x => x.str()), sep);
@@ -38,9 +50,9 @@ class TSum extends Type {
 }
 
 class TMap extends TCollection {
-  init(*elements) => {
+  init(key, val) => {
     this.klass = Map;
-    super.init(..elements);
+    super.init(key, val);
   }
 }
 
@@ -100,8 +112,7 @@ class SubtypeState extends SimpleTypeState {
       let obj = node[0], tObj = this.principal(obj),
           key = node[1], tKey = this.principal(key);
 
-      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
-          tObjVal = TSum(..tObj.elements.map(x => x[1]));
+      let tObjKey = tObj.elements[0], tObjVal = tObj.elements[1];
 
       let tVal = typeVar();
 
@@ -117,8 +128,7 @@ class SubtypeState extends SimpleTypeState {
           key = node[1], tKey = this.principal(key),
           val = node[2], tVal = this.principal(val);
 
-      let tObjKey = TSum(..tObj.elements.map(x => x[0])),
-          tObjVal = TSum(..tObj.elements.map(x => x[1]));
+      let tObjKey = tObj.elements[0], tObjVal = tObj.elements[1];
 
       this.extendConstraints(node, [
         (tKey <| tObjKey),
@@ -136,13 +146,13 @@ class SubtypeState extends SimpleTypeState {
 
     if (node is ASTLocalTypeAssignment) {
       let var = node[0];
-      let val = node[1];
+      let ano = node[1];
 
       let tVar = this.lookup(var);
-      let tVal = this.system.typify(val.resolve());
+      let tAno = this.system.typify(ano.resolve());
 
       // value must be subtype of its annotation.
-      this.pushConstraint(node, tVar <| tVal);
+      this.pushConstraint(node, tVar <| tAno);
 
       return void;
     }
@@ -172,18 +182,23 @@ class SubtypeState extends SimpleTypeState {
       return super._unify(constraint);
 
     if (left is TCollection && right is TCollection) {
-      if (len(left) == len(right)) {
-        this.constraints.extend([
-          x[0] <| x[1] | x in zip(left.elements, right.elements)
-        ]);
-        return this.solve();
-      }
+      if (len(left) != len(right))
+        return false;
 
-      return false;
+      this.constraints.extend([
+        x[0] <| x[1] | x in zip(left.elements, right.elements)
+      ]);
+      return this.solve();
     }
 
-    if (left is TInstance && right is TInstance)
-      return isSubclass(left.klass, right.klass);
+    // TMap(a, b) < c -> d iff a > c and b < d.
+    if (left is TMap && right is ->) {
+      this.constraints.extend([
+        (right.domain <| left[0]),
+        (left[1] <| right.range)
+      ]);
+      return this.solve();
+    }
 
     // a -> b < c -> d iff a > c and b < d.
     if (left is TFunction && right is TFunction) {
@@ -195,6 +210,9 @@ class SubtypeState extends SimpleTypeState {
 
       return this.solve();
     }
+
+    if (left is TInstance && right is TInstance)
+      return isSubclass(left.klass, right.klass);
 
     let a = TSum.lift(left);
     let b = TSum.lift(right);
