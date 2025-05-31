@@ -62,11 +62,27 @@ class CompositionSystem {
 
   // Map a Tree into an AnnotatedTree.
   evaluate(node: Tree) => {
-    if (node.leaf())
+    if (node.leaf()) {
+      for (rule in this.unaryRules) {
+        print rule;
+        let data = rule(node.data);
+        if (data != undefined)
+          return AnnotatedTree(data, [
+            AnnotatedTree(node.data, [], node.type)
+          ], TypeSystem.type(data));
+      }
+        
       return AnnotatedTree(node.data, [], TypeSystem.type(node.data));
+    }
+
 
     if (node.unary()) {
       let child = this.evaluate(node[0]);
+      for (rule in this.unaryRules) {
+        let data = rule(node.data);
+        if (data)
+          return AnnotatedTree(data, [child], TypeSystem.type(data));
+      }
       return AnnotatedTree(child.data, [child], child.type);
     }
 

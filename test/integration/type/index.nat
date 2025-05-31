@@ -1,0 +1,35 @@
+import type/vm
+
+let _ts = TypeSystem;
+
+TypeSystem = SimpleTypeSystem;
+
+import type/simple
+
+TypeSystem = SubtypeSystem;
+
+import type/simple
+import type/subtype
+
+TypeSystem = AdhocTypeSystem;
+
+import type/simple
+import type/subtype
+import type/adhoc
+
+TypeSystem = PolyTypeSystem;
+
+import type/simple
+import type/subtype
+import type/adhoc
+import type/poly
+
+TypeSystem = DenotationalTypeSystem();
+
+import type/simple
+import type/subtype
+import type/adhoc
+import type/poly
+import type/denotational
+
+TypeSystem = _ts;

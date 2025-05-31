@@ -281,6 +281,7 @@ static void markRoots() {
   markMap(&vm.methodInfixes);
 
   markObject((Obj*)vm.module);
+  markObject((Obj*)vm.projectDir);
 
   markObject((Obj*)vm.core.sName);
   markObject((Obj*)vm.core.sArity);

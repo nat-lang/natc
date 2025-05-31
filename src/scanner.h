@@ -18,7 +18,7 @@ void rewindScanner(Token token);
 void printScanner(Scanner sc);
 void skipWhitespace();
 Token scanToken();
-Token scanSlashedIdentifier();
+Token scanPathIdentifier();
 Token scanVirtualToken(char c);
 char charAt(int i);
 bool isWhite(char c);

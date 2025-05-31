@@ -1,5 +1,6 @@
 #include "vm.h"
 
+#include <libgen.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -140,6 +141,8 @@ bool initVM() {
 
   vm.compiler = NULL;
   vm.module = NULL;
+
+  vm.projectDir = NULL;
 
   vm.comprehensionDepth = 0;
   for (int i = 0; i < COMPREHENSION_DEPTH_MAX; i++) vm.comprehensions[i] = NULL;
@@ -1631,39 +1634,24 @@ InterpretResult vmInterpretModule(char* path) {
   return vmExecuteModule(module);
 }
 
-InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]) {
-  ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
+InterpretResult vmInterpretEntrypoint(char* path) {
+  // create a copy of the path since dirname modifies it.
+  char* pathCopy = strdup(path);
+  if (pathCopy == NULL) return INTERPRET_COMPILE_ERROR;
+
+  char* dir = dirname(pathCopy);
+  char* base = basename(pathCopy);
+
+  vm.projectDir = intern(dir);
+
+  ObjModule* module = vmCompileModule(syntheticToken(base), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
-  InterpretResult status;
-  if ((status = vmExecuteModule(module)) != INTERPRET_OK) return status;
-
-  Value main;
-  if (!mapGet(&module->namespace, OBJ_VAL(vm.core.sMain), &main) ||
-      !IS_CLOSURE(main)) {
-    vmRuntimeError("Entrypoint requires a 'main' function.");
-    return INTERPRET_RUNTIME_ERROR;
-  }
-
-  vmPush(main);
-
-  for (int i = 0; i < argc; i++) vmPush(INTERN(argv[i]));
-
-  if (!callClosure(AS_CLOSURE(main), argc)) return INTERPRET_RUNTIME_ERROR;
-
-  return vmExecute(vm.frameCount - 1);
+  return vmExecuteModule(module);
 }
 
 // wasm api.
-
-InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]) {
-  if (!initVM()) exit(2);
-
-  InterpretResult status = vmInterpretEntrypoint(path, argc, argv);
-  freeVM();
-  return status;
-}
 
 InterpretResult vmInterpretModule_wasm(char* path) {
   if (!initVM()) exit(2);

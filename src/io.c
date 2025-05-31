@@ -1,3 +1,4 @@
+#include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +21,7 @@ char* withNatExt(const char* path) {
 char* pathToUri(const char* path) {
   static char buf[256];
 
-  snprintf(buf, sizeof(buf), "%s%s", NAT_SRC_DIR, path);
+  snprintf(buf, sizeof(buf), "%s/%s", vm.projectDir->chars, path);
 
   return buf;
 }
@@ -69,4 +70,22 @@ char* readSource(const char* path) {
 char* readRelativeSource(const char* path) {
   char* absolutePath = pathToUri(path);
   return readSource(absolutePath);
+}
+
+int pathDir(const char* relPath, char* outDir) {
+  char* dir;
+
+  // Create a copy of the path since dirname might modify it
+  char* pathCopy = strdup(relPath);
+  if (pathCopy == NULL) {
+    perror("strdup failed");
+    return 1;
+  }
+
+  dir = dirname(pathCopy);
+
+  printf("Directory: %s\n", dir);
+  *outDir = *dir;
+
+  return 0;
 }

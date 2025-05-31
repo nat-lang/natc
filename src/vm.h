@@ -133,6 +133,8 @@ typedef struct {
 
   int comprehensionDepth;
   Obj* comprehensions[COMPREHENSION_DEPTH_MAX];
+
+  ObjString* projectDir;
 } VM;
 
 typedef enum {
@@ -150,7 +152,7 @@ void vmRuntimeError(const char* format, ...);
 
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretModule(char* path);
-InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]);
+InterpretResult vmInterpretEntrypoint(char* path);
 
 InterpretResult vmInterpretModule_wasm(char* path);
 char* vmTypesetModule_wasm(char* path);

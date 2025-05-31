@@ -587,7 +587,7 @@ InterpretResult loadCore() {
 
   // core classes.
 
-  InterpretResult coreIntpt = vmInterpretModule(NAT_CORE_LOC);
+  InterpretResult coreIntpt = vmInterpretEntrypoint(NAT_CORE_LOC);
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
   if ((vm.core.object = getGlobalClass(S_OBJECT)) == NULL) return false;
@@ -642,7 +642,7 @@ InterpretResult loadCore() {
 
   // system objects and functions.
 
-  InterpretResult systemIntpt = vmInterpretModule(NAT_SYSTEM_LOC);
+  InterpretResult systemIntpt = vmInterpretEntrypoint(NAT_SYSTEM_LOC);
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||

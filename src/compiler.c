@@ -114,9 +114,9 @@ static void advance(Compiler* cmp) {
   checkError(cmp);
 }
 
-static void advanceSlashedIdentifier(Compiler* cmp) {
+static void advancePathIdentifier(Compiler* cmp) {
   shiftParser();
-  parser.next = scanSlashedIdentifier();
+  parser.next = scanPathIdentifier();
   checkError(cmp);
 }
 
@@ -1745,17 +1745,18 @@ static void ifStatement(Compiler* cmp) {
 }
 
 void importStatement(Compiler* cmp) {
-  advanceSlashedIdentifier(cmp);
-  consumeIdentifier(cmp, "Expect path to import.");
-  Token path = parser.current;
-
+  advancePathIdentifier(cmp);
   advance(cmp);
+  consumeIdentifier(cmp, "Expect path to import.");
+  Token path = parser.previous;
 
   int alias = -1;
   if (match(cmp, TOKEN_AS)) {
     consumeIdentifier(cmp, "Expect identifier alias.");
     alias = identifierConstant(cmp, &parser.previous);
   }
+
+  if (parser.hadError) return;
 
   Parser checkpoint = saveParser();
 

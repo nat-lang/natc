@@ -394,8 +394,10 @@ Token scanVirtualToken(char c) {
   return consumeToken(c);
 }
 
-Token scanSlashedIdentifier() {
-  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
+Token scanPathIdentifier() {
+  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/' || peek() == '.')
+    advance();
+
   return scanner.current == scanner.start ? errorToken("Unexpected character.")
                                           : makeToken(TOKEN_IDENTIFIER);
 }
