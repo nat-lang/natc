@@ -108,12 +108,12 @@ typedef struct {
   // heap.
   Obj* objects;
   ObjUpvalue* openUpvalues;
-  ObjMap strings;
-  ObjMap globals;
-  ObjMap typeEnv;
-  ObjMap prefixes;
-  ObjMap infixes;
-  ObjMap methodInfixes;
+  Map strings;
+  Map globals;
+  Map typeEnv;
+  Map prefixes;
+  Map infixes;
+  Map methodInfixes;
 
   // core defs.
   Core core;
@@ -160,7 +160,7 @@ void vmFree_wasm();
 
 ObjModule* vmCompileModule(Token path, ModuleType type);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
-bool vmImport(ObjModule* module, ObjMap* target);
+bool vmImport(ObjModule* module, Map* target);
 bool vmImportAsInstance(ObjModule* module);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);

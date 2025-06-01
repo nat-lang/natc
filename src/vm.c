@@ -184,7 +184,7 @@ bool vmGetProperty(ObjString* name, int argCount, Value* method) {
 
   char* error = "Only instances, classes, and functions have properties.";
 
-  ObjMap* fields;
+  Map* fields;
   switch (OBJ_TYPE(receiver)) {
     case OBJ_INSTANCE: {
       ObjInstance* instance = AS_INSTANCE(receiver);
@@ -654,7 +654,7 @@ bool vmOverload(CallFrame* frame) {
   return true;
 }
 
-bool vmImport(ObjModule* module, ObjMap* target) {
+bool vmImport(ObjModule* module, Map* target) {
   ObjModule* enclosing = vm.module;
   vm.module = module;
   vmPush(OBJ_VAL(module));  // [ObjModule].
@@ -908,7 +908,7 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_SET_PROPERTY: {
         Value name = READ_CONSTANT();
-        ObjMap* fields;
+        Map* fields;
 
         char* error = "Can only set property of object, class, or function.";
 

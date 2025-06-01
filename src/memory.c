@@ -142,11 +142,6 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)((ObjVariable*)object)->name);
       break;
     }
-    case OBJ_MAP: {
-      ObjMap* map = (ObjMap*)object;
-      markMap(map);
-      break;
-    }
     case OBJ_NATIVE: {
       ObjNative* native = (ObjNative*)object;
       markMap(&native->fields);
@@ -218,11 +213,6 @@ static void freeObject(Obj* object) {
       freeMap(&overload->fields);
       FREE_ARRAY(ObjOverload*, overload->closures, overload->cases);
       FREE(ObjOverload, object);
-      break;
-    }
-    case OBJ_MAP: {
-      ObjMap* map = (ObjMap*)object;
-      freeMap(map);
       break;
     }
     case OBJ_MODULE: {

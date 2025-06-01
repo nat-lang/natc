@@ -10,7 +10,7 @@
 #include "io.h"
 
 static void defineNativeFn(char* name, int arity, bool variadic,
-                           NativeFn function, ObjMap* dest) {
+                           NativeFn function, Map* dest) {
   // keep the values on the stack so they're
   // not gc'd if/when the [dest] map is recapacitated.
   ObjString* objName = intern(name);
@@ -376,8 +376,8 @@ bool __moduleImport__(int argCount, Value* args) {
     return false;
   }
 
-  ObjMap* target = vm.module->type == MODULE_ENTRYPOINT ? &vm.globals
-                                                        : &vm.module->namespace;
+  Map* target = vm.module->type == MODULE_ENTRYPOINT ? &vm.globals
+                                                     : &vm.module->namespace;
   mapAddAll(&AS_MODULE(module)->namespace, target);
   vmPop();
   vmPush(NIL_VAL);

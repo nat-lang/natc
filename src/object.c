@@ -213,13 +213,13 @@ ObjSpread* newSpread(Value value) {
   return spread;
 }
 
-void initMap(ObjMap* map) {
+void initMap(Map* map) {
   map->count = 0;
   map->capacity = 0;
   map->entries = NULL;
 }
 
-void freeMap(ObjMap* map) {
+void freeMap(Map* map) {
   FREE_ARRAY(MapEntry, map->entries, map->capacity);
   initMap(map);
 }
@@ -253,7 +253,7 @@ static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
   return mapFindHash(entries, capacity, key, hashValue(key));
 }
 
-static void mapAdjustCapacity(ObjMap* map, int capacity) {
+static void mapAdjustCapacity(Map* map, int capacity) {
   MapEntry* entries = ALLOCATE(MapEntry, capacity);
 
   for (int i = 0; i < capacity; i++) {
@@ -278,7 +278,7 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   map->capacity = capacity;
 }
 
-bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
+bool mapHasHash(Map* map, Value key, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -286,11 +286,11 @@ bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
   return !IS_UNDEF(entry->key);
 }
 
-bool mapHas(ObjMap* map, Value key) {
+bool mapHas(Map* map, Value key) {
   return mapHasHash(map, key, hashValue(key));
 }
 
-bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
+bool mapGetHash(Map* map, Value key, Value* value, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -300,11 +300,11 @@ bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
   return true;
 }
 
-bool mapGet(ObjMap* map, Value key, Value* value) {
+bool mapGet(Map* map, Value key, Value* value) {
   return mapGetHash(map, key, value, hashValue(key));
 }
 
-bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
+bool mapSetHash(Map* map, Value key, Value value, uint32_t hash) {
   if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
     int capacity = GROW_CAPACITY(map->capacity);
     mapAdjustCapacity(map, capacity);
@@ -320,11 +320,11 @@ bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
   return isNewKey;
 }
 
-bool mapSet(ObjMap* map, Value key, Value value) {
+bool mapSet(Map* map, Value key, Value value) {
   return mapSetHash(map, key, value, hashValue(key));
 }
 
-bool mapDelete(ObjMap* map, Value key) {
+bool mapDelete(Map* map, Value key) {
   if (map->count == 0) return false;
 
   // Find the entry.
@@ -337,7 +337,7 @@ bool mapDelete(ObjMap* map, Value key) {
   return true;
 }
 
-void mapAddAll(ObjMap* from, ObjMap* to) {
+void mapAddAll(Map* from, Map* to) {
   for (int i = 0; i < from->capacity; i++) {
     MapEntry* entry = &from->entries[i];
     if (!IS_UNDEF(entry->key)) {
@@ -346,7 +346,7 @@ void mapAddAll(ObjMap* from, ObjMap* to) {
   }
 }
 
-ObjString* mapFindString(ObjMap* map, const char* chars, int length,
+ObjString* mapFindString(Map* map, const char* chars, int length,
                          uint32_t hash) {
   if (map->count == 0) return NULL;
 
@@ -368,7 +368,7 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
   }
 }
 
-void mapRemoveWhite(ObjMap* map) {
+void mapRemoveWhite(Map* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
     if (!IS_UNDEF(entry->key) && IS_OBJ(entry->key) &&
@@ -378,15 +378,13 @@ void mapRemoveWhite(ObjMap* map) {
   }
 }
 
-void markMap(ObjMap* map) {
+void markMap(Map* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
     markValue(entry->key);
     markValue(entry->value);
   }
 }
-
-static void printMap(ObjMap* map) { printf("<map>"); }
 
 // Is [a] a subclass of [b]?
 bool isSubclass(ObjClass* a, ObjClass* b) {
@@ -451,9 +449,6 @@ void printObject(Value value) {
     case OBJ_INSTANCE:
       printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
              AS_INSTANCE(value));
-      break;
-    case OBJ_MAP:
-      printMap(AS_MAP(value));
       break;
     case OBJ_MODULE:
       printf("<module %s>", AS_MODULE(value)->closure->function->name->chars);
