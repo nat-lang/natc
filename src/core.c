@@ -311,10 +311,14 @@ bool __vType__(int argCount, Value* args) {
 }
 
 bool __compile__(int argCount, Value* args) {
-  Value source = vmPeek(0), path = vmPeek(1);
+  Value source = vmPeek(0), baseName = vmPeek(1), dirName = vmPeek(2);
 
-  if (!IS_STRING(path)) {
-    vmRuntimeError("Expecting string for path.");
+  if (!IS_STRING(baseName)) {
+    vmRuntimeError("Expecting string for name.");
+    return false;
+  }
+  if (!IS_STRING(dirName)) {
+    vmRuntimeError("Expecting string for dir.");
     return false;
   }
   if (!IS_STRING(source)) {
@@ -322,16 +326,18 @@ bool __compile__(int argCount, Value* args) {
     return false;
   }
 
-  ObjString* objPath = AS_STRING(path);
+  ObjString* objDirName = AS_STRING(dirName);
+  ObjString* objBaseName = AS_STRING(baseName);
   ObjString* objSource = AS_STRING(source);
-  ObjModule* module = newModule(objPath, objSource, MODULE_IMPORT);
+  ObjModule* module =
+      newModule(objDirName, objBaseName, objSource, MODULE_IMPORT);
 
   vmPush(OBJ_VAL(module));
-  ObjClosure* closure = vmCompileClosure(syntheticToken(objPath->chars),
+  ObjClosure* closure = vmCompileClosure(syntheticToken(objBaseName->chars),
                                          objSource->chars, module);
 
   if (closure == NULL) {
-    vmRuntimeError("Failed to compile module at '%s'.", objPath->chars);
+    vmRuntimeError("Failed to compile module at '%s'.", objBaseName->chars);
     return false;
   }
 
@@ -569,7 +575,7 @@ InterpretResult loadCore() {
   defineNativeFnGlobal("stackTrace", 0, __stackTrace__);
   defineNativeFnGlobal("address", 1, __address__);
   defineNativeFnGlobal("annotations", 1, __annotations__);
-  defineNativeFnGlobal("compile", 2, __compile__);
+  defineNativeFnGlobal("compile", 3, __compile__);
 
   defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
   defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
@@ -587,7 +593,7 @@ InterpretResult loadCore() {
 
   // core classes.
 
-  InterpretResult coreIntpt = vmInterpretModule(NAT_CORE_LOC);
+  InterpretResult coreIntpt = vmInterpretEntrypoint(NAT_CORE_LOC);
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
   if ((vm.core.object = getGlobalClass(S_OBJECT)) == NULL) return false;
@@ -642,7 +648,7 @@ InterpretResult loadCore() {
 
   // system objects and functions.
 
-  InterpretResult systemIntpt = vmInterpretModule(NAT_SYSTEM_LOC);
+  InterpretResult systemIntpt = vmInterpretEntrypoint(NAT_SYSTEM_LOC);
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||

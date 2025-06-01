@@ -9,14 +9,6 @@ let checkStatus = (status: InterpretationStatus) => {
 (async () => {
   let engine = new Engine();
   let status: InterpretationStatus;
-  let resp = await engine.typeset("test/integration/composition");
-
-  if (!resp)
-    throw new Error("Complation failure: undefined.");
-  if (!resp.success)
-    throw new Error("Complation failure: expecting success = true.");
-  if (typeof resp.tex !== "string")
-    throw new Error("Complation failure: expecting instanceof resp.tex = String.");
 
   status = await engine.interpret("test/integration/index");
   checkStatus(status);
@@ -26,6 +18,15 @@ let checkStatus = (status: InterpretationStatus) => {
 
   status = await engine.interpret("test/trip/index");
   checkStatus(status);
+
+  let resp = await engine.typeset("test/integration/composition/index");
+
+  if (!resp)
+    throw new Error("Complation failure: undefined.");
+  if (!resp.success)
+    throw new Error("Complation failure: expecting success = true.");
+  if (typeof resp.tex !== "string")
+    throw new Error("Complation failure: expecting instanceof resp.tex = String.");
 })();
 
 

@@ -3,11 +3,11 @@
 // Instantiate them here. Note that this module must be
 // executed after the rest of the core modules.
 
-import core/type/system
-import core/composition
-import core/tex
+import type/system
+import composition
+import tex
 
 // We keep the quantifiers in their own namespace
 // so that grammars can use the identifiers.
 
-import core/quantification as Quantification
+import quantification as Quantification

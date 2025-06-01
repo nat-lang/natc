@@ -1,3 +1,4 @@
+#include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,10 +18,10 @@ char* withNatExt(const char* path) {
   return buf;
 }
 
-char* pathToUri(const char* path) {
+char* pathToUri(const char* dirName, const char* baseName) {
   static char buf[256];
 
-  snprintf(buf, sizeof(buf), "%s%s", NAT_SRC_DIR, path);
+  snprintf(buf, sizeof(buf), "%s/%s", dirName, baseName);
 
   return buf;
 }
@@ -64,9 +65,4 @@ char* readSource(const char* path) {
     return readFile(path);
   else
     return readFile(withNatExt(path));
-}
-
-char* readRelativeSource(const char* path) {
-  char* absolutePath = pathToUri(path);
-  return readSource(absolutePath);
 }

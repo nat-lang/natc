@@ -1,7 +1,7 @@
-import test/utils
+import ../utils
 
 let conclude = begin();
 
-import test/regression/0
+import 0
 
 conclude("regression ");

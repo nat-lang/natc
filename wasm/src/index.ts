@@ -86,7 +86,7 @@ class Engine {
 
   interpret = async (path: string): Promise<InterpretationStatus> => {
     const runtime = await this.loadRuntime();
-    const fn = runtime.cwrap('vmInterpretModule_wasm', 'number', ['string']);
+    const fn = runtime.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
     return fn(path);
   };
 

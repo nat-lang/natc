@@ -38,7 +38,6 @@ typedef struct {
 
 Parser parser;
 ClassCompiler* currentClass = NULL;
-ObjModule* currentModule = NULL;
 
 static Parser saveParser() {
   Parser checkpoint = parser;
@@ -114,9 +113,9 @@ static void advance(Compiler* cmp) {
   checkError(cmp);
 }
 
-static void advanceSlashedIdentifier(Compiler* cmp) {
+static void advancePathIdentifier(Compiler* cmp) {
   shiftParser();
-  parser.next = scanSlashedIdentifier();
+  parser.next = scanPathIdentifier();
   checkError(cmp);
 }
 
@@ -269,13 +268,15 @@ static void patchJump(Compiler* cmp, int offset) {
 }
 
 void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
-                  FunctionType functionType, Token name) {
+                  FunctionType functionType, ObjModule* module, Token name) {
   cmp->enclosing = NULL;
   cmp->enclosing = enclosing;
   cmp->signature = NULL;
   cmp->signature = signature;
+  cmp->module = NULL;
+  cmp->module = module;
   cmp->function = NULL;
-  cmp->function = newFunction(currentModule);
+  cmp->function = newFunction(cmp->module);
   cmp->functionType = functionType;
   cmp->function->localCount = 0;
   cmp->scopeDepth = 0;
@@ -974,7 +975,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 
   Compiler cmp;
 
-  initCompiler(&cmp, enclosing, NULL, TYPE_IMPLICIT,
+  initCompiler(&cmp, enclosing, NULL, TYPE_IMPLICIT, enclosing->module,
                syntheticToken("implicit"));
   beginScope(&cmp);
 
@@ -1044,10 +1045,11 @@ static void parameter(Compiler* cmp, Compiler* sigCmp) {
 static void openFunction(Compiler* enclosing, Compiler* cmp, Compiler* sigCmp,
                          FunctionType type, Token name) {
   Token sigToken = syntheticToken("signature");
-  initCompiler(sigCmp, enclosing, NULL, TYPE_IMPLICIT, sigToken);
+  initCompiler(sigCmp, enclosing, NULL, TYPE_IMPLICIT, enclosing->module,
+               sigToken);
   beginScope(sigCmp);
 
-  initCompiler(cmp, enclosing, sigCmp, type, name);
+  initCompiler(cmp, enclosing, sigCmp, type, enclosing->module, name);
   beginScope(cmp);
 }
 
@@ -1311,7 +1313,7 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
     advance(enclosing);  // eat the pipe.
 
     Compiler cmp;
-    initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS,
+    initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS, enclosing->module,
                  syntheticToken("#comprehension"));
     beginScope(&cmp);
 
@@ -1745,11 +1747,10 @@ static void ifStatement(Compiler* cmp) {
 }
 
 void importStatement(Compiler* cmp) {
-  advanceSlashedIdentifier(cmp);
-  consumeIdentifier(cmp, "Expect path to import.");
-  Token path = parser.current;
-
+  advancePathIdentifier(cmp);
   advance(cmp);
+  consumeIdentifier(cmp, "Expect path to import.");
+  Token path = parser.previous;
 
   int alias = -1;
   if (match(cmp, TOKEN_AS)) {
@@ -1757,9 +1758,11 @@ void importStatement(Compiler* cmp) {
     alias = identifierConstant(cmp, &parser.previous);
   }
 
-  Parser checkpoint = saveParser();
+  if (parser.hadError) return;
 
-  ObjModule* module = vmCompileModule(path, MODULE_IMPORT);
+  Parser checkpoint = saveParser();
+  ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
+                                      path, MODULE_IMPORT);
   gotoParser(checkpoint);
 
   if (module == NULL) {
@@ -2018,13 +2021,11 @@ static void declarations(Compiler* cmp) {
 
 ObjFunction* compileModule(Compiler* enclosing, const char* source, Token path,
                            ObjModule* module) {
-  currentModule = module;
-
   Scanner sc = initScanner(source);
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, path);
+  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, module, path);
 
   declarations(&cmp);
 
