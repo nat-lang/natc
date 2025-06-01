@@ -1583,7 +1583,10 @@ ObjModule* vmCompileModule(Token path, ModuleType type) {
   ObjString* objPath = copyString(path.start, path.length);
   vmPush(OBJ_VAL(objPath));
 
-  char* source = readSource(pathToUri(objPath->chars));
+  char* absPath = pathToUri(objPath->chars);
+  objPath = intern(absPath);
+
+  char* source = readSource(absPath);
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
   free(source);
