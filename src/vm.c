@@ -1654,24 +1654,12 @@ InterpretResult vmExecuteModule(ObjModule* module) {
 }
 
 InterpretResult vmInterpretEntrypoint(char* path) {
-  char *c1 = malloc(strlen(path) + 1), *c2 = malloc(strlen(path) + 1);
-  if (c1 == 0 || c2 == 0) return INTERPRET_COMPILE_ERROR;
-
-  strcpy(c1, path);
-  strcpy(c2, path);
-
-  char* dir = dirname(c1);
-  char* base = basename(c2);
-
   ObjModule* module =
-      vmCompileModule(dir, syntheticToken(base), MODULE_ENTRYPOINT);
+      vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
-  InterpretResult status = vmExecuteModule(module);
-  free(c1);
-  free(c2);
-  return status;
+  return vmExecuteModule(module);
 }
 
 // wasm api.

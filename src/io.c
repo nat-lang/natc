@@ -21,7 +21,8 @@ char* withNatExt(const char* path) {
 char* pathToUri(const char* dirName, const char* baseName) {
   static char buf[256];
 
-  snprintf(buf, sizeof(buf), "%s/%s", dirName, baseName);
+  snprintf(buf, sizeof(buf), "%s%s%s", dirName == NULL ? "" : dirName,
+           dirName == NULL ? "" : "/", baseName);
 
   return buf;
 }
