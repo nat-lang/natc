@@ -564,7 +564,7 @@ typefail(() => {
   x[true] = "1";
 });
 
-// maps unify with functions.
+// maps unify with arrows, TMap <| ->
 
 typecheck(() => {
   let x: num -> bool = {1: true};
@@ -604,6 +604,24 @@ typecheck(() => {
 
 typefail(() => {
   let x: num -> (bool or num) = {1: true, 1: 1, 2: "foo"};
+});
+
+// maps unify with arrows, -> <| TMap
+
+typecheck(() => {
+  let f: TMap(num, bool) = x => x > 1;
+});
+
+typefail(() => {
+  let f: TMap(num, bool) = (x: string) => x == "x";
+});
+
+typecheck(() => {
+  let f: TMap(num, TMap(num, bool)) = x y => x > y;
+});
+
+typecheck(() => {
+  let f: num -> (num -> bool) -> bool = n g => g[n];
 });
 
 // assignment with -> annotation.

@@ -191,9 +191,19 @@ class SubtypeState extends SimpleTypeState {
 
     // TMap(a, b) <| c -> d iff a |> c and b <| d.
     if (left is TMap && right is ->) {
+
       this.constraints.extend([
         (right.domain <| left[0]),
         (left[1] <| right.range)
+      ]);
+      return this.solve();
+    }
+
+    // a -> b <| TMap(c, d) iff a |> c and b <| d.
+    if (left is -> && right is TMap) {
+      this.constraints.extend([
+        (right[0] <| left.domain),
+        (left.range <| right[1])
       ]);
       return this.solve();
     }
