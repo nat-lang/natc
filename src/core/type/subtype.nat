@@ -112,14 +112,9 @@ class SubtypeState extends SimpleTypeState {
       let obj = node[0], tObj = this.principal(obj),
           key = node[1], tKey = this.principal(key);
 
-      let tObjKey = tObj.elements[0], tObjVal = tObj.elements[1];
-
       let tVal = typeVar();
 
-      this.extendConstraints(node, [
-        (tKey <| tObjKey),
-        (tVal <| tObjVal)
-      ]);
+      this.pushConstraint(node, TMap(tKey,tVal) <| tObj);
       return tVal;
     }
 
@@ -128,13 +123,7 @@ class SubtypeState extends SimpleTypeState {
           key = node[1], tKey = this.principal(key),
           val = node[2], tVal = this.principal(val);
 
-      let tObjKey = tObj.elements[0], tObjVal = tObj.elements[1];
-
-      this.extendConstraints(node, [
-        (tKey <| tObjKey),
-        (tVal <| tObjVal)
-      ]);
-
+      this.pushConstraint(node, TMap(tKey,tVal) <| tObj);
       return tObj;
     }
 
@@ -191,7 +180,16 @@ class SubtypeState extends SimpleTypeState {
       return this.solve();
     }
 
-    // TMap(a, b) < c -> d iff a > c and b < d.
+    // TMap(a, b) <| TMap(c, d) iff a |> c and b <| d.
+    if (left is TMap && right is TMap) {
+      this.constraints.extend([
+        (right[0] <| left[0]),
+        (left[1] <| right[1])
+      ]);
+      return this.solve();
+    }
+
+    // TMap(a, b) <| c -> d iff a |> c and b <| d.
     if (left is TMap && right is ->) {
       this.constraints.extend([
         (right.domain <| left[0]),
@@ -200,7 +198,7 @@ class SubtypeState extends SimpleTypeState {
       return this.solve();
     }
 
-    // a -> b < c -> d iff a > c and b < d.
+    // a -> b <| c -> d iff a |> c and b <| d.
     if (left is TFunction && right is TFunction) {
       this.constraints.extend([
       // fixme: the compiler fails when these are unparenthesized.
