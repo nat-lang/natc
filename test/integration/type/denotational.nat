@@ -1,5 +1,5 @@
 
-const a,b,c,d;
+sym a,b,c,d;
 
 dom e = {a,b,c,d};
 dom t = {true, false};

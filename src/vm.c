@@ -101,10 +101,10 @@ void initCore(Core* core) {
   core->astBlock = NULL;
   core->astQuantification = NULL;
 
-  core->vTypeBool = NULL;
-  core->vTypeNil = NULL;
-  core->vTypeNumber = NULL;
-  core->vTypeUndef = NULL;
+  core->vmTypeBool = NULL;
+  core->vmTypeNil = NULL;
+  core->vmTypeNumber = NULL;
+  core->vmTypeUndef = NULL;
   core->oTypeClass = NULL;
   core->oTypeInstance = NULL;
   core->oTypeString = NULL;
@@ -238,7 +238,7 @@ bool vmExecuteMethod(char* name, int argCount) {
 // If [value] is natively hashable, then hash it. Otherwise, if it's
 // an instance and it has a hash function, then call the function.
 bool vmHashValue(Value value, uint32_t* hash) {
-  if (isHashable(value)) {
+  if (vHashable(value)) {
     *hash = hashValue(value);
     return true;
   }

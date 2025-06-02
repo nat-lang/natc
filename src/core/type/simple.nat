@@ -198,7 +198,7 @@ let infixr(8) -> = TFunction;
 class SimpleTypeSystem {
   // Map vm types to object language types.
   literalType(value) => {
-    let type = vType(value);
+    let type = vmType(value);
 
     if (type == CUnit) return unit;
     if (type == CUndef) return undef;
@@ -235,9 +235,9 @@ class SimpleTypeSystem {
       return typeVar();
     if (value is Tuple)
       return TProduct(..value.map(this.typify));
-    if (vType(value) == OSequence)
+    if (vmType(value) == OSequence)
       return this.typify(Sequence.fromRaw(value));
-    if (vType(value) == OClass)
+    if (vmType(value) == OClass)
       return TInstance(value);
     if (value is TFunction)
       return this.typify(value.domain) -> this.typify(value.range);

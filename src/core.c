@@ -76,7 +76,7 @@ bool getGlobalObj(char* name, Value* obj, ObjType type) {
 
   if (OBJ_TYPE(*obj) != type) {
     vmRuntimeError("Global has wrong type. Expected '%i' but got '%i.", type,
-                   obj->vType);
+                   obj->vmType);
     return false;
   }
 
@@ -236,29 +236,29 @@ bool __hash__(int argCount, Value* args) {
   return true;
 }
 
-bool __hashable__(int argCount, Value* args) {
+bool __vmHashable__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
-  vmPush(BOOL_VAL(isHashable(value)));
+  vmPush(BOOL_VAL(vHashable(value)));
   return true;
 }
 
-bool __vType__(int argCount, Value* args) {
+bool __vmType__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
 
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_UNIT:
       vmPush(value);
       break;
     case VAL_BOOL:
-      vmPush(OBJ_VAL(vm.core.vTypeBool));
+      vmPush(OBJ_VAL(vm.core.vmTypeBool));
       break;
     case VAL_NUMBER:
-      vmPush(OBJ_VAL(vm.core.vTypeNumber));
+      vmPush(OBJ_VAL(vm.core.vmTypeNumber));
       break;
     case VAL_NIL:
-      vmPush(OBJ_VAL(vm.core.vTypeNil));
+      vmPush(OBJ_VAL(vm.core.vmTypeNil));
       break;
     case VAL_OBJ:
       switch (AS_OBJ(value)->oType) {
@@ -301,7 +301,7 @@ bool __vType__(int argCount, Value* args) {
       }
       break;
     case VAL_UNDEF:
-      vmPush(OBJ_VAL(vm.core.vTypeUndef));
+      vmPush(OBJ_VAL(vm.core.vmTypeUndef));
       break;
     default:
       vmRuntimeError("Unexpected value.");
@@ -425,7 +425,7 @@ bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
 
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_UNIT: {
       string = copyString("()", 2);
       break;
@@ -566,8 +566,8 @@ InterpretResult loadCore() {
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);
-  defineNativeFnGlobal("hashable", 1, __hashable__);
-  defineNativeFnGlobal("vType", 1, __vType__);
+  defineNativeFnGlobal("vmHashable", 1, __vmHashable__);
+  defineNativeFnGlobal("vmType", 1, __vmType__);
   defineNativeFnGlobal("globals", 0, __globals__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
@@ -629,11 +629,11 @@ InterpretResult loadCore() {
       (vm.core.astBlock = getGlobalClass(S_AST_BLOCK)) == NULL ||
       (vm.core.astQuantification = getGlobalClass(S_AST_QUANTIFICATION)) ==
           NULL ||
-      (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
-      (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
-      (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
-      (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
-      (vm.core.vTypeUndef = getGlobalClass(S_CTYPE_UNDEF)) == NULL ||
+      (vm.core.vmTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
+      (vm.core.vmTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
+      (vm.core.vmTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
+      (vm.core.vmTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
+      (vm.core.vmTypeUndef = getGlobalClass(S_CTYPE_UNDEF)) == NULL ||
       (vm.core.oTypeVariable = getGlobalClass(S_OTYPE_VARIABLE)) == NULL ||
       (vm.core.oTypeClass = getGlobalClass(S_OTYPE_CLASS)) == NULL ||
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||

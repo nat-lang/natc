@@ -2,7 +2,7 @@ import prelude
 
 // individuals.
 
-const Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel, Ursula, Sebastian, Sam;
+sym Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel, Ursula, Sebastian, Sam;
 
 dom e = {Agnetha, Bjorn, Benny, Carlos, Paco, Frida, Ariel, Ursula, Sebastian, Sam};
 

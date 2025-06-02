@@ -58,8 +58,8 @@ static void errorAt(Compiler* cmp, Token* token, const char* message) {
   else
     parser.panicMode = true;
 
-  fprintf(stderr, "[line %d] in %s, Error", token->line,
-          cmp->function->name->chars);
+  fprintf(stderr, "Error at %s/%s:%d", cmp->module->dirName->chars,
+          cmp->module->baseName->chars, token->line);
 
   if (token->type == TOKEN_EOF) {
     fprintf(stderr, " at end");
@@ -222,8 +222,7 @@ static int emitJump(Compiler* cmp, uint8_t instruction) {
 static int getConstant(Compiler* cmp, Value value) {
   Value existing;
 
-  if (isHashable(value) &&
-      mapGet(&cmp->function->constants, value, &existing) &&
+  if (vHashable(value) && mapGet(&cmp->function->constants, value, &existing) &&
       IS_NUMBER(existing)) {
     return (uint16_t)AS_NUMBER(existing);
   }
@@ -242,7 +241,7 @@ static uint16_t makeConstant(Compiler* cmp, Value value) {
     return 0;
   }
 
-  if (isHashable(value))
+  if (vHashable(value))
     mapSet(&cmp->function->constants, value, NUMBER_VAL(constant));
 
   return (uint16_t)constant;
@@ -1628,17 +1627,17 @@ static void multiLetDeclaration(Compiler* cmp) {
   consume(cmp, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 }
 
-static void constDeclaration(Compiler* cmp) {
+static void symbolDeclaration(Compiler* cmp) {
   do {
-    uint16_t var = parseVariable(cmp, "Expect constant name.");
-    Token name = parser.previous;
+    uint16_t var = parseVariable(cmp, "Expect symbol name.");
 
-    loadConstant(cmp, identifierToken(name));
+    getGlobalConstant(cmp, "Symbol");
+    emitBytes(cmp, OP_CALL, 0);
     defineVariable(cmp, var);
 
   } while (match(cmp, TOKEN_COMMA));
 
-  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after constant declaration.");
+  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after symbol declaration.");
 }
 
 static void domainDeclaration(Compiler* cmp) {
@@ -1851,8 +1850,8 @@ static void declaration(Compiler* cmp) {
     classDeclaration(cmp);
   } else if (match(cmp, TOKEN_LET)) {
     multiLetDeclaration(cmp);
-  } else if (match(cmp, TOKEN_CONST)) {
-    constDeclaration(cmp);
+  } else if (match(cmp, TOKEN_SYM)) {
+    symbolDeclaration(cmp);
   } else if (match(cmp, TOKEN_DOM)) {
     domainDeclaration(cmp);
   } else {

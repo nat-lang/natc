@@ -39,7 +39,7 @@ bool findInValueArray(ValueArray* array, Value value) {
 }
 
 void printValue(Value value) {
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_UNIT: {
       printf("()");
       break;
@@ -73,9 +73,9 @@ void printValueArray(ValueArray* array) {
 }
 
 bool valuesEqual(Value a, Value b) {
-  if (a.vType != b.vType) return false;
+  if (a.vmType != b.vmType) return false;
 
-  switch (a.vType) {
+  switch (a.vmType) {
     case VAL_UNDEF:
     case VAL_UNIT:
     case VAL_NIL:
@@ -129,7 +129,7 @@ static inline uint32_t hashNumber(double num) {
   return hashBits(doubleToBits(num));
 }
 
-bool isHashable(Value value) {
+bool vHashable(Value value) {
   return (IS_BOOL(value) || IS_NIL(value) || IS_UNDEF(value) ||
           IS_UNIT(value) || IS_NUMBER(value) || IS_STRING(value)) ||
          IS_CLASS(value);
@@ -138,7 +138,7 @@ bool isHashable(Value value) {
 // Generates a hash code for [value], which must be one of
 // nil, bool, num, or string.
 uint32_t hashValue(Value value) {
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_UNIT:
       return 4;
     case VAL_UNDEF:

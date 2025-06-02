@@ -17,4 +17,5 @@ import type/adhoc
 import type/poly
 import type/denotational
 import quantification
+import symbol
 import json

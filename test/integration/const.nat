@@ -1,35 +1,25 @@
 
-const a,b,c,xyz;
+sym a,bc,xyz;
 
-assert(a == "a");
 assert(a == a);
-
-assert(b == "b");
-assert(b == b);
-
-assert(c == "c");
-assert(c == c);
-
-assert(xyz == "xyz");
+assert(bc == bc);
 assert(xyz == xyz);
 
-let j;
-let k;
-let m;
+assert(a != bc);
+assert(bc != xyz);
+
+let j = a;
+let k = bc;
+let m = xyz;
+
+assert(j == a);
+assert(k == bc);
+assert(m == xyz);
 
 (() => {
-  const a,b,xyz;
+  sym a,bc,xyz;
 
-  j = a;
-  k = b;
-  m = xyz;
+  assert(a == a);
+  assert(bc == bc);
+  assert(xyz == xyz);
 })();
-
-assert(j == "a");
-assert(j == a);
-
-assert(k == "b");
-assert(k == b);
-
-assert(m == "xyz");
-assert(m == xyz);

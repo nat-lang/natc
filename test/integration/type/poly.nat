@@ -54,7 +54,7 @@ let id: w -> w = x => x;
 let abstract = annotations(id)[0];
 let concrete = abstract(num);
 
-assert(vType(abstract) == OFunction);
+assert(vmType(abstract) == OFunction);
 
 assert(concrete is TFunction);
 assert(concrete.domain == num);
@@ -81,7 +81,7 @@ let f: x -> y -> y -> y = a b c => c;
 let abstract = annotations(f)[0];
 let concrete = abstract(num, string);
 
-assert(vType(abstract) == OFunction);
+assert(vmType(abstract) == OFunction);
 
 assert(concrete is TFunction);
 assert(concrete.domain == num);

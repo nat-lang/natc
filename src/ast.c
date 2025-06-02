@@ -675,7 +675,7 @@ bool astOverload(ObjOverload* overload) {
 }
 
 bool ast(Value value) {
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_OBJ: {
       switch (OBJ_TYPE(value)) {
         case OBJ_BOUND_FUNCTION:

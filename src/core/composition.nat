@@ -18,7 +18,7 @@ class AnnotatedTree extends Tree {
 
       let type = TypeSystem.type(this.data);
 
-      if (vType(this.data) in [OFunction, OOverload]) {
+      if (vmType(this.data) in [OFunction, OOverload]) {
         let ast <- this.data;
         ast = ast.simplify();
         let tex = "$#{type.tex()}$ \\ $#{ast.tex()}$";
@@ -73,7 +73,6 @@ class CompositionSystem {
         
       return AnnotatedTree(node.data, [], TypeSystem.type(node.data));
     }
-
 
     if (node.unary()) {
       let child = this.evaluate(node[0]);

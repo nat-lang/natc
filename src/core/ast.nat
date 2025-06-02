@@ -31,7 +31,7 @@ class ASTNode extends Tree {
       node => {
         if (node is ASTExternalUpvalue) {
           let v = node.resolve();
-          if (vType(v) == OFunction) {
+          if (vmType(v) == OFunction) {
             let node' <- v;
             return node'.unroll();
           }
@@ -268,7 +268,7 @@ class ASTLiteral extends ASTExpr {
     super.init();
   }
   str() => "ASTLiteral(#{this.value})";
-  tex() => this.value;
+  tex() => str(this.value);
 
   resolve() => this.value;
   betaReduce() => this;
@@ -334,7 +334,7 @@ class ASTGlobal extends ASTVariable {
   betaReduce() => this;
   variadic() => {
     let value = this.resolve();
-    let type = vType(value);
+    let type = vmType(value);
     if (type == OClass)
       return value.init && value.init.variadic;
     if (type == OFunction || type == OBoundFunction || type == ONative)
@@ -359,11 +359,11 @@ class ASTExternalUpvalue extends ASTUpvalue {
 
   tex() => {
     let value = this.resolve();
-    if (vType(value) in [OFunction, OOverload]) {
+    if (vmType(value) in [OFunction, OOverload]) {
       let ast <- value;
       return ast.tex();
     }
-    return value;
+    return str(value);
   }
 }
 
@@ -466,7 +466,7 @@ class ASTAppInfix extends ASTApp {
 
     // check if this is a method infix.
     let lhs = args[0], rhs = args[1],
-        tLhs = vType(lhs), tRhs = vType(rhs);
+        tLhs = vmType(lhs), tRhs = vmType(rhs);
     if (tLhs == OInstance && tRhs == OInstance) {
       let sup = lca(lhs.__class__, rhs.__class__);
       if (sup && args[0][fn.name])

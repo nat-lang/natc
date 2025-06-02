@@ -234,7 +234,7 @@ class PolyTypeState extends AdhocTypeState {
 
 class PolyTypeSystem extends AdhocTypeSystem {
   literalType(value) => {
-    let type = vType(value);
+    let type = vmType(value);
   
     if (value == Tuple)
       return TAbstract((*types) => TProduct(..types) -> TProduct(..types));
@@ -259,7 +259,7 @@ class PolyTypeSystem extends AdhocTypeSystem {
   }
 
   typify(value) => {
-    if (vType(value) == OFunction)
+    if (vmType(value) == OFunction)
       return TAbstract(value);
 
     return super.typify(value);

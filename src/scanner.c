@@ -147,17 +147,8 @@ static TokenType identifierType() {
   switch (START[0]) {
     case 'a':
       return checkpointKeyword(1, 1, "s", TOKEN_AS);
-    case 'c': {
-      if (CURRENT - START > 1) {
-        switch (START[1]) {
-          case 'o':
-            return checkpointKeyword(2, 3, "nst", TOKEN_CONST);
-          case 'l':
-            return checkpointKeyword(2, 3, "ass", TOKEN_CLASS);
-        }
-      }
-      break;
-    }
+    case 'c':
+      return checkpointKeyword(1, 4, "lass", TOKEN_CLASS);
     case 'd':
       return checkpointKeyword(1, 2, "om", TOKEN_DOM);
     case 'e':
@@ -252,7 +243,15 @@ static TokenType identifierType() {
     case 'r':
       return checkpointKeyword(1, 5, "eturn", TOKEN_RETURN);
     case 's':
-      return checkpointKeyword(1, 4, "uper", TOKEN_SUPER);
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
+          case 'u':
+            return checkpointKeyword(2, 3, "per", TOKEN_SUPER);
+          case 'y':
+            return checkpointKeyword(2, 1, "m", TOKEN_SYM);
+        }
+      }
+      break;
     case 't':
       if (CURRENT - START > 1) {
         switch (START[1]) {

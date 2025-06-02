@@ -1,3 +1,4 @@
+let hashable = x => vmHashable(x) || vmType(x) == OInstance && "hash" in x;
 
 class Domain extends Type {
   init(name, elements) => {
@@ -14,8 +15,8 @@ class Domain extends Type {
   some(predicate) => this.elements.some(predicate);
 
   __iter__() => iter(this.elements);
-  // functions are not hashable atm
-  __in__(value) => hashable(value) && value in this.elements;
+  // functions are not hashable atm.
+  __in__(value) => vmHashable(value) && value in this.elements;
   __eq__(that) => this.elements == that.elements;
 }
 

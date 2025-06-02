@@ -78,11 +78,11 @@ typedef struct {
   ObjClass* astBlock;
   ObjClass* astQuantification;
 
-  ObjClass* vTypeUnit;
-  ObjClass* vTypeBool;
-  ObjClass* vTypeNil;
-  ObjClass* vTypeNumber;
-  ObjClass* vTypeUndef;
+  ObjClass* vmTypeUnit;
+  ObjClass* vmTypeBool;
+  ObjClass* vmTypeNil;
+  ObjClass* vmTypeNumber;
+  ObjClass* vmTypeUndef;
   ObjClass* oTypeVariable;
   ObjClass* oTypeClass;
   ObjClass* oTypeInstance;
