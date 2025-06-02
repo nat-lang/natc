@@ -2052,6 +2052,8 @@ assert(f == ASTClosureMock(
   )
 ));
 
+// subscripts.
+
 let f <- x => { x[1]; };
 
 assert(f == ASTClosureMock(
@@ -2148,6 +2150,45 @@ assert(f == ASTClosureMock(
       ),
       ASTImplicitReturn(
         ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// subscript assignment leaves object on the stack.
+
+let f <- () => m[1] = true;
+
+assert(f == ASTClosureMock(
+  ASTSubscriptSet(
+    ASTGlobal("m"),
+    ASTLiteral(1),
+    ASTLiteral(true)
+  ),
+  ASTReturn(
+    ASTGlobal("m")
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- () => f(m[1] = true);
+
+assert(f == ASTClosureMock(
+  ASTSubscriptSet(
+    ASTGlobal("m"),
+    ASTLiteral(1),
+    ASTLiteral(true)
+  ),
+  ASTReturn(
+    ASTApp(
+      ASTGlobal("f"),
+      ASTArgumentSequence(
+        ASTGlobal("m")
       )
     )
   ),
