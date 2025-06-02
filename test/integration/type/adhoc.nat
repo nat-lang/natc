@@ -3,7 +3,7 @@
 
 let f = (x: num) => nil | (x: bool) => nil;
 
-assert(type(f) == TOverload(num -> void, bool -> void));
+assert(TypeSystem.type(f) == TOverload(num -> void, bool -> void));
 
 // functions map into overloads.
 

@@ -166,7 +166,7 @@ typecheck(() => f(true)(true));
 
 // type parameters propagate to embedded type constructors.
 
-let t = type((x: w) => ({x}));
+let t = TypeSystem.type((x: w) => ({x}));
 
 assert(t is TAbstract);
 
@@ -183,7 +183,7 @@ assert(concrete.domain == num);
 assert(concrete.range == TSet(num));
 
 let f = (x: u, y: v, z: w) => ({x,y,z});
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t is TAbstract);
 
@@ -268,7 +268,7 @@ typefail(id => {
 // the type of forward application is inferrable.
 
 let f = g x => g(x);
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies ((a -> b) -> (a -> b)));
 assert(t unifies ((b -> a) -> (b -> a)));
@@ -285,7 +285,7 @@ assert(!(t unifies ((a -> b) -> (b -> b))));
 // the type of backward application is inferrable.
 
 let f = x g => g(x);
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (a -> ((a -> b) -> b)));
 assert(t unifies (b -> ((b -> a) -> a)));
@@ -302,7 +302,7 @@ assert(!(t unifies (b -> ((b -> a) -> b))));
 // the type of composition is inferrable.
 
 let @ = f g x => f(g(x));
-let t = type(@);
+let t = TypeSystem.type(@);
 
 assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
 assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
@@ -312,7 +312,7 @@ assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> b)));
 assert(t unifies (((a, a -> b) -> b) & ((a -> b, a) -> b)));
@@ -329,7 +329,7 @@ assert(!(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> c))));
 // the type of curried type driven application is inferrable.
 
 let f = (a: x -> y) => ((b: x) => a(b)) | (a: x) => ((b: x -> y) => b(a));
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
 assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
@@ -337,7 +337,7 @@ assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
 assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 let f = (a: x) => ((b: x -> y) => b(a)) | (a: x -> y) => ((b: x) => a(b));
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
 assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
@@ -346,7 +346,7 @@ assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 // nested abstract types normalize to a single first order type.
 
-let t = type(x y => y);
+let t = TypeSystem.type(x y => y);
 
 assert(t unifies (a -> (a -> a)));
 assert(t unifies (a -> (b -> b)));
@@ -361,7 +361,7 @@ assert(!(t unifies (a -> (a -> b))));
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t is TGeneralization);
 assert(t unifies (TProduct(a -> b, a) -> b) & (TProduct(d, c -> d) -> d));

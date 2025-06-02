@@ -11,8 +11,8 @@ bool = t;
 assert(e is Domain);
 assert(t is Domain);
 
-assert(type(a) == e);
-assert(type(true) == t);
+assert(TypeSystem.type(a) == e);
+assert(TypeSystem.type(true) == t);
 
 // simple.
 

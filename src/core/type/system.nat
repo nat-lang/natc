@@ -2,7 +2,7 @@
 let TypeSystem = DenotationalTypeSystem();
 let TypeState = () => DenotationalTypeState(TypeSystem, false);
 
-let type = x => TypeSystem.type(x);
+let type = TypeSystem;
 let typify = TypeSystem.typify;
 
 // The vm uses this function to match overload cases with arguments.
