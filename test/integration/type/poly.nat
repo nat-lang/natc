@@ -200,11 +200,13 @@ assert(concrete is ->);
 assert(concrete.domain == TProduct(num, num, num));
 assert(concrete.range == TSet(num));
 
-//
+// abstract annotations are instantiated by lower
+// concrete constraints.
 
-let f: num -> w -> num = x y => +(x,y);
+let g: num -> num -> num = x y => x + y;
+let f: u -> v -> w = x y => g(x)(y);
 
-// print type(f).str();
+assert(type(f) == num -> num -> num);
 
 // the polymorphic type system types overloads
 // with implicit variables in their case signatures.
@@ -617,6 +619,24 @@ typefail(() => {
 
   x[true] = 1;
 });
+
+// inference.
+
+let f: num -> w -> num = n m => m[n];
+
+assert(type(f) == num -> TMap(num,num) -> num);
+
+let f: bool -> w -> num = n m => m[n];
+
+assert(type(f) == bool -> TMap(bool,num) -> num);
+
+let f: u -> v -> w = n m => m[n];
+
+let a = typeVar(), b = typeVar();
+
+assert(type(f) unifies a -> TMap(a,b) -> b);
+
+assert(type(f(1)) unifies num -> TMap(num,b) -> b);
 
 // comprehensions.
 

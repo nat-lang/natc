@@ -383,7 +383,6 @@ let a = Type(), b = Type(), c = Type();
 
 let f = g x => g(x);
 let t = TypeSystem.type(f);
-print t;
 
 assert(t unifies ((a -> b) -> (a -> b)));
 assert(t unifies ((b -> a) -> (b -> a)));
