@@ -196,6 +196,10 @@ let string = TString();
 let infixr(8) -> = TFunction;
 
 class SimpleTypeSystem {
+  call(expr) => this.type(expr);
+  check(expr) => this.typecheck(expr);
+  _check(expr, debug) => this._typecheck(expr, debug);
+
   // Map vm types to object language types.
   literalType(value) => {
     let type = vmType(value);
@@ -640,13 +644,11 @@ class SimpleTypeState {
   unifyAnnotations(expr, type) => {
     let tAnnotations = annotations(expr).map(this.system.typify);
 
-    if (len(tAnnotations) > 0) {
-      for (annotation in tAnnotations)
-        this.constrainAnnotation(annotation, type);
+    for (annotation in tAnnotations)
+      this.constrainAnnotation(annotation, type);
 
-      if (this.solve())
-        return tAnnotations[0].apply(this.solution);
-    }
+    if (this.solve())
+      type = type.apply(this.solution);
 
     return type;
   }

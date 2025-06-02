@@ -200,6 +200,12 @@ assert(concrete is ->);
 assert(concrete.domain == TProduct(num, num, num));
 assert(concrete.range == TSet(num));
 
+//
+
+let f: num -> w -> num = x y => +(x,y);
+
+// print type(f).str();
+
 // the polymorphic type system types overloads
 // with implicit variables in their case signatures.
 

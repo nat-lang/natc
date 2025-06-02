@@ -330,8 +330,7 @@ typecheck(() => k(nil));
 
 if (type != PolyTypeSystem and type is not DenotationalTypeSystem) {
   let t = TypeSystem.type(h => h(1)).domain;
-  print type;
-  print t;
+
   assert(t is TFunction);
   assert(t.domain is TNumber);
   assert(t.range is TVar);
