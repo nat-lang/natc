@@ -8,6 +8,7 @@
 
 #define FRAMES_MAX 2000
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
+#define COMPREHENSION_DEPTH_MAX UINT8_MAX
 
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() \
@@ -65,7 +66,9 @@ typedef struct {
 
   ObjClass* astClosure;
   ObjClass* astComprehension;
+  ObjClass* astClassMethod;
   ObjClass* astMethod;
+
   ObjClass* astExternalUpvalue;
   ObjClass* astInternalUpvalue;
   ObjClass* astLocal;
@@ -75,11 +78,11 @@ typedef struct {
   ObjClass* astBlock;
   ObjClass* astQuantification;
 
-  ObjClass* vTypeUnit;
-  ObjClass* vTypeBool;
-  ObjClass* vTypeNil;
-  ObjClass* vTypeNumber;
-  ObjClass* vTypeUndef;
+  ObjClass* vmTypeUnit;
+  ObjClass* vmTypeBool;
+  ObjClass* vmTypeNil;
+  ObjClass* vmTypeNumber;
+  ObjClass* vmTypeUndef;
   ObjClass* oTypeVariable;
   ObjClass* oTypeClass;
   ObjClass* oTypeInstance;
@@ -127,6 +130,9 @@ typedef struct {
 
   // currently executing module.
   ObjModule* module;
+
+  int comprehensionDepth;
+  Obj* comprehensions[COMPREHENSION_DEPTH_MAX];
 } VM;
 
 typedef enum {
@@ -143,14 +149,13 @@ void freeVM();
 void vmRuntimeError(const char* format, ...);
 
 InterpretResult vmInterpretExpr(char* path, char* expr);
-InterpretResult vmInterpretModule(char* path);
-InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]);
+InterpretResult vmInterpretEntrypoint(char* path);
 
-InterpretResult vmInterpretModule_wasm(char* path);
+InterpretResult vmInterpretEntrypoint_wasm(char* path);
 char* vmTypesetModule_wasm(char* path);
 void vmFree_wasm();
 
-ObjModule* vmCompileModule(Token path, ModuleType type);
+ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
 bool vmImport(ObjModule* module, ObjMap* target);
 bool vmImportAsInstance(ObjModule* module);

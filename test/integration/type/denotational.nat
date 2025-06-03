@@ -1,5 +1,5 @@
 
-const a,b,c,d;
+sym a,b,c,d;
 
 dom e = {a,b,c,d};
 dom t = {true, false};
@@ -11,8 +11,8 @@ bool = t;
 assert(e is Domain);
 assert(t is Domain);
 
-assert(type(a) == e);
-assert(type(true) == t);
+assert(TypeSystem.type(a) == e);
+assert(TypeSystem.type(true) == t);
 
 // simple.
 
@@ -26,10 +26,10 @@ typecheck((f: e -> t, g: t -> e) => f(g(true)));
 
 // subtype.
 
-typecheck((f: (e % t) -> e) => f(a));
-typecheck((f: (e % t) -> e) => f(true));
+typecheck((f: (e or t) -> e) => f(a));
+typecheck((f: (e or t) -> e) => f(true));
 
-typefail((f: (e % t) -> e) => f(nil));
+typefail((f: (e or t) -> e) => f(nil));
 
 // poly adhoc.
 

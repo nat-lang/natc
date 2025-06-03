@@ -1,13 +1,16 @@
+#include <libgen.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
 #include "vm.h"
 
-char* qualifyPath(const char* path) {
+char* withNatExt(const char* path) {
   static char buf[256];
 
   snprintf(buf, sizeof(buf), "%s%s", path, NAT_EXT);
@@ -15,10 +18,11 @@ char* qualifyPath(const char* path) {
   return buf;
 }
 
-char* pathToUri(const char* path) {
+char* pathToUri(const char* dirName, const char* baseName) {
   static char buf[256];
 
-  snprintf(buf, sizeof(buf), "%s%s", NAT_SRC_DIR, path);
+  snprintf(buf, sizeof(buf), "%s%s%s", dirName == NULL ? "" : dirName,
+           dirName == NULL ? "" : "/", baseName);
 
   return buf;
 }
@@ -52,13 +56,14 @@ char* readFile(const char* path) {
   return buffer;
 }
 
-char* readSource(const char* path) {
-  char* qualifiedPath = qualifyPath(path);
-  char* source = readFile(qualifiedPath);
-  return source;
+bool fileExists(const char* filename) {
+  struct stat buffer;
+  return (stat(filename, &buffer) == 0);
 }
 
-char* readRelativeSource(const char* path) {
-  char* absolutePath = pathToUri(path);
-  return readSource(absolutePath);
+char* readSource(const char* path) {
+  if (fileExists(path))
+    return readFile(path);
+  else
+    return readFile(withNatExt(path));
 }

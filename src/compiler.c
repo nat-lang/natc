@@ -38,7 +38,6 @@ typedef struct {
 
 Parser parser;
 ClassCompiler* currentClass = NULL;
-ObjModule* currentModule = NULL;
 
 static Parser saveParser() {
   Parser checkpoint = parser;
@@ -59,8 +58,8 @@ static void errorAt(Compiler* cmp, Token* token, const char* message) {
   else
     parser.panicMode = true;
 
-  fprintf(stderr, "[line %d] in %s, Error", token->line,
-          cmp->function->name->chars);
+  fprintf(stderr, "Error at %s/%s:%d", cmp->module->dirName->chars,
+          cmp->module->baseName->chars, token->line);
 
   if (token->type == TOKEN_EOF) {
     fprintf(stderr, " at end");
@@ -84,7 +83,7 @@ static void errorAtCurrent(Compiler* cmp, const char* message) {
 
 static void initIterator(Iterator* iter) {
   iter->var = 0;
-  iter->iter = 0;
+  iter->obj = 0;
   iter->loopStart = 0;
 }
 
@@ -114,9 +113,9 @@ static void advance(Compiler* cmp) {
   checkError(cmp);
 }
 
-static void advanceSlashedIdentifier(Compiler* cmp) {
+static void advancePathIdentifier(Compiler* cmp) {
   shiftParser();
-  parser.next = scanSlashedIdentifier();
+  parser.next = scanPathIdentifier();
   checkError(cmp);
 }
 
@@ -223,8 +222,7 @@ static int emitJump(Compiler* cmp, uint8_t instruction) {
 static int getConstant(Compiler* cmp, Value value) {
   Value existing;
 
-  if (isHashable(value) &&
-      mapGet(&cmp->function->constants, value, &existing) &&
+  if (vHashable(value) && mapGet(&cmp->function->constants, value, &existing) &&
       IS_NUMBER(existing)) {
     return (uint16_t)AS_NUMBER(existing);
   }
@@ -243,7 +241,7 @@ static uint16_t makeConstant(Compiler* cmp, Value value) {
     return 0;
   }
 
-  if (isHashable(value))
+  if (vHashable(value))
     mapSet(&cmp->function->constants, value, NUMBER_VAL(constant));
 
   return (uint16_t)constant;
@@ -269,13 +267,15 @@ static void patchJump(Compiler* cmp, int offset) {
 }
 
 void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
-                  FunctionType functionType, Token name) {
+                  FunctionType functionType, ObjModule* module, Token name) {
   cmp->enclosing = NULL;
   cmp->enclosing = enclosing;
   cmp->signature = NULL;
   cmp->signature = signature;
+  cmp->module = NULL;
+  cmp->module = module;
   cmp->function = NULL;
-  cmp->function = newFunction(currentModule);
+  cmp->function = newFunction(cmp->module);
   cmp->functionType = functionType;
   cmp->function->localCount = 0;
   cmp->scopeDepth = 0;
@@ -669,7 +669,7 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   emitBytes(cmp, OP_CALL, 1);
   emitBytes(cmp, OP_CALL, 2);
 
-  // pretend the
+  // pretend the next token is an opening string literal.
   rewindScanner(parser.current);
   parser.next = scanVirtualToken('"');
 
@@ -711,9 +711,6 @@ static int namedVariable(Compiler* cmp, Token name, bool canAssign) {
   if (canAssign && match(cmp, TOKEN_EQUAL)) {
     boundExpression(cmp, name);
     emitConstInstr(cmp, setOp, arg);
-  } else if (canAssign && match(cmp, TOKEN_COLON)) {
-    expression(cmp);
-    defineType(cmp, arg);
   } else if (canAssign && match(cmp, TOKEN_ARROW_LEFT)) {
     expression(cmp);
     emitByte(cmp, OP_DESTRUCTURE);
@@ -807,7 +804,7 @@ static void unary(Compiler* cmp, bool canAssign) {
       emitByte(cmp, OP_NOT);
       break;
     default:
-      return;  // Unreachable.
+      return;  // unreachable.
   }
 }
 
@@ -977,7 +974,7 @@ static bool tryImplicitFunction(Compiler* enclosing) {
 
   Compiler cmp;
 
-  initCompiler(&cmp, enclosing, NULL, TYPE_IMPLICIT,
+  initCompiler(&cmp, enclosing, NULL, TYPE_IMPLICIT, enclosing->module,
                syntheticToken("implicit"));
   beginScope(&cmp);
 
@@ -1047,10 +1044,11 @@ static void parameter(Compiler* cmp, Compiler* sigCmp) {
 static void openFunction(Compiler* enclosing, Compiler* cmp, Compiler* sigCmp,
                          FunctionType type, Token name) {
   Token sigToken = syntheticToken("signature");
-  initCompiler(sigCmp, enclosing, NULL, TYPE_IMPLICIT, sigToken);
+  initCompiler(sigCmp, enclosing, NULL, TYPE_IMPLICIT, enclosing->module,
+               sigToken);
   beginScope(sigCmp);
 
-  initCompiler(cmp, enclosing, sigCmp, type, name);
+  initCompiler(cmp, enclosing, sigCmp, type, enclosing->module, name);
   beginScope(cmp);
 }
 
@@ -1173,7 +1171,7 @@ static Iterator iterator(Compiler* cmp) {
   // turn the expression into an iterator instance and store it.
   getGlobalConstant(cmp, S_ITER);
   emitBytes(cmp, OP_CALL_POSTFIX, 1);
-  iter.iter = addLocal(cmp, syntheticToken("#iter"));
+  iter.obj = addLocal(cmp, syntheticToken("#iter"));
   markInitialized(cmp);
 
   iter.loopStart = cmp->function->chunk.count;
@@ -1239,7 +1237,7 @@ static void forQuantification(Compiler* enclosing, bool canAssign) {
 // Parse a comprehension, given a [Parser] that points at the body,
 // the stack address [var] of the object under construction, and the
 // type of [closingToken].
-Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
+Parser comprehension(Compiler* cmp, Parser checkpointA,
                      TokenType closingToken) {
   Iterator iter;
 
@@ -1267,7 +1265,7 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
     // variables will be in scope in every condition
     // to their right, and all we have to do is conclude
     // each scope at the end of this function.
-    checkpointB = comprehension(cmp, checkpointA, var, closingToken);
+    checkpointB = comprehension(cmp, checkpointA, closingToken);
   } else if (check(closingToken)) {
     // now we parse the body, first saving the point
     // where the generator ends.
@@ -1276,9 +1274,6 @@ Parser comprehension(Compiler* cmp, Parser checkpointA, int var,
 
     // parse the expression, load the comprehension, and append.
     expression(cmp);
-    emitConstInstr(cmp, OP_GET_LOCAL, var);
-    getProperty(cmp, S_ADD);
-    emitBytes(cmp, OP_CALL_POSTFIX, 1);
     emitByte(cmp, OP_COMPREHENSION_BODY);
     emitByte(cmp, OP_POP);
   }
@@ -1317,22 +1312,18 @@ static bool tryComprehension(Compiler* enclosing, char* klass,
     advance(enclosing);  // eat the pipe.
 
     Compiler cmp;
-    initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS,
+    initCompiler(&cmp, enclosing, NULL, TYPE_ANONYMOUS, enclosing->module,
                  syntheticToken("#comprehension"));
     beginScope(&cmp);
 
-    // init the comprehension instance at local 0. we'll load
-    // it when we hit the bottom of the condition clauses.
-    nativeCall(&cmp, klass);
-    int var = addLocal(&cmp, syntheticToken("#comprehension-instance"));
-    markInitialized(&cmp);
+    Parser checkpointB = comprehension(&cmp, checkpointA, closingToken);
 
-    Parser checkpointB = comprehension(&cmp, checkpointA, var, closingToken);
+    nativeCall(enclosing, klass);
 
-    // return the comprehension instance.
-    emitConstInstr(&cmp, OP_GET_LOCAL, var);
-    emitByte(&cmp, OP_RETURN);
-    closeFunction(&cmp, enclosing, OP_COMPREHENSION);
+    ObjFunction* function = endCompiler(&cmp);
+    emitConstInstr(enclosing, OP_COMPREHENSION,
+                   makeConstant(enclosing, OBJ_VAL(function)));
+    closeUpvalues(function, &cmp, enclosing);
 
     // pick up at the end of the expression.
     gotoParser(checkpointB);
@@ -1611,8 +1602,7 @@ static void letDeclaration(Compiler* cmp) {
   emitByte(cmp, OP_POP);
 
   if (annotated) {
-    // after the value assignment so that we're setting
-    // the type of the value.
+    // after the value assignment so that we annotate the value.
     defineType(cmp, var);
     emitByte(cmp, OP_POP);  // the type.
   }
@@ -1637,17 +1627,17 @@ static void multiLetDeclaration(Compiler* cmp) {
   consume(cmp, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 }
 
-static void constDeclaration(Compiler* cmp) {
+static void symbolDeclaration(Compiler* cmp) {
   do {
-    uint16_t var = parseVariable(cmp, "Expect constant name.");
-    Token name = parser.previous;
+    uint16_t var = parseVariable(cmp, "Expect symbol name.");
 
-    loadConstant(cmp, identifierToken(name));
+    getGlobalConstant(cmp, "Symbol");
+    emitBytes(cmp, OP_CALL, 0);
     defineVariable(cmp, var);
 
   } while (match(cmp, TOKEN_COMMA));
 
-  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after constant declaration.");
+  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after symbol declaration.");
 }
 
 static void domainDeclaration(Compiler* cmp) {
@@ -1756,11 +1746,10 @@ static void ifStatement(Compiler* cmp) {
 }
 
 void importStatement(Compiler* cmp) {
-  advanceSlashedIdentifier(cmp);
-  consumeIdentifier(cmp, "Expect path to import.");
-  Token path = parser.current;
-
+  advancePathIdentifier(cmp);
   advance(cmp);
+  consumeIdentifier(cmp, "Expect path to import.");
+  Token path = parser.previous;
 
   int alias = -1;
   if (match(cmp, TOKEN_AS)) {
@@ -1768,9 +1757,11 @@ void importStatement(Compiler* cmp) {
     alias = identifierConstant(cmp, &parser.previous);
   }
 
-  Parser checkpoint = saveParser();
+  if (parser.hadError) return;
 
-  ObjModule* module = vmCompileModule(path, MODULE_IMPORT);
+  Parser checkpoint = saveParser();
+  ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
+                                      path, MODULE_IMPORT);
   gotoParser(checkpoint);
 
   if (module == NULL) {
@@ -1859,8 +1850,8 @@ static void declaration(Compiler* cmp) {
     classDeclaration(cmp);
   } else if (match(cmp, TOKEN_LET)) {
     multiLetDeclaration(cmp);
-  } else if (match(cmp, TOKEN_CONST)) {
-    constDeclaration(cmp);
+  } else if (match(cmp, TOKEN_SYM)) {
+    symbolDeclaration(cmp);
   } else if (match(cmp, TOKEN_DOM)) {
     domainDeclaration(cmp);
   } else {
@@ -1969,7 +1960,7 @@ static void setPrecedence(Compiler* cmp, ParseRule* rule, int prec) {
 
 // Look up the rule for the [token]'s type, unless the
 // [token] is an identifier, in which case check the vm's
-// infix table for a user-defined infixation precedence.
+// infix tables for a user-defined infixation precedence.
 static ParseRule* getInfixRule(Compiler* cmp, Token token) {
   if (token.type == TOKEN_IDENTIFIER) {
     Value name = identifierToken(token);
@@ -2029,13 +2020,11 @@ static void declarations(Compiler* cmp) {
 
 ObjFunction* compileModule(Compiler* enclosing, const char* source, Token path,
                            ObjModule* module) {
-  currentModule = module;
-
   Scanner sc = initScanner(source);
   initParser(sc);
 
   Compiler cmp;
-  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, path);
+  initCompiler(&cmp, enclosing, NULL, TYPE_MODULE, module, path);
 
   declarations(&cmp);
 

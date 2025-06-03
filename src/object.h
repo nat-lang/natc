@@ -122,6 +122,7 @@ typedef struct {
   bool variadic;
   ObjString *name;
   NativeFn function;
+  ObjMap fields;
 } ObjNative;
 
 typedef struct ObjUpvalue {
@@ -179,7 +180,8 @@ typedef enum { MODULE_ENTRYPOINT, MODULE_IMPORT } ModuleType;
 struct ObjModule {
   Obj obj;
   ModuleType type;
-  ObjString *path;
+  ObjString *dirName;
+  ObjString *baseName;
   ObjString *source;
   ObjClosure *closure;
   ObjMap namespace;
@@ -203,7 +205,8 @@ ObjFunction *newFunction(ObjModule *module);
 ObjOverload *newOverload(int cases);
 ObjVariable *newVariable(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
-ObjModule *newModule(ObjString *path, ObjString *source, ModuleType type);
+ObjModule *newModule(ObjString *dirName, ObjString *baseName, ObjString *source,
+                     ModuleType type);
 ObjNative *newNative(int arity, bool variadic, ObjString *name,
                      NativeFn function);
 ObjSequence *newSequence();

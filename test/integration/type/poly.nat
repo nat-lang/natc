@@ -31,8 +31,6 @@ assert(_check.failure());
 // but the polymorphic type system can, with the
 // aid of abstract types.
 
-// with either explicit abstraction.
-
 typecheck(() => {
   let id: (a => a -> a) = x => x;
 
@@ -56,7 +54,7 @@ let id: w -> w = x => x;
 let abstract = annotations(id)[0];
 let concrete = abstract(num);
 
-assert(vType(abstract) == OFunction);
+assert(vmType(abstract) == OFunction);
 
 assert(concrete is TFunction);
 assert(concrete.domain == num);
@@ -83,7 +81,7 @@ let f: x -> y -> y -> y = a b c => c;
 let abstract = annotations(f)[0];
 let concrete = abstract(num, string);
 
-assert(vType(abstract) == OFunction);
+assert(vmType(abstract) == OFunction);
 
 assert(concrete is TFunction);
 assert(concrete.domain == num);
@@ -168,7 +166,7 @@ typecheck(() => f(true)(true));
 
 // type parameters propagate to embedded type constructors.
 
-let t = type((x: w) => ({x}));
+let t = TypeSystem.type((x: w) => ({x}));
 
 assert(t is TAbstract);
 
@@ -185,7 +183,7 @@ assert(concrete.domain == num);
 assert(concrete.range == TSet(num));
 
 let f = (x: u, y: v, z: w) => ({x,y,z});
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t is TAbstract);
 
@@ -201,6 +199,14 @@ let concrete = t(num, num, num);
 assert(concrete is ->);
 assert(concrete.domain == TProduct(num, num, num));
 assert(concrete.range == TSet(num));
+
+// abstract annotations are instantiated by lower
+// concrete constraints.
+
+let g: num -> num -> num = x y => x + y;
+let f: u -> v -> w = x y => g(x)(y);
+
+assert(type(f) == num -> num -> num);
 
 // the polymorphic type system types overloads
 // with implicit variables in their case signatures.
@@ -227,15 +233,27 @@ typefail(() => f(f("x", g), h));
 
 // the polymorphic type system types quantification.
 
-typecheck(() => for all (x in {1,2,3}) x in {1,2});
+typecheck(() => for all (x in {true,false}) x);
 typecheck(() => for some (x in {true,false}) x);
+typecheck(() => for no (x in {true,false}) x);
+
+typefail(() => for all (x in {"true","false"}) x);
+typefail(() => for some (x in {"true","false"}) x);
+typefail(() => for no (x in {"true","false"}) x);
+
+typecheck(() => for all (x in {1,2,3}) x in {1,2});
+typecheck(() => for some (x in {1,2,3}) x in {1,2});
+typecheck(() => for no (x in {1,2,3}) x in {1,2});
+
+typefail(() => for all (x in {1,2,3}) x);
+typefail(() => for some (x in {1,2,3}) x);
 typefail(() => for no (x in {1,2,3}) x);
 
 typecheck(() => for some (x in {1,2,3}) x > 1 and x < 3);
 
 // reconstruction.
 
-let a = Type(), b = Type(), c = Type();
+let a = Type(), b = Type(), c = Type(), d = Type();
 
 // the type of identity is inferrable in first order context.
 
@@ -258,7 +276,7 @@ typefail(id => {
 // the type of forward application is inferrable.
 
 let f = g x => g(x);
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies ((a -> b) -> (a -> b)));
 assert(t unifies ((b -> a) -> (b -> a)));
@@ -275,7 +293,7 @@ assert(!(t unifies ((a -> b) -> (b -> b))));
 // the type of backward application is inferrable.
 
 let f = x g => g(x);
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (a -> ((a -> b) -> b)));
 assert(t unifies (b -> ((b -> a) -> a)));
@@ -292,7 +310,7 @@ assert(!(t unifies (b -> ((b -> a) -> b))));
 // the type of composition is inferrable.
 
 let @ = f g x => f(g(x));
-let t = type(@);
+let t = TypeSystem.type(@);
 
 assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
 assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
@@ -302,7 +320,7 @@ assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> b)));
 assert(t unifies (((a, a -> b) -> b) & ((a -> b, a) -> b)));
@@ -319,7 +337,7 @@ assert(!(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> c))));
 // the type of curried type driven application is inferrable.
 
 let f = (a: x -> y) => ((b: x) => a(b)) | (a: x) => ((b: x -> y) => b(a));
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
 assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
@@ -327,7 +345,7 @@ assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
 assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 let f = (a: x) => ((b: x -> y) => b(a)) | (a: x -> y) => ((b: x) => a(b));
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
 assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
@@ -336,7 +354,7 @@ assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 // nested abstract types normalize to a single first order type.
 
-let t = type(x y => y);
+let t = TypeSystem.type(x y => y);
 
 assert(t unifies (a -> (a -> a)));
 assert(t unifies (a -> (b -> b)));
@@ -345,6 +363,16 @@ assert(t unifies (b -> (b -> b)));
 
 assert(!(t unifies (a -> (b -> a))));
 assert(!(t unifies (a -> (a -> b))));
+
+// nested abstract cases normalize to a single abstract overload.
+
+let f = (a: x -> y, b: x) => a(b)
+      | (a: x, b: x -> y) => b(a);
+
+let t = TypeSystem.type(f);
+
+assert(t is TGeneralization);
+assert(t unifies (TProduct(a -> b, a) -> b) & (TProduct(d, c -> d) -> d));
 
 // the poly type system exposes an api for instantiating
 // the annotations of applied abstract functions.
@@ -377,3 +405,344 @@ assert(t == num -> (num -> num));
 
 let t = instantiate(f, 1, true);
 assert(t == bool -> (num -> bool));
+
+// maps.
+
+// instantiation.
+
+typecheck(() => ({1: true}));
+typecheck(() => ({1: true, true: 1}));
+typecheck(() => ({1: {true: 1}}));
+typecheck(() => ({1: {true: {1: true}}}));
+
+// key type.
+
+typecheck((x: string) => ({"1": true})[x]);
+typecheck((x: bool) => ({1: true, false: 3})[x]);
+typecheck((x: num) => ({1: true, 2: false, 3: false})[x]);
+
+// key types.
+
+typecheck((x: bool or num) => ({1: true, false: 3})[x]);
+typefail((x: string) => ({1: true, false: 3})[x]);
+
+// val type.
+
+typecheck((x: num) => ((x: bool) => {})({1: true}[x]));
+
+// val types.
+
+typecheck(() => ((x: num) => {})({1: 1}[1]));
+typecheck(() => ((x: num or bool) => {})({1: true, true: 1}[1]));
+typecheck(() => ((x: num or bool) => {})({1: true, true: 1}[true]));
+typecheck(() => ((x: num or bool or string) => {})({1: true, true: 1}[1]));
+typecheck(() => ((x: num or bool or string) => {})({1: true, true: 1}[true]));
+
+typefail(() => ((x: bool) => {})({1: 1}[1]));
+typefail(() => ((x: bool) => {})({1: true, true: 1}[1]));
+typefail(() => ((x: bool) => {})({1: true, true: 1}[true]));
+
+typefail(() => ((x: num) => {})({1: true, true: 1}[1]));
+typefail(() => ((x: num) => {})({1: true, true: 1}[true]));
+
+// assignment.
+
+typecheck(() => {
+  let x = {1: true};
+  x[1] = false;
+});
+
+typecheck(() => {
+  let x = {1: true, true: 1};
+  x[1] = false;
+});
+
+typecheck(() => {
+  let x = {1: true, true: 1};
+  x[true] = 1;
+});
+
+typecheck((z: num or bool) => {
+  let x = {1: true, true: 1};
+  x[z] = 1;
+});
+
+typefail(() => {
+  let x = {1: true};
+  x[true] = false;
+});
+
+typefail((z: num or bool or string) => {
+  let x = {1: true, true: 1};
+  x[z] = 1;
+});
+
+// annotation.
+
+typecheck(() => {
+  let x: {bool: bool} = {false: true};
+});
+
+typefail(() => {
+  let x: {bool: bool} = {false: 1};
+});
+
+typefail(() => {
+  let x: {bool: bool} = {1: false};
+});
+
+typecheck(() => {
+  let x: {bool: bool or num} = {false: true};
+});
+
+typefail(() => {
+ let x: {bool: bool or num} = {false: true, 1: false};
+});
+
+typecheck(() => {
+  let x: {bool: bool or num} = {false: true, true: 1};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool} = {false: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool} = {false: true, 1: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true, 1: true};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true, 1: true, true: 1};
+});
+
+typecheck(() => {
+  let x: {bool or num: bool or num} = {false: true, 1: true, true: 1, 1: 1};
+});
+
+// annotation and assignment.
+
+typecheck(() => {
+  let x: {bool: bool} = Map();
+  x[true] = false;
+});
+
+typefail(() => {
+  let x: {bool: bool} = Map();
+  x[true] = 1;
+});
+
+typefail(() => {
+  let x: {bool: bool} = Map();
+  x[1] = true;
+});
+
+typecheck(() => {
+  let x: {bool: bool or num} = Map();
+  x[true] = 1;
+});
+
+typefail(() => {
+  let x: {bool: bool or num} = Map();
+  x[1] = true;
+});
+
+typefail(() => {
+  let x: {bool: bool or num} = Map();
+  x["true"] = 1;
+});
+
+typefail(() => {
+  let x: {bool: bool or num} = Map();
+  x[true] = "1";
+});
+
+// maps unify with arrows, TMap <| ->
+
+typecheck(() => {
+  let x: num -> bool = {1: true};
+});
+
+typefail(() => {
+  let x: num -> bool = {true: 1};
+});
+
+// key |> domain.
+
+typecheck(() => {
+  let x: num -> bool = {1: true, true: false};
+});
+
+typefail(() => {
+  let x: num -> bool = {1: true, 1: 1};
+});
+
+typecheck(() => {
+  let x: (num or bool) -> bool = {1: true, true: false};
+});
+
+typefail(() => {
+  let x: (num or bool or string) -> bool = {1: true, true: false};
+});
+
+// val <| range.
+
+typecheck(() => {
+  let x: num -> (bool or num) = {1: true};
+});
+
+typecheck(() => {
+  let x: num -> (bool or num) = {1: true, 1: 1};
+});
+
+typefail(() => {
+  let x: num -> (bool or num) = {1: true, 1: 1, 2: "foo"};
+});
+
+// maps unify with arrows, -> <| TMap
+
+typecheck(() => {
+  let f: TMap(num, bool) = x => x > 1;
+});
+
+typefail(() => {
+  let f: TMap(num, bool) = (x: string) => x == "x";
+});
+
+typecheck(() => {
+  let f: TMap(num, TMap(num, bool)) = x y => x > y;
+});
+
+typecheck(() => {
+  let f: num -> (num -> bool) -> bool = n g => g[n];
+});
+
+// assignment with -> annotation.
+
+typecheck(() => {
+  let x: num -> bool = Map();
+
+  x[1] = true;
+});
+
+typefail(() => {
+  let x: num -> bool = Map();
+
+  x[true] = 1;
+});
+
+// inference.
+
+let f: num -> w -> num = n m => m[n];
+
+assert(type(f) == num -> TMap(num,num) -> num);
+
+let f: bool -> w -> num = n m => m[n];
+
+assert(type(f) == bool -> TMap(bool,num) -> num);
+
+let f: u -> v -> w = n m => m[n];
+
+let a = typeVar(), b = typeVar();
+
+assert(type(f) unifies a -> TMap(a,b) -> b);
+
+assert(type(f(1)) unifies num -> TMap(num,b) -> b);
+
+// comprehensions.
+
+typecheck(() => ({1 | true}));
+typecheck(() => ({1 | false}));
+
+typefail(() => ({x | x in false}));
+typefail(() => ({x | x in nil}));
+typefail(() => ({x | x in 1}));
+
+typecheck(() => ({x | x in {1,2}}));
+typecheck(() => ({x | x in {1,2}, true}));
+typecheck(() => ({x | false, x in {1,2}}));
+
+typecheck(() => ({((z: num) => z)(x) | x in {1,2}}));
+typefail(() => ({((z: string) => z)(x) | x in {1,2}}));
+
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({1 | true});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({"1" | true});
+});
+
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({x | x in {1,2}});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({x | x in {"1","2"}});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+
+  f({x | x in {"1",2}});
+});
+
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+  let z = {x | x in {1,2}};
+  f({x | x in z});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+  let z = {x | x in {"1","2"}};
+  f({x | x in z});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+  let z = {x | x in {"1",2}};
+  f({x | x in z});
+});
+
+typecheck(() => {
+  let f = (x: TSet(num)) => {};
+  let g = x => 1;
+  f({g(true) | true});
+});
+
+typefail(() => {
+  let f = (x: TSet(num)) => {};
+  let g = x => "1";
+  f({g(true) | true});
+});
+
+typecheck(() => {
+  let f = (x: num or bool) => {};
+  let y = {f(x) | x in {1, true}};
+});
+
+typefail(() => {
+  let f = (x: num or bool) => {};
+  let y = {f(x) | x in {1, true, "string"}};
+});
+
+typecheck(() => {
+  let f = (x: num or bool or string) => {};
+  let y = {f(x) | x in {1, true, "string"}};
+});

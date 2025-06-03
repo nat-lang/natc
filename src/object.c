@@ -65,10 +65,12 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
-ObjModule* newModule(ObjString* path, ObjString* source, ModuleType type) {
+ObjModule* newModule(ObjString* dirName, ObjString* baseName, ObjString* source,
+                     ModuleType type) {
   ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
   module->type = type;
-  module->path = path;
+  module->dirName = dirName;
+  module->baseName = baseName;
   module->source = source;
   module->closure = NULL;
   initMap(&module->namespace);
@@ -122,6 +124,7 @@ ObjNative* newNative(int arity, bool variadic, ObjString* name,
   native->variadic = variadic;
   native->name = name;
   native->function = function;
+  initMap(&native->fields);
   return native;
 }
 

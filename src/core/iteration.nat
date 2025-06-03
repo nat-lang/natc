@@ -19,11 +19,10 @@ class Iterator {
 }
 
 let iter = object => {
-  if (object is Sequential or vType(object) == OString)
+  if (object is Sequential or vmType(object) == OString)
     return Iterator(object, 0, len(object));
 
-
-  if (vType(object) != OInstance)
+  if (vmType(object) != OInstance)
     throw IterationProtocolError("can't iterate over #{object}.");
 
   if ("__iter__" in object) return object.__iter__();

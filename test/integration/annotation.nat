@@ -5,10 +5,6 @@ let f: 1 = () => 1;
 
 assert(annotations(f) == [1]);
 
-f: 2;
-
-assert(annotations(f) == [1,2]);
-
 // locals can be annotated.
 
 (() => {
@@ -16,24 +12,6 @@ assert(annotations(f) == [1,2]);
 
   assert(annotations(f) == [1]);
 
-  f: 2;
-
-  assert(annotations(f) == [1,2]);
-})();
-
-// upvalues can be annotated.
-
-(() => {
-  let x: 2 = (() => {
-    let x: 1 = () => 1;
-    return x;
-  })();
-
-  assert(annotations(x) == [1, 2]);
-
-  x: 3;
-
-  assert(annotations(x) == [1, 2, 3]);
 })();
 
 // function annotations propagate to their return values.

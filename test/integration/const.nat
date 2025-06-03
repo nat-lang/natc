@@ -1,0 +1,25 @@
+
+sym a,bc,xyz;
+
+assert(a == a);
+assert(bc == bc);
+assert(xyz == xyz);
+
+assert(a != bc);
+assert(bc != xyz);
+
+let j = a;
+let k = bc;
+let m = xyz;
+
+assert(j == a);
+assert(k == bc);
+assert(m == xyz);
+
+(() => {
+  sym a,bc,xyz;
+
+  assert(a == a);
+  assert(bc == bc);
+  assert(xyz == xyz);
+})();

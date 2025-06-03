@@ -1,5 +1,6 @@
 #include "vm.h"
 
+#include <libgen.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -47,14 +48,16 @@ void vmRuntimeError(const char* format, ...) {
 
     // it's a script.
     if (frame->closure->function->module->closure == frame->closure) {
-      fprintf(stderr, "        %*s %s%s:%d\n", leftOffset, "in",
-              function->module->path->chars, NAT_EXT,
+      fprintf(stderr, "        %*s %s/%s:%d\n", leftOffset, "in",
+              function->module->dirName->chars,
+              function->module->baseName->chars,
               function->chunk.lines[instruction]);
 
     } else {
       // it's a function.
-      fprintf(stderr, "  in %-*s at %s%s:%d\n", leftOffset,
-              function->name->chars, function->module->path->chars, NAT_EXT,
+      fprintf(stderr, "  in %-*s at %s/%s:%d\n", leftOffset,
+              function->name->chars, function->module->dirName->chars,
+              function->module->baseName->chars,
               function->chunk.lines[instruction]);
     }
   }
@@ -69,23 +72,12 @@ void initCore(Core* core) {
   core->sVariadic = NULL;
   core->sValues = NULL;
   core->sSignature = NULL;
+  core->sFunction = NULL;
+  core->sModule = NULL;
   core->sQuote = NULL;
   core->sBackslash = NULL;
   core->sArgv = NULL;
   core->sMain = NULL;
-
-  core->sName = intern("name");
-  core->sArity = intern("arity");
-  core->sPatterned = intern("patterned");
-  core->sVariadic = intern("variadic");
-  core->sValues = intern("values");
-  core->sSignature = intern("signature");
-  core->sFunction = intern("function");
-  core->sModule = intern("__module__");
-  core->sQuote = intern("\"");
-  core->sBackslash = intern("\\");
-  core->sArgv = intern("argv");
-  core->sMain = intern("main");
 
   core->base = NULL;
   core->object = NULL;
@@ -98,6 +90,7 @@ void initCore(Core* core) {
 
   core->astClosure = NULL;
   core->astComprehension = NULL;
+  core->astClassMethod = NULL;
   core->astMethod = NULL;
   core->astExternalUpvalue = NULL;
   core->astInternalUpvalue = NULL;
@@ -108,10 +101,10 @@ void initCore(Core* core) {
   core->astBlock = NULL;
   core->astQuantification = NULL;
 
-  core->vTypeBool = NULL;
-  core->vTypeNil = NULL;
-  core->vTypeNumber = NULL;
-  core->vTypeUndef = NULL;
+  core->vmTypeBool = NULL;
+  core->vmTypeNil = NULL;
+  core->vmTypeNumber = NULL;
+  core->vmTypeUndef = NULL;
   core->oTypeClass = NULL;
   core->oTypeInstance = NULL;
   core->oTypeString = NULL;
@@ -140,6 +133,9 @@ bool initVM() {
   vm.compiler = NULL;
   vm.module = NULL;
 
+  vm.comprehensionDepth = 0;
+  for (int i = 0; i < COMPREHENSION_DEPTH_MAX; i++) vm.comprehensions[i] = NULL;
+
   initMap(&vm.globals);
   initMap(&vm.strings);
   initMap(&vm.prefixes);
@@ -148,12 +144,28 @@ bool initVM() {
 
   initCore(&vm.core);
 
+  vm.core.sName = intern("name");
+  vm.core.sArity = intern("arity");
+  vm.core.sPatterned = intern("patterned");
+  vm.core.sVariadic = intern("variadic");
+  vm.core.sValues = intern("values");
+  vm.core.sSignature = intern("signature");
+  vm.core.sFunction = intern("function");
+  vm.core.sModule = intern("__module__");
+  vm.core.sQuote = intern("\"");
+  vm.core.sBackslash = intern("\\");
+  vm.core.sArgv = intern("argv");
+  vm.core.sMain = intern("main");
+
   return loadCore() == INTERPRET_OK;
 }
 
 void freeVM() {
   freeMap(&vm.globals);
   freeMap(&vm.strings);
+  freeMap(&vm.prefixes);
+  freeMap(&vm.infixes);
+  freeMap(&vm.methodInfixes);
 
   initCore(&vm.core);
 
@@ -172,10 +184,10 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
-bool vmGetMethod(ObjString* name, int argCount, Value* method) {
+bool vmGetProperty(ObjString* name, int argCount, Value* method) {
   Value receiver = vmPeek(argCount);
 
-  char* error = "Only instances and classes have methods.";
+  char* error = "Only instances, classes, and functions have properties.";
 
   ObjMap* fields;
   switch (OBJ_TYPE(receiver)) {
@@ -205,7 +217,7 @@ bool vmInvoke(ObjString* name, int argCount) {
   Value receiver = vmPeek(argCount);
   Value method = NIL_VAL;
 
-  if (!vmGetMethod(name, argCount, &method)) return false;
+  if (!vmGetProperty(name, argCount, &method)) return false;
 
   vm.stackTop[-argCount - 1] = receiver;
   return vmCallValue(method, argCount);
@@ -214,7 +226,7 @@ bool vmInvoke(ObjString* name, int argCount) {
 bool vmExecuteMethod(char* name, int argCount) {
   Value receiver = vmPeek(argCount);
   Value method = NIL_VAL;
-  if (!vmGetMethod(intern(name), argCount, &method)) return false;
+  if (!vmGetProperty(intern(name), argCount, &method)) return false;
   vm.stackTop[-argCount - 1] = receiver;
   if (!vmCallValue(method, argCount)) return false;
 
@@ -226,7 +238,7 @@ bool vmExecuteMethod(char* name, int argCount) {
 // If [value] is natively hashable, then hash it. Otherwise, if it's
 // an instance and it has a hash function, then call the function.
 bool vmHashValue(Value value, uint32_t* hash) {
-  if (isHashable(value)) {
+  if (vHashable(value)) {
     *hash = hashValue(value);
     return true;
   }
@@ -854,12 +866,21 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(value);
             break;
           }
+          case OBJ_NATIVE: {
+            ObjNative* native = AS_NATIVE(vmPeek(0));
+            mapGet(&native->fields, name, &value);
+
+            vmPop();  // native.
+            vmPush(value);
+            break;
+          }
           case OBJ_BOUND_FUNCTION: {
             ObjBoundFunction* obj = AS_BOUND_FUNCTION(vmPop());
 
             if (obj->type == BOUND_NATIVE) {
-              vmRuntimeError("Natives have no properties.");
-              return INTERPRET_RUNTIME_ERROR;
+              mapGet(&obj->bound.native->fields, name, &value);
+              vmPush(value);
+              break;
             }
 
             vmPush(OBJ_VAL(obj->bound.method));
@@ -1128,13 +1149,41 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_COMPREHENSION: {
+        Value obj = vmPeek(0);
+        if (vm.comprehensionDepth == COMPREHENSION_DEPTH_MAX) {
+          vmRuntimeError("Can't next comprehensions deeper than %s.",
+                         COMPREHENSION_DEPTH_MAX);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        vm.comprehensions[vm.comprehensionDepth++] = AS_OBJ(obj);
+
         vmClosure(frame);
-        if (!vmCallValue(vmPeek(0), 0)) return INTERPRET_RUNTIME_ERROR;
-        frame = &vm.frames[vm.frameCount - 1];
+        if (!vmCallValue(vmPeek(0), 0) ||
+            vmExecute(vm.frameCount - 1) != INTERPRET_OK)
+          return INTERPRET_RUNTIME_ERROR;
+        vmPop();  // nil.
+
+        vm.comprehensions[--vm.comprehensionDepth] = NULL;
         break;
       }
-      case OP_COMPREHENSION_BODY:
+      case OP_COMPREHENSION_BODY: {
+        Obj* comp;
+        if ((comp = vm.comprehensions[vm.comprehensionDepth - 1]) == NULL) {
+          vmRuntimeError("Missing comprehension at depth %d.",
+                         vm.comprehensionDepth);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        Value el = vmPeek(0);
+        vmPush(OBJ_VAL(comp));
+        vmPush(el);
+
+        if (!vmExecuteMethod("add", 1)) return INTERPRET_RUNTIME_ERROR;
+
+        vmPop();
         break;
+      }
       case OP_OVERLOAD: {
         if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
         break;
@@ -1322,6 +1371,20 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(OBJ_VAL(character));
             break;
           }
+          case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(obj);
+            uint32_t hash;
+            if (!vmHashValue(key, &hash)) return INTERPRET_RUNTIME_ERROR;
+
+            Value value;
+            if (mapGetHash(&klass->fields, key, &value, hash)) {
+              vmPush(value);
+            } else {
+              // we don't throw an error if the property doesn't exist.
+              vmPush(NIL_VAL);
+            }
+            break;
+          }
           case OBJ_INSTANCE: {
             // classes may define their own subscript access operator.
             ObjInstance* instance = AS_INSTANCE(obj);
@@ -1355,7 +1418,8 @@ InterpretResult vmExecute(int baseFrame) {
           }
           default: {
             vmRuntimeError(
-                "Only objects, sequences, and instances with a '%s' method "
+                "Only objects, sequences, classes, and instances with a '%s' "
+                "method "
                 "support access by subscript.",
                 S_SUBSCRIPT_GET);
             return INTERPRET_RUNTIME_ERROR;
@@ -1462,7 +1526,6 @@ InterpretResult vmExecute(int baseFrame) {
           Obj* obj = AS_OBJ(global);
           writeValueArray(&obj->annotations, vmPeek(0));
         }
-
         break;
       }
       case OP_SPREAD: {
@@ -1521,26 +1584,48 @@ ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
   return closure;
 }
 
-ObjModule* vmCompileModule(Token path, ModuleType type) {
+ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
+  // path can be of the form a/b/c, in which case we need to
+  // separate a/b from c.
   ObjString* objPath = copyString(path.start, path.length);
   vmPush(OBJ_VAL(objPath));
 
-  char* source = readSource(pathToUri(objPath->chars));
+  char* absPath = pathToUri(enclosingDir, objPath->chars);
+  char *c1 = malloc(strlen(absPath) + 1), *c2 = malloc(strlen(absPath) + 1);
+  if (c1 == 0 || c2 == 0) return NULL;
+  strcpy(c1, absPath);
+  strcpy(c2, absPath);
+  char* dir = dirname(c1);
+  char* base = basename(c2);
+
+  vmPop();
+
+  ObjString* objDirName = intern(dir);
+  vmPush(OBJ_VAL(objDirName));
+  ObjString* objBaseName = intern(base);
+  vmPush(OBJ_VAL(objBaseName));
+
+  free(c1);
+  free(c2);
+
+  char* source = readSource(absPath);
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
   free(source);
 
-  ObjModule* module = newModule(objPath, objSource, type);
+  ObjModule* module = newModule(objDirName, objBaseName, objSource, type);
   vmPush(OBJ_VAL(module));
 
-  ObjClosure* closure = vmCompileClosure(path, objSource->chars, module);
+  ObjClosure* closure = vmCompileClosure(syntheticToken(objBaseName->chars),
+                                         objSource->chars, module);
   if (closure == NULL) return NULL;
 
   module->closure = closure;
 
   vmPop();  // module.
   vmPop();  // objSource.
-  vmPop();  // objPath.
+  vmPop();  // objBaseName.
+  vmPop();  // objDirName.
 
   return module;
 }
@@ -1568,52 +1653,21 @@ InterpretResult vmExecuteModule(ObjModule* module) {
   return vmExecute(vm.frameCount - 1);
 }
 
-InterpretResult vmInterpretModule(char* path) {
-  ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
+InterpretResult vmInterpretEntrypoint(char* path) {
+  ObjModule* module =
+      vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
   return vmExecuteModule(module);
 }
 
-InterpretResult vmInterpretEntrypoint(char* path, int argc, char* argv[]) {
-  ObjModule* module = vmCompileModule(syntheticToken(path), MODULE_ENTRYPOINT);
-
-  if (module == NULL) return INTERPRET_COMPILE_ERROR;
-
-  InterpretResult status;
-  if ((status = vmExecuteModule(module)) != INTERPRET_OK) return status;
-
-  Value main;
-  if (!mapGet(&module->namespace, OBJ_VAL(vm.core.sMain), &main) ||
-      !IS_CLOSURE(main)) {
-    vmRuntimeError("Entrypoint requires a 'main' function.");
-    return INTERPRET_RUNTIME_ERROR;
-  }
-
-  vmPush(main);
-
-  for (int i = 0; i < argc; i++) vmPush(INTERN(argv[i]));
-
-  if (!callClosure(AS_CLOSURE(main), argc)) return INTERPRET_RUNTIME_ERROR;
-
-  return vmExecute(vm.frameCount - 1);
-}
-
 // wasm api.
 
-InterpretResult vmInterpretEntrypoint_wasm(char* path, int argc, char* argv[]) {
+InterpretResult vmInterpretEntrypoint_wasm(char* path) {
   if (!initVM()) exit(2);
 
-  InterpretResult status = vmInterpretEntrypoint(path, argc, argv);
-  freeVM();
-  return status;
-}
-
-InterpretResult vmInterpretModule_wasm(char* path) {
-  if (!initVM()) exit(2);
-
-  InterpretResult status = vmInterpretModule(path);
+  InterpretResult status = vmInterpretEntrypoint(path);
   freeVM();
   return status;
 }
@@ -1621,7 +1675,7 @@ InterpretResult vmInterpretModule_wasm(char* path) {
 char* vmTypesetModule_wasm(char* path) {
   if (!initVM()) exit(2);
 
-  InterpretResult status = vmInterpretModule(path);
+  InterpretResult status = vmInterpretEntrypoint(path);
 
   if (status != INTERPRET_OK) exit(2);
 

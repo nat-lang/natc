@@ -22,13 +22,6 @@ static void repl() {
   }
 }
 
-static void uErr() {
-  fprintf(stderr,
-          "Usage: nat [file] \n [-a argument] call [file] with argument");
-  freeVM();
-  exit(64);
-}
-
 int main(int argc, char* argv[]) {
   int exitStatus = 0;
 
@@ -37,30 +30,7 @@ int main(int argc, char* argv[]) {
   if (argc == 1) {
     repl();
   } else {
-    int opt;
-
-    int paramc = 0;
-    char* paramv[10];  // max 10 params.
-
-    while ((opt = getopt(argc, argv, "a:")) != -1) {
-      switch (opt) {
-        case 'a':
-          paramv[paramc++] = optarg;
-          break;
-        default: {
-          freeVM();
-          uErr();
-        }
-      }
-    }
-
-    if (argc - optind > 1) uErr();
-
-    InterpretResult status;
-    if (paramc > 0)
-      status = vmInterpretEntrypoint((char*)argv[optind], paramc, paramv);
-    else
-      status = vmInterpretModule((char*)argv[optind]);
+    InterpretResult status = vmInterpretEntrypoint((char*)argv[optind]);
 
     if (status == INTERPRET_COMPILE_ERROR) exitStatus = 65;
     if (status == INTERPRET_RUNTIME_ERROR) exitStatus = 70;

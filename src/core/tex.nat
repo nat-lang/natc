@@ -1,7 +1,4 @@
 
-let newline = "
-";
-
 class TexDocument {
   init() => {
     this.preamble = "";

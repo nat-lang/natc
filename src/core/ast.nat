@@ -20,6 +20,8 @@ class ASTNode extends Tree {
     this.children = children;
   }
 
+  hash() => (hash . address)(this);
+
   str() => str(this.__class__);
   tex() => { throw NotImplemented(this.__class__, this.tex); }
 
@@ -29,7 +31,7 @@ class ASTNode extends Tree {
       node => {
         if (node is ASTExternalUpvalue) {
           let v = node.resolve();
-          if (vType(v) == OFunction) {
+          if (vmType(v) == OFunction) {
             let node' <- v;
             return node'.unroll();
           }
@@ -104,7 +106,13 @@ class ASTNode extends Tree {
   opGetGlobal(name) => ASTGlobal(name);
   opGetUpvalue(address) => this.upvalues[address];
   opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
-  opCall(fn, *args) => ASTApp(fn, ASTArgumentSequence(..args));
+  opSubscriptGet(obj, key) => ASTSubscriptGet(obj, key);
+  opSubscriptSet(obj, key, value) => ASTSubscriptSet(obj, key, value);
+  opCall(fn, *args) => {
+    if (fn is ASTGlobal && fn.variadic())
+      return ASTApp(fn, ASTVariadicArgumentSequence(..args));
+    return ASTApp(fn, ASTArgumentSequence(..args));
+  }
   opCallInfix(fn, left, right) => ASTAppInfix(fn, ASTArgumentSequence(left, right));
   opVariable(var) => ASTPatternVariable(var);
   opMember(element, collection) => ASTMembership(element, collection);
@@ -140,6 +148,11 @@ class ASTNode extends Tree {
     let literal = ASTLiteral(name);
     let assignment = ASTPropertyAssignment(obj, literal, value);
     this.children.push(assignment);
+  }
+
+  opThrow(exc) => {
+    let node = ASTThrow(exc);
+    this.children.push(node);
   }
 
   opReturn(expr) => {
@@ -181,11 +194,6 @@ class ASTNode extends Tree {
     let node = ASTComprehensionIter(local, iterator, body);
     this.children.push(node);
   }
-
-  opComprehensionBody(expr) => {
-    let node = ASTComprehensionBody(expr);
-    this.children.push(node);
-  }
 }
 
 class ASTStatement extends ASTNode {}
@@ -199,11 +207,12 @@ class ASTLocalTypeAssignment extends ASTTypeAssignment {}
 class ASTGlobalValueAssignment extends ASTAssignment {}
 class ASTGlobalTypeAssignment extends ASTTypeAssignment {}
 
+class ASTThrow extends ASTStatement {}
+
 class ASTReturn extends ASTStatement {
   tex() => join([n.tex() | n in this.children], " ");
 }
 class ASTImplicitReturn extends ASTReturn {
-  tex() => "";
 }
 class ASTExprStatement extends ASTStatement {}
 
@@ -219,7 +228,18 @@ class ASTBlock extends ASTNode {
   }
 
   opGetUpvalue(address) => this.enclosing.opGetUpvalue(address);
-  str() => "ASTBlock(#{this.enclosing})";
+  opComprehensionBody(expr) => {
+    let root = this.enclosing;
+    while (root is not ASTComprehension) {
+      root = root.enclosing;
+      if (root == nil)
+        throw Error("Missing root for comprehension body.");
+    }
+    let node = ASTComprehensionBody(root, expr);
+    this.children.push(node);
+  }
+
+  str() => "ASTBlock(#{this.enclosing.str()})";
   tex() => join(this.children.map(x => x.tex()), "");
 }
 
@@ -242,8 +262,8 @@ class ASTLiteral extends ASTExpr {
     this.value = value;
     super.init();
   }
-  str() => "ASTLiteral(#{str(this.value)})";
-  tex() => this.value;
+  str() => "ASTLiteral(#{this.value})";
+  tex() => str(this.value);
 
   resolve() => this.value;
   betaReduce() => this;
@@ -296,7 +316,7 @@ class ASTLocal extends ASTVariable {
 
   betaReduce() => this;
 
-  str() => "ASTLocal(#{this.id}, '#{this.name}')";
+  str() => "ASTLocal(#{this.id}, '#{this.name}', #{this.uuid})";
   tex() => this.name;
 
   __eq__(that) => this.name == that.name && super.__eq__(that);
@@ -307,6 +327,15 @@ class ASTGlobal extends ASTVariable {
   tex() => str(this.id);
   str() => "ASTGlobal(#{this.id})";
   betaReduce() => this;
+  variadic() => {
+    let value = this.resolve();
+    let type = vmType(value);
+    if (type == OClass)
+      return value.init && value.init.variadic;
+    if (type == OFunction || type == OBoundFunction || type == ONative)
+      return value.variadic;
+    return false;
+  }
 }
 
 class ASTUpvalue extends ASTVariable {
@@ -325,16 +354,15 @@ class ASTExternalUpvalue extends ASTUpvalue {
 
   tex() => {
     let value = this.resolve();
-    if (vType(value) in [OFunction, OOverload]) {
+    if (vmType(value) in [OFunction, OOverload]) {
       let ast <- value;
       return ast.tex();
     }
-    return value;
+    return str(value);
   }
 }
 
 class ASTInternalUpvalue extends ASTUpvalue {
-  resolve() => { throw Error("Not resolvable."); }
   tex() => this.name;
   str() => "ASTInternalUpvalue(#{this.id}, #{this.localId}, '#{this.name}')";
 }
@@ -353,15 +381,14 @@ class ASTArgumentSequence extends ASTExpr {
   tex() => join([arg.tex() | arg in this.children], ", ");
 }
 
-class ASTApp extends ASTExprStatement {
-  // we could have the interpreter do this,
-  // but we only want to reach normal form - 1.
-  betaReduce() => {
-    let fn = this[0],
-        args = this[1].betaReduce();
+class ASTVariadicArgumentSequence extends ASTArgumentSequence {}
 
-    if (fn is ASTApp)
-      fn = fn.betaReduce();
+class ASTApp extends ASTExprStatement {
+  // we only want to reach normal form - 1, otherwise
+  // we'd just let the interpreter do this.
+  betaReduce() => {
+    let fn = this[0].betaReduce(),
+        args = this[1].betaReduce();
 
     // if the applicand is not a function then we
     // can't reduce.
@@ -375,20 +402,16 @@ class ASTApp extends ASTExprStatement {
 
     // now substitute.
     let reduct = fn[0][0].map(x => {
-      if (x is not ASTLocal && x is not ASTInternalUpvalue)
-        return x;
-      for (let i = 0; i < len(args); i = i + 1) {
-        if (params[i].uuid == x.uuid)
-          return args[i];
+      if (x is ASTLocal || x is ASTInternalUpvalue) {
+        for (let i = 0; i < len(args); i = i + 1) {
+          if (params[i].uuid == x.uuid)
+            return args[i];
+        }
       }
       return x;
     });
 
-    // one final reduction if any argument is a function.
-    if (args.children.some(x => x is ASTClosure))
-      reduct = reduct.betaReduce();
-
-    return reduct;
+    return reduct.betaReduce();
   }
 
   evaluate() => {
@@ -425,6 +448,23 @@ class ASTApp extends ASTExprStatement {
 
 class ASTAppInfix extends ASTApp {
   tex() => this.resolveTex() || "#{this[1][0].tex()} #{this[0].tex()} #{this[1][1].tex()}";
+  evaluate() => {
+    let fn = this[0].resolve();
+    let args = this[1].resolve();
+
+    // check if this is a method infix.
+    let lhs = args[0], rhs = args[1],
+        tLhs = vmType(lhs), tRhs = vmType(rhs);
+    if (tLhs == OInstance && tRhs == OInstance) {
+      let sup = lca(lhs.__class__, rhs.__class__);
+      if (sup && args[0][fn.name])
+        return args[0][fn.name](args[1]);
+    }
+
+    if (len(args) > 0)
+      return fn(..args);
+    return fn();
+  }
 }
 
 class ASTPropertyAccess extends ASTExpr {
@@ -433,6 +473,23 @@ class ASTPropertyAccess extends ASTExpr {
   }
   resolve() => this[0].resolve()[this[1].resolve()];
   tex() => "#{this[0].tex()}.#{this[1].tex()}";
+}
+
+class ASTSubscriptGet extends ASTExpr {
+  init(obj, key) => {
+    this.children = [obj, key];
+  }
+  betaReduce() => {
+    if (this[0] is ASTSubscriptSet && this[0][1] == this[1])
+      return this[0][2];
+    return this;
+  }
+  resolve() => this[0].resolve()[this[1].resolve()];
+  tex() => "#{this[0].tex()}[#{this[1].tex()}]";
+}
+
+class ASTSubscriptSet extends ASTAssignment {
+  tex() => "#{this[0].tex()}^{#{this[1].tex()} \to #{this[2].tex()}}";
 }
 
 class ASTMembership extends ASTExpr {
@@ -454,9 +511,8 @@ class ASTClosure extends ASTExpr {
 
     if (enclosing == nil)
       this.upvalues = Map();
-    else {
+    else
       this.upvalues = enclosing.upvalues.copy();
-    }
 
     for (val in upvalues) {
       if (!this.upvalues[val.id])
@@ -526,16 +582,35 @@ class ASTClosure extends ASTExpr {
   }
 }
 
-class ASTComprehension extends ASTClosure {}
-class ASTComprehensionBody extends ASTExpr {}
+class ASTComprehension extends ASTClosure {
+  init(instance, enclosing, function, upvalues, *children) => {
+    super.init(enclosing, function, upvalues, instance, ..children);
+  }
+  body() => this.find(x => x is ASTComprehensionBody && x.root == this);
+}
+
+class ASTComprehensionBody extends ASTExpr {
+  init(root, *children) => {
+    this.root = root;
+    super.init(..children);
+  }
+}
 class ASTComprehensionPred extends ASTConditional {}
 class ASTComprehensionIter extends ASTIterate {}
 
-class ASTMethod extends ASTExpr {
-  init(klass, method, receiver, closure) => {
+class ASTClassMethod extends ASTExpr {
+  init(klass, method, closure) => {
     this.klass = klass;
     this.method = method;
-    this.receiver = receiver;
+    this.children = [closure];
+  }
+}
+
+class ASTMethod extends ASTExpr {
+  init(klass, method, instance, closure) => {
+    this.klass = klass;
+    this.method = method;
+    this.instance = instance;
     this.children = [closure];
   }
 }

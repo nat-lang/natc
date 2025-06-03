@@ -54,8 +54,8 @@ static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 static bool isSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
-          c == '+' || c == '-' || c == '/' || c == '*' || c == '|' ||
-          c == '=' || c == '_' || c == '%');
+          c == '+' || c == '-' || c == '/' || c == '\\' || c == '*' ||
+          c == '|' || c == '=' || c == '_' || c == '%');
 }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }
@@ -147,17 +147,8 @@ static TokenType identifierType() {
   switch (START[0]) {
     case 'a':
       return checkpointKeyword(1, 1, "s", TOKEN_AS);
-    case 'c': {
-      if (CURRENT - START > 1) {
-        switch (START[1]) {
-          case 'o':
-            return checkpointKeyword(2, 3, "nst", TOKEN_CONST);
-          case 'l':
-            return checkpointKeyword(2, 3, "ass", TOKEN_CLASS);
-        }
-      }
-      break;
-    }
+    case 'c':
+      return checkpointKeyword(1, 4, "lass", TOKEN_CLASS);
     case 'd':
       return checkpointKeyword(1, 2, "om", TOKEN_DOM);
     case 'e':
@@ -252,7 +243,15 @@ static TokenType identifierType() {
     case 'r':
       return checkpointKeyword(1, 5, "eturn", TOKEN_RETURN);
     case 's':
-      return checkpointKeyword(1, 4, "uper", TOKEN_SUPER);
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
+          case 'u':
+            return checkpointKeyword(2, 3, "per", TOKEN_SUPER);
+          case 'y':
+            return checkpointKeyword(2, 1, "m", TOKEN_SYM);
+        }
+      }
+      break;
     case 't':
       if (CURRENT - START > 1) {
         switch (START[1]) {
@@ -394,8 +393,10 @@ Token scanVirtualToken(char c) {
   return consumeToken(c);
 }
 
-Token scanSlashedIdentifier() {
-  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/') advance();
+Token scanPathIdentifier() {
+  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/' || peek() == '.')
+    advance();
+
   return scanner.current == scanner.start ? errorToken("Unexpected character.")
                                           : makeToken(TOKEN_IDENTIFIER);
 }

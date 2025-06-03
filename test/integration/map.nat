@@ -1,13 +1,15 @@
 
 // declaration and access.
 
-let map = {"a": 1, "b": 2};
+let map = {"a": 1};
 
 let a = "a";
 
 assert(map["a"] == 1);
 assert(map[a] == 1);
 assert(map[(() => { return "a"; })()] == 1);
+
+let map = {"a": 1, "b": 2};
 
 let b = "b";
 
@@ -29,7 +31,7 @@ map["c"] = 3;
 
 assert("c" in map);
 
-// any literal can be a key.
+// literal keys.
 
 map = {1: 1, 2: 2};
 assert(map[1] == 1);
@@ -39,6 +41,38 @@ assert(map[true] == 1);
 
 map = {nil: 1};
 assert(map[nil] == 1);
+
+// variable keys.
+
+let x = "x", y = "y", z = "z";
+
+map = {x: 1, y: 2};
+
+assert(map[x] == 1);
+assert(map[y] == 2);
+
+map[x] = 3;
+map[y] = 4;
+map[z] = 5;
+
+assert(map[x] == 3);
+assert(map[y] == 4);
+assert(map[z] == 5);
+
+// expression keys.
+
+map = {1 + 1: 2};
+
+assert(map[2] == 2);
+
+map = {true and false: false};
+
+assert(map[false] == false);
+
+map = {true and false: false, true and true: true};
+
+assert(map[false] == false);
+assert(map[true] == true);
 
 // api.
 

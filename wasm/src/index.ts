@@ -16,7 +16,7 @@ type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
 export const CORE_DIR = "core", SRC_DIR = "src";
-const abs = (path: string) => `/${SRC_DIR}/${path}`;
+export const abs = (path: string) => `/${SRC_DIR}/${path}`;
 
 export enum InterpretationStatus {
   OK = 0,
@@ -86,7 +86,7 @@ class Engine {
 
   interpret = async (path: string): Promise<InterpretationStatus> => {
     const runtime = await this.loadRuntime();
-    const fn = runtime.cwrap('vmInterpretModule_wasm', 'number', ['string']);
+    const fn = runtime.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
     return fn(path);
   };
 
@@ -132,7 +132,6 @@ class Engine {
 
   setFile = async (path: string, content: string) => {
     const runtime = await this.loadRuntime();
-
     runtime.FS.writeFile(abs(path), content, { flags: "w+" });
   }
 }

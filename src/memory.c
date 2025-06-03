@@ -88,11 +88,11 @@ static void blackenObject(Obj* object) {
       markValue(obj->receiver);
 
       switch (obj->type) {
-        case BOUND_METHOD: {
+        case BOUND_METHOD:
           markObject((Obj*)obj->bound.method);
           break;
-        }
         case BOUND_NATIVE:
+          markObject((Obj*)obj->bound.native);
           break;
       }
       break;
@@ -147,7 +147,11 @@ static void blackenObject(Obj* object) {
       markMap(map);
       break;
     }
-    case OBJ_NATIVE:
+    case OBJ_NATIVE: {
+      ObjNative* native = (ObjNative*)object;
+      markMap(&native->fields);
+      break;
+    }
     case OBJ_STRING:
       break;
     case OBJ_SEQUENCE: {
@@ -164,7 +168,8 @@ static void blackenObject(Obj* object) {
       ObjModule* module = (ObjModule*)object;
       markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
-      markObject((Obj*)module->path);
+      markObject((Obj*)module->dirName);
+      markObject((Obj*)module->baseName);
       markMap(&module->namespace);
       break;
     }
@@ -267,6 +272,9 @@ static void markRoots() {
        upvalue = upvalue->next) {
     markObject((Obj*)upvalue);
   }
+
+  for (int i = 0; i < vm.comprehensionDepth; i++)
+    markObject(vm.comprehensions[i]);
 
   markMap(&vm.globals);
   markMap(&vm.prefixes);

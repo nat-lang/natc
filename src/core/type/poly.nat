@@ -55,8 +55,88 @@ class TGeneralization extends TAbstract {
   }
 }
 
+class TMapAbstract extends TAbstract {
+  // Map is constructed from pairs of keys and values,
+  // but TMap is constructed from a single pair of possibly
+  // disjunctive key and value types. We have to handle the
+  // former case when unifying Map.init constraints, but the
+  // latter is the most convenient normal form for typing
+  // access and assignment. Here we translate the pairwise
+  // to the normal form.
+  init() => {
+    this.arity = 2;
+    this.variadic = true;
+  }
+  fn(*types) => {
+    // three cases:
+  
+    // (1) for an empty map -- i.e. Map() -- we delay
+    // instantiation of the key/val types.
+    if (len(types) == 1 && types[0] == unit)
+      return unit -> TMap(typeVar(), typeVar());
+    // (2) TAbstract.instantiate will pass this function
+    // two type variables.
+    if (len(types) == 2 && types.all(x => x is TVar))
+      return TProduct(..types) -> TMap(..types);
+    // (3) unification with pairwise Map.init arguments.
+    if(types.all(x => x is TProduct && len(x) == 2)) {
+      let kvs = unzip(types), keys = kvs[0], vals = kvs[1];
+
+      return TProduct(..types) -> TMap(TSum(..keys), TSum(..vals));
+    }
+
+    throw SubtypeError("Can't construct TMap.");
+  }
+}
+
 class PolyTypeState extends AdhocTypeState {
   constrain(node: ASTNode) => {
+    if (node is ASTApp) {
+      let func = node[0];
+      let args = node[1];
+
+      let tFunc = this.principal(func);
+      let tArgs = this.principal(args);
+      let tApp = typeVar();
+      
+      this.pushConstraint(node, tFunc <| tArgs -> tApp);
+      
+      return tApp;
+    }
+  
+    if (node is ASTComprehension) {
+      let instance = node[0], body = node.body();
+
+      let tInstance = this.principal(instance),
+          tBody = this.principal(body);
+
+      this.pushConstraint(node, TCollection(tBody) ~ tInstance);
+      this.constrainFnRange(node);
+
+      return tInstance;
+    }
+
+    if (node is ASTComprehensionBody)
+      return this.principal(node[0]);
+
+    if (node is ASTComprehensionIter) {
+      let var = node[0], iterApp = node[1], body = node[2];
+
+      // each ASTComprehensionIter has an application of the [iter]
+      // function to a potential iterable as its second child. we don't
+      // have everything necessary to type the [iter] function itself
+      // right now, so in the meantime just type the potential iterable.
+      let iter = iterApp[1][0];
+
+      let tVar = this.principal(var);
+      let tIter = this.principal(iter);
+
+      this.pushConstraint(node, tIter <| TCollection(tVar));
+      this.principal(body);
+
+      return void;
+    }
+  
     if (node is ASTClosure) {
       let tParams = this.constrainFnDomain(node),
           tReturns = this.constrainFnRange(node);
@@ -76,15 +156,34 @@ class PolyTypeState extends AdhocTypeState {
       return type;
     }
 
+    if (node is ASTOverload) {
+      let tCases = node.children.map(this.principal);
+
+      // push case abstractions to left edge.
+      let abstract = false;
+      tCases = tCases.map(x => {
+        if (x is TGeneralization) {
+          abstract = true;
+          return x.concrete;
+        }
+        return x;
+      });
+
+      if (abstract)
+        return TGeneralization(TOverload(..tCases));
+
+      return TOverload(..tCases);
+    }
+
     if (node is ASTQuantification) {
       let tQ = this.principal(node.quantifier);
       let tR = this.principal(node.restriction);
       let tB = this.principal(node.body);
       let tV = typeVar();
 
-      this.constraints.push(tR ~ TSet(tV));
-      this.constraints.push(tQ <| TProduct(tR, tB) -> bool);
-      this.constraints.push(tB <| tV -> bool);
+      this.pushConstraint(node, tR ~ TSet(tV));
+      this.pushConstraint(node, tQ <| TProduct(tR, tB) -> bool);
+      this.pushConstraint(node, tB <| tV -> bool);
 
       return bool;
     }
@@ -98,12 +197,14 @@ class PolyTypeState extends AdhocTypeState {
 
     if (left is TAbstract) {
       if (left.variadic and right is ->) {
+                
         if (right.domain is TProduct)
           left = left(..right.domain.elements);
         else
           left = left(right.domain);
       } else if (right is not TVar) {
         left = left.instantiate();
+
       }
     }
 
@@ -121,18 +222,30 @@ class PolyTypeState extends AdhocTypeState {
     return super._unify(constraint.__class__(left, right));
   }
 
-  // Abstract types need to be instantiated before
-  // they're unified with a set of annotations.
-  constrainAnnotation(annotation, type) => {
+  unifyAnnotations(expr, type) => {
+    // abstract types need to be instantiated before
+    // they're unified with a set of annotations.
     if (type is TAbstract)
       type = type.instantiate();
 
-    super.constrainAnnotation(annotation, type);
+    let tAnnotations = annotations(expr).map(this.system.typify);
+  
+    for (annotation in tAnnotations)
+      this.constrainAnnotation(annotation, type);
+
+    if (this.solve())
+      type = type.apply(this.solution);
+
+    if (type.hasFvs())
+      return TGeneralization(type);
+    return type;
   }
 }
 
 class PolyTypeSystem extends AdhocTypeSystem {
   literalType(value) => {
+    let type = vmType(value);
+  
     if (value == Tuple)
       return TAbstract((*types) => TProduct(..types) -> TProduct(..types));
 
@@ -140,22 +253,23 @@ class PolyTypeSystem extends AdhocTypeSystem {
       return TAbstract((*types) => {
         let element;
 
-        if (len(types) == 0)
-          element = unit;
-        else if (len(types) == 1)
-          element = types[0];
-        else
-          element = TSum(..types);
-
-        return TProduct(..types) -> TSet(element);
+        if (len(types) == 1) {
+          if (types[0] == unit)
+            return unit -> TSet(typeVar());
+          else
+            return types[0] -> TSet(types[0]);
+        }
+        return TProduct(..types) -> TSet(TSum(..types));
       });
     }
-    
+
+    if (value == Map) return TMapAbstract();
+
     return super.literalType(value);
   }
 
   typify(value) => {
-    if (vType(value) == OFunction)
+    if (vmType(value) == OFunction)
       return TAbstract(value);
 
     return super.typify(value);

@@ -54,7 +54,7 @@ assert(g.name == "g");
 // functions have optional type annotations.
 // --------------------------------------
 
-const z;
+sym z;
 
 let a = () => {};
 

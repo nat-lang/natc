@@ -4,19 +4,19 @@
 let f: num -> void;
 let g: bool -> void;
 
-typefail((x: num % bool) => f(x));
-typefail((x: num % bool) => g(x));
+typefail((x: num or bool) => f(x));
+typefail((x: num or bool) => g(x));
 
-let f: (bool % string) -> void = x => {};
+let f: (bool or string) -> void = x => {};
 
 typecheck((x: bool) => f(x));
 typecheck((x: string) => f(x));
-typecheck((x: bool % string) => f(x));
+typecheck((x: bool or string) => f(x));
 
 typefail((x: num) => f(x));
-typefail((x: bool % num) => f(x));
-typefail((x: string % num) => f(x));
-typefail((x: bool % string % num) => f(x));
+typefail((x: bool or num) => f(x));
+typefail((x: string or num) => f(x));
+typefail((x: bool or string or num) => f(x));
 
 // the subtype relation for functions is contravariant
 // in the domain and covariant in the range.
@@ -25,37 +25,37 @@ typefail((x: bool % string % num) => f(x));
 
 let f: (bool -> void) -> void = f => {};
 
-// (bool -> void) -> void < ((bool % string) -> void) -> w
-//   .. (bool -> void) > (bool % string) -> void
-//   .. bool           < (bool % string)
+// (bool -> void) -> void < ((bool or string) -> void) -> w
+//   .. (bool -> void) > (bool or string) -> void
+//   .. bool           < (bool or string)
 
-typecheck((x: (bool % string) -> void) => f(x));
+typecheck((x: (bool or string) -> void) => f(x));
 
-let f: ((bool % string) -> void) -> void = f => {};
+let f: ((bool or string) -> void) -> void = f => {};
 
 typefail((x: bool -> void) => f(x));
 typefail((x: string -> void) => f(x));
 
-typecheck((x: (bool % string) -> void) => f(x));
-typecheck((x: (bool % string % num) -> void) => f(x));
+typecheck((x: (bool or string) -> void) => f(x));
+typecheck((x: (bool or string or num) -> void) => f(x));
 
 // covariant ranges.
 
 let f: (() -> bool) -> void = g => {};
 
-typefail((x: () -> (bool % string)) => f(x));
+typefail((x: () -> (bool or string)) => f(x));
 
-let f: (() -> (bool % string)) -> void = g => {};
+let f: (() -> (bool or string)) -> void = g => {};
 
 typecheck((x: () -> bool) => f(x));
 typecheck((x: () -> string) => f(x));
-typecheck((x: () -> (bool % string)) => f(x));
+typecheck((x: () -> (bool or string)) => f(x));
 
-typefail((x: () -> (bool % string % num)) => f(x));
+typefail((x: () -> (bool or string or num)) => f(x));
 
 // sums of products.
 
-let f: (num, num) % (string, string) -> void = x => {};
+let f: (TProduct(num, num) or TProduct(string, string)) -> void = x => {};
 
 typecheck((x: (string, string)) => f(x));
 typecheck((x: (num, num)) => f(x));
@@ -65,24 +65,24 @@ typefail((x: (string, num)) => f(x));
 
 // reconstruction.
 
-let f: (num % string) -> void = x => {};
+let f: (num or string) -> void = x => {};
 
 let t = SubtypeSystem.type(x => f(x));
 
-assert(t == (num % string) -> void);
+assert(t == (num or string) -> void);
 
 // products of sums.
 
-let f: (num % string, num % bool) -> void = (x,y) => {};
+let f: (num or string, num or bool) -> void = (x,y) => {};
 
 typecheck((x: num, y: num) => f(x,y));
 typecheck((x: num, y: bool) => f(x,y));
 typecheck((x: string, y: num) => f(x,y));
 typecheck((x: string, y: bool) => f(x,y));
-typecheck((x: num % string, y: num) => f(x,y));
-typecheck((x: num % string, y: bool) => f(x,y));
-typecheck((x: string, y: num % bool) => f(x,y));
-typecheck((x: num, y: num % bool) => f(x,y));
+typecheck((x: num or string, y: num) => f(x,y));
+typecheck((x: num or string, y: bool) => f(x,y));
+typecheck((x: string, y: num or bool) => f(x,y));
+typecheck((x: num, y: num or bool) => f(x,y));
 
 // negation.
 
@@ -195,6 +195,12 @@ typefail(() => {
   let x: C = A();
 });
 
-// ------------------------
+// exceptions.
 
+typecheck(() => { throw Error(""); });
+typefail(() => { throw 1; });
+
+class Error' extends Error {}
+
+typecheck(() => { throw Error'(""); });
 

@@ -34,7 +34,11 @@ class Sequential extends Object {
     return acc;
   }
 
-  filter(predicate) => [x | x in this, predicate(x)];
+  filter(predicate) => {
+    let seq = [];
+    for (x in this) if (predicate(x)) seq.push(x);
+    return seq;
+  }
 
   concat(that) => {
     let seq = [x | x in this];

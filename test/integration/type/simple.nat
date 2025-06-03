@@ -328,20 +328,20 @@ typecheck(() => k(nil));
 // poly type systems will infer generalizations in these
 // cases, so skip them.
 
-if (TypeSystem != PolyTypeSystem and TypeSystem is not DenotationalTypeSystem) {
-  let t = type(h => h(1)).domain;
+if (type != PolyTypeSystem and type is not DenotationalTypeSystem) {
+  let t = TypeSystem.type(h => h(1)).domain;
 
   assert(t is TFunction);
   assert(t.domain is TNumber);
   assert(t.range is TVar);
 
-  t = type(h => h(true)).domain;
+  t = TypeSystem.type(h => h(true)).domain;
 
   assert(t is TFunction);
   assert(t.domain is TBoolean);
   assert(t.range is TVar);
 
-  t = type(h => h("a")).domain;
+  t = TypeSystem.type(h => h("a")).domain;
 
   assert(t is TFunction);
   assert(t.domain is TString);
@@ -351,29 +351,29 @@ if (TypeSystem != PolyTypeSystem and TypeSystem is not DenotationalTypeSystem) {
 // infer the type of a function from its body.
 
 let f: num -> num = x => 1;
-let t = type(x => f(x));
+let t = TypeSystem.type(x => f(x));
 
 assert(t == num -> num);
 
 let g: num -> bool = x => true;
-let t = type(x => (g . f)(x));
+let t = TypeSystem.type(x => (g . f)(x));
 
 assert(t == num -> bool);
 
 let f: (num, num) -> num = (x,y) => 1;
-let t = type((x,y) => f(x,y));
+let t = TypeSystem.type((x,y) => f(x,y));
 
 assert(t == TProduct(num, num) -> num);
 
 // with constraints on upvalues.
 
 let f: (num, num) -> bool = (x,y) => true;
-let t = type(x y => f(x,y));
+let t = TypeSystem.type(x y => f(x,y));
 
 assert(t == num -> (num -> bool));
 
 let f: (num, num, num) -> bool = (x,y,z) => true;
-let t = type(x y z => f(x,y,z));
+let t = TypeSystem.type(x y z => f(x,y,z));
 
 assert(t == (num -> (num -> (num -> bool))));
 
@@ -382,7 +382,7 @@ assert(t == (num -> (num -> (num -> bool))));
 let a = Type(), b = Type(), c = Type();
 
 let f = g x => g(x);
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies ((a -> b) -> (a -> b)));
 assert(t unifies ((b -> a) -> (b -> a)));
@@ -399,7 +399,12 @@ assert(!(t unifies ((a -> b) -> (b -> a))));
 // infer the type of composition.
 
 let @ = f g x => f(g(x));
-let t = type(@);
+let t = TypeSystem.type(@);
 
 assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
 assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
+
+// exceptions.
+
+typecheck(() => { throw Error(""); });
+typefail(() => { throw 1; });

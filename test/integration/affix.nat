@@ -89,4 +89,4 @@ assert(f f 1 == 3);
 
 assert(f 1 + f 2 == 5);
 
-assert(vType(f) == OFunction);
+assert(vmType(f) == OFunction);
