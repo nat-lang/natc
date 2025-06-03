@@ -73,7 +73,7 @@ class Engine {
     const interpret = runtime.cwrap('vmTypesetModule_wasm', 'number', ['string']);
     const free = runtime.cwrap('vmFree_wasm', null, []);
 
-    const respPtr = interpret(path);
+    const respPtr = interpret(abs(path));
     const resp = await this.readStrMem(respPtr);
 
     free();
@@ -87,7 +87,7 @@ class Engine {
   interpret = async (path: string): Promise<InterpretationStatus> => {
     const runtime = await this.loadRuntime();
     const fn = runtime.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
-    return fn(path);
+    return fn(abs(path));
   };
 
   getCoreFiles = async (dir = CORE_DIR) => {
@@ -132,7 +132,6 @@ class Engine {
 
   setFile = async (path: string, content: string) => {
     const runtime = await this.loadRuntime();
-
     runtime.FS.writeFile(abs(path), content, { flags: "w+" });
   }
 }
