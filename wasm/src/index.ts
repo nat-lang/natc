@@ -16,7 +16,7 @@ type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
 export const CORE_DIR = "core", SRC_DIR = "src";
-const abs = (path: string) => `/${SRC_DIR}/${path}`;
+export const abs = (path: string) => `/${SRC_DIR}/${path}`;
 
 export enum InterpretationStatus {
   OK = 0,
@@ -73,7 +73,7 @@ class Engine {
     const interpret = runtime.cwrap('vmTypesetModule_wasm', 'number', ['string']);
     const free = runtime.cwrap('vmFree_wasm', null, []);
 
-    const respPtr = interpret(abs(path));
+    const respPtr = interpret(path);
     const resp = await this.readStrMem(respPtr);
 
     free();
@@ -87,7 +87,7 @@ class Engine {
   interpret = async (path: string): Promise<InterpretationStatus> => {
     const runtime = await this.loadRuntime();
     const fn = runtime.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
-    return fn(abs(path));
+    return fn(path);
   };
 
   getCoreFiles = async (dir = CORE_DIR) => {
