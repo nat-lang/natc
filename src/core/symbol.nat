@@ -1,7 +1,8 @@
 
 
 class Symbol {
-  init() => {
+  init(name) => {
+    this.name = name;
     this.id = this.__class__.count;
     this.__class__.count = this.__class__.count + 1;
   }

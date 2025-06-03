@@ -2,8 +2,11 @@
 sym a,bc,xyz;
 
 assert(a == a);
+assert(a.name == "a");
 assert(bc == bc);
+assert(bc.name == "bc");
 assert(xyz == xyz);
+assert(xyz.name == "xyz");
 
 assert(a != bc);
 assert(bc != xyz);
@@ -23,3 +26,10 @@ assert(m == xyz);
   assert(bc == bc);
   assert(xyz == xyz);
 })();
+
+(x => {
+  sym a;
+  assert(x.name == "a");
+  assert(a.name == "a");
+  assert(x != a);
+})(a);
