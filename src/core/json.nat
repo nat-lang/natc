@@ -9,12 +9,12 @@ let jsonEscapeChar = char => {
 let jsonEscape = string => [jsonEscapeChar(char) | char in string].join();
 
 let jsonEncode = value => {
-  let vmType = vType(value);
+  let type = vmType(value);
 
-  if (vmType == CBool) return str(value);
-  if (vmType == CNumber) return str(value);
-  if (vmType == CNil) return "null";
-  if (vmType == OString) return quote(jsonEscape(value));
+  if (type == CBool) return str(value);
+  if (type == CNumber) return str(value);
+  if (type == CNil) return "null";
+  if (type == OString) return quote(jsonEscape(value));
 
   if (value is Sequence) return "[#{join(value.map(jsonEncode), ", ")}]";
   if (value is Tree) return jsonEncode(value.json());
@@ -28,5 +28,5 @@ let jsonEncode = value => {
     return "{#{join(entries, ", ")}}";
   }
 
-  throw JSONError("Don't know how to encode #{value} of type #{vmType}.");
+  throw JSONError("Don't know how to encode #{value} of type #{type}.");
 };

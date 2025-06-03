@@ -76,7 +76,7 @@ bool getGlobalObj(char* name, Value* obj, ObjType type) {
 
   if (OBJ_TYPE(*obj) != type) {
     vmRuntimeError("Global has wrong type. Expected '%i' but got '%i.", type,
-                   obj->vType);
+                   obj->vmType);
     return false;
   }
 
@@ -236,29 +236,29 @@ bool __hash__(int argCount, Value* args) {
   return true;
 }
 
-bool __hashable__(int argCount, Value* args) {
+bool __vmHashable__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
-  vmPush(BOOL_VAL(isHashable(value)));
+  vmPush(BOOL_VAL(vHashable(value)));
   return true;
 }
 
-bool __vType__(int argCount, Value* args) {
+bool __vmType__(int argCount, Value* args) {
   Value value = vmPop();
   vmPop();  // native fn.
 
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_UNIT:
       vmPush(value);
       break;
     case VAL_BOOL:
-      vmPush(OBJ_VAL(vm.core.vTypeBool));
+      vmPush(OBJ_VAL(vm.core.vmTypeBool));
       break;
     case VAL_NUMBER:
-      vmPush(OBJ_VAL(vm.core.vTypeNumber));
+      vmPush(OBJ_VAL(vm.core.vmTypeNumber));
       break;
     case VAL_NIL:
-      vmPush(OBJ_VAL(vm.core.vTypeNil));
+      vmPush(OBJ_VAL(vm.core.vmTypeNil));
       break;
     case VAL_OBJ:
       switch (AS_OBJ(value)->oType) {
@@ -301,7 +301,7 @@ bool __vType__(int argCount, Value* args) {
       }
       break;
     case VAL_UNDEF:
-      vmPush(OBJ_VAL(vm.core.vTypeUndef));
+      vmPush(OBJ_VAL(vm.core.vmTypeUndef));
       break;
     default:
       vmRuntimeError("Unexpected value.");
@@ -311,10 +311,14 @@ bool __vType__(int argCount, Value* args) {
 }
 
 bool __compile__(int argCount, Value* args) {
-  Value source = vmPeek(0), path = vmPeek(1);
+  Value source = vmPeek(0), baseName = vmPeek(1), dirName = vmPeek(2);
 
-  if (!IS_STRING(path)) {
-    vmRuntimeError("Expecting string for path.");
+  if (!IS_STRING(baseName)) {
+    vmRuntimeError("Expecting string for name.");
+    return false;
+  }
+  if (!IS_STRING(dirName)) {
+    vmRuntimeError("Expecting string for dir.");
     return false;
   }
   if (!IS_STRING(source)) {
@@ -322,16 +326,18 @@ bool __compile__(int argCount, Value* args) {
     return false;
   }
 
-  ObjString* objPath = AS_STRING(path);
+  ObjString* objDirName = AS_STRING(dirName);
+  ObjString* objBaseName = AS_STRING(baseName);
   ObjString* objSource = AS_STRING(source);
-  ObjModule* module = newModule(objPath, objSource, MODULE_IMPORT);
+  ObjModule* module =
+      newModule(objDirName, objBaseName, objSource, MODULE_IMPORT);
 
   vmPush(OBJ_VAL(module));
-  ObjClosure* closure = vmCompileClosure(syntheticToken(objPath->chars),
+  ObjClosure* closure = vmCompileClosure(syntheticToken(objBaseName->chars),
                                          objSource->chars, module);
 
   if (closure == NULL) {
-    vmRuntimeError("Failed to compile module at '%s'.", objPath->chars);
+    vmRuntimeError("Failed to compile module at '%s'.", objBaseName->chars);
     return false;
   }
 
@@ -419,7 +425,7 @@ bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
 
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_UNIT: {
       string = copyString("()", 2);
       break;
@@ -560,8 +566,8 @@ InterpretResult loadCore() {
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("hash", 1, __hash__);
-  defineNativeFnGlobal("hashable", 1, __hashable__);
-  defineNativeFnGlobal("vType", 1, __vType__);
+  defineNativeFnGlobal("vmHashable", 1, __vmHashable__);
+  defineNativeFnGlobal("vmType", 1, __vmType__);
   defineNativeFnGlobal("globals", 0, __globals__);
   defineNativeFnGlobal("clock", 0, __clock__);
   defineNativeFnGlobal("random", 1, __randomNumber__);
@@ -569,7 +575,7 @@ InterpretResult loadCore() {
   defineNativeFnGlobal("stackTrace", 0, __stackTrace__);
   defineNativeFnGlobal("address", 1, __address__);
   defineNativeFnGlobal("annotations", 1, __annotations__);
-  defineNativeFnGlobal("compile", 2, __compile__);
+  defineNativeFnGlobal("compile", 3, __compile__);
 
   defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
   defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
@@ -587,7 +593,7 @@ InterpretResult loadCore() {
 
   // core classes.
 
-  InterpretResult coreIntpt = vmInterpretModule(NAT_CORE_LOC);
+  InterpretResult coreIntpt = vmInterpretEntrypoint(NAT_CORE_LOC);
   if (coreIntpt != INTERPRET_OK) return coreIntpt;
 
   if ((vm.core.object = getGlobalClass(S_OBJECT)) == NULL) return false;
@@ -623,11 +629,11 @@ InterpretResult loadCore() {
       (vm.core.astBlock = getGlobalClass(S_AST_BLOCK)) == NULL ||
       (vm.core.astQuantification = getGlobalClass(S_AST_QUANTIFICATION)) ==
           NULL ||
-      (vm.core.vTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
-      (vm.core.vTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
-      (vm.core.vTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
-      (vm.core.vTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
-      (vm.core.vTypeUndef = getGlobalClass(S_CTYPE_UNDEF)) == NULL ||
+      (vm.core.vmTypeUnit = getGlobalClass(S_CTYPE_UNIT)) == NULL ||
+      (vm.core.vmTypeBool = getGlobalClass(S_CTYPE_BOOL)) == NULL ||
+      (vm.core.vmTypeNil = getGlobalClass(S_CTYPE_NIL)) == NULL ||
+      (vm.core.vmTypeNumber = getGlobalClass(S_CTYPE_NUMBER)) == NULL ||
+      (vm.core.vmTypeUndef = getGlobalClass(S_CTYPE_UNDEF)) == NULL ||
       (vm.core.oTypeVariable = getGlobalClass(S_OTYPE_VARIABLE)) == NULL ||
       (vm.core.oTypeClass = getGlobalClass(S_OTYPE_CLASS)) == NULL ||
       (vm.core.oTypeInstance = getGlobalClass(S_OTYPE_INSTANCE)) == NULL ||
@@ -642,7 +648,7 @@ InterpretResult loadCore() {
 
   // system objects and functions.
 
-  InterpretResult systemIntpt = vmInterpretModule(NAT_SYSTEM_LOC);
+  InterpretResult systemIntpt = vmInterpretEntrypoint(NAT_SYSTEM_LOC);
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||

@@ -54,7 +54,7 @@ let id: w -> w = x => x;
 let abstract = annotations(id)[0];
 let concrete = abstract(num);
 
-assert(vType(abstract) == OFunction);
+assert(vmType(abstract) == OFunction);
 
 assert(concrete is TFunction);
 assert(concrete.domain == num);
@@ -81,7 +81,7 @@ let f: x -> y -> y -> y = a b c => c;
 let abstract = annotations(f)[0];
 let concrete = abstract(num, string);
 
-assert(vType(abstract) == OFunction);
+assert(vmType(abstract) == OFunction);
 
 assert(concrete is TFunction);
 assert(concrete.domain == num);
@@ -166,7 +166,7 @@ typecheck(() => f(true)(true));
 
 // type parameters propagate to embedded type constructors.
 
-let t = type((x: w) => ({x}));
+let t = TypeSystem.type((x: w) => ({x}));
 
 assert(t is TAbstract);
 
@@ -183,7 +183,7 @@ assert(concrete.domain == num);
 assert(concrete.range == TSet(num));
 
 let f = (x: u, y: v, z: w) => ({x,y,z});
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t is TAbstract);
 
@@ -199,6 +199,14 @@ let concrete = t(num, num, num);
 assert(concrete is ->);
 assert(concrete.domain == TProduct(num, num, num));
 assert(concrete.range == TSet(num));
+
+// abstract annotations are instantiated by lower
+// concrete constraints.
+
+let g: num -> num -> num = x y => x + y;
+let f: u -> v -> w = x y => g(x)(y);
+
+assert(type(f) == num -> num -> num);
 
 // the polymorphic type system types overloads
 // with implicit variables in their case signatures.
@@ -268,7 +276,7 @@ typefail(id => {
 // the type of forward application is inferrable.
 
 let f = g x => g(x);
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies ((a -> b) -> (a -> b)));
 assert(t unifies ((b -> a) -> (b -> a)));
@@ -285,7 +293,7 @@ assert(!(t unifies ((a -> b) -> (b -> b))));
 // the type of backward application is inferrable.
 
 let f = x g => g(x);
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (a -> ((a -> b) -> b)));
 assert(t unifies (b -> ((b -> a) -> a)));
@@ -302,7 +310,7 @@ assert(!(t unifies (b -> ((b -> a) -> b))));
 // the type of composition is inferrable.
 
 let @ = f g x => f(g(x));
-let t = type(@);
+let t = TypeSystem.type(@);
 
 assert(t unifies ((a -> b) -> ((c -> a) -> (c -> b))));
 assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
@@ -312,7 +320,7 @@ assert(!(t unifies ((c -> a) -> ((a -> b) -> (c -> b)))));
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> b)));
 assert(t unifies (((a, a -> b) -> b) & ((a -> b, a) -> b)));
@@ -329,7 +337,7 @@ assert(!(t unifies (((a -> b, a) -> b) & ((a, a -> b) -> c))));
 // the type of curried type driven application is inferrable.
 
 let f = (a: x -> y) => ((b: x) => a(b)) | (a: x) => ((b: x -> y) => b(a));
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
 assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
@@ -337,7 +345,7 @@ assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
 assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 let f = (a: x) => ((b: x -> y) => b(a)) | (a: x -> y) => ((b: x) => a(b));
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t unifies (((a -> b) -> (a -> b)) & (a -> ((a -> b) -> b))));
 assert(t unifies ((a -> ((a -> b) -> b)) & ((a -> b) -> (a -> b))));
@@ -346,7 +354,7 @@ assert(!(t unifies (((a -> b) -> (b -> b)) & (a -> ((a -> b) -> b)))));
 
 // nested abstract types normalize to a single first order type.
 
-let t = type(x y => y);
+let t = TypeSystem.type(x y => y);
 
 assert(t unifies (a -> (a -> a)));
 assert(t unifies (a -> (b -> b)));
@@ -361,7 +369,7 @@ assert(!(t unifies (a -> (a -> b))));
 let f = (a: x -> y, b: x) => a(b)
       | (a: x, b: x -> y) => b(a);
 
-let t = type(f);
+let t = TypeSystem.type(f);
 
 assert(t is TGeneralization);
 assert(t unifies (TProduct(a -> b, a) -> b) & (TProduct(d, c -> d) -> d));
@@ -556,7 +564,7 @@ typefail(() => {
   x[true] = "1";
 });
 
-// maps unify with functions.
+// maps unify with arrows, TMap <| ->
 
 typecheck(() => {
   let x: num -> bool = {1: true};
@@ -598,6 +606,24 @@ typefail(() => {
   let x: num -> (bool or num) = {1: true, 1: 1, 2: "foo"};
 });
 
+// maps unify with arrows, -> <| TMap
+
+typecheck(() => {
+  let f: TMap(num, bool) = x => x > 1;
+});
+
+typefail(() => {
+  let f: TMap(num, bool) = (x: string) => x == "x";
+});
+
+typecheck(() => {
+  let f: TMap(num, TMap(num, bool)) = x y => x > y;
+});
+
+typecheck(() => {
+  let f: num -> (num -> bool) -> bool = n g => g[n];
+});
+
 // assignment with -> annotation.
 
 typecheck(() => {
@@ -611,6 +637,24 @@ typefail(() => {
 
   x[true] = 1;
 });
+
+// inference.
+
+let f: num -> w -> num = n m => m[n];
+
+assert(type(f) == num -> TMap(num,num) -> num);
+
+let f: bool -> w -> num = n m => m[n];
+
+assert(type(f) == bool -> TMap(bool,num) -> num);
+
+let f: u -> v -> w = n m => m[n];
+
+let a = typeVar(), b = typeVar();
+
+assert(type(f) unifies a -> TMap(a,b) -> b);
+
+assert(type(f(1)) unifies num -> TMap(num,b) -> b);
 
 // comprehensions.
 

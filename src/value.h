@@ -17,7 +17,7 @@ typedef enum {
 } ValueType;
 
 typedef struct Value {
-  ValueType vType;
+  ValueType vmType;
   union {
     bool boolean;
     double number;
@@ -25,14 +25,15 @@ typedef struct Value {
   } as;
 } Value;
 
-#define IS_UNIT(value) ((value).vType == VAL_UNIT)
-#define IS_BOOL(value) ((value).vType == VAL_BOOL)
-#define IS_NIL(value) ((value).vType == VAL_NIL)
-#define IS_NUMBER(value) ((value).vType == VAL_NUMBER)
-#define IS_INTEGER(value) \
-  ((value).vType == VAL_NUMBER && rintf((value).as.number) == (value).as.number)
-#define IS_OBJ(value) ((value).vType == VAL_OBJ)
-#define IS_UNDEF(value) ((value).vType == VAL_UNDEF)
+#define IS_UNIT(value) ((value).vmType == VAL_UNIT)
+#define IS_BOOL(value) ((value).vmType == VAL_BOOL)
+#define IS_NIL(value) ((value).vmType == VAL_NIL)
+#define IS_NUMBER(value) ((value).vmType == VAL_NUMBER)
+#define IS_INTEGER(value)          \
+  ((value).vmType == VAL_NUMBER && \
+   rintf((value).as.number) == (value).as.number)
+#define IS_OBJ(value) ((value).vmType == VAL_OBJ)
+#define IS_UNDEF(value) ((value).vmType == VAL_UNDEF)
 
 #define AS_OBJ(value) ((value).as.obj)
 #define AS_BOOL(value) ((value).as.boolean)
@@ -60,5 +61,5 @@ bool findInValueArray(ValueArray* array, Value value);
 void printValue(Value value);
 void printValueArray(ValueArray* array);
 uint32_t hashValue(Value value);
-bool isHashable(Value value);
+bool vHashable(Value value);
 #endif

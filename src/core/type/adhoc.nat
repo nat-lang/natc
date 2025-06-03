@@ -103,7 +103,7 @@ class AdhocTypeState extends SubtypeState {
   }
 
   type(expr) => {
-    if (vType(expr) == OOverload)
+    if (vmType(expr) == OOverload)
       return this.infer(expr);
 
     return super.type(expr);

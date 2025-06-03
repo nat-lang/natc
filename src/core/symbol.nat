@@ -1,0 +1,12 @@
+
+
+class Symbol {
+  init() => {
+    this.id = this.__class__.count;
+    this.__class__.count = this.__class__.count + 1;
+  }
+  __eq__(that) => this.id == that.id;
+  hash() => (hash . address)(this);
+}
+
+Symbol.count = 0;

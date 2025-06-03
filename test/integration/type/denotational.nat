@@ -1,5 +1,5 @@
 
-const a,b,c,d;
+sym a,b,c,d;
 
 dom e = {a,b,c,d};
 dom t = {true, false};
@@ -11,8 +11,8 @@ bool = t;
 assert(e is Domain);
 assert(t is Domain);
 
-assert(type(a) == e);
-assert(type(true) == t);
+assert(TypeSystem.type(a) == e);
+assert(TypeSystem.type(true) == t);
 
 // simple.
 

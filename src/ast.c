@@ -208,7 +208,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(value);
 
       FAIL_UNLESS(vmExecuteMethod("opSubscriptSet", 3));
-      vmPush(object);
+
       return AST_INSTRUCTION_OK;
     }
     case OP_EQUAL: {
@@ -675,7 +675,7 @@ bool astOverload(ObjOverload* overload) {
 }
 
 bool ast(Value value) {
-  switch (value.vType) {
+  switch (value.vmType) {
     case VAL_OBJ: {
       switch (OBJ_TYPE(value)) {
         case OBJ_BOUND_FUNCTION:

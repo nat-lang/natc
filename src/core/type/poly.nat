@@ -222,19 +222,29 @@ class PolyTypeState extends AdhocTypeState {
     return super._unify(constraint.__class__(left, right));
   }
 
-  // Abstract types need to be instantiated before
-  // they're unified with a set of annotations.
-  constrainAnnotation(annotation, type) => {
+  unifyAnnotations(expr, type) => {
+    // abstract types need to be instantiated before
+    // they're unified with a set of annotations.
     if (type is TAbstract)
       type = type.instantiate();
 
-    super.constrainAnnotation(annotation, type);
+    let tAnnotations = annotations(expr).map(this.system.typify);
+  
+    for (annotation in tAnnotations)
+      this.constrainAnnotation(annotation, type);
+
+    if (this.solve())
+      type = type.apply(this.solution);
+
+    if (type.hasFvs())
+      return TGeneralization(type);
+    return type;
   }
 }
 
 class PolyTypeSystem extends AdhocTypeSystem {
   literalType(value) => {
-    let type = vType(value);
+    let type = vmType(value);
   
     if (value == Tuple)
       return TAbstract((*types) => TProduct(..types) -> TProduct(..types));
@@ -259,7 +269,7 @@ class PolyTypeSystem extends AdhocTypeSystem {
   }
 
   typify(value) => {
-    if (vType(value) == OFunction)
+    if (vmType(value) == OFunction)
       return TAbstract(value);
 
     return super.typify(value);

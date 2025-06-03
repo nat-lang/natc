@@ -38,6 +38,7 @@ typedef struct Compiler {
   struct Compiler* enclosing;
   struct Compiler* signature;
   ObjFunction* function;
+  ObjModule* module;
   FunctionType functionType;
 
   Upvalue upvalues[UINT8_COUNT];

@@ -11,8 +11,8 @@ let ASTExternalUpvalueMock = name => ASTExternalUpvalue(nil,nil,nil,name);
 
 let f <- (a) => 1;
 
-assert(vType(f.function) == OFunction);
-assert(vType(f.function.signature) == OFunction);
+assert(vmType(f.function) == OFunction);
+assert(vmType(f.function.signature) == OFunction);
 assert(f.upvalues is Map);
 
 assert(f.signature() is ASTSignature);
@@ -1424,7 +1424,7 @@ assert(f.children == [
 let f <- 1 => true | 2 => false;
 
 assert(f is ASTOverload);
-assert(vType(f.overload) == OOverload);
+assert(vmType(f.overload) == OOverload);
 assert(f.overload.name == "f");
 assert(f.count == 2);
 assert(f[0] is ASTClosure);
@@ -1437,7 +1437,7 @@ let f <- () => {
 let g = f[0][1];
 
 assert(g is ASTOverload);
-assert(vType(g.overload) == OOverload);
+assert(vmType(g.overload) == OOverload);
 assert(g.overload.name == "g");
 assert(g.count == 2);
 assert(g[0] is ASTClosure);
@@ -1455,12 +1455,12 @@ let f <- a.f;
 assert(f is ASTMethod);
 
 assert(f.klass == A);
-assert(vType(f.method) == OBoundFunction);
+assert(vmType(f.method) == OBoundFunction);
 assert(f.instance == a);
 assert(f[0] is ASTClosure);
 
-assert(vType(f[0].function) == OFunction);
-assert(vType(f[0].function.signature) == OFunction);
+assert(vmType(f[0].function) == OFunction);
+assert(vmType(f[0].function.signature) == OFunction);
 assert(f[0].upvalues is Map);
 assert(f[0].signature() is ASTSignature);
 assert(len(f[0].signature().children) == 1);
@@ -1540,7 +1540,7 @@ let f <- () => {
 let k = f[0][1];
 
 assert(k is ASTClosure);
-assert(vType(k.function.signature) == OFunction);
+assert(vmType(k.function.signature) == OFunction);
 assert(k.signature() is ASTSignature);
 assert(len(k.signature().children) == 1);
 
@@ -1630,7 +1630,7 @@ let q = f[0][0];
 assert(q.resolve());
 
 assert(q.body is ASTClosure);
-assert(vType(q.body.function.signature) == OFunction);
+assert(vmType(q.body.function.signature) == OFunction);
 assert(q.body.sign() is ASTSignature);
 
 let f <- () => for no (x in {1,2,3}) x in {1};
@@ -1639,7 +1639,7 @@ let q = f[0][0];
 assert(!q.resolve());
 
 assert(q.body is ASTClosure);
-assert(vType(q.body.function.signature) == OFunction);
+assert(vmType(q.body.function.signature) == OFunction);
 assert(q.body.sign() is ASTSignature);
 
 let f <- () => for some (x in {1,2,3}) x == 1;
@@ -1648,13 +1648,13 @@ let q = f[0][0];
 assert(q.resolve());
 
 assert(q.body is ASTClosure);
-assert(vType(q.body.function.signature) == OFunction);
+assert(vmType(q.body.function.signature) == OFunction);
 assert(q.body.sign() is ASTSignature);
 
 // modules.
 
 let f <- () => {
-  import test/integration/module/importable
+  import module/importable
 };
 
 assert(f == ASTClosureMock(
@@ -1667,7 +1667,7 @@ assert(f == ASTClosureMock(
 assert(f[0].module.x == 1);
 
 let f <- () => {
-  import test/integration/module/importable as importable
+  import module/importable as importable
 };
 
 assert(f == ASTClosureMock(
@@ -2039,6 +2039,39 @@ assert(f' == ASTClosureMock(
   )
 ));
 
+let f <- x => (m => m[1])(x[1] = true);
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTLiteral(true)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- g => ((m x => !x)(g))((m => m[1])(g));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTNegation(
+      ASTSubscriptGet(
+        ASTLocal(1, "g"),
+        ASTLiteral(1)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
 // exceptions.
 
 let f <- () => { throw z; };
@@ -2051,6 +2084,8 @@ assert(f == ASTClosureMock(
     ASTLiteral(nil)
   )
 ));
+
+// subscripts.
 
 let f <- x => { x[1]; };
 
@@ -2069,13 +2104,12 @@ assert(f == ASTClosureMock(
 let f <- x => { x[1] = true; };
 
 assert(f == ASTClosureMock(
-  ASTSubscriptSet(
-    ASTLocal(1, "x"),
-    ASTLiteral(1),
-    ASTLiteral(true)
-  ),
   ASTExprStatement(
-    ASTLocal(1, "x")
+    ASTSubscriptSet(
+      ASTLocal(1, "x"),
+      ASTLiteral(1),
+      ASTLiteral(true)
+    )
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)
@@ -2099,13 +2133,12 @@ assert(f == ASTClosureMock(
 let f <- x => { x["1"] = true; };
 
 assert(f == ASTClosureMock(
-  ASTSubscriptSet(
-    ASTLocal(1, "x"),
-    ASTLiteral("1"),
-    ASTLiteral(true)
-  ),
   ASTExprStatement(
-    ASTLocal(1, "x")
+    ASTSubscriptSet(
+      ASTLocal(1, "x"),
+      ASTLiteral("1"),
+      ASTLiteral(true)
+    )
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)
@@ -2138,16 +2171,52 @@ let f <- x y => { x[y] = true; };
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTClosureMock(
-      ASTSubscriptSet(
-        ASTInternalUpvalueMock("x"),
-        ASTLocal(1, "y"),
-        ASTLiteral(true)
-      ),
       ASTExprStatement(
-        ASTInternalUpvalueMock("x")
+        ASTSubscriptSet(
+          ASTInternalUpvalueMock("x"),
+          ASTLocal(1, "y"),
+          ASTLiteral(true)
+        )
       ),
       ASTImplicitReturn(
         ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// subscript assignment leaves object on the stack.
+
+let f <- () => m[1] = true;
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTSubscriptSet(
+      ASTGlobal("m"),
+      ASTLiteral(1),
+      ASTLiteral(true)
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- () => f(m[1] = true);
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTApp(
+      ASTGlobal("f"),
+      ASTArgumentSequence(
+        ASTSubscriptSet(
+          ASTGlobal("m"),
+          ASTLiteral(1),
+          ASTLiteral(true)
+        )
       )
     )
   ),
