@@ -16,8 +16,6 @@ class AnnotatedTree extends Tree {
     let datum = () => {
       if (this.data == nil) return "";
 
-      // let type = TypeSystem.type(this.data);
-
       if (vmType(this.data) in [OFunction, OOverload]) {
         let ast <- this.data;
         ast = ast.simplify();
