@@ -353,10 +353,13 @@ class ASTExternalUpvalue extends ASTUpvalue {
   resolve() => resolveUpvalue(this.upvalue);
 
   tex() => {
-    let value = this.resolve();
-    if (vmType(value) in [OFunction, OOverload]) {
+    let value = this.resolve(), type = vmType(value);
+
+    if (type in [OFunction, OOverload]) {
       let ast <- value;
       return ast.tex();
+    } else if (type == OInstance && "tex" in value) {
+      return value.tex();
     }
     return str(value);
   }

@@ -1632,7 +1632,9 @@ static void symbolDeclaration(Compiler* cmp) {
     uint16_t var = parseVariable(cmp, "Expect symbol name.");
 
     getGlobalConstant(cmp, "Symbol");
-    emitBytes(cmp, OP_CALL, 0);
+    Token name = parser.previous;
+    loadConstant(cmp, identifierToken(name));
+    emitBytes(cmp, OP_CALL, 1);
     defineVariable(cmp, var);
 
   } while (match(cmp, TOKEN_COMMA));
