@@ -107,6 +107,7 @@ class ASTNode extends Tree {
   opGetUpvalue(address) => this.upvalues[address];
   opGetProperty(obj, key) => ASTPropertyAccess(obj, ASTLiteral(key));
   opSubscriptGet(obj, key) => ASTSubscriptGet(obj, key);
+  opSubscriptSet(obj, key, value) => ASTSubscriptSet(obj, key, value);
   opCall(fn, *args) => {
     if (fn is ASTGlobal && fn.variadic())
       return ASTApp(fn, ASTVariadicArgumentSequence(..args));
@@ -146,11 +147,6 @@ class ASTNode extends Tree {
   opSetProperty(obj, name, value) => {
     let literal = ASTLiteral(name);
     let assignment = ASTPropertyAssignment(obj, literal, value);
-    this.children.push(assignment);
-  }
-
-  opSubscriptSet(obj, key, value) => {
-    let assignment = ASTSubscriptSet(obj, key, value);
     this.children.push(assignment);
   }
 
@@ -217,7 +213,6 @@ class ASTReturn extends ASTStatement {
   tex() => join([n.tex() | n in this.children], " ");
 }
 class ASTImplicitReturn extends ASTReturn {
-  tex() => "";
 }
 class ASTExprStatement extends ASTStatement {}
 
@@ -392,11 +387,8 @@ class ASTApp extends ASTExprStatement {
   // we only want to reach normal form - 1, otherwise
   // we'd just let the interpreter do this.
   betaReduce() => {
-    let fn = this[0],
+    let fn = this[0].betaReduce(),
         args = this[1].betaReduce();
-
-    if (fn is ASTApp)
-      fn = fn.betaReduce();
 
     // if the applicand is not a function then we
     // can't reduce.
@@ -419,11 +411,7 @@ class ASTApp extends ASTExprStatement {
       return x;
     });
 
-    // one final reduction if any argument is a function.
-    if (args.children.some(x => x is ASTClosure))
-      reduct = reduct.betaReduce();
-
-    return reduct;
+    return reduct.betaReduce();
   }
 
   evaluate() => {
@@ -491,11 +479,18 @@ class ASTSubscriptGet extends ASTExpr {
   init(obj, key) => {
     this.children = [obj, key];
   }
+  betaReduce() => {
+    if (this[0] is ASTSubscriptSet && this[0][1] == this[1])
+      return this[0][2];
+    return this;
+  }
   resolve() => this[0].resolve()[this[1].resolve()];
   tex() => "#{this[0].tex()}[#{this[1].tex()}]";
 }
 
-class ASTSubscriptSet extends ASTAssignment {}
+class ASTSubscriptSet extends ASTAssignment {
+  tex() => "#{this[0].tex()}^{#{this[1].tex()} \to #{this[2].tex()}}";
+}
 
 class ASTMembership extends ASTExpr {
   init(element, collection) => {

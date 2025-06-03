@@ -208,8 +208,6 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
       vmPush(value);
 
       FAIL_UNLESS(vmExecuteMethod("opSubscriptSet", 3));
-      vmPop();  // nil.
-      vmPush(object);
 
       return AST_INSTRUCTION_OK;
     }

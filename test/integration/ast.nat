@@ -2039,6 +2039,39 @@ assert(f' == ASTClosureMock(
   )
 ));
 
+let f <- x => (m => m[1])(x[1] = true);
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTLiteral(true)
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+let f <- g => ((m x => !x)(g))((m => m[1])(g));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTNegation(
+      ASTSubscriptGet(
+        ASTLocal(1, "g"),
+        ASTLiteral(1)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
 // exceptions.
 
 let f <- () => { throw z; };
@@ -2071,13 +2104,12 @@ assert(f == ASTClosureMock(
 let f <- x => { x[1] = true; };
 
 assert(f == ASTClosureMock(
-  ASTSubscriptSet(
-    ASTLocal(1, "x"),
-    ASTLiteral(1),
-    ASTLiteral(true)
-  ),
   ASTExprStatement(
-    ASTLocal(1, "x")
+    ASTSubscriptSet(
+      ASTLocal(1, "x"),
+      ASTLiteral(1),
+      ASTLiteral(true)
+    )
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)
@@ -2101,13 +2133,12 @@ assert(f == ASTClosureMock(
 let f <- x => { x["1"] = true; };
 
 assert(f == ASTClosureMock(
-  ASTSubscriptSet(
-    ASTLocal(1, "x"),
-    ASTLiteral("1"),
-    ASTLiteral(true)
-  ),
   ASTExprStatement(
-    ASTLocal(1, "x")
+    ASTSubscriptSet(
+      ASTLocal(1, "x"),
+      ASTLiteral("1"),
+      ASTLiteral(true)
+    )
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)
@@ -2140,13 +2171,12 @@ let f <- x y => { x[y] = true; };
 assert(f == ASTClosureMock(
   ASTReturn(
     ASTClosureMock(
-      ASTSubscriptSet(
-        ASTInternalUpvalueMock("x"),
-        ASTLocal(1, "y"),
-        ASTLiteral(true)
-      ),
       ASTExprStatement(
-        ASTInternalUpvalueMock("x")
+        ASTSubscriptSet(
+          ASTInternalUpvalueMock("x"),
+          ASTLocal(1, "y"),
+          ASTLiteral(true)
+        )
       ),
       ASTImplicitReturn(
         ASTLiteral(nil)
@@ -2163,13 +2193,12 @@ assert(f == ASTClosureMock(
 let f <- () => m[1] = true;
 
 assert(f == ASTClosureMock(
-  ASTSubscriptSet(
-    ASTGlobal("m"),
-    ASTLiteral(1),
-    ASTLiteral(true)
-  ),
   ASTReturn(
-    ASTGlobal("m")
+    ASTSubscriptSet(
+      ASTGlobal("m"),
+      ASTLiteral(1),
+      ASTLiteral(true)
+    )
   ),
   ASTImplicitReturn(
     ASTLiteral(nil)
@@ -2179,16 +2208,15 @@ assert(f == ASTClosureMock(
 let f <- () => f(m[1] = true);
 
 assert(f == ASTClosureMock(
-  ASTSubscriptSet(
-    ASTGlobal("m"),
-    ASTLiteral(1),
-    ASTLiteral(true)
-  ),
   ASTReturn(
     ASTApp(
       ASTGlobal("f"),
       ASTArgumentSequence(
-        ASTGlobal("m")
+        ASTSubscriptSet(
+          ASTGlobal("m"),
+          ASTLiteral(1),
+          ASTLiteral(true)
+        )
       )
     )
   ),

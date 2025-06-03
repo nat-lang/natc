@@ -54,6 +54,7 @@ class TMap extends TCollection {
     this.klass = Map;
     super.init(key, val);
   }
+  tex() => "#{this[0].tex()} \to #{this[1].tex()}";
 }
 
 class SubtypeConstraint extends Constraint {
@@ -191,7 +192,6 @@ class SubtypeState extends SimpleTypeState {
 
     // TMap(a, b) <| c -> d iff a |> c and b <| d.
     if (left is TMap && right is ->) {
-
       this.constraints.extend([
         (right.domain <| left[0]),
         (left[1] <| right.range)

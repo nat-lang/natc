@@ -23,7 +23,7 @@ class AnnotatedTree extends Tree {
         ast = ast.simplify();
         let tex = "$#{type.tex()}$ \\ $#{ast.tex()}$";
 
-        if (this.leaf())
+        if (this.leaf() && this.data.name != "lambda")
           return "{#{tex} \\ #{this.data.name}}";
         return "{#{tex}}";
       }

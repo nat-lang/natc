@@ -84,7 +84,7 @@ class TFunction extends Type {
   }
   tex() => {
     let domain = this.domain.tex();
-    if (this.domain is TFunction)
+    if (this.domain is TFunction || this.domain is TMap)
       domain = "(#{domain})";
 
     return "#{domain} \to #{this.range.tex()}";
@@ -131,6 +131,7 @@ class TBoolean extends Type {
 }
 class TNumber extends Type {
   str() => "num";
+  tex() => "n";
 }
 class TString extends Type {
   str() => "string";
