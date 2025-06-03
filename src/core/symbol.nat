@@ -8,6 +8,7 @@ class Symbol {
   }
   __eq__(that) => this.id == that.id;
   hash() => (hash . address)(this);
+  tex() => this.name;
 }
 
 Symbol.count = 0;

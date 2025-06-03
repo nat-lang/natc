@@ -16,19 +16,21 @@ class AnnotatedTree extends Tree {
     let datum = () => {
       if (this.data == nil) return "";
 
-      let type = TypeSystem.type(this.data);
+      // let type = TypeSystem.type(this.data);
 
       if (vmType(this.data) in [OFunction, OOverload]) {
         let ast <- this.data;
         ast = ast.simplify();
-        let tex = "$#{type.tex()}$ \\ $#{ast.tex()}$";
+        let tex = "$#{this.type.tex()}$ \\ $#{ast.tex()}$";
 
         if (this.leaf() && this.data.name != "lambda")
           return "{#{tex} \\ #{this.data.name}}";
         return "{#{tex}}";
+      } else if (vmType(this.data) == OInstance && "tex" in this.data) {
+        return "{$#{this.type.tex()}$ \\ #{this.data.tex()}}";
       }
 
-      return "{$#{type.tex()}$ \\ #{this.data}}";
+      return "{$#{this.type.tex()}$ \\ #{this.data}}";
     };
 
     if (this.leaf()) return "[#{datum()}]";
@@ -65,13 +67,14 @@ class CompositionSystem {
     if (node.leaf()) {
       for (rule in this.unaryRules) {
         let data = rule(node.data);
-        if (data != undefined)
+        if (data != undefined) {
           return AnnotatedTree(data, [
-            AnnotatedTree(node.data, [], node.type)
-          ], TypeSystem.type(data));
+            AnnotatedTree(node.data, [], type(node.data))
+          ], type(data));
+        }
       }
         
-      return AnnotatedTree(node.data, [], TypeSystem.type(node.data));
+      return AnnotatedTree(node.data, [], type(node.data));
     }
 
     if (node.unary()) {
@@ -79,7 +82,7 @@ class CompositionSystem {
       for (rule in this.unaryRules) {
         let data = rule(node.data);
         if (data)
-          return AnnotatedTree(data, [child], TypeSystem.type(data));
+          return AnnotatedTree(data, [child], type(data));
       }
       return AnnotatedTree(child.data, [child], child.type);
     }
@@ -92,7 +95,7 @@ class CompositionSystem {
         let data = rule(left.data, right.data);
 
         if (data != undefined)
-          return AnnotatedTree(data, [left, right], TypeSystem.type(data));
+          return AnnotatedTree(data, [left, right], type(data));
       }
 
       return AnnotatedTree(node.data, [left, right], nil);
