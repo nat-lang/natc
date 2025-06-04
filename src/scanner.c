@@ -318,12 +318,12 @@ static Token number() {
   return makeToken(TOKEN_NUMBER);
 }
 
-static Token string(TokenType type) {
+static Token string(TokenType type, TokenType interpolationType) {
   while (peek() != '"' && !isAtEnd()) {
     if (peek() == '#' && peekNext() == '{') {
       advance();
       advance();
-      return makeToken(TOKEN_INTERPOLATION);
+      return makeToken(interpolationType);
     }
 
     if (peek() == '\n') scanner.line++;
@@ -383,11 +383,11 @@ Token consumeToken(char c) {
       break;
     }
     case '"':
-      return string(TOKEN_STRING);
+      return string(TOKEN_STRING, TOKEN_INTERPOLATION);
     case 't': {
       if (checkpoint(1, 3, "ex\"")) {
         advanceBy(3);
-        return string(TOKEN_TEX_STRING);
+        return string(TOKEN_TEX_STRING, TOKEN_TEX_INTERPOLATION);
       }
       break;
     }

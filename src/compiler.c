@@ -663,11 +663,14 @@ static void texString(Compiler* cmp, bool canAssign) {
   loadConstant(cmp, OBJ_VAL(str));
 }
 
-static void interpolation(Compiler* cmp, bool canAssign) {
+static void stringInterpolation(Compiler* cmp, bool canAssign);
+
+static void interpolation(Compiler* cmp, bool canAssign, int startOffset,
+                          int lengthOffset) {
   getGlobalConstant(cmp, "+");
   getGlobalConstant(cmp, "+");
-  loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + 1,
-                                       parser.previous.length - 3)));
+  loadConstant(cmp, OBJ_VAL(copyString(parser.previous.start + startOffset,
+                                       parser.previous.length - lengthOffset)));
 
   getGlobalConstant(cmp, "str");
   expression(cmp);
@@ -679,18 +682,24 @@ static void interpolation(Compiler* cmp, bool canAssign) {
   rewindScanner(parser.current);
   parser.next = scanVirtualToken('"');
 
-  if (match(cmp, TOKEN_RIGHT_BRACE)) {
-    if (match(cmp, TOKEN_STRING))
-      string(cmp, canAssign);
-    else if (match(cmp, TOKEN_INTERPOLATION))
-      interpolation(cmp, canAssign);
-    else
-      return;
+  if (!match(cmp, TOKEN_RIGHT_BRACE)) return error(cmp, "Expecting '}'.");
 
-    emitBytes(cmp, OP_CALL, 2);
-  } else {
-    error(cmp, "Expecting '}'.");
-  }
+  if (match(cmp, TOKEN_STRING))
+    string(cmp, canAssign);
+  else if (match(cmp, TOKEN_INTERPOLATION))
+    stringInterpolation(cmp, canAssign);
+  else
+    return;
+
+  emitBytes(cmp, OP_CALL, 2);
+}
+
+static void stringInterpolation(Compiler* cmp, bool canAssign) {
+  interpolation(cmp, canAssign, 1, 3);
+}
+
+static void texInterpolation(Compiler* cmp, bool canAssign) {
+  interpolation(cmp, canAssign, 4, 6);
 }
 
 static void undefined(Compiler* cmp, bool canAssign) {
@@ -1910,10 +1919,11 @@ ParseRule rules[] = {
     [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY,
                            PREC_EQUALITY + PREC_STEP},
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_TEX_STRING] = {texString, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {variable, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_INTERPOLATION] = {interpolation, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TEX_STRING] = {texString, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_INTERPOLATION] = {stringInterpolation, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TEX_INTERPOLATION] = {texInterpolation, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_AND] = {NULL, and_, PREC_AND, PREC_NONE},
     [TOKEN_OR] = {NULL, or_, PREC_OR, PREC_NONE},
