@@ -657,6 +657,12 @@ static void string(Compiler* cmp, bool canAssign) {
   loadConstant(cmp, OBJ_VAL(str));
 }
 
+static void texString(Compiler* cmp, bool canAssign) {
+  ObjString* str =
+      copyString(parser.previous.start + 4, parser.previous.length - 5);
+  loadConstant(cmp, OBJ_VAL(str));
+}
+
 static void interpolation(Compiler* cmp, bool canAssign) {
   getGlobalConstant(cmp, "+");
   getGlobalConstant(cmp, "+");
@@ -1904,6 +1910,7 @@ ParseRule rules[] = {
     [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY,
                            PREC_EQUALITY + PREC_STEP},
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TEX_STRING] = {texString, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {variable, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_INTERPOLATION] = {interpolation, NULL, PREC_NONE, PREC_NONE},

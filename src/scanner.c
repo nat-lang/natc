@@ -60,10 +60,12 @@ static bool isSymbol(char c) {
 
 static bool isAtEnd() { return *scanner.current == '\0'; }
 
-static char advance() {
-  scanner.current++;
+static char advanceBy(int chars) {
+  scanner.current += chars;
   return scanner.current[-1];
 }
+
+static char advance() { return advanceBy(1); }
 
 static char peekNext() {
   if (isAtEnd()) return '\0';
@@ -130,10 +132,14 @@ void skipWhitespace() {
   }
 }
 
+static bool checkpoint(int start, int length, const char *rest) {
+  return memcmp(scanner.start + start, rest, length) == 0;
+}
+
 static TokenType checkpointKeyword(int start, int length, const char *rest,
                                    TokenType type) {
   if (scanner.current - scanner.start == start + length &&
-      memcmp(scanner.start + start, rest, length) == 0) {
+      checkpoint(start, length, rest)) {
     return type;
   }
 
@@ -312,7 +318,7 @@ static Token number() {
   return makeToken(TOKEN_NUMBER);
 }
 
-static Token string() {
+static Token string(TokenType type) {
   while (peek() != '"' && !isAtEnd()) {
     if (peek() == '#' && peekNext() == '{') {
       advance();
@@ -328,7 +334,7 @@ static Token string() {
 
   // The closing quote.
   advance();
-  return makeToken(TOKEN_STRING);
+  return makeToken(type);
 }
 
 Token consumeToken(char c) {
@@ -377,7 +383,14 @@ Token consumeToken(char c) {
       break;
     }
     case '"':
-      return string();
+      return string(TOKEN_STRING);
+    case 't': {
+      if (checkpoint(1, 3, "ex\"")) {
+        advanceBy(3);
+        return string(TOKEN_TEX_STRING);
+      }
+      break;
+    }
   }
 
   if (isTypeAlpha(c)) return typeVariable();
