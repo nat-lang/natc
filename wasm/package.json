@@ -1,6 +1,6 @@
 {
   "name": "@nat-lang/nat",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "wasm compiler for nat",
   "keywords": [
     "natural",
