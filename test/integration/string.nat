@@ -59,3 +59,15 @@ assert("#{nil} #{nil}" == "nil nil");
 // fixme
 
 // let x = ["#{"a"}", "#{"b"}", "#{"c"}"];
+
+// tex strings.
+
+let z = tex"\documentclass{article}";
+
+assert(vmType(z) == OString);
+assert(z == "\documentclass{article}");
+
+let z = tex"\documentclass{#{(() => "article")()}}";
+
+assert(vmType(z) == OString);
+assert(z == "\documentclass{article}");
