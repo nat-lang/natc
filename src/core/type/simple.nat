@@ -66,8 +66,8 @@ class Type extends Base {
 
 class TFunction extends Type {
   init(domain, range) => {
-    this.domain = domain;
-    this.range = range;
+    this.domain = type.typify(domain);
+    this.range = type.typify(range);
   }
 
   __eq__(that) => this.domain == that.domain &&
@@ -244,8 +244,6 @@ class SimpleTypeSystem {
       return this.typify(Sequence.fromRaw(value));
     if (vmType(value) == OClass)
       return TInstance(value);
-    if (value is TFunction)
-      return this.typify(value.domain) -> this.typify(value.range);
     if (value is Map) {
       if (len(value) != 1)
         throw SimpleTypeError("TMap expects single key/value pair.");
@@ -254,6 +252,8 @@ class SimpleTypeSystem {
         this.typify(entry[0]), this.typify(entry[1])
       );
     }
+    if (value is Set)
+      return TSet(..value.elements());
 
     return value;
   }
