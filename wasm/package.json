@@ -25,6 +25,7 @@
     "clean": "rimraf dist types"
   },
   "files": [
+    "dist",
     "lib",
     "types"
   ],
