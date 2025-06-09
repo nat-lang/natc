@@ -30,6 +30,8 @@ let iter = object => {
   throw IterationProtocolError("Must define an '__iter__' method to iterate.");
 };
 
+iter.tex = (args: ASTArgumentSequence) => args[0].tex();
+
 let range = (x,y) => {
   if (x == y) return [];
 

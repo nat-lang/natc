@@ -239,6 +239,12 @@ class ASTBlock extends ASTNode {
     this.children.push(node);
   }
 
+  betaReduce() => {
+    let children = this.children.map(x => x.betaReduce());
+    let node = this.__class__(this.enclosing, ..children);
+    return node;
+  }
+
   str() => "ASTBlock(#{this.enclosing.str()})";
   tex() => join(this.children.map(x => x.tex()), "");
 }
@@ -271,7 +277,12 @@ class ASTLiteral extends ASTExpr {
 }
 
 class ASTNegation extends ASTExpr {
-  tex() => "\neg #{this[0].tex()}";
+  tex() =>{
+    let arg = this[0];
+    if (arg is ASTEquality)
+      return "#{arg[0].tex()} \not= #{arg[1].tex()}";
+    return "\neg #{arg.tex()}";
+  } 
 }
 
 class ASTEquality extends ASTExpr {
@@ -375,7 +386,9 @@ class ASTParameter extends ASTVariable {
     super.init(id);
     this.var = var;
     this.type = type;
+    this.uuid = nil;
   }
+  str() => "#{this.__class__}(#{this.id}, #{this.uuid})";
   tex() => "\lambda #{this.var.name}";
 }
 
@@ -403,7 +416,6 @@ class ASTApp extends ASTExprStatement {
     if (params.some(x => x.uuid == nil))
       throw Error("Call rename() before beta reducing.");
 
-    // now substitute.
     let reduct = fn[0][0].map(x => {
       if (x is ASTLocal || x is ASTInternalUpvalue) {
         for (let i = 0; i < len(args); i = i + 1) {
@@ -533,7 +545,7 @@ class ASTClosure extends ASTExpr {
     let body = this.nakedBody();
 
     let sep = ". ";
-    if (body[0] is ASTClosure or body[0] is ASTQuantification)
+    if (body[0].__class__ == ASTClosure or body[0] is ASTQuantification)
       sep = "";
 
     return "#{this.signature().tex()}#{sep}#{body.tex()}";
@@ -586,10 +598,12 @@ class ASTClosure extends ASTExpr {
 }
 
 class ASTComprehension extends ASTClosure {
-  init(instance, enclosing, function, upvalues, *children) => {
-    super.init(enclosing, function, upvalues, instance, ..children);
+  init(enclosing, function, upvalues, *children) => {
+    super.init(enclosing, function, upvalues, ..children);
   }
   body() => this.find(x => x is ASTComprehensionBody && x.root == this);
+  conditions() => this.collect(x => x is ASTComprehensionIter || x is ASTComprehensionPred);
+  tex() => "\{#{this.body().tex()} \mid #{join(this.conditions().map(x => x.tex()) ,", ")}\}";
 }
 
 class ASTComprehensionBody extends ASTExpr {
@@ -597,9 +611,17 @@ class ASTComprehensionBody extends ASTExpr {
     this.root = root;
     super.init(..children);
   }
+  betaReduce() => this.__class__(this.root, ..this.children.map(x => x.betaReduce()));
+  tex() => this[0].tex();
 }
-class ASTComprehensionPred extends ASTConditional {}
-class ASTComprehensionIter extends ASTIterate {}
+
+class ASTComprehensionPred extends ASTConditional {
+  tex() => this[0].tex();
+}
+
+class ASTComprehensionIter extends ASTIterate {
+  tex() => "#{this[0].tex()} \in #{this[1].tex()}";
+}
 
 class ASTClassMethod extends ASTExpr {
   init(klass, method, closure) => {
