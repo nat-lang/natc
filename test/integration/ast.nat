@@ -1,6 +1,6 @@
 
 let ASTClosureMock = (*children) => ASTClosure(nil,nil,[],..children);
-let ASTComprehensionMock = (instance, *children) => ASTComprehension(instance,nil,nil,[],..children);
+let ASTComprehensionMock = (*children) => ASTComprehension(nil,nil,[],..children);
 let ASTComprehensionBodyMock = (*children) => ASTComprehensionBody(nil, ..children);
 
 let ASTBlockMock = (*children) => ASTBlock(nil, ..children);
@@ -2018,7 +2018,7 @@ assert(f' == ASTClosureMock(
   )
 ));
 
-let f <- () => ((x => x(x)))(x => x);
+let f <- () => (x => x(x))(x => x);
 
 f.rename();
 let f' = f.betaReduce();
@@ -2038,6 +2038,12 @@ assert(f' == ASTClosureMock(
     ASTLiteral(nil)
   )
 ));
+
+// we can't in general beta reduce subscript operations,
+// as that would require resolving variables to their values,
+// but in the special case of subscript access of a key
+// that has been set within the ast, we can resolve that
+// key's value.
 
 let f <- x => (m => m[1])(x[1] = true);
 
@@ -2064,6 +2070,194 @@ assert(f' == ASTClosureMock(
       ASTSubscriptGet(
         ASTLocal(1, "g"),
         ASTLiteral(1)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// beta reduction in comprehensions.
+
+// in the body.
+
+let f <- () => ({(x => x + 1)(y) | y in [1,2]});
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTComprehensionMock(
+      ASTApp(
+        ASTGlobal("Set"),
+        ASTVariadicArgumentSequence()
+      ),
+      ASTComprehensionIter(
+        ASTLocal(1, "y"),
+        ASTApp(
+          ASTGlobal("iter"),
+          ASTArgumentSequence(
+            ASTApp(
+              ASTGlobal("Sequence"),
+              ASTArgumentSequence(
+                ASTLiteral(1),
+                ASTLiteral(2)
+              )
+            )
+          )
+        ),
+        ASTBlockMock(
+          ASTComprehensionBodyMock(
+            ASTApp(
+              ASTClosureMock(
+                ASTReturn(
+                  ASTAppInfix(
+                    ASTGlobal("+"),
+                    ASTArgumentSequence(
+                      ASTLocal(1, "x"),
+                      ASTLiteral(1)
+                    )
+                  )
+                ),
+                ASTImplicitReturn(
+                  ASTLiteral(nil)
+                )
+              ),
+              ASTArgumentSequence(
+                ASTLocal(1, "y")
+              )
+            )
+          )
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTComprehensionMock(
+      ASTApp(
+        ASTGlobal("Set"),
+        ASTVariadicArgumentSequence()
+      ),
+      ASTComprehensionIter(
+        ASTLocal(1, "y"),
+        ASTApp(
+          ASTGlobal("iter"),
+          ASTArgumentSequence(
+            ASTApp(
+              ASTGlobal("Sequence"),
+              ASTArgumentSequence(
+                ASTLiteral(1),
+                ASTLiteral(2)
+              )
+            )
+          )
+        ),
+        ASTBlockMock(
+          ASTComprehensionBodyMock(
+            ASTAppInfix(
+              ASTGlobal("+"),
+              ASTArgumentSequence(
+                ASTLocal(1, "y"),
+                ASTLiteral(1)
+              )
+            )
+          )
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+// in conditions.
+
+let f <- () => ({y | y in (x => x)(z)});
+
+assert(f == ASTClosureMock(
+  ASTReturn(
+    ASTComprehensionMock(
+      ASTApp(
+        ASTGlobal("Set"),
+        ASTVariadicArgumentSequence()
+      ),
+      ASTComprehensionIter(
+        ASTLocal(1, "y"),
+        ASTApp(
+          ASTGlobal("iter"),
+          ASTArgumentSequence(
+            ASTApp(
+              ASTClosureMock(
+                ASTReturn(
+                  ASTLocal(1, "x")
+                ),
+                ASTImplicitReturn(
+                  ASTLiteral(nil)
+                )
+              ),
+              ASTArgumentSequence(
+                ASTGlobal("z")
+              )
+            )
+          )
+        ),
+        ASTBlockMock(
+          ASTComprehensionBodyMock(
+            ASTLocal(1, "y")
+          )
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
+      )
+    )
+  ),
+  ASTImplicitReturn(
+    ASTLiteral(nil)
+  )
+));
+
+f.rename();
+let f' = f.betaReduce();
+
+assert(f' == ASTClosureMock(
+  ASTReturn(
+    ASTComprehensionMock(
+      ASTApp(
+        ASTGlobal("Set"),
+        ASTVariadicArgumentSequence()
+      ),
+      ASTComprehensionIter(
+        ASTLocal(1, "y"),
+        ASTApp(
+          ASTGlobal("iter"),
+          ASTArgumentSequence(
+            ASTGlobal("z")
+          )
+        ),
+        ASTBlockMock(
+          ASTComprehensionBodyMock(
+            ASTLocal(1, "y")
+          )
+        )
+      ),
+      ASTImplicitReturn(
+        ASTLiteral(nil)
       )
     )
   ),
