@@ -4,6 +4,6 @@
 #include "vm.h"
 
 char* pathToUri(const char* dirName, const char* baseName);
-char* readSource(const char* path);
+char* readFile(const char* path);
 
 #endif

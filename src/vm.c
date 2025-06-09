@@ -1608,7 +1608,7 @@ ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
   free(c1);
   free(c2);
 
-  char* source = readSource(absPath);
+  char* source = readFile(absPath);
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
   free(source);
