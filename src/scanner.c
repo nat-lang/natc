@@ -286,6 +286,7 @@ static TokenType identifierType() {
             return checkpointKeyword(2, 1, "e", TOKEN_USE);
         }
       }
+      break;
     case 'w':
       return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
     case '&':
