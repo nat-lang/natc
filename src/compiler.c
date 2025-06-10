@@ -113,10 +113,9 @@ static void advance(Compiler* cmp) {
   checkError(cmp);
 }
 
-void advancePathIdentifier(Compiler* cmp) {
-  shiftParser();
+void rescanPathIdentifier(Compiler* cmp) {
   parser.next = scanPathIdentifier();
-  checkError(cmp);
+  advance(cmp);
 }
 
 static bool prev(TokenType type) { return parser.previous.type == type; }
@@ -1762,24 +1761,37 @@ static void ifStatement(Compiler* cmp) {
   patchJump(cmp, elseJump);
 }
 
+#define MAX_IMPORT_VARS 25
+
 void useStatement(Compiler* cmp) {
-  parser.next = scanPathIdentifier();
-  advance(cmp);
+  Token vars[MAX_IMPORT_VARS];
+  int varcount = 0;
+
+  rescanPathIdentifier(cmp);
   consume(cmp, TOKEN_IDENTIFIER, "Expect identifier.");
   Token token = parser.previous;
 
-  if (match(cmp, TOKEN_FROM)) {
-    consumeIdentifier(cmp, "Expect path.");
-    Parser checkpoint = saveParser();
-    ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
-                                        parser.previous, MODULE_IMPORT);
-    gotoParser(checkpoint);
+  while (check(TOKEN_COMMA)) {
+    if (++varcount == MAX_IMPORT_VARS)
+      return error(cmp, "Too many identifiers to import.");
 
-    emitConstInstr(cmp, OP_IMPORT_FROM, makeConstant(cmp, OBJ_VAL(module)));
-    emitByte(cmp, 1);
-    emitConstant(cmp, identifierConstant(cmp, &token));
-    return;
+    rescanPathIdentifier(cmp);
+    consume(cmp, TOKEN_IDENTIFIER, "Expect identifier.");
+
+    vars[varcount] = parser.previous;
   }
+
+  if (match(cmp, TOKEN_FROM)) {
+    varcount++;
+    vars[0] = token;
+
+    consumeIdentifier(cmp, "Expect path.");
+  }
+
+  Parser checkpoint = saveParser();
+  ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
+                                      parser.previous, MODULE_IMPORT);
+  gotoParser(checkpoint);
 
   int alias = -1;
   if (match(cmp, TOKEN_AS)) {
@@ -1787,22 +1799,18 @@ void useStatement(Compiler* cmp) {
     alias = identifierConstant(cmp, &parser.previous);
   }
 
-  // we compile imports during compilation, as opposed to
-  // execution, to register affix declarations.
-  Parser checkpoint = saveParser();
-  ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
-                                      token, MODULE_IMPORT);
-  gotoParser(checkpoint);
+  if (module == NULL) return error(cmp, "Failed to compile import.");
 
-  if (module == NULL) {
-    error(cmp, "Failed to compile import.");
+  if (varcount > 0) {
+    emitConstInstr(cmp, OP_IMPORT_FROM, makeConstant(cmp, OBJ_VAL(module)));
+    emitByte(cmp, varcount);
+    for (int i = 0; i < varcount; i++)
+      emitConstant(cmp, identifierConstant(cmp, &vars[i]));
+  } else if (alias == -1) {
+    emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
   } else {
-    if (alias == -1) {
-      emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
-    } else {
-      emitConstInstr(cmp, OP_IMPORT_AS, makeConstant(cmp, OBJ_VAL(module)));
-      emitConstant(cmp, alias);
-    }
+    emitConstInstr(cmp, OP_IMPORT_AS, makeConstant(cmp, OBJ_VAL(module)));
+    emitConstant(cmp, alias);
   }
 }
 

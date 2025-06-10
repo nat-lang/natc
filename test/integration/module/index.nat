@@ -49,6 +49,8 @@ assert(x == 1);
 
 // named imports.
 
+// single.
+
 let y = 1;
 use x from importable
 
@@ -59,4 +61,10 @@ use y from importable
 
 assert(y == 0);
 
-// use x,y from importable
+// multiple.
+
+use x,y,z from importable
+
+assert(x == 1);
+assert(y == 0);
+assert(z == 2);
