@@ -1,4 +1,4 @@
-import importable as importable
+use importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
@@ -6,7 +6,7 @@ let x = 0;
 importable.__import__();
 assert(x == 1);
 
-import ../module/importable as importable
+use ../module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
@@ -14,7 +14,7 @@ let x = 0;
 importable.__import__();
 assert(x == 1);
 
-import ../module/../module/importable as importable
+use ../module/../module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
@@ -22,7 +22,7 @@ let x = 0;
 importable.__import__();
 assert(x == 1);
 
-import ../../integration/module/importable as importable
+use ../../integration/module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);

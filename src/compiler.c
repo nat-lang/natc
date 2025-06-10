@@ -1762,7 +1762,7 @@ static void ifStatement(Compiler* cmp) {
   patchJump(cmp, elseJump);
 }
 
-void importStatement(Compiler* cmp) {
+void useStatement(Compiler* cmp) {
   advancePathIdentifier(cmp);
   advance(cmp);
   consumeIdentifier(cmp, "Expect path to import.");
@@ -1883,8 +1883,8 @@ static void statement(Compiler* cmp) {
     forStatement(cmp);
   } else if (match(cmp, TOKEN_IF)) {
     ifStatement(cmp);
-  } else if (check(TOKEN_IMPORT)) {
-    importStatement(cmp);
+  } else if (check(TOKEN_USE)) {
+    useStatement(cmp);
   } else if (match(cmp, TOKEN_LEFT_BRACE)) {
     beginScope(cmp);
     block(cmp);

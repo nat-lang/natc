@@ -1654,7 +1654,7 @@ assert(q.body.sign() is ASTSignature);
 // modules.
 
 let f <- () => {
-  import module/importable
+  use module/importable
 };
 
 assert(f == ASTClosureMock(
@@ -1667,7 +1667,7 @@ assert(f == ASTClosureMock(
 assert(f[0].module.x == 1);
 
 let f <- () => {
-  import module/importable as importable
+  use module/importable as importable
 };
 
 assert(f == ASTClosureMock(
