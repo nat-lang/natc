@@ -406,6 +406,32 @@ assert(t == num -> (num -> num));
 let t = instantiate(f, 1, true);
 assert(t == bool -> (num -> bool));
 
+// sets.
+
+typecheck(() => ({false}));
+typecheck(() => ({true, false}));
+typecheck(() => ({true, 1}));
+
+typecheck(() => {
+  let x: TSet(bool) = {false};
+});
+
+typefail(() => {
+  let x: TSet(bool) = {1};
+});
+
+typecheck(() => {
+  let x: TSet(bool or num) = {false, 1};
+});
+
+typecheck(() => {
+  let x: TSet(bool or num) = {false};
+});
+
+typefail(() => {
+  let x: TSet(bool) = {false, 1};
+});
+
 // maps.
 
 // instantiation.

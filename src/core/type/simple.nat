@@ -168,6 +168,7 @@ class TCollection extends TInstance {
   __eq__(that) => this.elements == that.elements;
   __len__() => len(this.elements);
   __get__(key) => this.elements[key];
+  tex() => "[#{join(this.elements.map(x => x.tex()), ", ")}]";
 }
 
 class TProduct extends TCollection {
@@ -186,6 +187,7 @@ class TSet extends TCollection {
     this.element = elements[0];
     super.init(this.element);
   }
+  tex() => "\{#{this.element.tex()}\}";
 }
 
 let unit = TUnit();

@@ -81,7 +81,6 @@ class TMapAbstract extends TAbstract {
     // (3) unification with pairwise Map.init arguments.
     if (types.all(x => x is TProduct && len(x) == 2)) {
       let kvs = unzip(types), keys = kvs[0], vals = kvs[1];
-
       return TProduct(..types) -> TMap(TSum(..keys), TSum(..vals));
     }
 
@@ -251,14 +250,9 @@ class PolyTypeSystem extends AdhocTypeSystem {
 
     if (value == Set) {
       return TAbstract((*types) => {
-        let element;
-
-        if (len(types) == 1) {
-          if (types[0] == unit)
+        if (len(types) == 1 && types[0] == unit)
             return unit -> TSet(typeVar());
-          else
-            return types[0] -> TSet(types[0]);
-        }
+
         return TProduct(..types) -> TSet(TSum(..types));
       });
     }

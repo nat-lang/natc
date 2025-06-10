@@ -554,10 +554,8 @@ class ASTClosure extends ASTExpr {
   resolve() => this.function;
 
   betaReduce() => {
-    let children = this.children.map(x => x.betaReduce());
-    let node = this.__class__(this.enclosing, this.function, this.upvalues, ..children);
-    node._signature = this._signature;
-    return node;
+    this.children = this.children.map(x => x.betaReduce());
+    return this;
   }
 
   // Wrap [this] function's signature in ast.

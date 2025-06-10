@@ -23,7 +23,7 @@ let iter = object => {
     return Iterator(object, 0, len(object));
 
   if (vmType(object) != OInstance)
-    throw IterationProtocolError("can't iterate over #{object}.");
+    throw IterationProtocolError("Can't iterate over #{object}.");
 
   if ("__iter__" in object) return object.__iter__();
 

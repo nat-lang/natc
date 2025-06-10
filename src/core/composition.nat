@@ -40,6 +40,9 @@ class AnnotatedTree extends Tree {
   tex() => "\begin{exe} \ex \[ \begin{forest} #{this.innerTex()} \end{forest} \] \end{exe}";
 }
 
+class TypeShiftedTree extends AnnotatedTree {
+}
+
 class CompositionSystem {
   init() => {
     this.binaryRules = [];
@@ -73,6 +76,15 @@ class CompositionSystem {
       }
         
       return AnnotatedTree(node.data, [], type(node.data));
+    }
+
+    // treat interior nodes with data as unary type shifters.
+    if (node.data != nil) {
+      let node' = this.evaluate(Tree(nil, node.children)),
+          data' = node.data(node'.data),
+          type' = type(data');
+      
+      return TypeShiftedTree(data', [node'], type');
     }
 
     if (node.unary()) {
