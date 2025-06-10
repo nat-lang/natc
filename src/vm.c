@@ -659,18 +659,24 @@ bool vmOverload(CallFrame* frame) {
   return true;
 }
 
-bool vmImport(ObjModule* module, ObjMap* target) {
+bool vmCallModule(ObjModule* module) {
   ObjModule* enclosing = vm.module;
   vm.module = module;
-  vmPush(OBJ_VAL(module));  // [ObjModule].
+  vmPush(OBJ_VAL(module));
 
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return false;
   vmPop();  // nil.
 
-  mapAddAll(&vm.module->namespace, target);
-
   vm.module = enclosing;
+  return true;
+}
+
+bool vmImport(ObjModule* module, ObjMap* target) {
+  if (!vmCallModule(module)) return false;
+
+  mapAddAll(&module->namespace, target);
+
   return true;
 }
 
@@ -1301,7 +1307,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        if (!vmImport(module, &vm.globals)) return INTERPRET_RUNTIME_ERROR;
+        ObjMap* target = vm.module->type == MODULE_ENTRYPOINT
+                             ? &vm.globals
+                             : &vm.module->namespace;
+        if (!vmImport(module, target)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1321,6 +1330,34 @@ InterpretResult vmExecute(int baseFrame) {
         mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
         vmPop();  // objModule.
+        break;
+      }
+      case OP_IMPORT_FROM: {
+        ObjModule* module = AS_MODULE(READ_CONSTANT());
+        int vars = READ_BYTE();
+        ObjMap* target = vm.module->type == MODULE_ENTRYPOINT
+                             ? &vm.globals
+                             : &vm.module->namespace;
+
+        if (!vmCallModule(module)) return INTERPRET_RUNTIME_ERROR;
+        frame = &vm.frames[vm.frameCount - 1];
+
+        while (vars-- > 0) {
+          Value key = READ_CONSTANT();
+          if (!IS_STRING(key)) {
+            vmRuntimeError("Import identifier must be string.");
+            return INTERPRET_RUNTIME_ERROR;
+          }
+          Value val;
+          if (!mapGet(&module->namespace, key, &val)) {
+            vmRuntimeError("%s has no identifier '%s' ",
+                           module->baseName->chars, AS_STRING(key)->chars);
+            return INTERPRET_RUNTIME_ERROR;
+          }
+
+          mapSet(target, key, val);
+        }
+
         break;
       }
       case OP_THROW: {

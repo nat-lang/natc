@@ -174,6 +174,8 @@ static TokenType identifierType() {
             return checkpointKeyword(2, 3, "lse", TOKEN_FALSE);
           case 'o':
             return checkpointKeyword(2, 1, "r", TOKEN_FOR);
+          case 'r':
+            return checkpointKeyword(2, 2, "om", TOKEN_FROM);
         }
       }
       break;

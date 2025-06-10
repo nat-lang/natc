@@ -113,7 +113,7 @@ static void advance(Compiler* cmp) {
   checkError(cmp);
 }
 
-static void advancePathIdentifier(Compiler* cmp) {
+void advancePathIdentifier(Compiler* cmp) {
   shiftParser();
   parser.next = scanPathIdentifier();
   checkError(cmp);
@@ -1763,10 +1763,23 @@ static void ifStatement(Compiler* cmp) {
 }
 
 void useStatement(Compiler* cmp) {
-  advancePathIdentifier(cmp);
+  parser.next = scanPathIdentifier();
   advance(cmp);
-  consumeIdentifier(cmp, "Expect path to import.");
-  Token path = parser.previous;
+  consume(cmp, TOKEN_IDENTIFIER, "Expect identifier.");
+  Token token = parser.previous;
+
+  if (match(cmp, TOKEN_FROM)) {
+    consumeIdentifier(cmp, "Expect path.");
+    Parser checkpoint = saveParser();
+    ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
+                                        parser.previous, MODULE_IMPORT);
+    gotoParser(checkpoint);
+
+    emitConstInstr(cmp, OP_IMPORT_FROM, makeConstant(cmp, OBJ_VAL(module)));
+    emitByte(cmp, 1);
+    emitConstant(cmp, identifierConstant(cmp, &token));
+    return;
+  }
 
   int alias = -1;
   if (match(cmp, TOKEN_AS)) {
@@ -1774,11 +1787,11 @@ void useStatement(Compiler* cmp) {
     alias = identifierConstant(cmp, &parser.previous);
   }
 
-  if (parser.hadError) return;
-
+  // we compile imports during compilation, as opposed to
+  // execution, to register affix declarations.
   Parser checkpoint = saveParser();
   ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
-                                      path, MODULE_IMPORT);
+                                      token, MODULE_IMPORT);
   gotoParser(checkpoint);
 
   if (module == NULL) {

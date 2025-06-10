@@ -1,0 +1,12 @@
+let f <- () => (x => x(x))(x => x);
+f.pp();
+print "-----";
+
+f.rename();
+let f' = f.betaReduce();
+
+print "------";
+f'.pp();
+
+
+print ((x => x(x))(x => x));

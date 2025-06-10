@@ -1,31 +1,62 @@
+
+// module alias.
+
 use importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
+
+// module alias with relative path.
 
 use ../module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
+
+// nested ..
 
 use ../module/../module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
+
+// multiple dirs up.
 
 use ../../integration/module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
+
+// named imports.
+
+let y = 1;
+use x from importable
+
+assert(y == 1);
+assert(x == 1);
+
+use y from importable
+
+assert(y == 0);
+
+// use x,y from importable
