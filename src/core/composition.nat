@@ -12,35 +12,45 @@ class AnnotatedTree extends Tree {
     return "";
   }
 
-  innerTex() => {
-    let datum = () => {
-      if (this.data == nil) return "";
+  texData() => {
+    if (this.data == nil) return "";
 
-      if (vmType(this.data) in [OFunction, OOverload]) {
-        let ast <- this.data;
-        ast = ast.simplify();
-        let tex = "$#{this.type.tex()}$ \\ $#{ast.tex()}$";
+    if (vmType(this.data) in [OFunction, OOverload]) {
+      let ast <- this.data;
+      ast = ast.simplify();
+      let tex = "$#{this.type.tex()}$ \\ $#{ast.tex()}$";
 
-        if (this.leaf() && this.data.name != "lambda")
-          return "{#{tex} \\ #{this.data.name}}";
-        return "{#{tex}}";
-      } else if (vmType(this.data) == OInstance && "tex" in this.data) {
-        return "{$#{this.type.tex()}$ \\ #{this.data.tex()}}";
-      }
+      if (this.leaf() && this.data.name != "lambda")
+        return "{#{tex} \\ #{this.data.name}}";
+      return "{#{tex}}";
+    } else if (vmType(this.data) == OInstance && "tex" in this.data) {
+      return "{$#{this.type.tex()}$ \\ #{this.data.tex()}}";
+    }
 
-      return "{$#{this.type.tex()}$ \\ #{this.data}}";
-    };
-
-    if (this.leaf()) return "[#{datum()}]";
-
-    let children = join(this.children.map(x => x.innerTex()), " ");
-    return "[#{datum()} #{children}]";
+    return "{$#{this.type.tex()}$ \\ #{this.data}}";
   }
 
-  tex() => "\begin{exe} \ex \[ \begin{forest} #{this.innerTex()} \end{forest} \] \end{exe}";
+  texNode() => {
+    if (this.leaf()) return "[#{this.texData()}]";
+    let children = join(this.children.map(x => x.texNode()), " ");
+  
+    return "[#{this.texData()} #{children}]";
+  }
+
+  tex() => "\begin{exe} \ex \[ \begin{forest} #{this.texNode()} \end{forest} \] \end{exe}";
 }
 
-class TypeShiftedTree extends AnnotatedTree {
+class TypeShiftTree extends AnnotatedTree {
+  init(shift, data, children, type: Type) => {
+    super.init(data, children, type);
+    this.shift = shift;
+  }
+  texNode() => {
+    if (this.leaf()) return "[#{this.texData()}]";
+    let children = join(this.children.map(x => x.texNode()), " ");
+
+    return "[#{this.texData()}, edge label={node[midway,right,font=\scriptsize]{$#{this.shift.name}$}} #{children}]";
+  }
 }
 
 class CompositionSystem {
@@ -84,7 +94,7 @@ class CompositionSystem {
           data' = node.data(node'.data),
           type' = type(data');
       
-      return TypeShiftedTree(data', [node'], type');
+      return TypeShiftTree(node.data, data', [node'], type');
     }
 
     if (node.unary()) {

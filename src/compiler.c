@@ -1452,28 +1452,31 @@ static bool sequence(Compiler* cmp) {
   return false;
 }
 
-void tree(Compiler* cmp) {
-  // if we're here, the sequence check has already
-  // parsed the first element.
-  int elements = 1;
-
-  // make a node of it.
+void tree(Compiler* cmp, char* fn, int children) {
+  // make a node of the first child.
   nativePostfix(cmp, "Node", 1);
 
   // parse the children.
   while (!check(TOKEN_RIGHT_BRACKET)) {
     whiteDelimitedExpression(cmp);
     nativePostfix(cmp, "Node", 1);
-    elements++;
+    children++;
   }
 
-  // parse the root.
-  nativePostfix(cmp, "Root", elements);
+  // construct the root.
+  nativePostfix(cmp, fn, children);
 }
 
 // A sequence literal, sequence comprehension, or tree.
 static void brackets(Compiler* cmp, bool canAssign) {
-  if (!sequence(cmp)) tree(cmp);
+  if (check(TOKEN_DOT)) {
+    advance(cmp);
+    whiteDelimitedExpression(cmp);
+    whiteDelimitedExpression(cmp);
+    tree(cmp, "Interior", 2);
+  } else if (!sequence(cmp)) {
+    tree(cmp, "Root", 1);
+  }
 
   consume(cmp, TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }
