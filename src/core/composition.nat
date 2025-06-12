@@ -46,10 +46,11 @@ class TypeShiftTree extends AnnotatedTree {
     this.shift = shift;
   }
   texNode() => {
-    if (this.leaf()) return "[#{this.texData()}]";
-    let children = join(this.children.map(x => x.texNode()), " ");
+    let child = this.children[0],
+        childTex = this.children[0].texData(),
+        grandTex = join(child.children.map(x => x.texNode()), " ");
 
-    return "[#{this.texData()}, edge label={node[midway,right,font=\scriptsize]{$#{this.shift.name}$}} #{children}]";
+    return "[#{this.texData()} [#{childTex}, edge label={node[midway,right,font=\scriptsize]{$#{this.shift.name}$}} #{grandTex}]]";
   }
 }
 
@@ -90,8 +91,9 @@ class CompositionSystem {
 
     // treat interior nodes with data as unary type shifters.
     if (node.data != nil) {
-      let node' = this.evaluate(Tree(nil, node.children)),
-          data' = node.data(node'.data),
+      let node' = this.evaluate(Tree(nil, node.children));
+
+      let data' = node.data(node'.data),
           type' = type(data');
       
       return TypeShiftTree(node.data, data', [node'], type');
