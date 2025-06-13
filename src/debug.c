@@ -147,15 +147,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_CALL_INFIX", chunk, offset);
     case OP_CALL_POSTFIX:
       return byteInstruction("OP_CALL_POSTFIX", chunk, offset);
-    case OP_SIGN: {
-      uint16_t constant = readShort(chunk, offset);
-      offset += 3;
-
-      printf("%-16s %4d ", "OP_SIGN", constant);
-      printValue(chunk->constants.values[constant]);
-      printf("\n");
-      return offset;
-    }
+    case OP_SIGN:
+      return constantInstruction("OP_SIGN", chunk, offset);
     case OP_CLOSURE:
       return closureInstruction("OP_CLOSURE", chunk, offset);
     case OP_COMPREHENSION:
@@ -175,13 +168,14 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
     case OP_OVERLOAD: {
-      uint8_t slot = chunk->code[offset + 1];
-      uint16_t constant = readShort(chunk, offset + 1);
-
+      offset += 1;
+      uint8_t slot = chunk->code[offset];
+      uint16_t constant = readShort(chunk, offset);
+      offset += 3;
       printf("%-16s %4d '", "OP_OVERLOAD", slot);
       printValue(chunk->constants.values[constant]);
       printf("'\n");
-      return offset + 5;
+      return offset;
     }
     case OP_CLASS:
       return constantInstruction("OP_CLASS", chunk, offset);
@@ -195,16 +189,37 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_IMPORT", chunk, offset);
     case OP_IMPORT_AS: {
       uint16_t module = readShort(chunk, offset);
-      uint16_t alias = readShort(chunk, offset);
+      uint16_t alias = readShort(chunk, offset + 2);
 
-      printf("OP_IMPORT_AS %d '", module);
+      printf("%-16s %4d '", "OP_IMPORT_AS", module);
       printValue(chunk->constants.values[module]);
       printf(" '");
       printValue(chunk->constants.values[alias]);
       printf("'\n");
       return offset + 6;
     }
+    case OP_IMPORT_FROM: {
+      offset += 1;
+      uint16_t module = readShort(chunk, offset);
+      offset += 2;
+      uint8_t vars = chunk->code[offset];
 
+      printf("%-16s %4d '", "OP_IMPORT_FROM", module);
+      printValue(chunk->constants.values[module]);
+      printf("' (");
+
+      for (int i = 0; i < vars; i++) {
+        uint16_t var = readShort(chunk, offset);
+        offset += 2;
+        printf("%d '", var);
+        printValue(chunk->constants.values[var]);
+        printf("'");
+        if (i < vars - 1) printf(", ");
+      }
+      printf(")\n");
+
+      return offset + 1;  // vars byte.
+    }
     case OP_THROW:
       return simpleInstruction("OP_THROW", offset);
     case OP_SUBSCRIPT_GET:

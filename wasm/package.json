@@ -1,6 +1,6 @@
 {
   "name": "@nat-lang/nat",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "wasm compiler for nat",
   "keywords": [
     "natural",
@@ -25,6 +25,7 @@
     "clean": "rimraf dist types"
   },
   "files": [
+    "dist",
     "lib",
     "types"
   ],

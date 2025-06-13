@@ -18,13 +18,23 @@ char* withNatExt(const char* path) {
   return buf;
 }
 
-char* pathToUri(const char* dirName, const char* baseName) {
-  static char buf[256];
+bool fileExists(const char* filename) {
+  struct stat buffer;
+  return (stat(filename, &buffer) == 0);
+}
 
-  snprintf(buf, sizeof(buf), "%s%s%s", dirName == NULL ? "" : dirName,
+char* pathToUri(const char* dirName, const char* baseName) {
+  static char uri[256];
+
+  snprintf(uri, sizeof(uri), "%s%s%s", dirName == NULL ? "" : dirName,
            dirName == NULL ? "" : "/", baseName);
 
-  return buf;
+  if (fileExists(uri)) return uri;
+
+  char* withExt = withNatExt(uri);
+  if (fileExists(withExt)) return withExt;
+
+  return uri;
 }
 
 char* readFile(const char* path) {
@@ -54,16 +64,4 @@ char* readFile(const char* path) {
 
   fclose(file);
   return buffer;
-}
-
-bool fileExists(const char* filename) {
-  struct stat buffer;
-  return (stat(filename, &buffer) == 0);
-}
-
-char* readSource(const char* path) {
-  if (fileExists(path))
-    return readFile(path);
-  else
-    return readFile(withNatExt(path));
 }

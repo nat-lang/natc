@@ -295,7 +295,7 @@ ASTInstructionResult astInstruction(CallFrame* frame, Value root) {
 
       // an [ASTComprehension] instance has four arguments.
       vmPush(OBJ_VAL(vm.core.astComprehension));
-      // (0) the object language comprehension instance.
+      // (0) the comprehension instance.
       vmPush(instance);
       // (1) the enclosing function.
       vmPush(root);

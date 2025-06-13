@@ -174,6 +174,8 @@ static TokenType identifierType() {
             return checkpointKeyword(2, 3, "lse", TOKEN_FALSE);
           case 'o':
             return checkpointKeyword(2, 1, "r", TOKEN_FOR);
+          case 'r':
+            return checkpointKeyword(2, 2, "om", TOKEN_FROM);
         }
       }
       break;
@@ -182,8 +184,6 @@ static TokenType identifierType() {
         switch (START[1]) {
           case 'f':
             return checkpointKeyword(1, 1, "f", TOKEN_IF);
-          case 'm':
-            return checkpointKeyword(2, 4, "port", TOKEN_IMPORT);
           case 'n': {
             if (CURRENT - START > 2) {
               switch (START[2]) {
@@ -278,7 +278,15 @@ static TokenType identifierType() {
       }
       break;
     case 'u':
-      return checkpointKeyword(1, 8, "ndefined", TOKEN_UNDEFINED);
+      if (CURRENT - START > 1) {
+        switch (START[1]) {
+          case 'n':
+            return checkpointKeyword(2, 7, "defined", TOKEN_UNDEFINED);
+          case 's':
+            return checkpointKeyword(2, 1, "e", TOKEN_USE);
+        }
+      }
+      break;
     case 'w':
       return checkpointKeyword(1, 4, "hile", TOKEN_WHILE);
     case '&':

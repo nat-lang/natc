@@ -659,18 +659,27 @@ bool vmOverload(CallFrame* frame) {
   return true;
 }
 
-bool vmImport(ObjModule* module, ObjMap* target) {
+bool vmCallModule(ObjModule* module) {
   ObjModule* enclosing = vm.module;
   vm.module = module;
-  vmPush(OBJ_VAL(module));  // [ObjModule].
 
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return false;
   vmPop();  // nil.
 
-  mapAddAll(&vm.module->namespace, target);
-
   vm.module = enclosing;
+  return true;
+}
+
+bool vmImport(ObjModule* module, ObjMap* target) {
+  vmPush(OBJ_VAL(module));
+
+  if (!vmCallModule(module)) return false;
+
+  vmPush(OBJ_VAL(module));
+  mapAddAll(&module->namespace, target);
+  vmPop();
+
   return true;
 }
 
@@ -1301,7 +1310,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_IMPORT: {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
-        if (!vmImport(module, &vm.globals)) return INTERPRET_RUNTIME_ERROR;
+        ObjMap* target = vm.module->type == MODULE_ENTRYPOINT
+                             ? &vm.globals
+                             : &vm.module->namespace;
+        if (!vmImport(module, target)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -1309,18 +1321,42 @@ InterpretResult vmExecute(int baseFrame) {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         Value alias = READ_CONSTANT();
 
-        vmPush(OBJ_VAL(vm.core.module));
-        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
-        ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
-
-        if (!vmImport(module, &objModule->fields))
-          return INTERPRET_RUNTIME_ERROR;
+        if (!vmImportAsInstance(module)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
         mapSet(&vm.globals, alias, OBJ_VAL(objModule));
         mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
         vmPop();  // objModule.
+        break;
+      }
+      case OP_IMPORT_FROM: {
+        ObjModule* module = AS_MODULE(READ_CONSTANT());
+        int vars = READ_BYTE();
+        ObjMap* target = vm.module->type == MODULE_ENTRYPOINT
+                             ? &vm.globals
+                             : &vm.module->namespace;
+
+        if (!vmCallModule(module)) return INTERPRET_RUNTIME_ERROR;
+        frame = &vm.frames[vm.frameCount - 1];
+
+        while (vars-- > 0) {
+          Value key = READ_CONSTANT();
+          if (!IS_STRING(key)) {
+            vmRuntimeError("Import identifier must be string.");
+            return INTERPRET_RUNTIME_ERROR;
+          }
+          Value val;
+          if (!mapGet(&module->namespace, key, &val)) {
+            vmRuntimeError("%s has no identifier '%s' ",
+                           module->baseName->chars, AS_STRING(key)->chars);
+            return INTERPRET_RUNTIME_ERROR;
+          }
+
+          mapSet(target, key, val);
+        }
+
         break;
       }
       case OP_THROW: {
@@ -1608,7 +1644,7 @@ ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
   free(c1);
   free(c2);
 
-  char* source = readSource(absPath);
+  char* source = readFile(absPath);
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
   free(source);

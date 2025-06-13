@@ -2,10 +2,10 @@
 // These tests target syntax and behavior that no one would ever
 // want or need to concoct, but that are nevertheless valid nat.
 
-import ../utils
+use ../utils
 
 let conclude = begin();
 
-import tree
+use tree
 
 conclude("trip       ");
