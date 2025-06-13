@@ -65,10 +65,3 @@ char* readFile(const char* path) {
   fclose(file);
   return buffer;
 }
-
-char* readSource(const char* path) {
-  if (fileExists(path))
-    return readFile(path);
-  else
-    return readFile(withNatExt(path));
-}

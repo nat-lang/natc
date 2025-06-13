@@ -1796,25 +1796,26 @@ void useStatement(Compiler* cmp) {
                                       parser.previous, MODULE_IMPORT);
   gotoParser(checkpoint);
 
-  int alias = -1;
-  if (match(cmp, TOKEN_AS)) {
-    consumeIdentifier(cmp, "Expect identifier alias.");
-    alias = identifierConstant(cmp, &parser.previous);
-  }
-
   if (module == NULL) return error(cmp, "Failed to compile import.");
+  uint16_t moduleConst = makeConstant(cmp, OBJ_VAL(module));
 
   if (varcount > 0) {
-    emitConstInstr(cmp, OP_IMPORT_FROM, makeConstant(cmp, OBJ_VAL(module)));
+    emitConstInstr(cmp, OP_IMPORT_FROM, moduleConst);
     emitByte(cmp, varcount);
     for (int i = 0; i < varcount; i++)
       emitConstant(cmp, identifierConstant(cmp, &vars[i]));
-  } else if (alias == -1) {
-    emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
-  } else {
-    emitConstInstr(cmp, OP_IMPORT_AS, makeConstant(cmp, OBJ_VAL(module)));
-    emitConstant(cmp, alias);
+    return;
   }
+
+  if (match(cmp, TOKEN_AS)) {
+    consumeIdentifier(cmp, "Expect identifier alias.");
+    uint16_t alias = identifierConstant(cmp, &parser.previous);
+    emitConstInstr(cmp, OP_IMPORT_AS, moduleConst);
+    emitConstant(cmp, alias);
+    return;
+  }
+
+  emitConstInstr(cmp, OP_IMPORT, moduleConst);
 }
 
 static void printStatement(Compiler* cmp) {

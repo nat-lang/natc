@@ -662,7 +662,6 @@ bool vmOverload(CallFrame* frame) {
 bool vmCallModule(ObjModule* module) {
   ObjModule* enclosing = vm.module;
   vm.module = module;
-  vmPush(OBJ_VAL(module));
 
   if (!callModule(module) || vmExecute(vm.frameCount - 1) != INTERPRET_OK)
     return false;
@@ -673,6 +672,8 @@ bool vmCallModule(ObjModule* module) {
 }
 
 bool vmImport(ObjModule* module, ObjMap* target) {
+  vmPush(OBJ_VAL(module));
+
   if (!vmCallModule(module)) return false;
 
   mapAddAll(&module->namespace, target);
@@ -1318,14 +1319,10 @@ InterpretResult vmExecute(int baseFrame) {
         ObjModule* module = AS_MODULE(READ_CONSTANT());
         Value alias = READ_CONSTANT();
 
-        vmPush(OBJ_VAL(vm.core.module));
-        if (!vmInitInstance(vm.core.module, 0)) return INTERPRET_RUNTIME_ERROR;
-        ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
-
-        if (!vmImport(module, &objModule->fields))
-          return INTERPRET_RUNTIME_ERROR;
+        if (!vmImportAsInstance(module)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        ObjInstance* objModule = AS_INSTANCE(vmPeek(0));
         mapSet(&vm.globals, alias, OBJ_VAL(objModule));
         mapSet(&objModule->fields, OBJ_VAL(vm.core.sModule), OBJ_VAL(module));
 
