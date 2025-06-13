@@ -1,7 +1,7 @@
-import ../utils
+use ../utils
 
 let conclude = begin();
 
-import 0
+use 0
 
 conclude("regression ");

@@ -103,4 +103,5 @@ class Sequence extends Sequential {
     for (x in elements)
       this.push(x);
   }
+  tex(args: ASTArgumentSequence) => "[#{args.tex()}]";
 }

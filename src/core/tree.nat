@@ -7,6 +7,7 @@ class Tree extends Object {
   }
 
   __eq__(that) => this.__class__ == that.__class__ &&
+                  this.data == that.data &&
                   this.children == that.children;
 
   // Subscript access is to children.
@@ -82,8 +83,8 @@ class Tree extends Object {
 
 // Functions for building tree literals during compilation.
 
-// Childless tree.
-let LeafNode = data => Tree(data, []);
+// variadify the second argument.
+let Interior = (data, *children) => Tree(data, children);
 
 // Dataless tree.
 let Root = (*children) => Tree(nil, children);
@@ -92,5 +93,5 @@ let Root = (*children) => Tree(nil, children);
 let Node = value => {
   if (value is Tree)
     return value;
-  return LeafNode(value);
+  return Tree(value, []);
 };

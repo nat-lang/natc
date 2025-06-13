@@ -1,35 +1,35 @@
-import vm
+use vm
 
 let _ts = TypeSystem;
 
 TypeSystem = SimpleTypeSystem;
 
-import simple
+use simple
 
 TypeSystem = SubtypeSystem;
 
-import simple
-import subtype
+use simple
+use subtype
 
 TypeSystem = AdhocTypeSystem;
 
-import simple
-import subtype
-import adhoc
+use simple
+use subtype
+use adhoc
 
 TypeSystem = PolyTypeSystem;
 
-import simple
-import subtype
-import adhoc
-import poly
+use simple
+use subtype
+use adhoc
+use poly
 
 TypeSystem = DenotationalTypeSystem();
 
-import simple
-import subtype
-import adhoc
-import poly
-import denotational
+use simple
+use subtype
+use adhoc
+use poly
+use denotational
 
 TypeSystem = _ts;

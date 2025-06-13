@@ -113,10 +113,9 @@ static void advance(Compiler* cmp) {
   checkError(cmp);
 }
 
-static void advancePathIdentifier(Compiler* cmp) {
-  shiftParser();
+void rescanPathIdentifier(Compiler* cmp) {
   parser.next = scanPathIdentifier();
-  checkError(cmp);
+  advance(cmp);
 }
 
 static bool prev(TokenType type) { return parser.previous.type == type; }
@@ -1453,28 +1452,31 @@ static bool sequence(Compiler* cmp) {
   return false;
 }
 
-void tree(Compiler* cmp) {
-  // if we're here, the sequence check has already
-  // parsed the first element.
-  int elements = 1;
-
-  // make a node of it.
+void tree(Compiler* cmp, char* fn, int children) {
+  // make a node of the first child.
   nativePostfix(cmp, "Node", 1);
 
   // parse the children.
   while (!check(TOKEN_RIGHT_BRACKET)) {
     whiteDelimitedExpression(cmp);
     nativePostfix(cmp, "Node", 1);
-    elements++;
+    children++;
   }
 
-  // parse the root.
-  nativePostfix(cmp, "Root", elements);
+  // construct the root.
+  nativePostfix(cmp, fn, children);
 }
 
 // A sequence literal, sequence comprehension, or tree.
 static void brackets(Compiler* cmp, bool canAssign) {
-  if (!sequence(cmp)) tree(cmp);
+  if (check(TOKEN_DOT)) {
+    advance(cmp);
+    whiteDelimitedExpression(cmp);
+    whiteDelimitedExpression(cmp);
+    tree(cmp, "Interior", 2);
+  } else if (!sequence(cmp)) {
+    tree(cmp, "Root", 1);
+  }
 
   consume(cmp, TOKEN_RIGHT_BRACKET, "Expect closing ']'.");
 }
@@ -1762,35 +1764,58 @@ static void ifStatement(Compiler* cmp) {
   patchJump(cmp, elseJump);
 }
 
-void importStatement(Compiler* cmp) {
-  advancePathIdentifier(cmp);
-  advance(cmp);
-  consumeIdentifier(cmp, "Expect path to import.");
-  Token path = parser.previous;
+#define MAX_IMPORT_VARS 25
 
-  int alias = -1;
-  if (match(cmp, TOKEN_AS)) {
-    consumeIdentifier(cmp, "Expect identifier alias.");
-    alias = identifierConstant(cmp, &parser.previous);
+void useStatement(Compiler* cmp) {
+  Token vars[MAX_IMPORT_VARS];
+  int varcount = 0;
+
+  rescanPathIdentifier(cmp);
+  consume(cmp, TOKEN_IDENTIFIER, "Expect identifier.");
+  Token token = parser.previous;
+
+  while (check(TOKEN_COMMA)) {
+    if (++varcount == MAX_IMPORT_VARS)
+      return error(cmp, "Too many identifiers to import.");
+
+    rescanPathIdentifier(cmp);
+    consume(cmp, TOKEN_IDENTIFIER, "Expect identifier.");
+
+    vars[varcount] = parser.previous;
   }
 
-  if (parser.hadError) return;
+  if (match(cmp, TOKEN_FROM)) {
+    varcount++;
+    vars[0] = token;
+
+    consumeIdentifier(cmp, "Expect path.");
+  }
 
   Parser checkpoint = saveParser();
   ObjModule* module = vmCompileModule(cmp->function->module->dirName->chars,
-                                      path, MODULE_IMPORT);
+                                      parser.previous, MODULE_IMPORT);
   gotoParser(checkpoint);
 
-  if (module == NULL) {
-    error(cmp, "Failed to compile import.");
-  } else {
-    if (alias == -1) {
-      emitConstInstr(cmp, OP_IMPORT, makeConstant(cmp, OBJ_VAL(module)));
-    } else {
-      emitConstInstr(cmp, OP_IMPORT_AS, makeConstant(cmp, OBJ_VAL(module)));
-      emitConstant(cmp, alias);
-    }
+  if (module == NULL) return error(cmp, "Failed to compile import.");
+  uint16_t moduleConst = makeConstant(cmp, OBJ_VAL(module));
+
+  if (varcount > 0) {
+    emitConstInstr(cmp, OP_IMPORT_FROM, moduleConst);
+    emitByte(cmp, varcount);
+    for (int i = 0; i < varcount; i++)
+      emitConstant(cmp, identifierConstant(cmp, &vars[i]));
+    return;
   }
+
+  if (match(cmp, TOKEN_AS)) {
+    consumeIdentifier(cmp, "Expect identifier alias.");
+    uint16_t alias = identifierConstant(cmp, &parser.previous);
+    emitConstInstr(cmp, OP_IMPORT_AS, moduleConst);
+    emitConstant(cmp, alias);
+    return;
+  }
+
+  emitConstInstr(cmp, OP_IMPORT, moduleConst);
 }
 
 static void printStatement(Compiler* cmp) {
@@ -1883,8 +1908,8 @@ static void statement(Compiler* cmp) {
     forStatement(cmp);
   } else if (match(cmp, TOKEN_IF)) {
     ifStatement(cmp);
-  } else if (check(TOKEN_IMPORT)) {
-    importStatement(cmp);
+  } else if (check(TOKEN_USE)) {
+    useStatement(cmp);
   } else if (match(cmp, TOKEN_LEFT_BRACE)) {
     beginScope(cmp);
     block(cmp);

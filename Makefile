@@ -44,7 +44,7 @@ debug-trace:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-trace SOURCE_DIR=src
 
-# Compile the interpreter with a manic garbage collector.
+# Compile the interpreter with an eager garbage collector.
 debug-stress-gc:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stress-gc SOURCE_DIR=src

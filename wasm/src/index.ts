@@ -25,19 +25,23 @@ export enum InterpretationStatus {
   RUNTIME_ERROR = 2,
 }
 
-class Engine {
-  runtime?: NatModule;
+class Runtime {
+  wasmModule?: NatModule;
   stdOutHandlers: OutputHandlerMap;
   stdErrHandlers: OutputHandlerMap;
+  errors: string[];
 
   constructor() {
-    this.runtime = undefined;
+    this.wasmModule = undefined;
     this.stdOutHandlers = { console: console.log };
-    this.stdErrHandlers = { console: console.error };
+    this.stdErrHandlers = { console: console.error, store: this.storeErr };
+    this.errors = [];
   }
 
-  print = (stdout: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stdout));
-  printErr = (stderr: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stderr));
+  handleStdOut = (stdout: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stdout));
+  handleStdErr = (stderr: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stderr));
+
+  storeErr = (err: string) => this.errors.push(err);
 
   onStdout = (handler: OutputHandler) => {
     let uid = v4();
@@ -49,17 +53,17 @@ class Engine {
     };
   }
 
-  loadRuntime = async (): Promise<NatModule> => {
-    if (!this.runtime) this.runtime = await initialize({
-      print: this.print.bind(this),
-      printErr: this.printErr.bind(this)
+  loadWasmModule = async (): Promise<NatModule> => {
+    if (!this.wasmModule) this.wasmModule = await initialize({
+      print: this.handleStdOut.bind(this),
+      printErr: this.handleStdErr.bind(this)
     });
-    return this.runtime as NatModule;
+    return this.wasmModule as NatModule;
   }
 
   readStrMem = async (pointer: number) => {
-    const runtime = await this.loadRuntime();
-    const memBuff = new Uint8Array(runtime.wasmMemory.buffer);
+    const mod = await this.loadWasmModule();
+    const memBuff = new Uint8Array(mod.wasmMemory.buffer);
 
     let str = "";
 
@@ -70,9 +74,9 @@ class Engine {
   }
 
   typeset = async (path: string) => {
-    const runtime = await this.loadRuntime();
-    const interpret = runtime.cwrap('vmTypesetModule_wasm', 'number', ['string']);
-    const free = runtime.cwrap('vmFree_wasm', null, []);
+    const mod = await this.loadWasmModule();
+    const interpret = mod.cwrap('vmTypesetModule_wasm', 'number', ['string']);
+    const free = mod.cwrap('vmFree_wasm', null, []);
 
     const respPtr = interpret(path);
     const resp = await this.readStrMem(respPtr);
@@ -81,34 +85,35 @@ class Engine {
 
     return {
       success: true,
-      tex: resp
+      tex: resp,
+      errors: [],
     }
   }
 
   interpret = async (path: string): Promise<InterpretationStatus> => {
-    const runtime = await this.loadRuntime();
-    const fn = runtime.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
+    const mod = await this.loadWasmModule();
+    const fn = mod.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
     return fn(path);
   };
 
   getCoreFiles = async (dir = CORE_DIR) => {
-    const runtime = await this.loadRuntime();
+    const mod = await this.loadWasmModule();
     const files: CoreFile[] = [{
       path: dir,
       type: "tree",
       content: ""
     }];
 
-    runtime.FS.readdir(abs(dir)).forEach(async file => {
+    mod.FS.readdir(abs(dir)).forEach(async file => {
       if ([".", ".."].includes(file)) return;
 
       let path = `${dir}/${file}`;
-      let stat = runtime.FS.stat(abs(path));
+      let stat = mod.FS.stat(abs(path));
 
-      if (runtime.FS.isDir(stat.mode)) {
+      if (mod.FS.isDir(stat.mode)) {
         files.push(...await this.getCoreFiles(path));
       } else {
-        let content = runtime.FS.readFile(abs(path), { encoding: "utf8" });
+        let content = mod.FS.readFile(abs(path), { encoding: "utf8" });
         files.push({ path, type: "blob", content });
       }
     });
@@ -117,25 +122,25 @@ class Engine {
   };
 
   mkDir = async (path: string): Promise<void> => {
-    const runtime = await this.loadRuntime();
-    const pathStat = runtime.FS.analyzePath(abs(path));
+    const mod = await this.loadWasmModule();
+    const pathStat = mod.FS.analyzePath(abs(path));
 
     if (!pathStat.exists)
-      runtime.FS.mkdir(abs(path));
+      mod.FS.mkdir(abs(path));
   }
 
   getFile = async (path: string): Promise<CoreFile> => {
-    const runtime = await this.loadRuntime();
-    const content = runtime.FS.readFile(abs(path), { encoding: "utf8" });
+    const mod = await this.loadWasmModule();
+    const content = mod.FS.readFile(abs(path), { encoding: "utf8" });
 
     return { path, content, type: "blob" };
   }
 
   setFile = async (path: string, content: string) => {
-    const runtime = await this.loadRuntime();
-    runtime.FS.writeFile(abs(path), content, { flags: "w+" });
+    const mod = await this.loadWasmModule();
+    mod.FS.writeFile(abs(path), content, { flags: "w+" });
   }
 }
 
 export const version = pack.version;
-export default Engine;
+export default Runtime;

@@ -1,31 +1,70 @@
-import importable as importable
+
+// module alias.
+
+use importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
 
-import ../module/importable as importable
+// module alias with relative path.
+
+use ../module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
 
-import ../module/../module/importable as importable
+// nested ..
+
+use ../module/../module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
 
-import ../../integration/module/importable as importable
+// multiple dirs up.
+
+use ../../integration/module/importable as importable
 
 assert(importable is Module);
 assert(importable.x == 1);
+
 let x = 0;
+
 importable.__import__();
 assert(x == 1);
+
+// named imports.
+
+// single.
+
+let y = 1;
+use x from importable
+
+assert(y == 1);
+assert(x == 1);
+
+use y from importable
+
+assert(y == 0);
+
+// multiple.
+
+use x,y,z from importable
+
+assert(x == 1);
+assert(y == 0);
+assert(z == 2);

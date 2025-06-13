@@ -23,12 +23,14 @@ let iter = object => {
     return Iterator(object, 0, len(object));
 
   if (vmType(object) != OInstance)
-    throw IterationProtocolError("can't iterate over #{object}.");
+    throw IterationProtocolError("Can't iterate over #{object}.");
 
   if ("__iter__" in object) return object.__iter__();
 
   throw IterationProtocolError("Must define an '__iter__' method to iterate.");
 };
+
+iter.tex = (args: ASTArgumentSequence) => args[0].tex();
 
 let range = (x,y) => {
   if (x == y) return [];
