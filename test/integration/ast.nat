@@ -1,6 +1,6 @@
 
 let ASTClosureMock = (*children) => ASTClosure(nil,nil,[],..children);
-let ASTComprehensionMock = (*children) => ASTComprehension(nil,nil,[],..children);
+let ASTComprehensionMock = (instance, *children) => ASTComprehension(instance, nil,nil,[],..children);
 let ASTComprehensionBodyMock = (*children) => ASTComprehensionBody(nil, ..children);
 
 let ASTBlockMock = (*children) => ASTBlock(nil, ..children);

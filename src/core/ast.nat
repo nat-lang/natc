@@ -596,8 +596,8 @@ class ASTClosure extends ASTExpr {
 }
 
 class ASTComprehension extends ASTClosure {
-  init(enclosing, function, upvalues, *children) => {
-    super.init(enclosing, function, upvalues, ..children);
+  init(instance, enclosing, function, upvalues, *children) => {
+    super.init(enclosing, function, upvalues, instance, ..children);
   }
   body() => this.find(x => x is ASTComprehensionBody && x.root == this);
   conditions() => this.collect(x => x is ASTComprehensionIter || x is ASTComprehensionPred);

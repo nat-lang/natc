@@ -676,7 +676,9 @@ bool vmImport(ObjModule* module, ObjMap* target) {
 
   if (!vmCallModule(module)) return false;
 
+  vmPush(OBJ_VAL(module));
   mapAddAll(&module->namespace, target);
+  vmPop();
 
   return true;
 }
