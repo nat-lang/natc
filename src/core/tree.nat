@@ -65,6 +65,11 @@ class Tree extends Object {
       child.visit(fn, acc);
   }
 
+  // continuized map.
+  kmap(fn) => this.children.map(
+    x => fn(x, y => y.kmap(fn))
+  );
+
   find(predicate) => this.depthFirst().find(predicate);
 
   collect(predicate) => [node | node in this, predicate(node)];

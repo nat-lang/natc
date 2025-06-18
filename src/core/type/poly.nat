@@ -196,14 +196,12 @@ class PolyTypeState extends AdhocTypeState {
 
     if (left is TAbstract) {
       if (left.variadic and right is ->) {
-                
         if (right.domain is TProduct)
           left = left(..right.domain.elements);
         else
           left = left(right.domain);
       } else if (right is not TVar) {
         left = left.instantiate();
-
       }
     }
 
