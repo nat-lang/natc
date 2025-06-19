@@ -369,7 +369,7 @@ class ASTExternalUpvalue extends ASTUpvalue {
     if (type in [OFunction, OOverload]) {
       let ast <- value;
       return ast.tex();
-    } else if (type == OInstance && "tex" in value) {
+    } else if (type == OInstance && callable(value.tex)) {
       return value.tex();
     }
     return str(value);
@@ -401,7 +401,7 @@ class ASTVariadicArgumentSequence extends ASTArgumentSequence {}
 
 class ASTApp extends ASTExprStatement {
   // we only want to reach normal form - 1, otherwise
-  // we'd just let the interpreter do this.
+  // we'd let the interpreter do this.
   betaReduce() => {
     let fn = this[0].betaReduce(),
         args = this[1].betaReduce();
@@ -600,7 +600,17 @@ class ASTComprehension extends ASTClosure {
     super.init(enclosing, function, upvalues, instance, ..children);
   }
   body() => this.find(x => x is ASTComprehensionBody && x.root == this);
-  conditions() => this.collect(x => x is ASTComprehensionIter || x is ASTComprehensionPred);
+  conditions() => {
+    let conds = [];
+    this.kmap((x, k) => {
+      if (x is ASTComprehensionIter || x is ASTComprehensionPred)
+        conds.push(x);
+      if (x is not ASTComprehension)
+        k(x);
+    });
+    return conds;
+  }
+
   tex() => "\{#{this.body().tex()} \mid #{join(this.conditions().map(x => x.tex()) ,", ")}\}";
 }
 

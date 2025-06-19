@@ -6,6 +6,9 @@ class Set extends Object {
     for (let i = 0; i < len(elements); i = i + 1) {
       this.inner[elements[i]] = true;
     }
+
+    // instance method.
+    this.tex = () => "\{#{join(this.elements().map(x => x.tex()), ", ")}\}";
   }
 
   // The elements of the set are the keys of the underlying map.
