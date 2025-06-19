@@ -97,9 +97,9 @@ class CompositionSystem {
       let applicable = type.checks(() => fn(arg));
     
       if (applicable) {
-        let data' = node.data(node'.data),
+        let data' = fn(arg),
             type' = type(data');
-        
+
         return TypeShiftTree(node.data, data', [node'], type');
       }
 

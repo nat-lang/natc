@@ -1,6 +1,5 @@
 import { v4 } from 'uuid';
 import initialize, { NatModule } from "../lib/nat";
-import pack from "../package.json";
 
 export type Compilation = {
   success: boolean;
@@ -142,5 +141,4 @@ class Runtime {
   }
 }
 
-export const version = pack.version;
 export default Runtime;
