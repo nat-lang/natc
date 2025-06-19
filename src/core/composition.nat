@@ -20,10 +20,10 @@ class AnnotatedTree extends Tree {
       ast = ast.simplify();
       let tex = "$#{this.type.tex()}$ \\ $#{ast.tex()}$";
 
-      if (this.leaf() && this.data.name != "lambda")
+      if (this.data.name != "lambda")
         return "{#{tex} \\ #{this.data.name}}";
       return "{#{tex}}";
-    } else if (vmType(this.data) == OInstance && "tex" in this.data) {
+    } else if (vmType(this.data) == OInstance && callable(this.data.tex)) {
       return "{$#{this.type.tex()}$ \\ #{this.data.tex()}}";
     }
 
@@ -85,28 +85,35 @@ class CompositionSystem {
           ], type(data));
         }
       }
-        
       return AnnotatedTree(node.data, [], type(node.data));
     }
 
-    // treat interior nodes with data as unary type shifters.
+    // treat interior nodes with data as unary type shifters,
+    // if applicable.
     if (node.data != nil) {
       let node' = this.evaluate(Tree(nil, node.children));
-
-      let data' = node.data(node'.data),
-          type' = type(data');
       
-      return TypeShiftTree(node.data, data', [node'], type');
+      let fn = node.data, arg = node'.data;
+      let applicable = type.checks(() => fn(arg));
+    
+      if (applicable) {
+        let data' = node.data(node'.data),
+            type' = type(data');
+        
+        return TypeShiftTree(node.data, data', [node'], type');
+      }
+
+      return AnnotatedTree(node.data, node'.children, type(node.data));
     }
 
     if (node.unary()) {
-      let child = this.evaluate(node[0]);
+      let node' = this.evaluate(node[0]);
       for (rule in this.unaryRules) {
         let data = rule(node.data);
         if (data)
-          return AnnotatedTree(data, [child], type(data));
+          return AnnotatedTree(data, [node'], type(data));
       }
-      return AnnotatedTree(child.data, [child], child.type);
+      return node';
     }
 
     if (node.binary()) {

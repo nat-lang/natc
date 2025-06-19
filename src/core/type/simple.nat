@@ -202,6 +202,7 @@ class SimpleTypeSystem {
   call(expr) => this.type(expr);
   check(expr) => this.typecheck(expr);
   _check(expr, debug) => this._typecheck(expr, debug);
+  checks(expr) => this.typecheck(expr).success();
 
   // Map vm types to object language types.
   literalType(value) => {

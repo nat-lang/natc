@@ -195,6 +195,17 @@ typefail(() => {
   let x: C = A();
 });
 
+// set instance type inference.
+
+let t = type({1,2,3});
+assert(t == TSet(num));
+
+let t = type({1,true});
+assert(t == TSet(TSum(num, bool)));
+
+let t = type({});
+assert(t unifies (TSet(typeVar())));
+
 // exceptions.
 
 typecheck(() => { throw Error(""); });

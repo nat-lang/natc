@@ -23,6 +23,15 @@ class OBoundFunction extends CObject {}
 class OOverload extends CObject {}
 class OSequence extends CObject {}
 
+let callable = x => {
+  let type = vmType(x);
+  return type == OClass ||
+         type == OFunction ||
+         type == OBoundFunction ||
+         type == OOverload ||
+         (type == OInstance && callable(x.call));
+};
+
 let isSubclass = (a, b) => {
   if (vmType(a) != OClass or vmType(b) != OClass) 
     return false;

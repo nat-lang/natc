@@ -234,7 +234,27 @@ class SubtypeState extends SimpleTypeState {
   );
 }
 
-class SubtypeSystem extends SimpleTypeSystem {}
+class SubtypeSystem extends SimpleTypeSystem {
+  literalType(value) => {
+    let type = vmType(value);
+    
+    if (type == OInstance) {
+      if (value is Set) {
+
+        if (len(value) == 0)
+          return TSet(typeVar());
+
+        let sum = TSum(..value.map(this.literalType));
+
+        if (len(sum) == 1)
+          return TSet(sum.lower());
+        return TSet(sum);
+      }
+    }
+
+    return super.literalType(value);
+  }
+}
 
 SubtypeSystem.ConstraintClass = SubtypeConstraint;
 SubtypeSystem.TypeStateClass = SubtypeState;
