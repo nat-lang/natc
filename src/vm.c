@@ -76,8 +76,10 @@ void initCore(Core* core) {
   core->sModule = NULL;
   core->sQuote = NULL;
   core->sBackslash = NULL;
-  core->sArgv = NULL;
+
   core->sMain = NULL;
+  core->sExecMain = NULL;
+  core->sOut = NULL;
 
   core->base = NULL;
   core->object = NULL;
@@ -154,8 +156,10 @@ bool initVM() {
   vm.core.sModule = intern("__module__");
   vm.core.sQuote = intern("\"");
   vm.core.sBackslash = intern("\\");
-  vm.core.sArgv = intern("argv");
+
   vm.core.sMain = intern("main");
+  vm.core.sExecMain = intern("let out = main();");
+  vm.core.sOut = intern("out");
 
   return loadCore() == INTERPRET_OK;
 }
@@ -815,7 +819,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.module->namespace, name, vmPeek(0));
+        ObjMap* target = vm.module->type == MODULE_ENTRYPOINT
+                             ? &vm.globals
+                             : &vm.module->namespace;
+        mapSet(target, name, vmPeek(0));
         vmPop();
         break;
       }
@@ -1221,6 +1228,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_IMPLICIT_RETURN:
       case OP_RETURN: {
         Value value = vmPop();
+
         vmCloseUpvalues(frame->slots);
         vm.frameCount--;
 
@@ -1681,7 +1689,6 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
 }
 
 InterpretResult vmExecuteModule(ObjModule* module) {
-  vmPush(OBJ_VAL(module));
   vm.module = module;
 
   if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
@@ -1694,18 +1701,50 @@ InterpretResult vmInterpretEntrypoint(char* path) {
       vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
-
+  vmPush(OBJ_VAL(module));
   return vmExecuteModule(module);
 }
 
 // wasm api.
 
-InterpretResult vmInterpretEntrypoint_wasm(char* path) {
+char* vmInterpretEntrypoint_wasm(char* path) {
   if (!initVM()) exit(2);
 
-  InterpretResult status = vmInterpretEntrypoint(path);
-  freeVM();
-  return status;
+  ObjModule* module =
+      vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
+  if (module == NULL) exit(2);
+  vmPush(OBJ_VAL(module));
+  if (vmExecuteModule(module) != INTERPRET_OK) exit(2);
+
+  Value main;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sMain), &main))
+    return "No entrypoint.";
+
+  if (!IS_CLOSURE(main)) {
+    vmRuntimeError("Main must be a function.");
+    exit(2);
+  }
+
+  ObjModule* mainModule = newModule(module->dirName, module->baseName,
+                                    vm.core.sExecMain, MODULE_ENTRYPOINT);
+  vmPush(OBJ_VAL(mainModule));
+
+  ObjClosure* closure =
+      vmCompileClosure(syntheticToken(path), vm.core.sExecMain->chars, module);
+  if (closure == NULL) return NULL;
+  mainModule->closure = closure;
+
+  if (vmExecuteModule(mainModule) != INTERPRET_OK) exit(2);
+
+  Value out;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) return "No output.";
+
+  if (!IS_STRING(out)) {
+    vmRuntimeError("Main must return a string.");
+    exit(2);
+  }
+
+  return AS_STRING(out)->chars;
 }
 
 char* vmTypesetModule_wasm(char* path) {

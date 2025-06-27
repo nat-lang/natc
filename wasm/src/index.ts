@@ -12,6 +12,11 @@ export type CoreFile = {
   type: "tree" | "blob";
 };
 
+export type InterpretResp = {
+  success: boolean;
+  out: string;
+};
+
 type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
@@ -72,27 +77,36 @@ class Runtime {
     return str;
   }
 
-  typeset = async (path: string) => {
+  typeset = async (path: string): Promise<InterpretResp> => {
     const mod = await this.loadWasmModule();
-    const interpret = mod.cwrap('vmTypesetModule_wasm', 'number', ['string']);
+    const fn = mod.cwrap('vmTypesetModule_wasm', 'number', ['string']);
     const free = mod.cwrap('vmFree_wasm', null, []);
 
-    const respPtr = interpret(path);
-    const resp = await this.readStrMem(respPtr);
+    const retPtr = fn(path);
+    const ret = await this.readStrMem(retPtr);
 
     free();
 
     return {
       success: true,
-      tex: resp,
-      errors: [],
+      out: ret,
     }
   }
 
-  interpret = async (path: string): Promise<InterpretationStatus> => {
+  interpret = async (path: string): Promise<InterpretResp> => {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
-    return fn(path);
+    const free = mod.cwrap('vmFree_wasm', null, []);
+
+    const retPtr = fn(path);
+    const ret = await this.readStrMem(retPtr);
+
+    free();
+
+    return {
+      success: true,
+      out: ret,
+    }
   };
 
   getCoreFiles = async (dir = CORE_DIR) => {
