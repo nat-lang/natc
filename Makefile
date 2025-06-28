@@ -117,7 +117,8 @@ test-wasm:
 		-s STACK_SIZE=5MB \
 		-sALLOW_MEMORY_GROWTH \
 		--embed-file src/core \
-		--embed-file test
+		--embed-file test \
+		--embed-file wasm/test
 	@ npx tsx wasm/test
 
 release-wasm:
