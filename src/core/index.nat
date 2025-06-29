@@ -4,6 +4,7 @@ use type/vm
 use object
 use module
 use iteration
+use generation
 use sequential
 use map
 use set

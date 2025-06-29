@@ -64,7 +64,7 @@ typedef struct {
   ObjClass* sequence;
   ObjClass* map;
   ObjClass* set;
-  ObjClass* iterator;
+  ObjClass* generator;
 
   ObjClass* astClosure;
   ObjClass* astComprehension;
@@ -154,6 +154,7 @@ InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretEntrypoint(char* path);
 
 char* vmInterpretEntrypoint_wasm(char* path);
+char* vmGenerate_wasm(char* path);
 char* vmTypesetModule_wasm(char* path);
 void vmFree_wasm();
 

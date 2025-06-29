@@ -195,6 +195,7 @@ bool __randomNumber__(int argCount, Value* args) {
 bool __length__(int argCount, Value* args) {
   Value obj = vmPop();
   vmPop();  // native fn.
+
   switch (OBJ_TYPE(obj)) {
     case OBJ_SEQUENCE: {
       ObjSequence* seq = AS_SEQUENCE(obj);
@@ -606,6 +607,8 @@ InterpretResult loadCore() {
   defineNativeFnMethod(S_PUSH, 1, false, __sequencePush__, vm.core.sequence);
   defineNativeFnMethod(S_ADD, 1, false, __sequencePush__, vm.core.sequence);
   defineNativeFnMethod(S_POP, 0, false, __sequencePop__, vm.core.sequence);
+
+  if ((vm.core.generator = getGlobalClass(S_GENERATOR)) == NULL) return false;
 
   if ((vm.core.module = getGlobalClass(S_MODULE)) == NULL) return false;
   defineNativeFnMethod("__import__", 0, false, __moduleImport__,

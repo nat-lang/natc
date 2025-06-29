@@ -20,6 +20,9 @@ export type InterpretResp = {
 type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
+const GEN_START = "__generator__";
+const GEN_END = "__stop_generation__";
+
 export const CORE_DIR = "core", SRC_DIR = "src";
 export const abs = (path: string) => `/${SRC_DIR}/${path}`;
 
@@ -65,14 +68,14 @@ class Runtime {
     return this.wasmModule as NatModule;
   }
 
-  readStrMem = async (pointer: number) => {
+  readStrMem = async (ptr: number) => {
     const mod = await this.loadWasmModule();
-    const memBuff = new Uint8Array(mod.wasmMemory.buffer);
+    const buf = new Uint8Array(mod.wasmMemory.buffer);
 
     let str = "";
 
-    while (memBuff[pointer] !== 0)
-      str += String.fromCharCode(memBuff[pointer++]);
+    while (buf[ptr] !== 0)
+      str += String.fromCharCode(buf[ptr++]);
 
     return str;
   }
@@ -96,18 +99,45 @@ class Runtime {
   interpret = async (path: string): Promise<InterpretResp> => {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
-    const free = mod.cwrap('vmFree_wasm', null, []);
+    // const free = mod.cwrap('vmFree_wasm', null, []);
 
     const retPtr = fn(path);
     const ret = await this.readStrMem(retPtr);
 
-    free();
+    // free();
 
     return {
       success: true,
       out: ret,
     }
   };
+
+  async *generate(path: string) {
+    const mod = await this.loadWasmModule();
+    const fn = mod.cwrap('vmGenerate_wasm', 'number', ['string']);
+    const free = mod.cwrap('vmFree_wasm', null, []);
+
+    let ret: string | null = null;
+
+
+    let i = 0;
+    while (ret !== GEN_END) {
+
+      const retPtr = fn(path);
+      ret = await this.readStrMem(retPtr);
+      console.log("-->", ret);
+
+      console.log(i);
+      i = i + 1;
+      yield {
+
+        success: true,
+        out: ret,
+      };
+    }
+
+    free();
+  }
 
   getCoreFiles = async (dir = CORE_DIR) => {
     const mod = await this.loadWasmModule();

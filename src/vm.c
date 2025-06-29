@@ -88,7 +88,7 @@ void initCore(Core* core) {
   core->sequence = NULL;
   core->map = NULL;
   core->set = NULL;
-  core->iterator = NULL;
+  core->generator = NULL;
 
   core->astClosure = NULL;
   core->astComprehension = NULL;
@@ -1689,8 +1689,6 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
 }
 
 InterpretResult vmExecuteModule(ObjModule* module) {
-  vm.module = module;
-
   if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
 
   return vmExecute(vm.frameCount - 1);
@@ -1701,11 +1699,27 @@ InterpretResult vmInterpretEntrypoint(char* path) {
       vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
+
   vmPush(OBJ_VAL(module));
+  vm.module = module;
   return vmExecuteModule(module);
 }
 
 // wasm api.
+
+InterpretResult executeMain(char* path) {
+  ObjModule* mainModule = newModule(vm.module->dirName, vm.module->baseName,
+                                    vm.core.sExecMain, MODULE_ENTRYPOINT);
+  vmPush(OBJ_VAL(mainModule));
+
+  ObjClosure* closure = vmCompileClosure(syntheticToken(path),
+                                         vm.core.sExecMain->chars, vm.module);
+  if (closure == NULL) return INTERPRET_COMPILE_ERROR;
+  mainModule->closure = closure;
+
+  vm.module = mainModule;
+  return vmExecuteModule(mainModule);
+}
 
 char* vmInterpretEntrypoint_wasm(char* path) {
   if (!initVM()) exit(2);
@@ -1714,33 +1728,51 @@ char* vmInterpretEntrypoint_wasm(char* path) {
       vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
   if (module == NULL) exit(2);
   vmPush(OBJ_VAL(module));
+  vm.module = module;
   if (vmExecuteModule(module) != INTERPRET_OK) exit(2);
 
   Value main;
   if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sMain), &main))
     return "No entrypoint.";
 
+  if (IS_INSTANCE(main) && AS_INSTANCE(main)->klass == vm.core.generator) {
+    return "__generator__";
+  }
+
   if (!IS_CLOSURE(main)) {
-    vmRuntimeError("Main must be a function.");
+    vmRuntimeError("Main must be a function or generator.");
     exit(2);
   }
 
-  ObjModule* mainModule = newModule(module->dirName, module->baseName,
-                                    vm.core.sExecMain, MODULE_ENTRYPOINT);
-  vmPush(OBJ_VAL(mainModule));
-
-  ObjClosure* closure =
-      vmCompileClosure(syntheticToken(path), vm.core.sExecMain->chars, module);
-  if (closure == NULL) return NULL;
-  mainModule->closure = closure;
-
-  if (vmExecuteModule(mainModule) != INTERPRET_OK) exit(2);
+  if (executeMain(path) != INTERPRET_OK) exit(2);
 
   Value out;
-  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) return "No output.";
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) {
+    vmRuntimeError("No output from entrypoint.");
+    exit(2);
+  }
 
   if (!IS_STRING(out)) {
     vmRuntimeError("Main must return a string.");
+    exit(2);
+  }
+
+  return AS_STRING(out)->chars;
+}
+
+char* vmGenerate_wasm(char* path) {
+  if (executeMain(path) != INTERPRET_OK) exit(2);
+
+  Value out;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) {
+    vmRuntimeError("No output from entrypoint.");
+    exit(2);
+  }
+
+  if (IS_UNDEF(out)) return "__stop_generation__";
+
+  if (!IS_STRING(out)) {
+    vmRuntimeError("Main generator must return a string or undefined.");
     exit(2);
   }
 

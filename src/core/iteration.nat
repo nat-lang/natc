@@ -21,11 +21,11 @@ class Iterator {
 let iter = object => {
   if (object is Sequential or vmType(object) == OString)
     return Iterator(object, 0, len(object));
-
+  print object;
   if (vmType(object) != OInstance)
     throw IterationProtocolError("Can't iterate over #{object}.");
 
-  if ("__iter__" in object) return object.__iter__();
+  if (callable(object.__iter__)) return object.__iter__();
 
   throw IterationProtocolError("Must define an '__iter__' method to iterate.");
 };

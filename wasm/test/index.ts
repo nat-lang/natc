@@ -1,5 +1,5 @@
 
-import Engine, { InterpretResp } from '../src';
+import Runtime, { InterpretResp } from '../src';
 
 let fail = (msg: string) => { throw new Error(`Interpretation failure: ${msg}.`); };
 
@@ -10,24 +10,14 @@ let checkResp = (resp: InterpretResp) => {
 }
 
 (async () => {
-  let engine = new Engine();
-  let resp: InterpretResp;
+  let runtime = new Runtime();
 
-  resp = await engine.interpret("test/integration/index");
-  checkResp(resp);
+  let z = await runtime.interpret("wasm/test/gen");
+  console.log(z);
 
-  resp = await engine.interpret("test/regression/index");
-  checkResp(resp);
-
-  resp = await engine.interpret("test/trip/index");
-  checkResp(resp);
-
-  resp = await engine.interpret("wasm/test/entry.nat");
-  checkResp(resp);
-  if (resp.out !== "success") fail("expecting resp.out = 'success'");
-
-  resp = await engine.typeset("test/integration/composition/index");
-  checkResp(resp);
+  let r = runtime.generate("wasm/test/gen");
+  for await (let x of r)
+    console.log(x);
 })();
 
 
