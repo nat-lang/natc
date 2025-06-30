@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - release
+      - misc
 
 jobs:
   docker-release:
