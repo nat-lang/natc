@@ -21,7 +21,7 @@ class Iterator {
 let iter = object => {
   if (object is Sequential or vmType(object) == OString)
     return Iterator(object, 0, len(object));
-  print object;
+
   if (vmType(object) != OInstance)
     throw IterationProtocolError("Can't iterate over #{object}.");
 

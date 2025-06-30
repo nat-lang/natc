@@ -23,8 +23,10 @@ let FunctionApplication = (a: x -> y, b: x) => a(b) | (a: x, b: x -> y) => b(a);
 
 grammar.addRules(FunctionApplication, NonBranchingNodes);
 
-let prefix ex = tree => {
-  let typedTree = grammar.evaluate(tree);
-  document.add(typedTree.tex());
-  return typedTree;
-};
+let examples = [];
+
+let prefix ex = examples.push;
+
+let main = () => Generator(
+  examples, (x => x.tex()) . grammar.evaluate
+);

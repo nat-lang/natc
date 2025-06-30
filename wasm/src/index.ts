@@ -20,7 +20,7 @@ export type InterpretResp = {
 type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
-const GEN_START = "__generator__";
+export const GEN_START = "__generator__";
 const GEN_END = "__stop_generation__";
 
 export const CORE_DIR = "core", SRC_DIR = "src";
@@ -80,31 +80,12 @@ class Runtime {
     return str;
   }
 
-  typeset = async (path: string): Promise<InterpretResp> => {
-    const mod = await this.loadWasmModule();
-    const fn = mod.cwrap('vmTypesetModule_wasm', 'number', ['string']);
-    const free = mod.cwrap('vmFree_wasm', null, []);
-
-    const retPtr = fn(path);
-    const ret = await this.readStrMem(retPtr);
-
-    free();
-
-    return {
-      success: true,
-      out: ret,
-    }
-  }
-
   interpret = async (path: string): Promise<InterpretResp> => {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
-    // const free = mod.cwrap('vmFree_wasm', null, []);
 
     const retPtr = fn(path);
     const ret = await this.readStrMem(retPtr);
-
-    // free();
 
     return {
       success: true,
@@ -112,30 +93,19 @@ class Runtime {
     }
   };
 
-  async *generate(path: string) {
+  async *generate(path: string): AsyncGenerator<InterpretResp> {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmGenerate_wasm', 'number', ['string']);
+
+    let out: string | null = null;
+
+    while ((out = await this.readStrMem(fn(path))) !== GEN_END)
+      yield { success: true, out };
+  }
+
+  free = async () => {
+    const mod = await this.loadWasmModule();
     const free = mod.cwrap('vmFree_wasm', null, []);
-
-    let ret: string | null = null;
-
-
-    let i = 0;
-    while (ret !== GEN_END) {
-
-      const retPtr = fn(path);
-      ret = await this.readStrMem(retPtr);
-      console.log("-->", ret);
-
-      console.log(i);
-      i = i + 1;
-      yield {
-
-        success: true,
-        out: ret,
-      };
-    }
-
     free();
   }
 

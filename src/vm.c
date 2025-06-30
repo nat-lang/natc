@@ -1727,6 +1727,7 @@ char* vmInterpretEntrypoint_wasm(char* path) {
   ObjModule* module =
       vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
   if (module == NULL) exit(2);
+
   vmPush(OBJ_VAL(module));
   vm.module = module;
   if (vmExecuteModule(module) != INTERPRET_OK) exit(2);
@@ -1735,12 +1736,8 @@ char* vmInterpretEntrypoint_wasm(char* path) {
   if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sMain), &main))
     return "No entrypoint.";
 
-  if (IS_INSTANCE(main) && AS_INSTANCE(main)->klass == vm.core.generator) {
-    return "__generator__";
-  }
-
   if (!IS_CLOSURE(main)) {
-    vmRuntimeError("Main must be a function or generator.");
+    vmRuntimeError("Main must be a function.");
     exit(2);
   }
 
@@ -1752,8 +1749,13 @@ char* vmInterpretEntrypoint_wasm(char* path) {
     exit(2);
   }
 
+  if (IS_INSTANCE(out) && AS_INSTANCE(out)->klass == vm.core.generator) {
+    mapSet(&vm.globals, OBJ_VAL(vm.core.sMain), out);
+    return "__generator__";
+  }
+
   if (!IS_STRING(out)) {
-    vmRuntimeError("Main must return a string.");
+    vmRuntimeError("Main must return a string or generator.");
     exit(2);
   }
 
