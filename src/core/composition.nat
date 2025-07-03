@@ -37,7 +37,7 @@ class AnnotatedTree extends Tree {
     return "[#{this.texData()} #{children}]";
   }
 
-  tex() => "\begin{exe} \ex \[ \begin{forest} #{this.texNode()} \end{forest} \] \end{exe}";
+  tex() => "\begin{forest} #{this.texNode()} \end{forest}";
 }
 
 class TypeShiftTree extends AnnotatedTree {
