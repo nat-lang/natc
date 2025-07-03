@@ -1,0 +1,13 @@
+
+class Generator {
+  init(iterable, fn) => {
+    this.fn = fn;
+    this.iterable = iter(iterable);
+  }
+  next() => {
+    if (this.iterable.more())
+      return this.fn(this.iterable.next());
+    return undefined;
+  }
+  call() => this.next();
+}

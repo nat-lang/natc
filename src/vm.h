@@ -50,10 +50,12 @@ typedef struct {
   ObjString* sSignature;
   ObjString* sFunction;
   ObjString* sModule;
-  ObjString* sArgv;
-  ObjString* sMain;
   ObjString* sQuote;
   ObjString* sBackslash;
+
+  ObjString* sMain;
+  ObjString* sExecMain;
+  ObjString* sOut;
 
   ObjClass* base;
   ObjClass* object;
@@ -62,7 +64,7 @@ typedef struct {
   ObjClass* sequence;
   ObjClass* map;
   ObjClass* set;
-  ObjClass* iterator;
+  ObjClass* generator;
 
   ObjClass* astClosure;
   ObjClass* astComprehension;
@@ -151,7 +153,8 @@ void vmRuntimeError(const char* format, ...);
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretEntrypoint(char* path);
 
-InterpretResult vmInterpretEntrypoint_wasm(char* path);
+char* vmInterpretEntrypoint_wasm(char* path);
+char* vmGenerate_wasm(char* path);
 char* vmTypesetModule_wasm(char* path);
 void vmFree_wasm();
 

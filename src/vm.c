@@ -76,8 +76,10 @@ void initCore(Core* core) {
   core->sModule = NULL;
   core->sQuote = NULL;
   core->sBackslash = NULL;
-  core->sArgv = NULL;
+
   core->sMain = NULL;
+  core->sExecMain = NULL;
+  core->sOut = NULL;
 
   core->base = NULL;
   core->object = NULL;
@@ -86,7 +88,7 @@ void initCore(Core* core) {
   core->sequence = NULL;
   core->map = NULL;
   core->set = NULL;
-  core->iterator = NULL;
+  core->generator = NULL;
 
   core->astClosure = NULL;
   core->astComprehension = NULL;
@@ -154,8 +156,10 @@ bool initVM() {
   vm.core.sModule = intern("__module__");
   vm.core.sQuote = intern("\"");
   vm.core.sBackslash = intern("\\");
-  vm.core.sArgv = intern("argv");
+
   vm.core.sMain = intern("main");
+  vm.core.sExecMain = intern("let out = main();");
+  vm.core.sOut = intern("out");
 
   return loadCore() == INTERPRET_OK;
 }
@@ -815,7 +819,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.module->namespace, name, vmPeek(0));
+        ObjMap* target = vm.module->type == MODULE_ENTRYPOINT
+                             ? &vm.globals
+                             : &vm.module->namespace;
+        mapSet(target, name, vmPeek(0));
         vmPop();
         break;
       }
@@ -1221,6 +1228,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_IMPLICIT_RETURN:
       case OP_RETURN: {
         Value value = vmPop();
+
         vmCloseUpvalues(frame->slots);
         vm.frameCount--;
 
@@ -1681,9 +1689,6 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
 }
 
 InterpretResult vmExecuteModule(ObjModule* module) {
-  vmPush(OBJ_VAL(module));
-  vm.module = module;
-
   if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
 
   return vmExecute(vm.frameCount - 1);
@@ -1695,17 +1700,85 @@ InterpretResult vmInterpretEntrypoint(char* path) {
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
+  vmPush(OBJ_VAL(module));
+  vm.module = module;
   return vmExecuteModule(module);
 }
 
 // wasm api.
 
-InterpretResult vmInterpretEntrypoint_wasm(char* path) {
+InterpretResult executeMain(char* path) {
+  ObjModule* mainModule = newModule(vm.module->dirName, vm.module->baseName,
+                                    vm.core.sExecMain, MODULE_ENTRYPOINT);
+  vmPush(OBJ_VAL(mainModule));
+
+  ObjClosure* closure = vmCompileClosure(syntheticToken(path),
+                                         vm.core.sExecMain->chars, vm.module);
+  if (closure == NULL) return INTERPRET_COMPILE_ERROR;
+  mainModule->closure = closure;
+
+  vm.module = mainModule;
+  return vmExecuteModule(mainModule);
+}
+
+char* vmInterpretEntrypoint_wasm(char* path) {
   if (!initVM()) exit(2);
 
-  InterpretResult status = vmInterpretEntrypoint(path);
-  freeVM();
-  return status;
+  ObjModule* module =
+      vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
+  if (module == NULL) exit(2);
+
+  vmPush(OBJ_VAL(module));
+  vm.module = module;
+  if (vmExecuteModule(module) != INTERPRET_OK) exit(2);
+
+  Value main;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sMain), &main))
+    return "No entrypoint.";
+
+  if (!IS_CLOSURE(main)) {
+    vmRuntimeError("Main must be a function.");
+    exit(2);
+  }
+
+  if (executeMain(path) != INTERPRET_OK) exit(2);
+
+  Value out;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) {
+    vmRuntimeError("No output from entrypoint.");
+    exit(2);
+  }
+
+  if (IS_INSTANCE(out) && AS_INSTANCE(out)->klass == vm.core.generator) {
+    mapSet(&vm.globals, OBJ_VAL(vm.core.sMain), out);
+    return "__generator__";
+  }
+
+  if (!IS_STRING(out)) {
+    vmRuntimeError("Main must return a string or generator.");
+    exit(2);
+  }
+
+  return AS_STRING(out)->chars;
+}
+
+char* vmGenerate_wasm(char* path) {
+  if (executeMain(path) != INTERPRET_OK) exit(2);
+
+  Value out;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) {
+    vmRuntimeError("No output from entrypoint.");
+    exit(2);
+  }
+
+  if (IS_UNDEF(out)) return "__stop_generation__";
+
+  if (!IS_STRING(out)) {
+    vmRuntimeError("Main generator must return a string or undefined.");
+    exit(2);
+  }
+
+  return AS_STRING(out)->chars;
 }
 
 char* vmTypesetModule_wasm(char* path) {

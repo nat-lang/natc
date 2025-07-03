@@ -36,8 +36,7 @@
 #define S_TUPLE "Tuple"
 #define S_MAP "Map"
 #define S_SET "Set"
-#define S_TREE "Tree"
-#define S_ITERATOR "Iterator"
+#define S_GENERATOR "Generator"
 
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_COMPREHENSION "ASTComprehension"
