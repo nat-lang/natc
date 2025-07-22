@@ -1,6 +1,7 @@
 class JSONError extends Error {}
 
 let jsonEscapeChar = char => {
+  if (char == Strings.newline) return "\n";
   if (char == Strings.backslash) return "\\";
   if (char == Strings.quote) return "\" + Strings.quote;
   return char;

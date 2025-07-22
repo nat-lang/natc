@@ -23,16 +23,6 @@ static void defineNativeFn(char* name, int arity, bool variadic,
   vmPop();
 }
 
-static void defineNativeInfixGlobal(char* name, int arity, NativeFn function,
-                                    Precedence prec) {
-  defineNativeFn(name, arity, false, function, &vm.globals);
-
-  Value fn;
-  Value fnName = INTERN(name);
-  mapGet(&vm.globals, fnName, &fn);
-  mapSet(&vm.infixes, fnName, NUMBER_VAL(prec));
-}
-
 static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
   defineNativeFn(name, arity, false, function, &vm.globals);
 }
@@ -40,6 +30,25 @@ static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
 static void defineNativeFnMethod(char* name, int arity, bool variadic,
                                  NativeFn function, ObjClass* klass) {
   defineNativeFn(name, arity, variadic, function, &klass->fields);
+}
+
+static void defineNativeAffixGlobal(char* name, int arity, NativeFn function,
+                                    Precedence prec, ObjMap* affixMap) {
+  defineNativeFn(name, arity, false, function, &vm.globals);
+
+  Value fn;
+  Value fnName = INTERN(name);
+  mapGet(&vm.globals, fnName, &fn);
+  mapSet(affixMap, fnName, NUMBER_VAL(prec));
+}
+
+static void defineNativeInfixGlobal(char* name, NativeFn function,
+                                    Precedence prec) {
+  defineNativeAffixGlobal(name, 2, function, prec, &vm.infixes);
+}
+
+static void defineNativePrefixGlobal(char* name, NativeFn function) {
+  defineNativeAffixGlobal(name, 1, function, 1, &vm.prefixes);
 }
 
 ObjClass* defineNativeClass(char* name) {
@@ -195,6 +204,11 @@ bool __randomNumber__(int argCount, Value* args) {
 bool __length__(int argCount, Value* args) {
   Value obj = vmPop();
   vmPop();  // native fn.
+
+  if (!IS_OBJ(obj)) {
+    vmRuntimeError("Only objects have length.");
+    return false;
+  }
 
   switch (OBJ_TYPE(obj)) {
     case OBJ_SEQUENCE: {
@@ -422,6 +436,18 @@ bool __address__(int argCount, Value* args) {
   return true;
 }
 
+bool __ord__(int argCount, Value* args) {
+  Value value = vmPop();
+  if (!IS_STRING(value) || AS_STRING(value)->length != 1) {
+    vmRuntimeError("Expecting string of length 1.");
+    return false;
+  }
+
+  vmPop();  // fn.
+  vmPush(NUMBER_VAL(AS_STRING(value)->chars[0]));
+  return true;
+}
+
 bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
@@ -491,6 +517,21 @@ bool __str__(int argCount, Value* args) {
   return true;
 }
 
+#define BINARY_NATIVE(name, valueType, op)                  \
+  static bool __##name(int argCount, Value* args) {         \
+    do {                                                    \
+      if (!IS_NUMBER(vmPeek(0)) || !IS_NUMBER(vmPeek(1))) { \
+        vmRuntimeError("Operands must be numbers.");        \
+        return false;                                       \
+      }                                                     \
+      double b = AS_NUMBER(vmPop());                        \
+      double a = AS_NUMBER(vmPop());                        \
+      vmPop();                                              \
+      vmPush(valueType(a op b));                            \
+    } while (false);                                        \
+    return true;                                            \
+  }
+
 BINARY_NATIVE(gt__, BOOL_VAL, >);
 BINARY_NATIVE(lt__, BOOL_VAL, <);
 BINARY_NATIVE(gte__, BOOL_VAL, >=);
@@ -499,6 +540,14 @@ BINARY_NATIVE(lte__, BOOL_VAL, <=);
 BINARY_NATIVE(sub__, NUMBER_VAL, -);
 BINARY_NATIVE(div__, NUMBER_VAL, /);
 BINARY_NATIVE(mul__, NUMBER_VAL, *);
+
+bool __print__(int argCount, Value* args) {
+  printValue(vmPop());
+  vmPop();  // fn.
+  printf("\n");
+  vmPush(NIL_VAL);
+  return true;
+}
 
 bool __add__(int argCount, Value* args) {
   if (IS_STRING(vmPeek(0)) && IS_STRING(vmPeek(1))) {
@@ -565,7 +614,8 @@ InterpretResult loadCore() {
   // native functions.
 
   defineNativeFnGlobal("len", 1, __length__);
-  defineNativeFnGlobal("str", 1, __str__);
+  defineNativeFnGlobal("__str__", 1, __str__);
+  defineNativeFnGlobal("ord", 1, __ord__);
   defineNativeFnGlobal("hash", 1, __hash__);
   defineNativeFnGlobal("vmHashable", 1, __vmHashable__);
   defineNativeFnGlobal("vmType", 1, __vmType__);
@@ -578,14 +628,16 @@ InterpretResult loadCore() {
   defineNativeFnGlobal("annotations", 1, __annotations__);
   defineNativeFnGlobal("compile", 3, __compile__);
 
-  defineNativeInfixGlobal(">", 2, __gt__, PREC_COMPARISON);
-  defineNativeInfixGlobal("<", 2, __lt__, PREC_COMPARISON);
-  defineNativeInfixGlobal(">=", 2, __gte__, PREC_COMPARISON);
-  defineNativeInfixGlobal("<=", 2, __lte__, PREC_COMPARISON);
-  defineNativeInfixGlobal("+", 2, __add__, PREC_TERM);
-  defineNativeInfixGlobal("-", 2, __sub__, PREC_TERM);
-  defineNativeInfixGlobal("/", 2, __div__, PREC_FACTOR);
-  defineNativeInfixGlobal("*", 2, __mul__, PREC_FACTOR);
+  defineNativeInfixGlobal(">", __gt__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<", __lt__, PREC_COMPARISON);
+  defineNativeInfixGlobal(">=", __gte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<=", __lte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("+", __add__, PREC_TERM);
+  defineNativeInfixGlobal("-", __sub__, PREC_TERM);
+  defineNativeInfixGlobal("/", __div__, PREC_FACTOR);
+  defineNativeInfixGlobal("*", __mul__, PREC_FACTOR);
+
+  defineNativePrefixGlobal("__print__", __print__);
 
   // native classes.
 
@@ -655,8 +707,7 @@ InterpretResult loadCore() {
   if (systemIntpt != INTERPRET_OK) return systemIntpt;
 
   if ((vm.core.unify = getGlobalClosure(S_UNIFY)) == NULL ||
-      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL ||
-      (vm.core.document = getGlobalInstance(S_DOCUMENT)) == NULL)
+      (vm.core.typeSystem = getGlobalInstance(S_TYPE_SYSTEM)) == NULL)
     return INTERPRET_RUNTIME_ERROR;
 
   ObjInstance* strings = getGlobalInstance("Strings");

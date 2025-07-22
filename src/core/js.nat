@@ -1,0 +1,26 @@
+
+class Codeblock {
+  init(text) => {
+    this.text = text;
+  }
+}
+
+let serialize = x => {
+  let type;
+
+  if (x is Codeblock)
+    type = "codeblock";
+  else if (x is TexDoc) {
+    type = "tex";
+    x = x.render();
+  } else if (vmType(x) == OString) {
+    type = "string";
+  } else
+    throw Error("Don't know how to serialize output.");
+
+  return jsonEncode({
+    "success": true,
+    "out": x,
+    "type": type
+  });
+};

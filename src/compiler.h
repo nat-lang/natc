@@ -47,6 +47,7 @@ typedef struct Compiler {
 
 typedef enum {
   PREC_NONE,
+  PREC_PREFIX,
   PREC_ASSIGNMENT,       // =
   PREC_TYPE_ASSIGNMENT,  // : _ =
   PREC_OR,               // or

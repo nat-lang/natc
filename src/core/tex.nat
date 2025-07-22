@@ -1,5 +1,5 @@
 
-class TexDocument {
+class TexDoc {
   init() => {
     this.preamble = "";
     this.blocks = [];
@@ -12,7 +12,7 @@ class TexDocument {
 
   add(block) => this.blocks.push(block);
 
-  renderBlocks() => join([block | block in this.blocks], newline + newline);
+  renderBlocks() => join([block | block in this.blocks], Strings.newline + Strings.newline);
 
   render() => "#{this.preamble}
 \begin{document}
@@ -21,4 +21,64 @@ class TexDocument {
   ";
 }
 
-let document = TexDocument();
+class ArticleTexDoc extends TexDoc {
+  init() => {
+    super.init();
+    this.preamble = tex"
+      \documentclass{article}
+      \usepackage[a1paper,margin=0.2in]{geometry}
+      \usepackage{stmaryrd}
+      \usepackage{amsmath}
+      \usepackage{tikz}
+      \usepackage[linguistics]{forest}
+      \usepackage{MnSymbol}
+      \usepackage{gb4e}
+
+      \usepackage[colorlinks]{hyperref}
+      \usepackage{cleveref}
+    ";
+  }
+}
+
+class StandaloneTexDoc extends TexDoc {
+  init(content) => {
+    super.init();
+    this.preamble = tex"
+      \documentclass{standalone}
+      \usepackage{stmaryrd}
+      \usepackage{amsmath}
+      \usepackage{tikz}
+      \usepackage[linguistics]{forest}
+      \usepackage{MnSymbol}
+      \usepackage{gb4e}
+
+      \usepackage[colorlinks]{hyperref}
+      \usepackage{cleveref}
+    ";
+
+    this.add(content);
+  }
+}
+
+class GuideTexDoc extends TexDoc {
+  init(content) => {
+    super.init();
+    this.preamble = tex"
+      \documentclass[
+        border={0pt 0px 0px 0px},
+        varwidth=400px
+      ]{standalone}
+      \usepackage{stmaryrd}
+      \usepackage{amsmath}
+      \usepackage{tikz}
+      \usepackage[linguistics]{forest}
+      \usepackage{MnSymbol}
+      \usepackage{gb4e}
+
+      \usepackage[colorlinks]{hyperref}
+      \usepackage{cleveref}
+    ";
+
+    this.add(content);
+  }
+}

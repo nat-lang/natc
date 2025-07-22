@@ -24,7 +24,6 @@ use negation
 use object
 use module/index
 use recursion
-use return
 use sequential
 use set
 use string

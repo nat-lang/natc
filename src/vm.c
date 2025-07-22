@@ -118,7 +118,6 @@ void initCore(Core* core) {
 
   core->unify = NULL;
   core->typeSystem = NULL;
-  core->document = NULL;
 }
 
 bool initVM() {
@@ -1018,11 +1017,6 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_NOT:
         vmPush(BOOL_VAL(isFalsey(vmPop())));
         break;
-      case OP_PRINT: {
-        printValue(vmPop());
-        printf("\n");
-        break;
-      }
       case OP_JUMP: {
         uint16_t offset = READ_SHORT();
         frame->ip += offset;
@@ -1734,7 +1728,7 @@ char* vmInterpretEntrypoint_wasm(char* path) {
 
   Value main;
   if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sMain), &main))
-    return "No entrypoint.";
+    return "{\"success\": true, \"type\": \"string\", \"out\": \"No output.\"}";
 
   if (!IS_CLOSURE(main)) {
     vmRuntimeError("Main must be a function.");
@@ -1751,7 +1745,8 @@ char* vmInterpretEntrypoint_wasm(char* path) {
 
   if (IS_INSTANCE(out) && AS_INSTANCE(out)->klass == vm.core.generator) {
     mapSet(&vm.globals, OBJ_VAL(vm.core.sMain), out);
-    return "__generator__";
+    return "{\"success\": true, \"type\": \"flag\", \"out\": "
+           "\"__start_generation__\"}";
   }
 
   if (!IS_STRING(out)) {
@@ -1771,7 +1766,9 @@ char* vmGenerate_wasm(char* path) {
     exit(2);
   }
 
-  if (IS_UNDEF(out)) return "__stop_generation__";
+  if (IS_UNDEF(out))
+    return "{\"success\": true, \"type\": \"flag\", \"out\": "
+           "\"__stop_generation__\"}";
 
   if (!IS_STRING(out)) {
     vmRuntimeError("Main generator must return a string or undefined.");
@@ -1779,31 +1776,6 @@ char* vmGenerate_wasm(char* path) {
   }
 
   return AS_STRING(out)->chars;
-}
-
-char* vmTypesetModule_wasm(char* path) {
-  if (!initVM()) exit(2);
-
-  InterpretResult status = vmInterpretEntrypoint(path);
-
-  if (status != INTERPRET_OK) exit(2);
-
-  vmPush(OBJ_VAL(vm.core.document));
-
-  if (!vmCallValue(vmPeek(0), 0)) exit(2);
-  if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) exit(2);
-
-  Value rendered;
-  if (!mapGet(&vm.core.document->fields, INTERN(S_RENDERED), &rendered)) {
-    vmRuntimeError("failed to render.");
-    exit(2);
-  }
-  if (!IS_STRING(rendered)) {
-    vmRuntimeError("document.%s must be a string", S_RENDERED);
-    exit(2);
-  }
-
-  return AS_STRING(rendered)->chars;
 }
 
 void vmFree_wasm() { freeVM(); }

@@ -69,7 +69,6 @@
 #define S_GRAMMAR "Grammar"
 #define S_TYPE_SYSTEM "TypeSystem"
 #define S_UNIFY "unify"
-#define S_DOCUMENT "document"
 #define S_RENDERED "rendered"
 
 typedef enum {
@@ -123,7 +122,6 @@ typedef enum {
   TOKEN_NIL,
   TOKEN_NOT,
   TOKEN_OR,
-  TOKEN_PRINT,
   TOKEN_RETURN,
   TOKEN_SUPER,
   TOKEN_THIS,

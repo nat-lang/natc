@@ -12,15 +12,22 @@ export type CoreFile = {
   type: "tree" | "blob";
 };
 
+export type RespType = "string" | "tex" | "flag";
+export type CodeblockResp = {
+  success: boolean;
+  type: "codeblock";
+  out: { text: string };
+}
 export type InterpretResp = {
   success: boolean;
+  type: RespType;
   out: string;
-};
+} | CodeblockResp;
 
 type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
-export const GEN_START = "__generator__";
+export const GEN_START = "__start_generation__";
 const GEN_END = "__stop_generation__";
 
 export const CORE_DIR = "core", SRC_DIR = "src";
@@ -60,6 +67,16 @@ class Runtime {
     };
   }
 
+  onStderr = (handler: OutputHandler) => {
+    let uid = v4();
+
+    this.stdErrHandlers[uid] = handler;
+
+    return () => {
+      delete this.stdErrHandlers[uid];
+    };
+  }
+
   loadWasmModule = async (): Promise<NatModule> => {
     if (!this.wasmModule) this.wasmModule = await initialize({
       print: this.handleStdOut.bind(this),
@@ -85,22 +102,25 @@ class Runtime {
     const fn = mod.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
 
     const retPtr = fn(path);
-    const ret = await this.readStrMem(retPtr);
+    const out = await this.readStrMem(retPtr);
 
-    return {
-      success: true,
-      out: ret,
-    }
+    return JSON.parse(out);
   };
 
   async *generate(path: string): AsyncGenerator<InterpretResp> {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmGenerate_wasm', 'number', ['string']);
 
-    let out: string | null = null;
+    const next = async () => {
+      let out = await this.readStrMem(fn(path));
+      let resp: InterpretResp = JSON.parse(out);
+      return resp;
+    };
 
-    while ((out = await this.readStrMem(fn(path))) !== GEN_END)
-      yield { success: true, out };
+    let resp: InterpretResp | null = null;
+
+    while ((resp = await next())?.out != GEN_END)
+      yield resp;
   }
 
   free = async () => {
@@ -152,6 +172,11 @@ class Runtime {
   setFile = async (path: string, content: string) => {
     const mod = await this.loadWasmModule();
     mod.FS.writeFile(abs(path), content, { flags: "w+" });
+  }
+
+  rmFile = async (path: string) => {
+    const mod = await this.loadWasmModule();
+    mod.FS.unlink(abs(path));
   }
 }
 

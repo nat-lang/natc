@@ -571,11 +571,10 @@ class SimpleTypeState {
     
     // function constraints become domain/domain range/range constraints.
     if (left is TFunction and right is TFunction) {
-      this.extendConstraints(this.tcEnv[constraint], [
-        // fixme: the compiler fails when these are unparenthesized.
-        (left.domain ~ right.domain),
-        (left.range ~ right.range)
-      ]);
+      this.extendConstraints(this.tcEnv[constraint], (
+        left.domain ~ right.domain,
+        left.range ~ right.range
+      ));
 
       return this.solve();
     }

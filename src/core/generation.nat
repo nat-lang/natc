@@ -11,3 +11,5 @@ class Generator {
   }
   call() => this.next();
 }
+
+let generate = (seq, fn) => Generator(seq, serialize . fn);

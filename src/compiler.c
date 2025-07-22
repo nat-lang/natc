@@ -777,7 +777,7 @@ static void infix(Compiler* cmp, bool canAssign) {
 static void prefix(Compiler* cmp, bool canAssign) {
   variable(cmp, canAssign);
   if (prevWhite()) {
-    parsePrecedence(cmp, PREC_UNARY);
+    parsePrecedence(cmp, PREC_PREFIX);
     emitBytes(cmp, OP_CALL, 1);
   }
 }
@@ -824,12 +824,14 @@ static void unary(Compiler* cmp, bool canAssign) {
 
 static void prefixNot(Compiler* cmp, bool canAssign) {
   ParseRule* penultRule = getInfixRule(cmp, parser.penult);
+
   if (penultRule->infix != NULL && penultRule->infix != call) {
     getGlobalConstant(cmp, "negate");
     emitBytes(cmp, OP_CALL_POSTFIX, 1);
     parsePrecedence(cmp, penultRule->rightPrec);
   } else {
-    error(cmp, "'not' must compose with an infix.");
+    parsePrecedence(cmp, PREC_UNARY);
+    emitByte(cmp, OP_NOT);
   }
 }
 
@@ -1818,12 +1820,6 @@ void useStatement(Compiler* cmp) {
   emitConstInstr(cmp, OP_IMPORT, moduleConst);
 }
 
-static void printStatement(Compiler* cmp) {
-  expression(cmp);
-  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after value.");
-  emitByte(cmp, OP_PRINT);
-}
-
 static void returnStatement(Compiler* cmp) {
   if (cmp->functionType == TYPE_MODULE) {
     error(cmp, "Can't return from top-level code.");
@@ -1876,7 +1872,6 @@ static void synchronize(Compiler* cmp) {
       case TOKEN_IF:
       case TOKEN_LET:
       case TOKEN_WHILE:
-      case TOKEN_PRINT:
       case TOKEN_RETURN:
         return;
 
@@ -1914,8 +1909,6 @@ static void statement(Compiler* cmp) {
     beginScope(cmp);
     block(cmp);
     endScope(cmp);
-  } else if (match(cmp, TOKEN_PRINT)) {
-    printStatement(cmp);
   } else if (match(cmp, TOKEN_RETURN)) {
     returnStatement(cmp);
   } else if (match(cmp, TOKEN_THROW)) {
@@ -1961,7 +1954,6 @@ ParseRule rules[] = {
     [TOKEN_IN] = {NULL, binary, PREC_COMPARISON, PREC_COMPARISON + PREC_STEP},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NOT] = {prefixNot, infixNot, PREC_CALL, PREC_CALL},
-    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SUPER] = {super_, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_THIS] = {this_, NULL, PREC_NONE, PREC_NONE},

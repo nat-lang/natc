@@ -28,5 +28,5 @@ let examples = [];
 let prefix ex = examples.push;
 
 let main = () => Generator(
-  examples, (x => x.tex()) . grammar.evaluate
+  examples, serialize . (x => x.tex()) . grammar.evaluate
 );

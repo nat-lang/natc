@@ -1,0 +1,5 @@
+
+  print len(newline);
+
+jsonEscape("xy
+z");

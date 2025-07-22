@@ -134,12 +134,12 @@ class Set extends Object {
   all(predicate) => this.elements().all(predicate);
   some(predicate) => this.elements().some(predicate);
 
-  join() => join([x.str() | x in this.elements()], ", ");
-  str() => "Set(#{this.join()}))";
+  str() => "{#{join([str(x) | x in this.elements()], ", ")}}";
   tex(ast: ASTArgumentSequence) => "\{#{ast.tex()}\}";
   pp() => {
     print this.str();
   }
+  print() => print(this.str());
 
   toSeq() => this.elements();
   fromSeq(seq: Sequential) => Set(..seq);

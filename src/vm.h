@@ -97,7 +97,6 @@ typedef struct {
 
   ObjClosure* unify;
   ObjInstance* typeSystem;
-  ObjInstance* document;
 } Core;
 
 typedef struct {
