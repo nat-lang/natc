@@ -78,10 +78,12 @@ class Runtime {
   }
 
   loadWasmModule = async (): Promise<NatModule> => {
-    if (!this.wasmModule) this.wasmModule = await initialize({
-      print: this.handleStdOut.bind(this),
-      printErr: this.handleStdErr.bind(this)
-    });
+    if (!this.wasmModule) {
+      this.wasmModule = initialize({
+        print: this.handleStdOut.bind(this),
+        printErr: this.handleStdErr.bind(this)
+      });
+    }
     return this.wasmModule as NatModule;
   }
 
@@ -101,7 +103,7 @@ class Runtime {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
 
-    const retPtr = fn(path);
+    const retPtr = fn(abs(path));
     const out = await this.readStrMem(retPtr);
 
     return JSON.parse(out);
@@ -112,7 +114,7 @@ class Runtime {
     const fn = mod.cwrap('vmGenerate_wasm', 'number', ['string']);
 
     const next = async () => {
-      let out = await this.readStrMem(fn(path));
+      let out = await this.readStrMem(fn(abs(path)));
       let resp: InterpretResp = JSON.parse(out);
       return resp;
     };
@@ -177,6 +179,20 @@ class Runtime {
   rmFile = async (path: string) => {
     const mod = await this.loadWasmModule();
     mod.FS.unlink(abs(path));
+  }
+
+  ls = async (path: string) => {
+    const mod = await this.loadWasmModule();
+    const files = [];
+
+    const contents = mod.FS.readdir(path);
+
+    for (const item of contents) {
+      if (item !== '.' && item !== '..') {
+        files.push(item);
+      }
+    }
+    return files;
   }
 }
 

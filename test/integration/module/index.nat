@@ -47,6 +47,16 @@ let x = 0;
 importable.__import__();
 assert(x == 1);
 
+// system file.
+
+use .dotted
+
+assert(dot == ".");
+
+use .dotted as dotted
+
+assert(dotted.dot == ".");
+
 // named imports.
 
 // single.
