@@ -1725,6 +1725,8 @@ char* vmInterpretEntrypoint_wasm(char* path) {
       vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
   if (module == NULL) exit(2);
 
+  mapDelete(&vm.globals, OBJ_VAL(vm.core.sMain));
+
   vmPush(OBJ_VAL(module));
   vm.module = module;
   if (vmExecuteModule(module) != INTERPRET_OK) exit(2);
