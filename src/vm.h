@@ -50,10 +50,12 @@ typedef struct {
   ObjString* sSignature;
   ObjString* sFunction;
   ObjString* sModule;
-  ObjString* sArgv;
-  ObjString* sMain;
   ObjString* sQuote;
   ObjString* sBackslash;
+
+  ObjString* sMain;
+  ObjString* sExecMain;
+  ObjString* sOut;
 
   ObjClass* base;
   ObjClass* object;
@@ -62,7 +64,7 @@ typedef struct {
   ObjClass* sequence;
   ObjClass* map;
   ObjClass* set;
-  ObjClass* iterator;
+  ObjClass* generator;
 
   ObjClass* astClosure;
   ObjClass* astComprehension;
@@ -95,7 +97,6 @@ typedef struct {
 
   ObjClosure* unify;
   ObjInstance* typeSystem;
-  ObjInstance* document;
 } Core;
 
 typedef struct {
@@ -114,6 +115,9 @@ typedef struct {
   ObjMap prefixes;
   ObjMap infixes;
   ObjMap methodInfixes;
+
+  // generator.
+  ObjInstance* gen;
 
   // core defs.
   Core core;
@@ -151,8 +155,9 @@ void vmRuntimeError(const char* format, ...);
 InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretEntrypoint(char* path);
 
-InterpretResult vmInterpretEntrypoint_wasm(char* path);
-char* vmTypesetModule_wasm(char* path);
+char* vmInterpretEntrypoint_wasm(char* path);
+char* vmGenerate_wasm(char* path);
+void vmInit_wasm();
 void vmFree_wasm();
 
 ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type);

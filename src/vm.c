@@ -76,8 +76,10 @@ void initCore(Core* core) {
   core->sModule = NULL;
   core->sQuote = NULL;
   core->sBackslash = NULL;
-  core->sArgv = NULL;
+
   core->sMain = NULL;
+  core->sExecMain = NULL;
+  core->sOut = NULL;
 
   core->base = NULL;
   core->object = NULL;
@@ -86,7 +88,7 @@ void initCore(Core* core) {
   core->sequence = NULL;
   core->map = NULL;
   core->set = NULL;
-  core->iterator = NULL;
+  core->generator = NULL;
 
   core->astClosure = NULL;
   core->astComprehension = NULL;
@@ -116,7 +118,6 @@ void initCore(Core* core) {
 
   core->unify = NULL;
   core->typeSystem = NULL;
-  core->document = NULL;
 }
 
 bool initVM() {
@@ -142,6 +143,8 @@ bool initVM() {
   initMap(&vm.infixes);
   initMap(&vm.methodInfixes);
 
+  vm.gen = NULL;
+
   initCore(&vm.core);
 
   vm.core.sName = intern("name");
@@ -154,8 +157,12 @@ bool initVM() {
   vm.core.sModule = intern("__module__");
   vm.core.sQuote = intern("\"");
   vm.core.sBackslash = intern("\\");
-  vm.core.sArgv = intern("argv");
+
   vm.core.sMain = intern("main");
+  vm.core.sExecMain = intern("let out = main();");
+  vm.core.sOut = intern("out");
+
+  vm.gen = NULL;
 
   return loadCore() == INTERPRET_OK;
 }
@@ -815,7 +822,10 @@ InterpretResult vmExecute(int baseFrame) {
       }
       case OP_DEFINE_GLOBAL: {
         Value name = READ_CONSTANT();
-        mapSet(&vm.module->namespace, name, vmPeek(0));
+        ObjMap* target = vm.module->type == MODULE_ENTRYPOINT
+                             ? &vm.globals
+                             : &vm.module->namespace;
+        mapSet(target, name, vmPeek(0));
         vmPop();
         break;
       }
@@ -1011,11 +1021,6 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_NOT:
         vmPush(BOOL_VAL(isFalsey(vmPop())));
         break;
-      case OP_PRINT: {
-        printValue(vmPop());
-        printf("\n");
-        break;
-      }
       case OP_JUMP: {
         uint16_t offset = READ_SHORT();
         frame->ip += offset;
@@ -1221,6 +1226,7 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_IMPLICIT_RETURN:
       case OP_RETURN: {
         Value value = vmPop();
+
         vmCloseUpvalues(frame->slots);
         vm.frameCount--;
 
@@ -1338,6 +1344,7 @@ InterpretResult vmExecute(int baseFrame) {
                              ? &vm.globals
                              : &vm.module->namespace;
 
+        vmPush(OBJ_VAL(module));
         if (!vmCallModule(module)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
@@ -1681,9 +1688,6 @@ InterpretResult vmInterpretExpr(char* path, char* expr) {
 }
 
 InterpretResult vmExecuteModule(ObjModule* module) {
-  vmPush(OBJ_VAL(module));
-  vm.module = module;
-
   if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
 
   return vmExecute(vm.frameCount - 1);
@@ -1695,42 +1699,96 @@ InterpretResult vmInterpretEntrypoint(char* path) {
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
+  vmPush(OBJ_VAL(module));
+  vm.module = module;
   return vmExecuteModule(module);
 }
 
 // wasm api.
 
-InterpretResult vmInterpretEntrypoint_wasm(char* path) {
-  if (!initVM()) exit(2);
+InterpretResult executeMain(char* path) {
+  ObjModule* mainModule = newModule(vm.module->dirName, vm.module->baseName,
+                                    vm.core.sExecMain, MODULE_ENTRYPOINT);
+  vmPush(OBJ_VAL(mainModule));
 
-  InterpretResult status = vmInterpretEntrypoint(path);
-  freeVM();
-  return status;
+  ObjClosure* closure = vmCompileClosure(syntheticToken(path),
+                                         vm.core.sExecMain->chars, vm.module);
+  if (closure == NULL) return INTERPRET_COMPILE_ERROR;
+  mainModule->closure = closure;
+
+  vm.module = mainModule;
+  return vmExecuteModule(mainModule);
 }
 
-char* vmTypesetModule_wasm(char* path) {
+char* vmInterpretEntrypoint_wasm(char* path) {
+  ObjModule* module =
+      vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
+  if (module == NULL) exit(2);
+
+  mapDelete(&vm.globals, OBJ_VAL(vm.core.sMain));
+
+  vmPush(OBJ_VAL(module));
+  vm.module = module;
+  if (vmExecuteModule(module) != INTERPRET_OK) exit(2);
+
+  Value main;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sMain), &main))
+    return "{\"success\": true, \"type\": \"string\", \"out\": \"No output.\"}";
+
+  if (!IS_CLOSURE(main)) {
+    vmRuntimeError("Main must be a function.");
+    exit(2);
+  }
+
+  if (executeMain(path) != INTERPRET_OK) exit(2);
+
+  Value out;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) {
+    vmRuntimeError("No output from entrypoint.");
+    exit(2);
+  }
+
+  if (IS_INSTANCE(out) && AS_INSTANCE(out)->klass == vm.core.generator) {
+    vm.gen = AS_INSTANCE(out);
+    return "{\"success\": true, \"type\": \"flag\", \"out\": "
+           "\"__start_generation__\"}";
+  }
+
+  if (!IS_STRING(out)) {
+    vmRuntimeError("Main must return a string or generator.");
+    exit(2);
+  }
+
+  return AS_STRING(out)->chars;
+}
+
+char* vmGenerate_wasm(char* path) {
+  mapSet(&vm.globals, OBJ_VAL(vm.core.sMain), OBJ_VAL(vm.gen));
+
+  if (executeMain(path) != INTERPRET_OK) exit(2);
+
+  Value out;
+  if (!mapGet(&vm.globals, OBJ_VAL(vm.core.sOut), &out)) {
+    vmRuntimeError("No output from entrypoint.");
+    exit(2);
+  }
+
+  if (IS_UNDEF(out)) {
+    vm.gen = NULL;
+    return "{\"success\": true, \"type\": \"flag\", \"out\": "
+           "\"__stop_generation__\"}";
+  }
+
+  if (!IS_STRING(out)) {
+    vmRuntimeError("Main generator must return a string or undefined.");
+    exit(2);
+  }
+
+  return AS_STRING(out)->chars;
+}
+
+void vmInit_wasm() {
   if (!initVM()) exit(2);
-
-  InterpretResult status = vmInterpretEntrypoint(path);
-
-  if (status != INTERPRET_OK) exit(2);
-
-  vmPush(OBJ_VAL(vm.core.document));
-
-  if (!vmCallValue(vmPeek(0), 0)) exit(2);
-  if (vmExecute(vm.frameCount - 1) != INTERPRET_OK) exit(2);
-
-  Value rendered;
-  if (!mapGet(&vm.core.document->fields, INTERN(S_RENDERED), &rendered)) {
-    vmRuntimeError("failed to render.");
-    exit(2);
-  }
-  if (!IS_STRING(rendered)) {
-    vmRuntimeError("document.%s must be a string", S_RENDERED);
-    exit(2);
-  }
-
-  return AS_STRING(rendered)->chars;
 }
 
 void vmFree_wasm() { freeVM(); }
