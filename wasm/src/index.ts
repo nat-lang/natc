@@ -13,16 +13,24 @@ export type CoreFile = {
 };
 
 export type RespType = "string" | "tex" | "flag";
-export type CodeblockResp = {
+
+type BaseResp = {
   success: boolean;
+  out: string;
+}
+export type FlagResp = BaseResp & { type: "flag"; }
+export type TexResp = BaseResp & { type: "tex"; }
+export type TextResp = BaseResp & { type: "string"; }
+export type CodeblockResp = BaseResp & {
   type: "codeblock";
   out: { text: string };
 }
-export type InterpretResp = {
-  success: boolean;
-  type: RespType;
-  out: string;
-} | CodeblockResp;
+export type AnchorResp = BaseResp & {
+  type: "anchor";
+  out: { title: string; tex: string; path: string };
+}
+
+export type NatResp = FlagResp | TexResp | TextResp | CodeblockResp | AnchorResp;
 
 type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
@@ -31,7 +39,6 @@ export const GEN_START = "__start_generation__";
 const GEN_END = "__stop_generation__";
 
 export const CORE_DIR = "core", SRC_DIR = "src";
-export const abs = (path: string) => `/${SRC_DIR}/${path}`;
 
 export enum InterpretationStatus {
   OK = 0,
@@ -39,18 +46,53 @@ export enum InterpretationStatus {
   RUNTIME_ERROR = 2,
 }
 
+class Lock {
+  locked: boolean;
+  queue: (() => void)[];
+  constructor() {
+    this.locked = false;
+    this.queue = [];
+  }
+
+  acquire() {
+    return new Promise<void>(resolve => {
+      if (!this.locked) {
+        this.locked = true;
+        resolve();
+      } else {
+        this.queue.push(resolve);
+      }
+    });
+  }
+
+  release() {
+    this.locked = false;
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      this.locked = true;
+      next && next();
+    }
+  }
+}
+
 class Runtime {
-  wasmModule?: NatModule;
+  wasmModule?: Promise<NatModule>;
   stdOutHandlers: OutputHandlerMap;
   stdErrHandlers: OutputHandlerMap;
   errors: string[];
+  lock: Lock;
+  rootDir: string;
 
-  constructor() {
+  constructor({ rootDir = "." } = {}) {
     this.wasmModule = undefined;
     this.stdOutHandlers = { console: console.log };
     this.stdErrHandlers = { console: console.error, store: this.storeErr };
     this.errors = [];
+    this.lock = new Lock();
+    this.rootDir = rootDir;
   }
+
+  abs = (path: string) => `${this.rootDir}/${path}`;
 
   handleStdOut = (stdout: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stdout));
   handleStdErr = (stderr: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stderr));
@@ -84,7 +126,8 @@ class Runtime {
         printErr: this.handleStdErr.bind(this)
       });
     }
-    return this.wasmModule as NatModule;
+
+    return await this.wasmModule as NatModule;
   }
 
   readStrMem = async (ptr: number) => {
@@ -99,27 +142,25 @@ class Runtime {
     return str;
   }
 
-  interpret = async (path: string): Promise<InterpretResp> => {
+  interpret = async (path: string): Promise<NatResp> => {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmInterpretEntrypoint_wasm', 'number', ['string']);
-
-    const retPtr = fn(abs(path));
+    const retPtr = fn(this.abs(path));
     const out = await this.readStrMem(retPtr);
 
     return JSON.parse(out);
   };
 
-  async *generate(path: string): AsyncGenerator<InterpretResp> {
+  async *generate(path: string): AsyncGenerator<NatResp> {
     const mod = await this.loadWasmModule();
     const fn = mod.cwrap('vmGenerate_wasm', 'number', ['string']);
-
     const next = async () => {
-      let out = await this.readStrMem(fn(abs(path)));
-      let resp: InterpretResp = JSON.parse(out);
+      let out = await this.readStrMem(fn(this.abs(path)));
+      let resp: NatResp = JSON.parse(out);
       return resp;
     };
 
-    let resp: InterpretResp | null = null;
+    let resp: NatResp | null = null;
 
     while ((resp = await next())?.out != GEN_END)
       yield resp;
@@ -131,25 +172,37 @@ class Runtime {
     free();
   }
 
+  init = async () => {
+    const mod = await this.loadWasmModule();
+    const init = mod.cwrap('vmInit_wasm', null, []);
+    init();
+  }
+
   getCoreFiles = async (dir = CORE_DIR) => {
     const mod = await this.loadWasmModule();
-    const files: CoreFile[] = [{
-      path: dir,
-      type: "tree",
-      content: ""
-    }];
+    const files: CoreFile[] = [];
 
-    mod.FS.readdir(abs(dir)).forEach(async file => {
+    mod.FS.readdir(this.abs(dir)).forEach(async file => {
       if ([".", ".."].includes(file)) return;
 
       let path = `${dir}/${file}`;
-      let stat = mod.FS.stat(abs(path));
+      let stat = mod.FS.stat(this.abs(path));
+      let relPath = path.replace(new RegExp(`^${CORE_DIR}/`), "");
 
       if (mod.FS.isDir(stat.mode)) {
+        files.push({
+          path: relPath,
+          type: "tree",
+          content: ""
+        });
         files.push(...await this.getCoreFiles(path));
       } else {
-        let content = mod.FS.readFile(abs(path), { encoding: "utf8" });
-        files.push({ path, type: "blob", content });
+        let content = mod.FS.readFile(this.abs(path), { encoding: "utf8" });
+        files.push({
+          path: relPath,
+          type: "blob",
+          content
+        });
       }
     });
 
@@ -158,27 +211,27 @@ class Runtime {
 
   mkDir = async (path: string): Promise<void> => {
     const mod = await this.loadWasmModule();
-    const pathStat = mod.FS.analyzePath(abs(path));
+    const pathStat = mod.FS.analyzePath(this.abs(path));
 
     if (!pathStat.exists)
-      mod.FS.mkdir(abs(path));
+      mod.FS.mkdir(this.abs(path));
   }
 
   getFile = async (path: string): Promise<CoreFile> => {
     const mod = await this.loadWasmModule();
-    const content = mod.FS.readFile(abs(path), { encoding: "utf8" });
+    const content = mod.FS.readFile(this.abs(path), { encoding: "utf8" });
 
     return { path, content, type: "blob" };
   }
 
   setFile = async (path: string, content: string) => {
     const mod = await this.loadWasmModule();
-    mod.FS.writeFile(abs(path), content, { flags: "w+" });
+    mod.FS.writeFile(this.abs(path), content, { flags: "w+" });
   }
 
   rmFile = async (path: string) => {
     const mod = await this.loadWasmModule();
-    mod.FS.unlink(abs(path));
+    mod.FS.unlink(this.abs(path));
   }
 
   ls = async (path: string) => {

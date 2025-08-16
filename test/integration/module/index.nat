@@ -78,3 +78,11 @@ use x,y,z from importable
 assert(x == 1);
 assert(y == 0);
 assert(z == 2);
+
+// via an intermediate module.
+
+use x,y,z from intermediate
+
+assert(x == 1);
+assert(y == 0);
+assert(z == 2);

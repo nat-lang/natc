@@ -298,6 +298,8 @@ static void markRoots() {
   markObject((Obj*)vm.core.sExecMain);
   markObject((Obj*)vm.core.sOut);
 
+  markObject((Obj*)vm.gen);
+
   markCompilerRoots(vm.compiler);
 }
 

@@ -143,6 +143,8 @@ bool initVM() {
   initMap(&vm.infixes);
   initMap(&vm.methodInfixes);
 
+  vm.gen = NULL;
+
   initCore(&vm.core);
 
   vm.core.sName = intern("name");
@@ -159,6 +161,8 @@ bool initVM() {
   vm.core.sMain = intern("main");
   vm.core.sExecMain = intern("let out = main();");
   vm.core.sOut = intern("out");
+
+  vm.gen = NULL;
 
   return loadCore() == INTERPRET_OK;
 }
@@ -1340,6 +1344,7 @@ InterpretResult vmExecute(int baseFrame) {
                              ? &vm.globals
                              : &vm.module->namespace;
 
+        vmPush(OBJ_VAL(module));
         if (!vmCallModule(module)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
@@ -1716,8 +1721,6 @@ InterpretResult executeMain(char* path) {
 }
 
 char* vmInterpretEntrypoint_wasm(char* path) {
-  if (!initVM()) exit(2);
-
   ObjModule* module =
       vmCompileModule(NULL, syntheticToken(path), MODULE_ENTRYPOINT);
   if (module == NULL) exit(2);
@@ -1744,7 +1747,7 @@ char* vmInterpretEntrypoint_wasm(char* path) {
   }
 
   if (IS_INSTANCE(out) && AS_INSTANCE(out)->klass == vm.core.generator) {
-    mapSet(&vm.globals, OBJ_VAL(vm.core.sMain), out);
+    vm.gen = AS_INSTANCE(out);
     return "{\"success\": true, \"type\": \"flag\", \"out\": "
            "\"__start_generation__\"}";
   }
@@ -1758,6 +1761,8 @@ char* vmInterpretEntrypoint_wasm(char* path) {
 }
 
 char* vmGenerate_wasm(char* path) {
+  mapSet(&vm.globals, OBJ_VAL(vm.core.sMain), OBJ_VAL(vm.gen));
+
   if (executeMain(path) != INTERPRET_OK) exit(2);
 
   Value out;
@@ -1766,9 +1771,11 @@ char* vmGenerate_wasm(char* path) {
     exit(2);
   }
 
-  if (IS_UNDEF(out))
+  if (IS_UNDEF(out)) {
+    vm.gen = NULL;
     return "{\"success\": true, \"type\": \"flag\", \"out\": "
            "\"__stop_generation__\"}";
+  }
 
   if (!IS_STRING(out)) {
     vmRuntimeError("Main generator must return a string or undefined.");
@@ -1776,6 +1783,10 @@ char* vmGenerate_wasm(char* path) {
   }
 
   return AS_STRING(out)->chars;
+}
+
+void vmInit_wasm() {
+  if (!initVM()) exit(2);
 }
 
 void vmFree_wasm() { freeVM(); }

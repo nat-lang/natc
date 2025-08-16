@@ -1789,7 +1789,6 @@ void useStatement(Compiler* cmp) {
   if (match(cmp, TOKEN_FROM)) {
     varcount++;
     vars[0] = token;
-
     consumeIdentifier(cmp, "Expect path.");
   }
 

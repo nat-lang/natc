@@ -5,6 +5,14 @@ class Codeblock {
   }
 }
 
+class Anchor {
+  init(title, path, tex: TexDoc) => {
+    this.title = title;
+    this.path = path;
+    this.tex = tex;
+  }
+}
+
 let serialize = x => {
   let type;
 
@@ -13,6 +21,13 @@ let serialize = x => {
   else if (x is TexDoc) {
     type = "tex";
     x = x.render();
+  } else if (x is Anchor) {
+    type = "anchor";
+    x = {
+      "title": x.title,
+      "path": x.path,
+      "tex": x.tex.render()
+    };
   } else if (vmType(x) == OString) {
     type = "string";
   } else

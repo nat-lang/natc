@@ -116,6 +116,9 @@ typedef struct {
   ObjMap infixes;
   ObjMap methodInfixes;
 
+  // generator.
+  ObjInstance* gen;
+
   // core defs.
   Core core;
 
@@ -154,7 +157,7 @@ InterpretResult vmInterpretEntrypoint(char* path);
 
 char* vmInterpretEntrypoint_wasm(char* path);
 char* vmGenerate_wasm(char* path);
-char* vmTypesetModule_wasm(char* path);
+void vmInit_wasm();
 void vmFree_wasm();
 
 ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type);

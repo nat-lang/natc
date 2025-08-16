@@ -102,9 +102,9 @@ build-wasm:
 		-s EXPORT_ES6=1 \
 		-s MODULARIZE=1 \
 		-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS,stringToUTF8,setValue,getValue,wasmMemory \
-		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmGenerate_wasm,_vmFree_wasm \
+		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmGenerate_wasm,_vmFree_wasm,_vmInit_wasm \
 		-s STACK_SIZE=5MB \
-		-sASSERTIONS=2 \
+		-sASSERTIONS=1 \
 		-O0 \
 		-sALLOW_MEMORY_GROWTH \
 		--embed-file src/core
@@ -115,7 +115,7 @@ test-wasm:
 		-s EXPORT_ES6=1 \
 		-s MODULARIZE=1 \
 		-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,print,FS,stringToUTF8,setValue,getValue,wasmMemory \
-		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmGenerate_wasm,_vmFree_wasm \
+		-s EXPORTED_FUNCTIONS=_vmInterpretEntrypoint_wasm,_vmGenerate_wasm,_vmFree_wasm,_vmInit_wasm \
 		-s STACK_SIZE=5MB \
 		-sALLOW_MEMORY_GROWTH \
 		--embed-file src/core \

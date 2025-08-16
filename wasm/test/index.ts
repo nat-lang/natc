@@ -1,27 +1,29 @@
 
-import Runtime, { GEN_START, InterpretResp } from '../src';
+import Runtime, { GEN_START, NatResp } from '../src';
 
 let fail = (msg: string) => { throw new Error(`Interpretation failure: ${msg}.`); };
 
-let checkResp = (resp: InterpretResp) => {
+let checkResp = (resp: NatResp) => {
   if (!resp) fail("undefined");
   if (!resp.success) fail("expecting success = true");
 }
 
-let checkStrResp = (resp: InterpretResp) => {
+let checkStrResp = (resp: NatResp) => {
   checkResp(resp);
   if (typeof resp.out !== "string") fail("expecting instanceof resp.out = String");
 }
 
-let checkGenStartResp = (resp: InterpretResp) => {
+let checkGenStartResp = (resp: NatResp) => {
   checkResp(resp);
   if (resp.out !== GEN_START) fail(`expecting resp.out = '${GEN_START}'`);
 };
 
 (async () => {
   let runtime = new Runtime();
-  let resp: InterpretResp;
-  let generator: AsyncGenerator<InterpretResp>;
+  let resp: NatResp;
+  let generator: AsyncGenerator<NatResp>;
+
+  await runtime.init();
 
   resp = await runtime.interpret("test/integration/index");
   checkStrResp(resp);
