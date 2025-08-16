@@ -237,8 +237,6 @@ static TokenType identifierType() {
               switch (START[2]) {
                 case 'e':
                   return checkpointKeyword(3, 3, "fix", TOKEN_PREFIX);
-                case 'i':
-                  return checkpointKeyword(3, 2, "nt", TOKEN_PRINT);
               }
             }
             break;

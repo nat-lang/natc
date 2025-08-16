@@ -51,7 +51,33 @@ let g;
 g = () => 1;
 assert(g.name == "g");
 
-// functions have optional type annotations.
+// functions can have implicit return values.
+// --------------------------------------
+
+let fn;
+
+fn = () => true;
+assert(fn());
+
+fn = (a) => (b) => a + b;
+assert(fn(1)(1) == 2);
+
+// as can methods.
+// --------------------------------------
+
+class A {
+  one() => 1;
+  two() => 2;
+  thr(a) => (b) => a + b;
+}
+
+let a = A();
+
+assert(a.one() == 1);
+assert(a.two() == 2);
+assert(a.thr(1)(1) == 2);
+
+// functions parameters can have type annotations.
 // --------------------------------------
 
 sym z;

@@ -94,14 +94,16 @@ class Sequential extends Object {
   join() => join(this, "");
 }
 
-class Tuple extends Sequential {
-  tex(args: ASTArgumentSequence) => "(#{args.tex()})";
-}
-
 class Sequence extends Sequential {
   extend(elements) => {
     for (x in elements)
       this.push(x);
   }
   tex(args: ASTArgumentSequence) => "[#{args.tex()}]";
+  str() => "[#{join(this, ", ")}]";
+  print() => print(this.str());
+}
+
+class Tuple extends Sequence {
+  tex(args: ASTArgumentSequence) => "(#{args.tex()})";
 }

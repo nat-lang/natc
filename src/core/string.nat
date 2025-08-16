@@ -1,13 +1,16 @@
 let Strings = Object();
 
+Strings.newline = "
+";
+
 let join = (seq: Sequential, sep: string) => {
   let i = 0, s = "";
 
   for (x in seq) {
     if (i == 0)
-      s = s + x;
+      s = s + str(x);
     else
-      s = s + sep + x;
+      s = s + sep + str(x);
     i = i + 1;
   }
 
@@ -18,5 +21,9 @@ let indent = (x: num) => join([" " | _ in range(0, x)], "");
 
 let quote = string => Strings.quote + string + Strings.quote;
 
-let newline = "
-";
+let str = x => {
+  let type = vmType(x);
+  if (type == OInstance && callable(x.str))
+    return x.str();
+  return __str__(x);
+};

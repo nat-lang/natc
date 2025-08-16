@@ -296,7 +296,9 @@ bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
-  if (IS_UNDEF(entry->key)) return false;
+  if (IS_UNDEF(entry->key)) {
+    return false;
+  }
 
   *value = entry->value;
   return true;

@@ -1,0 +1,41 @@
+
+class Codeblock {
+  init(text) => {
+    this.text = text;
+  }
+}
+
+class Anchor {
+  init(title, path, tex: TexDoc) => {
+    this.title = title;
+    this.path = path;
+    this.tex = tex;
+  }
+}
+
+let serialize = x => {
+  let type;
+
+  if (x is Codeblock)
+    type = "codeblock";
+  else if (x is TexDoc) {
+    type = "tex";
+    x = x.render();
+  } else if (x is Anchor) {
+    type = "anchor";
+    x = {
+      "title": x.title,
+      "path": x.path,
+      "tex": x.tex.render()
+    };
+  } else if (vmType(x) == OString) {
+    type = "string";
+  } else
+    throw Error("Don't know how to serialize output.");
+
+  return jsonEncode({
+    "success": true,
+    "out": x,
+    "type": type
+  });
+};

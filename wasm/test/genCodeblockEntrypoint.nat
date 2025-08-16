@@ -1,0 +1,9 @@
+let output: [Codeblock or TexDoc] = [];
+
+let prefix codeblock = output.push . Codeblock;
+let prefix render = output.push . StandaloneTexDoc;
+
+let main = () => Generator(output, serialize);
+
+codeblock "let x = 1;";
+render tex"\[ let x = 1 \]";

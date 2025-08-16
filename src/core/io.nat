@@ -1,0 +1,8 @@
+
+let prefix print = x => {
+  let type = vmType(x);
+  if (type == OInstance && callable(x.print))
+    x.print();
+  else
+    __print__(x);
+};

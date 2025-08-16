@@ -36,8 +36,7 @@
 #define S_TUPLE "Tuple"
 #define S_MAP "Map"
 #define S_SET "Set"
-#define S_TREE "Tree"
-#define S_ITERATOR "Iterator"
+#define S_GENERATOR "Generator"
 
 #define S_AST_CLOSURE "ASTClosure"
 #define S_AST_COMPREHENSION "ASTComprehension"
@@ -70,7 +69,6 @@
 #define S_GRAMMAR "Grammar"
 #define S_TYPE_SYSTEM "TypeSystem"
 #define S_UNIFY "unify"
-#define S_DOCUMENT "document"
 #define S_RENDERED "rendered"
 
 typedef enum {
@@ -124,7 +122,6 @@ typedef enum {
   TOKEN_NIL,
   TOKEN_NOT,
   TOKEN_OR,
-  TOKEN_PRINT,
   TOKEN_RETURN,
   TOKEN_SUPER,
   TOKEN_THIS,
