@@ -1,8 +1,0 @@
-
-
-let compose = (f, g) => x => (f . g)(x);
-
-let h = compose(x => x + 1, x => x - 1);
-
-print h(1);
-print h(2);
