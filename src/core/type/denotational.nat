@@ -1,4 +1,4 @@
-let hashable = x => vmHashable(x) || vmType(x) == OInstance && "hash" in x;
+let hashable = x => vmHashable(x) || vmType(x) == OInstance && callable(x.hash);
 
 class Domain extends Type {
   init(name, elements) => {

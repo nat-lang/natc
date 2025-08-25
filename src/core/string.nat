@@ -25,5 +25,7 @@ let str = x => {
   let type = vmType(x);
   if (type == OInstance && callable(x.str))
     return x.str();
+  if (type == ONative)
+    return x.name;
   return __str__(x);
 };

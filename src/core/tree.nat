@@ -84,7 +84,17 @@ class Tree extends Object {
   ppRepr(repr) => this.ppAt(0, repr);
 
   pp() => this.ppAt(0, (x, depth) => { print indent(depth) + x.str(); });
+
+  texNode() => {
+    if (this.leaf()) return "[#{this.data}]";
+    let children = join(this.children.map(x => x.texNode()), " ");
+    return "[#{this.data} #{children}]";
+  }
+
+  tex() => "\begin{forest} #{this.texNode()} \end{forest}";
+  viz() => StandaloneTexDoc(this.tex());
 }
+
 
 // Functions for building tree literals during compilation.
 
