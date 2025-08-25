@@ -94,8 +94,8 @@ class Runtime {
 
   abs = (path: string) => `${this.rootDir}/${path}`;
 
-  handleStdOut = (stdout: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stdout));
-  handleStdErr = (stderr: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(stderr));
+  handleStdOut = (out: string) => Object.values(this.stdOutHandlers).forEach(handler => handler(out));
+  handleStdErr = (err: string) => Object.values(this.stdErrHandlers).forEach(handler => handler(err));
 
   storeErr = (err: string) => this.errors.push(err);
 
