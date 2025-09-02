@@ -35,6 +35,7 @@ export type NatResp = FlagResp | TexResp | TextResp | CodeblockResp | AnchorResp
 type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
 
+export const EXT = "nat";
 export const GEN_START = "__start_generation__";
 const GEN_END = "__stop_generation__";
 
@@ -178,33 +179,35 @@ class Runtime {
     init();
   }
 
-  getCoreFiles = async (dir = CORE_DIR) => {
+  getCoreFiles = async (dir = "/" + CORE_DIR) => {
     const mod = await this.loadWasmModule();
     const files: CoreFile[] = [];
 
-    mod.FS.readdir(this.abs(dir)).forEach(async file => {
-      if ([".", ".."].includes(file)) return;
+    await Promise.all(
+      mod.FS.readdir(this.abs(dir)).map(async file => {
+        if ([".", ".."].includes(file)) return;
 
-      let path = `${dir}/${file}`;
-      let stat = mod.FS.stat(this.abs(path));
-      let relPath = path.replace(new RegExp(`^${CORE_DIR}/`), "");
+        let path = `${dir}/${file}`;
+        let stat = mod.FS.stat(this.abs(path));
 
-      if (mod.FS.isDir(stat.mode)) {
-        files.push({
-          path: relPath,
-          type: "tree",
-          content: ""
-        });
-        files.push(...await this.getCoreFiles(path));
-      } else {
-        let content = mod.FS.readFile(this.abs(path), { encoding: "utf8" });
-        files.push({
-          path: relPath,
-          type: "blob",
-          content
-        });
-      }
-    });
+        if (mod.FS.isDir(stat.mode)) {
+          files.push({
+            path,
+            type: "tree",
+            content: ""
+          });
+
+          files.push(...await this.getCoreFiles(path));
+        } else {
+          let content = mod.FS.readFile(this.abs(path), { encoding: "utf8" });
+          files.push({
+            path,
+            type: "blob",
+            content
+          });
+        }
+      })
+    );
 
     return files;
   };
