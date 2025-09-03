@@ -12,7 +12,7 @@ export type CoreFile = {
   type: "tree" | "blob";
 };
 
-export type RespType = "string" | "tex" | "flag";
+export type RespType = "string" | "tex" | "flag" | "markdown";
 
 type BaseResp = {
   success: boolean;
@@ -21,16 +21,17 @@ type BaseResp = {
 export type FlagResp = BaseResp & { type: "flag"; }
 export type TexResp = BaseResp & { type: "tex"; }
 export type TextResp = BaseResp & { type: "string"; }
+export type MarkdownResp = BaseResp & { type: "markdown"; }
 export type CodeblockResp = BaseResp & {
   type: "codeblock";
   out: { text: string };
 }
 export type AnchorResp = BaseResp & {
   type: "anchor";
-  out: { title: string; tex: string; path: string };
+  out: { title: string; md: string; path: string };
 }
 
-export type NatResp = FlagResp | TexResp | TextResp | CodeblockResp | AnchorResp;
+export type NatResp = FlagResp | TexResp | TextResp | CodeblockResp | MarkdownResp | AnchorResp;
 
 type OutputHandler = (stdout: string) => void;
 type OutputHandlerMap = { [key: string]: OutputHandler };
