@@ -390,6 +390,20 @@ Token consumeToken(char c) {
     }
     case '"':
       return string(TOKEN_STRING, TOKEN_INTERPOLATION);
+    case 'm': {
+      if (checkpoint(1, 2, "d\"")) {
+        advanceBy(2);
+        return string(TOKEN_MD_STRING, TOKEN_MD_INTERPOLATION);
+      }
+      break;
+    }
+    case 'n': {
+      if (checkpoint(1, 3, "at\"")) {
+        advanceBy(3);
+        return string(TOKEN_NAT_STRING, TOKEN_NAT_INTERPOLATION);
+      }
+      break;
+    }
     case 't': {
       if (checkpoint(1, 3, "ex\"")) {
         advanceBy(3);
