@@ -1,6 +1,6 @@
 ## natc
 
-This is the compiler for nat. For the language manual see [natlang.online](https://natlang.online).
+This is the compiler for nat. For the language manual see [natlang.online](https://natlang.online/guide/natlang).
 
 ### What is nat?
 
@@ -74,7 +74,7 @@ npm link @nat-lang/nat
 The primary public outlet for nat is its [npm package](https://www.npmjs.com/package/@nat-lang/nat), which bundles the webassembly and typescript client. To publish changes to nat, you should open a pull request into the `main` branch. Minimally, the PR must
 
 1. include an integration test, if applicable;
-2. pass the test suite, which is automated via the github action at [.github/workflows/ci.yml](.github/workflows/ci.yml);
+2. pass the test suite, which is automated via the github action at [.github/workflows/ci.yml](.github/workflows/ci.yml); and
 3. increment the semver version in the [package.json](wasm/package.json).
 
 If steps (1) - (3) are successfull, the PR can merge to `main`. To publish the changes, open a new PR from `main` into the `release` branch. Merging into `release` will initiate an automated publication.
