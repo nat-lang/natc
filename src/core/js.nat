@@ -5,11 +5,17 @@ class Codeblock {
   }
 }
 
+class Markdown {
+  init(text) => {
+    this.text = text;
+  }
+}
+
 class Anchor {
-  init(title, path, tex: TexDoc) => {
+  init(title, path, md: Markdown) => {
     this.title = title;
     this.path = path;
-    this.tex = tex;
+    this.md = md;
   }
 }
 
@@ -26,8 +32,11 @@ let serialize = x => {
     x = {
       "title": x.title,
       "path": x.path,
-      "tex": x.tex.render()
+      "md": x.md.text
     };
+  } else if (x is Markdown) {
+    type = "markdown";
+    x = x.text;
   } else if (vmType(x) == OString) {
     type = "string";
   } else

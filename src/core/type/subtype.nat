@@ -2,7 +2,6 @@ class SubtypeError extends SimpleTypeError {}
 
 class TSum extends Type {
   init(*types) => {
-    if (types.some(x => x == nil)) throw Error("!");
     let typified = types.map(TypeSystem.typify);
     this.disjuncts = Set.fromSeq(typified);
   }

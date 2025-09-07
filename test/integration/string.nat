@@ -71,3 +71,17 @@ let z = tex"\documentclass{#{(() => "article")()}}";
 
 assert(vmType(z) == OString);
 assert(z == "\documentclass{article}");
+
+// nat strings.
+
+let z = nat"(() => 1)()";
+
+assert(vmType(z) == OString);
+assert(z == "(() => 1)()");
+
+// md strings.
+
+let z = md"#### Header";
+
+assert(vmType(z) == OString);
+assert(z == "#### Header");

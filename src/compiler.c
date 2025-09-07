@@ -656,6 +656,18 @@ static void string(Compiler* cmp, bool canAssign) {
   loadConstant(cmp, OBJ_VAL(str));
 }
 
+static void mdString(Compiler* cmp, bool canAssign) {
+  ObjString* str =
+      copyString(parser.previous.start + 3, parser.previous.length - 4);
+  loadConstant(cmp, OBJ_VAL(str));
+}
+
+static void natString(Compiler* cmp, bool canAssign) {
+  ObjString* str =
+      copyString(parser.previous.start + 4, parser.previous.length - 5);
+  loadConstant(cmp, OBJ_VAL(str));
+}
+
 static void texString(Compiler* cmp, bool canAssign) {
   ObjString* str =
       copyString(parser.previous.start + 4, parser.previous.length - 5);
@@ -695,6 +707,14 @@ static void interpolation(Compiler* cmp, bool canAssign, int startOffset,
 
 static void stringInterpolation(Compiler* cmp, bool canAssign) {
   interpolation(cmp, canAssign, 1, 3);
+}
+
+static void mdInterpolation(Compiler* cmp, bool canAssign) {
+  interpolation(cmp, canAssign, 3, 5);
+}
+
+static void natInterpolation(Compiler* cmp, bool canAssign) {
+  interpolation(cmp, canAssign, 4, 6);
 }
 
 static void texInterpolation(Compiler* cmp, bool canAssign) {
@@ -1938,8 +1958,12 @@ ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {variable, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_MD_STRING] = {mdString, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_NAT_STRING] = {natString, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TEX_STRING] = {texString, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_INTERPOLATION] = {stringInterpolation, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_MD_INTERPOLATION] = {mdInterpolation, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_NAT_INTERPOLATION] = {natInterpolation, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TEX_INTERPOLATION] = {texInterpolation, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_AND] = {NULL, and_, PREC_AND, PREC_NONE},
