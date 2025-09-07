@@ -1,6 +1,6 @@
 let infix(3) or = (p, q) => p || q;
 let infix(4) and = (p, q) => p && q;
-
+let infix(3) implies = (p, q) => !p || q;
 
 or.tex = (args: ASTArgumentSequence) => "#{args[0].tex()} \vee #{args[1].tex()}";
 and.tex = (args: ASTArgumentSequence) => "#{args[0].tex()} \wedge #{args[1].tex()}";

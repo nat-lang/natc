@@ -88,7 +88,7 @@ class Set extends Object {
     return set;
   }
 
-  infix & (that) => this.union(that);
+  infix &(that) => this.union(that);
 
   intersection(that) => {
     let set = {};
@@ -133,6 +133,12 @@ class Set extends Object {
   reduce(fn, acc) => this.elements().reduce(fn, acc);
   all(predicate) => this.elements().all(predicate);
   some(predicate) => this.elements().some(predicate);
+  find(predicate) => {
+    for (x in this)
+      if (predicate(x))
+        return x;
+    throw Error("Couldn't find an element for #{predicate}.");
+  }
 
   str() => "{#{join([str(x) | x in this.elements()], ", ")}}";
   tex(ast: ASTArgumentSequence) => "\{#{ast.tex()}\}";
@@ -149,3 +155,87 @@ let union = (*sets) => sets.reduce(
   (big, set) => big & set,
   {}
 );
+
+class Poset {
+  init(X: Set, rel) => {
+    this.X = X;
+    this.rel = rel;
+  }
+
+  assertSubset(Y: Set) => {
+    if (!(Y <= this.X))
+      throw Error("Expecting subset of #{this.X}, got #{Y}.");
+  }
+
+  assertElement(x) => {
+    if (x not in this.X)
+      throw Error("Expecting #{x} to be in #{this.X}.");
+  }
+
+  isUpperBound(x, Y: Set) => {
+    this.assertElement(x);
+    this.assertSubset(Y);
+    return Y.all(y => this.rel(y, x));
+  }
+
+  isLowerBound(x, Y: Set) => {
+    this.assertElement(x);
+    this.assertSubset(Y);
+    return Y.all(y => this.rel(x, y));
+  }
+
+  isLeastUpperBound(x, Y: Set) => this.isUpperBound(x, Y) && this.X.all(
+    x' => this.isUpperBound(x', Y) implies this.rel(x, x')
+  );
+
+  isGreatestLowerBound(x, Y) => this.isLowerBound(x, Y) && this.X.all(
+    x' => this.isLowerBound(x', Y) implies this.rel(x', x)
+  );
+
+  downwardClosure(Y: Set) => ({x | x in this.X, Y.some(y => this.rel(x, y))});
+  upwardClosure(Y: Set) => ({x | x in this.X, Y.some(y => this.rel(y, x))});
+
+  isDownwardClosed(Y: Set) => {
+    this.assertSubset(Y);
+    return Y == this.downwardClosure(Y);
+  }
+
+  isUpwardClosed(Y: Set) => {
+    this.assertSubset(Y);
+    return Y == this.upwardClosure(Y);
+  }
+
+  isLattice() => [{x,y} | x in this.X, y in this.X, x != y].all(
+    Y => this.X.some(x => this.isLeastUpperBound(x, Y))
+          && this.X.some(x => this.isGreatestLowerBound(x, Y))
+  );
+
+  asLattice() => {
+    if (!this.isLattice())
+      throw Error("Not a lattice.");
+    return Lattice(
+      this.X,
+      (x,y) => this.X.find(z => this.isLeastUpperBound(z, {x,y})),
+      (x,y) => this.X.find(z => this.isGreatestLowerBound(z, {x,y}))
+    );
+  }
+}
+
+class Lattice {
+  init(X: Set, join, meet) => {
+    this.X = X;
+    this.join = join;
+    this.meet = meet;
+  }
+
+  isComplete() => this.X.powerset().all(
+    Y => this.sum(Y) in this.X
+  );
+
+  sum(Y: Set) => this.X.reduce(
+    (x, y) => this.join(x, y) , this.X[0]
+  );
+
+  top() => this.X.find(x => this.X.all(x' => this.meet(x, x') == x'));
+  bottom() => this.X.find(x => this.X.all(x' => this.join(x, x') == x'));
+}
