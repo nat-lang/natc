@@ -9,7 +9,7 @@ Nat is a language designed for modeling natural language semantics. It's a progr
 - Twin imperative and functional paradigms.
 - A dynamic, incrementally adoptable, and extensible suite of type systems. Types are values.
 - Pattern matching.
-- Sundry formalism from the semanticist's everyday toolbox: set comprehensions, first class trees, quantifiers, infixable functions, and more.
+- Sundry formalism from the semanticist's toolbox: set comprehensions, trees, quantifiers, infixable functions, and more.
 - A core library of data structures and utilities for building grammars.
 - Tight integration with LaTeX.
 - Runtime access to the AST.
