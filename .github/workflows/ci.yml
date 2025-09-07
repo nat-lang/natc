@@ -18,7 +18,7 @@ jobs:
         run: |
           echo "NAT_BASE_DIR=${{ github.workspace }}/" >> $GITHUB_ENV
       - name: Build
-        run: make nat
+        run: make install
       - name: Run integration tests
         run: make integration
       - name: Run regression tests
