@@ -27,6 +27,12 @@ let examples = [];
 
 let prefix ex = examples.push;
 
+let serialize = x => jsonEncode({
+  "success": true,
+  "out": x,
+  "type": "string"
+});
+
 let main = () => Generator(
   examples, serialize . (x => x.tex()) . grammar.evaluate
 );

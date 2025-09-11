@@ -1,2 +1,8 @@
 
+let serialize = x => jsonEncode({
+  "success": true,
+  "out": x,
+  "type": "string"
+});
+
 let main = () => Generator([1,2,3], serialize . str);
