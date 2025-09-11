@@ -21,4 +21,3 @@ use type/denotational
 use quantification
 use symbol
 use json
-use js
