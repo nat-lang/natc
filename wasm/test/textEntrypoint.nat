@@ -1,2 +1,6 @@
 
-let main = () => serialize("success");
+let main = () => jsonEncode({
+  "success": true,
+  "out": "success",
+  "type": "string"
+});
