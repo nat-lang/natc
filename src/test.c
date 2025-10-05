@@ -170,6 +170,8 @@ int testMain(void) {
 
   fmt("    ", testAstGC(), "Literal Number - Marked on stack");
 
+  printf("  Bytecode\n");
+
   freeVM();
   return 0;
 }
