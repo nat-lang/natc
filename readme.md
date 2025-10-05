@@ -1,22 +1,20 @@
-## natc
+## Nat -- a Language for Natural Language Semantics
 
-This is the compiler for nat. For the language manual see [natlang.online](https://natlang.online/guide/natlang).
+Nat is a programming language and toolchain for linguistic semantics, designed to make formal analyses executable, shareable, and testable. For the language manual see [natlang.online](https://natlang.online/guide/natlang).
 
-### What is nat?
-
-Nat is a language designed for modeling natural language semantics. It's a programming language with a variety of features aimed at linguists and philosophers who practice formal semantics. These include:
+### Features
 
 - Twin imperative and functional paradigms.
-- A dynamic, incrementally adoptable, and extensible suite of type systems. Types are values.
 - Pattern matching.
+- A dynamic, incrementally adoptable, and extensible suite of type systems. Types are values.
+- Metaprogramming: program AST is accessible at runtime.
 - Sundry formalism from the semanticist's toolbox: set comprehensions, trees, quantifiers, infixable functions, and more.
-- A core library of data structures and utilities for building grammars.
-- Tight integration with LaTeX.
-- Runtime access to the AST.
+- A standard library of data structures and utilities for building grammars.
+- Integration with LaTeX.
 
 ### Development
 
-The compiler is built on top of Robert Nystrom's `clox` compiler. Much of the foundation remains the same, and a good introduction to the basic design and implementation of the compiler is chapter three of Nystrom's book [Crafting Interpreters](https://craftinginterpreters.com/contents.html).
+The compiler is built on top of Robert Nystrom's `clox` compiler. Much of the foundation remains the same, and a good introduction to the basic design and implementation of the compiler is chapter three of Nystrom's book [Crafting Interpreters](https://craftinginterpreters.com/contents.html). The type system design and implementation is heavily influenced by Pierce's 2002 Types and Programming Languages.
 
 #### Getting started
 Clone the repo, install `make`, and then:

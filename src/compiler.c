@@ -1757,6 +1757,13 @@ static void forConditionStatement(Compiler* cmp) {
 
 static void forStatement(Compiler* cmp) {
   beginScope(cmp);
+
+  if (check(TOKEN_IDENTIFIER)) {
+    forQuantification(cmp, false);
+    consume(cmp, TOKEN_SEMICOLON, "Expect ';'.");
+    return;
+  }
+
   consume(cmp, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
   if (checkVariable()) {
