@@ -25,7 +25,7 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 #endif
 
     if (vm.bytesAllocated > vm.nextGC) {
-      collectGarbage();
+      // collectGarbage();
     }
   }
 
@@ -73,6 +73,11 @@ static void markArray(ValueArray* array) {
   }
 }
 
+static void markObjAST(ObjAst* ast) {
+  if (!ast) return;
+  markAstNode(ast->node);
+}
+
 static void blackenObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
   printf("%p blacken ", (void*)object);
@@ -83,6 +88,10 @@ static void blackenObject(Obj* object) {
   markArray(&object->annotations);
 
   switch (object->oType) {
+    case OBJ_AST:
+      markObjAST((ObjAst*)object);
+      break;
+
     case OBJ_BOUND_FUNCTION: {
       ObjBoundFunction* obj = (ObjBoundFunction*)object;
       markValue(obj->receiver);
@@ -176,6 +185,13 @@ static void blackenObject(Obj* object) {
   }
 }
 
+static void freeObjAST(ObjAst* ast) {
+  if (ast && ast->node) {
+    freeAstNode(ast->node);
+  }
+  FREE(ObjAst, ast);
+}
+
 static void freeObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
   printf("%p free type %d\n", (void*)object, object->type);
@@ -184,6 +200,9 @@ static void freeObject(Obj* object) {
   freeValueArray(&object->annotations);
 
   switch (object->oType) {
+    case OBJ_AST:
+      freeObjAST((ObjAst*)object);
+      break;
     case OBJ_BOUND_FUNCTION:
       FREE(ObjBoundFunction, object);
       break;

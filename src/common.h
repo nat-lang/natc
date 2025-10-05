@@ -73,8 +73,8 @@
 
 typedef enum {
   // Single-character tokens.
-  TOKEN_LEFT_PAREN,
-  TOKEN_RIGHT_PAREN,
+  TOKEN_PAREN_LEFT,
+  TOKEN_PAREN_RIGHT,
   TOKEN_LEFT_BRACE,
   TOKEN_RIGHT_BRACE,
   TOKEN_LEFT_BRACKET,
@@ -151,5 +151,24 @@ typedef struct {
   int depth;
   bool isCaptured;
 } Local;
+
+typedef enum {
+  PREC_NONE,
+  PREC_PREFIX,
+  PREC_ASSIGNMENT,       // =
+  PREC_TYPE_ASSIGNMENT,  // : _ =
+  PREC_OR,               // or
+  PREC_AND,              // and
+  PREC_EQUALITY,         // == !=
+  PREC_COMPARISON,       // < > <= >=
+  PREC_TERM,             // + -
+  PREC_FACTOR,           // * /
+  PREC_UNARY,            // ! -
+  PREC_CALL,             // . ()
+  PREC_PRIMARY
+} Precedence;
+
+typedef struct AstNode AstNode;
+typedef struct ObjString ObjString;
 
 #endif
