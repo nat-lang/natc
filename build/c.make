@@ -35,6 +35,9 @@ else ifeq ($(MODE),debug-log-gc)
 else ifeq ($(MODE),debug-stress-gc)
 	CFLAGS += -O0 -DDEBUG -g -D DEBUG_STRESS_GC
 	BUILD_DIR := build/debug
+else ifeq ($(MODE),unit)
+	CFLAGS += -O0 -DDEBUG -g -D UNIT
+	BUILD_DIR := build/unit
 else
 	CFLAGS += -O3 -flto
 	BUILD_DIR := build/release

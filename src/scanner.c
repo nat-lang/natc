@@ -346,9 +346,9 @@ static Token string(TokenType type, TokenType interpolationType) {
 Token consumeToken(char c) {
   switch (c) {
     case '(':
-      return makeToken(TOKEN_LEFT_PAREN);
+      return makeToken(TOKEN_PAREN_LEFT);
     case ')':
-      return makeToken(TOKEN_RIGHT_PAREN);
+      return makeToken(TOKEN_PAREN_RIGHT);
     case '{':
       return makeToken(TOKEN_LEFT_BRACE);
     case '}':

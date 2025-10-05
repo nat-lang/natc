@@ -62,4 +62,5 @@ void printValue(Value value);
 void printValueArray(ValueArray* array);
 uint32_t hashValue(Value value);
 bool vHashable(Value value);
+Value tokenValue(Token token);
 #endif

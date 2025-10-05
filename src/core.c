@@ -518,7 +518,7 @@ bool __str__(int argCount, Value* args) {
 }
 
 #define BINARY_NATIVE(name, valueType, op)                  \
-  static bool __##name(int argCount, Value* args) {         \
+  static bool name(int argCount, Value* args) {             \
     do {                                                    \
       if (!IS_NUMBER(vmPeek(0)) || !IS_NUMBER(vmPeek(1))) { \
         vmRuntimeError("Operands must be numbers.");        \
@@ -532,14 +532,14 @@ bool __str__(int argCount, Value* args) {
     return true;                                            \
   }
 
-BINARY_NATIVE(gt__, BOOL_VAL, >);
-BINARY_NATIVE(lt__, BOOL_VAL, <);
-BINARY_NATIVE(gte__, BOOL_VAL, >=);
-BINARY_NATIVE(lte__, BOOL_VAL, <=);
+BINARY_NATIVE(__gt__, BOOL_VAL, >)
+BINARY_NATIVE(__lt__, BOOL_VAL, <)
+BINARY_NATIVE(__gte__, BOOL_VAL, >=)
+BINARY_NATIVE(__lte__, BOOL_VAL, <=)
 
-BINARY_NATIVE(sub__, NUMBER_VAL, -);
-BINARY_NATIVE(div__, NUMBER_VAL, /);
-BINARY_NATIVE(mul__, NUMBER_VAL, *);
+BINARY_NATIVE(__sub__, NUMBER_VAL, -)
+BINARY_NATIVE(__div__, NUMBER_VAL, /)
+BINARY_NATIVE(__mul__, NUMBER_VAL, *)
 
 bool __print__(int argCount, Value* args) {
   printValue(vmPop());

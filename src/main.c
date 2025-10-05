@@ -8,6 +8,11 @@
 #include "io.h"
 #include "vm.h"
 
+#ifdef UNIT
+#include "test.h"
+int main(int argc, char* argv[]) { testMain(); }
+#else
+
 static void repl() {
   char line[1024];
   for (;;) {
@@ -39,3 +44,5 @@ int main(int argc, char* argv[]) {
     return exitStatus;
   }
 }
+
+#endif

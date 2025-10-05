@@ -30,6 +30,12 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
+ObjAst* newObjAst(AstNode* node) {
+  ObjAst* obj = (ObjAst*)allocateObject(sizeof(ObjAst), OBJ_AST);
+  obj->node = node;
+  return obj;
+}
+
 ObjBoundFunction* newBoundMethod(Value receiver, ObjClosure* method) {
   ObjBoundFunction* obj = ALLOCATE_OBJ(ObjBoundFunction, OBJ_BOUND_FUNCTION);
   obj->type = BOUND_METHOD;
@@ -419,6 +425,10 @@ bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
+    case OBJ_AST: {
+      printf("<ast>");
+      break;
+    }
     case OBJ_BOUND_FUNCTION: {
       ObjBoundFunction* obj = AS_BOUND_FUNCTION(value);
 
@@ -481,4 +491,8 @@ void printObject(Value value) {
       printf("<upvalue at %p>", AS_UPVALUE(value));
       break;
   }
+}
+
+ObjString* tokenString(Token token) {
+  return copyString(token.start, token.length);
 }
