@@ -10,7 +10,7 @@ default: clean dev
 
 # Remove all build outputs and intermediate files.
 clean:
-	@ rm -rf $(BUILD_DIR)/release $(BUILD_DIR)/debug $(BUILD_DIR)/wasm 
+	@ rm -rf $(BUILD_DIR)/release $(BUILD_DIR)/debug $(BUILD_DIR)/wasm $(BUILD_DIR)/test
 	@ rm -f $(BUILD_DIR)/nat $(BUILD_DIR)/nat.wasm $(BUILD_DIR)/lib.so $(BIN)/nat
 
 configure:
@@ -53,6 +53,11 @@ debug-stress-gc:
 debug-log-gc:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
+
+unit:
+	@ $(MAKE) configure
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=test MODE=unit SOURCE_DIR=src
+	@ $(BUILD_DIR)/test
 
 integration:
 	@ $(BUILD_DIR)/nat test/integration/index

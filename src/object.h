@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "common.h"
+#include "node.h"
 #include "value.h"
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->oType)
@@ -45,6 +46,7 @@
 #define INTERN(value) ((OBJ_VAL(intern(value))))
 
 typedef enum {
+  OBJ_AST,
   OBJ_BOUND_FUNCTION,
   OBJ_CLASS,
   OBJ_CLOSURE,
@@ -78,16 +80,21 @@ typedef struct {
 
 typedef struct {
   Obj obj;
+  AstNode *node;
+} ObjAst;
+
+typedef struct {
+  Obj obj;
   int count;
   int capacity;
   MapEntry *entries;
 } ObjMap;
 
-typedef struct {
+struct ObjString {
   Obj obj;
   int length;
   char *chars;
-} ObjString;
+};
 
 typedef struct {
   Obj obj;
@@ -197,6 +204,7 @@ typedef struct {
   Value value;
 } ObjSpread;
 
+ObjAst *newObjAst(AstNode *root);
 ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
 ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
 ObjClass *newClass(ObjString *name);
@@ -239,4 +247,6 @@ ObjString *mapFindString(ObjMap *map, const char *chars, int length,
 void mapRemoveWhite(ObjMap *map);
 void markMap(ObjMap *map);
 bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
+
+ObjString *tokenString(Token token);
 #endif

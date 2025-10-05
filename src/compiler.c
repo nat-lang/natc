@@ -173,10 +173,10 @@ bool advanceTo(Compiler* cmp, TokenType token, TokenType closing,
 
   for (;;) {
     if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
-        check(TOKEN_LEFT_PAREN))
+        check(TOKEN_PAREN_LEFT))
       depth++;
     if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
-        check(TOKEN_RIGHT_PAREN))
+        check(TOKEN_PAREN_RIGHT))
       depth--;
     // found one.
     if (check(token) && depth == initialDepth) return true;
@@ -392,12 +392,8 @@ static void parseDelimitedPrecedence(Compiler* cmp, Precedence precedence,
                                      DelimitFn fn);
 static void parsePrecedence(Compiler* cmp, Precedence precedence);
 
-static Value identifierToken(Token token) {
-  return OBJ_VAL(copyString(token.start, token.length));
-}
-
 static uint16_t identifierConstant(Compiler* cmp, Token* token) {
-  return makeConstant(cmp, identifierToken(*token));
+  return makeConstant(cmp, tokenValue(*token));
 }
 
 static bool identifiersEqual(Token* a, Token* b) {
@@ -517,7 +513,7 @@ void getProperty(Compiler* cmp, char* name) {
 
 static uint8_t argumentList(Compiler* cmp) {
   uint8_t argCount = 0;
-  if (!check(TOKEN_RIGHT_PAREN)) {
+  if (!check(TOKEN_PAREN_RIGHT)) {
     do {
       if (match(cmp, TOKEN_DOUBLE_DOT)) {
         expression(cmp);
@@ -531,7 +527,7 @@ static uint8_t argumentList(Compiler* cmp) {
       argCount++;
     } while (match(cmp, TOKEN_COMMA));
   }
-  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after arguments.");
   return argCount;
 }
 
@@ -604,7 +600,7 @@ static void literal(Compiler* cmp, bool canAssign) {
 }
 
 static void parentheses(Compiler* cmp, bool canAssign) {
-  if (match(cmp, TOKEN_RIGHT_PAREN)) {
+  if (match(cmp, TOKEN_PAREN_RIGHT)) {
     emitByte(cmp, OP_UNIT);
     return;
   }
@@ -622,7 +618,7 @@ static void parentheses(Compiler* cmp, bool canAssign) {
     getGlobalConstant(cmp, S_TUPLE);
     emitBytes(cmp, OP_CALL_POSTFIX, argCount);
   }
-  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after expression.");
 }
 
 static void and_(Compiler* cmp, bool canAssign) {
@@ -896,7 +892,7 @@ static void setVariable(Compiler* cmp, uint16_t var) {
 
 typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
 
-bool matchParamOrPattern(Compiler* cmp) {
+static bool matchParamOrPattern(Compiler* cmp) {
   return match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_TYPE_VARIABLE) ||
          match(cmp, TOKEN_NUMBER) || match(cmp, TOKEN_TRUE) ||
          match(cmp, TOKEN_FALSE) || match(cmp, TOKEN_NIL) ||
@@ -904,18 +900,18 @@ bool matchParamOrPattern(Compiler* cmp) {
 }
 
 static SignatureType peekSignatureType(Compiler* cmp) {
-  if (match(cmp, TOKEN_LEFT_PAREN)) {
-    if (!check(TOKEN_RIGHT_PAREN)) {
+  if (match(cmp, TOKEN_PAREN_LEFT)) {
+    if (!check(TOKEN_PAREN_RIGHT)) {
       do {
         if (!matchParamOrPattern(cmp)) return SIG_NOT;
         if (check(TOKEN_COLON)) {
-          advanceTo(cmp, TOKEN_COMMA, TOKEN_RIGHT_PAREN, 1);
+          advanceTo(cmp, TOKEN_COMMA, TOKEN_PAREN_RIGHT, 1);
         }
 
       } while (match(cmp, TOKEN_COMMA));
     }
 
-    if (!match(cmp, TOKEN_RIGHT_PAREN)) return SIG_NOT;
+    if (!match(cmp, TOKEN_PAREN_RIGHT)) return SIG_NOT;
     if (!match(cmp, TOKEN_FAT_ARROW)) return SIG_NOT;
 
     return SIG_PAREN;
@@ -1107,7 +1103,7 @@ static void closeSignature(Compiler* cmp, Compiler* sigCmp) {
 static void variadicSignature(Compiler* cmp, Compiler* sigCmp) {
   openSignature(sigCmp);
 
-  if (!check(TOKEN_RIGHT_PAREN)) {
+  if (!check(TOKEN_PAREN_RIGHT)) {
     do {
       if (cmp->function->variadic)
         error(cmp, "Can only apply * to the final parameter.");
@@ -1134,9 +1130,9 @@ static void function(Compiler* enclosing, FunctionType type, Token name) {
   Compiler cmp, sigCmp;
 
   openFunction(enclosing, &cmp, &sigCmp, type, name);
-  consume(&cmp, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+  consume(&cmp, TOKEN_PAREN_LEFT, "Expect '(' after function name.");
   variadicSignature(&cmp, &sigCmp);
-  consume(&cmp, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+  consume(&cmp, TOKEN_PAREN_RIGHT, "Expect ')' after parameters.");
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
   blockOrExpression(&cmp);
   signFunction(&cmp, &sigCmp, enclosing);
@@ -1229,7 +1225,7 @@ static void iterationEnd(Compiler* cmp, Iterator iter, int exitJump) {
 
 static void forInStatement(Compiler* cmp) {
   Iterator iter = iterator(cmp);
-  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after for clause.");
   int exitJump = iterationNext(cmp, iter);
   statement(cmp);
   iterationEnd(cmp, iter, exitJump);
@@ -1245,7 +1241,7 @@ static void forQuantification(Compiler* enclosing, bool canAssign) {
   Token name = syntheticToken("#quantifierBody");
   openFunction(enclosing, &cmp, &sigCmp, TYPE_ANONYMOUS, name);
 
-  consume(enclosing, TOKEN_LEFT_PAREN, "Expect '(' after quantifier.");
+  consume(enclosing, TOKEN_PAREN_LEFT, "Expect '(' after quantifier.");
   openSignature(&sigCmp);
   if (!check(TOKEN_IN)) {
     do {
@@ -1261,7 +1257,7 @@ static void forQuantification(Compiler* enclosing, bool canAssign) {
 
   consume(enclosing, TOKEN_IN, "Expect restriction.");
   expression(enclosing);
-  consume(enclosing, TOKEN_RIGHT_PAREN, "Expect ')' after restriction.");
+  consume(enclosing, TOKEN_PAREN_RIGHT, "Expect ')' after restriction.");
   closeSignature(&cmp, &sigCmp);
 
   blockOrExpression(&cmp);
@@ -1587,14 +1583,14 @@ static int infixPrecedence(Compiler* cmp) {
   if (currentClass == NULL && cmp->scopeDepth > 0)
     error(cmp, "Can only infix globals.");
 
-  if (match(cmp, TOKEN_LEFT_PAREN)) {
+  if (match(cmp, TOKEN_PAREN_LEFT)) {
     consume(cmp, TOKEN_NUMBER, "Expect numeral precedence.");
 
     prec = strtod(parser.previous.start, NULL);
 
     if (prec == 0) error(cmp, "Precedence must be > 0.");
 
-    consume(cmp, TOKEN_RIGHT_PAREN, "Expect closing ')'.");
+    consume(cmp, TOKEN_PAREN_RIGHT, "Expect closing ')'.");
   } else {
     prec = PREC_FACTOR;
   }
@@ -1605,7 +1601,7 @@ static int infixPrecedence(Compiler* cmp) {
 static bool checkPrefix(Compiler* cmp) {
   if (match(cmp, TOKEN_PREFIX)) return true;
 
-  mapDelete(&vm.prefixes, identifierToken(parser.current));
+  mapDelete(&vm.prefixes, tokenValue(parser.current));
   return false;
 }
 
@@ -1672,7 +1668,7 @@ static void symbolDeclaration(Compiler* cmp) {
 
     getGlobalConstant(cmp, "Symbol");
     Token name = parser.previous;
-    loadConstant(cmp, identifierToken(name));
+    loadConstant(cmp, tokenValue(name));
     emitBytes(cmp, OP_CALL, 1);
     defineVariable(cmp, var);
 
@@ -1689,7 +1685,7 @@ static void domainDeclaration(Compiler* cmp) {
 
   consume(cmp, TOKEN_EQUAL, "Expect domain assignment.");
   getGlobalConstant(cmp, "Domain");
-  loadConstant(cmp, identifierToken(name));
+  loadConstant(cmp, tokenValue(name));
   consume(cmp, TOKEN_LEFT_BRACE, "Expect domain elements.");
   braces(cmp, false);
 
@@ -1723,7 +1719,7 @@ static int loopIncrement(Compiler* cmp, int loopStart) {
   int incrementStart = cmp->function->chunk.count;
   expression(cmp);
   emitByte(cmp, OP_POP);
-  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after for clause.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after for clause.");
 
   emitLoop(cmp, loopStart);
   patchJump(cmp, bodyJump);
@@ -1743,7 +1739,7 @@ static void forConditionStatement(Compiler* cmp) {
   int loopStart = cmp->function->chunk.count;
   int exitJump = match(cmp, TOKEN_SEMICOLON) ? -1 : loopCondition(cmp);
 
-  if (!match(cmp, TOKEN_RIGHT_PAREN)) loopStart = loopIncrement(cmp, loopStart);
+  if (!match(cmp, TOKEN_PAREN_RIGHT)) loopStart = loopIncrement(cmp, loopStart);
 
   statement(cmp);
   emitLoop(cmp, loopStart);
@@ -1757,7 +1753,14 @@ static void forConditionStatement(Compiler* cmp) {
 
 static void forStatement(Compiler* cmp) {
   beginScope(cmp);
-  consume(cmp, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+  if (check(TOKEN_IDENTIFIER)) {
+    forQuantification(cmp, false);
+    consume(cmp, TOKEN_SEMICOLON, "Expect ';'.");
+    return;
+  }
+
+  consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'for'.");
 
   if (checkVariable()) {
     forInStatement(cmp);
@@ -1769,9 +1772,9 @@ static void forStatement(Compiler* cmp) {
 }
 
 static void ifStatement(Compiler* cmp) {
-  consume(cmp, TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+  consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'if'.");
   expression(cmp);
-  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after condition.");
 
   int thenJump = emitJump(cmp, OP_JUMP_IF_FALSE);
   emitByte(cmp, OP_POP);
@@ -1866,9 +1869,9 @@ static void throwStatement(Compiler* cmp) {
 static void whileStatement(Compiler* cmp) {
   int loopStart = cmp->function->chunk.count;
 
-  consume(cmp, TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
+  consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'while'.");
   expression(cmp);
-  consume(cmp, TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after condition.");
 
   int exitJump = emitJump(cmp, OP_JUMP_IF_FALSE);
   emitByte(cmp, OP_POP);
@@ -1940,8 +1943,8 @@ static void statement(Compiler* cmp) {
 }
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = {parentheses, call, PREC_CALL, PREC_NONE},
-    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_PAREN_LEFT] = {parentheses, call, PREC_CALL, PREC_NONE},
+    [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {braces, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_LEFT_BRACKET] = {brackets, subscript, PREC_CALL, PREC_NONE},
@@ -1991,7 +1994,7 @@ ParseRule rules[] = {
 
 static ParseRule* getPrefixRule(Compiler* cmp, Token token) {
   if (token.type == TOKEN_IDENTIFIER) {
-    Value name = identifierToken(token);
+    Value name = tokenValue(token);
 
     if (mapHas(&vm.prefixes, name)) return &rules[TOKEN_USER_PREFIX];
   }
@@ -2022,7 +2025,7 @@ static void setPrecedence(Compiler* cmp, ParseRule* rule, int prec) {
 // infix tables for a user-defined infixation precedence.
 static ParseRule* getInfixRule(Compiler* cmp, Token token) {
   if (token.type == TOKEN_IDENTIFIER) {
-    Value name = identifierToken(token);
+    Value name = tokenValue(token);
     Value prec;
 
     if (mapGet(&vm.infixes, name, &prec) ||

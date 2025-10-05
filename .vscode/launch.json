@@ -1,7 +1,13 @@
 {
   "configurations": [
     {
-      "name": "Launch",
+      "name": "Unit",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/test",
+    },
+    {
+      "name": "Integration",
       "type": "lldb",
       "request": "launch",
       "program": "${workspaceFolder}/build/nat",

@@ -22,3 +22,9 @@ let no = p q => for no (x in p) x in q;
 assert(all({1,2,3})({1,2,3}));
 assert(some({1,2,3})({1,2,3}));
 assert(!no({1,2,3})({1,2,3}));
+
+// as statement.
+
+for all (x in [true,false]) x or !x;
+for some (x in [true,false]) x or !x; 
+for no (x in [true,false]) x or !x; 

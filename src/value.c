@@ -163,3 +163,7 @@ uint32_t hashValue(Value value) {
   // unreachable.
   return 0;
 }
+
+Value tokenValue(Token token) {
+  return OBJ_VAL(copyString(token.start, token.length));
+}
