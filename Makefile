@@ -16,7 +16,7 @@ clean:
 configure:
 	@ python $(BUILD_DIR)/configure.py
 
-nat:
+install:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 
@@ -93,7 +93,7 @@ linux:
 	@ docker run -v $(CURRENT_DIR):/tmp -w /tmp -it linux sh
 
 lib:
-	@ $(MAKE) nat
+	@ $(MAKE) install
 	@ $(MAKE) -f $(BUILD_DIR)/c.make $(BUILD_DIR)/lib.so NAME=nat MODE=release SOURCE_DIR=src
 
 build-wasm:

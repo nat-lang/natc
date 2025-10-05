@@ -1,11 +1,6 @@
 import { v4 } from 'uuid';
 import initialize, { NatModule } from "../lib/nat";
 
-export type Compilation = {
-  success: boolean;
-  tex: string;
-}
-
 export type CoreFile = {
   path: string;
   content: string;
@@ -48,41 +43,11 @@ export enum InterpretationStatus {
   RUNTIME_ERROR = 2,
 }
 
-class Lock {
-  locked: boolean;
-  queue: (() => void)[];
-  constructor() {
-    this.locked = false;
-    this.queue = [];
-  }
-
-  acquire() {
-    return new Promise<void>(resolve => {
-      if (!this.locked) {
-        this.locked = true;
-        resolve();
-      } else {
-        this.queue.push(resolve);
-      }
-    });
-  }
-
-  release() {
-    this.locked = false;
-    if (this.queue.length > 0) {
-      const next = this.queue.shift();
-      this.locked = true;
-      next && next();
-    }
-  }
-}
-
 class Runtime {
   wasmModule?: Promise<NatModule>;
   stdOutHandlers: OutputHandlerMap;
   stdErrHandlers: OutputHandlerMap;
   errors: string[];
-  lock: Lock;
   rootDir: string;
 
   constructor({ rootDir = "." } = {}) {
@@ -90,7 +55,6 @@ class Runtime {
     this.stdOutHandlers = { console: console.log };
     this.stdErrHandlers = { console: console.error, store: this.storeErr };
     this.errors = [];
-    this.lock = new Lock();
     this.rootDir = rootDir;
   }
 

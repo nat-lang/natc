@@ -9,7 +9,7 @@ COPY Makefile Makefile
 COPY src src
 COPY build build
 
-RUN make nat && \
+RUN make install && \
     cp build/nat /bin/nat && \
     apk del make build-base python3 && \
     rm -rf src util Makefile build
