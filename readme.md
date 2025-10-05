@@ -1,4 +1,4 @@
-## Nat --- a Language for Natural Language Semantics
+## Nat, a Language for Natural Language Semantics
 
 Nat is a programming language and toolchain for linguistic semantics, designed to make formal analyses executable, shareable, and testable. For the language manual see [natlang.online](https://natlang.online/guide/natlang).
 
