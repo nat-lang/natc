@@ -109,7 +109,7 @@ class PolyTypeState extends AdhocTypeState {
       let tInstance = this.principal(instance),
           tBody = this.principal(body);
 
-      this.pushConstraint(node, TCollection(tBody) ~ tInstance);
+      this.pushConstraint(node, TSet(tBody) ~ tInstance);
       this.constrainFnRange(node);
 
       return tInstance;
@@ -130,7 +130,7 @@ class PolyTypeState extends AdhocTypeState {
       let tVar = this.principal(var);
       let tIter = this.principal(iter);
 
-      this.pushConstraint(node, tIter <| TCollection(tVar));
+      this.pushConstraint(node, tIter <| TSet(tVar));
       this.principal(body);
 
       return void;
