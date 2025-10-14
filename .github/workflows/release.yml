@@ -28,6 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '4.0.15'
       - name: Build wasm
         run: NAT_BASE_DIR="./" emmake make build-wasm
       - uses: actions/setup-node@v4
