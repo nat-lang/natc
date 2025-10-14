@@ -43,6 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '4.0.15'
       - uses: actions/setup-node@v4
       - name: Build package
         run: cd wasm && npm i
