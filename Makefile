@@ -64,7 +64,7 @@ unit:
 	@ $(BUILD_DIR)/test
 
 new-integration:
-	@ $(BUILD_DIR)/nat src/tests/integration/exprstmt
+	@ $(BUILD_DIR)/nat test/ast/exprstmt
 
 integration:
 	@ $(BUILD_DIR)/nat test/integration/index

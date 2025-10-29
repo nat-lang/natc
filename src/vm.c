@@ -9,13 +9,11 @@
 
 #include "ast.h"
 #include "common.h"
-#include "compiler.h"
 #include "core.h"
 #include "debug.h"
 #include "io.h"
 #include "memory.h"
-#include "node.h"
-#include "nodeCompiler.h"
+#include "native.h"
 #include "object.h"
 
 VM vm;
@@ -134,6 +132,7 @@ bool initVM() {
   vm.grayStack = NULL;
 
   vm.compiler = NULL;
+  vm.nodeCompiler = NULL;
   vm.module = NULL;
 
   vm.comprehensionDepth = 0;
@@ -144,8 +143,6 @@ bool initVM() {
   initMap(&vm.prefixes);
   initMap(&vm.infixes);
   initMap(&vm.methodInfixes);
-
-  vm.gen = NULL;
 
   initCore(&vm.core);
 
@@ -165,6 +162,8 @@ bool initVM() {
   vm.core.sOut = intern("out");
 
   vm.gen = NULL;
+
+  defineNatives();
 
   return true;
   // return loadCore() == INTERPRET_OK;

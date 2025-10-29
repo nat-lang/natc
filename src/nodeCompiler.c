@@ -7,12 +7,6 @@
 #include "scanner.h"
 #include "vm.h"
 
-typedef struct NodeCompiler {
-  struct NodeCompiler* enclosing;
-  AstNode* node;
-  int scopeDepth;
-} NodeCompiler;
-
 typedef AstNode* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
 typedef AstNode* (*InfixFn)(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
                             Precedence prec);
@@ -312,4 +306,12 @@ AstNode* compileModuleNode(Token path, const char* source) {
 
   ObjString* objName = tokenString(path);
   return newModuleNode(objName, node);
+}
+
+void markNodeCompilerRoots(NodeCompiler* cmp) {
+  printf("\n");
+  while (cmp != NULL) {
+    markAstNode(cmp->node);
+    cmp = cmp->enclosing;
+  }
 }

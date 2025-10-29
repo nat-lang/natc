@@ -18,7 +18,7 @@ bool assertNodesEqual(AstNode* a, AstNode* b) {
     printf("Nodes not equal: \n");
     printf("--- ---\n");
     printNode(a);
-    printf("-- -= --\n\n");
+    printf("\n-- != --\n\n");
     printNode(b);
     printf("--- ---\n");
     return false;
@@ -26,27 +26,41 @@ bool assertNodesEqual(AstNode* a, AstNode* b) {
   return true;
 }
 
+AstNode* mkModule(Token name) {
+  AstNode* fn = newFunctionNode();
+  AstNode* body = newBlockNode();
+  AstNode* module = newModuleNode(tokenString(name), fn);
+  module->as.module.fn->as.function.body = body;
+  return module;
+}
+
+void pushModuleStmt(AstNode* mod, AstNode* stmt) {
+  pushAstVec(&mod->as.module.fn->as.function.body->as.block.stmts, stmt);
+}
+
 bool testLiteralNumberNode() {
   Token name = syntheticToken("test");
   AstNode* node = compileModuleNode(name, "1;");
 
-  AstNode* target = newModuleNode(tokenString(name));
-  pushAstVec(&target->as.module.stmts, newLiteralNode(NUMBER_VAL(1)));
+  AstNode* module = mkModule(name);
+  AstNode* literal = newLiteralNode(NUMBER_VAL(1));
+  AstNode* exprStmt = newExprStmtNode(literal);
+  pushModuleStmt(module, exprStmt);
 
-  return assertNodesEqual(node, target);
+  return assertNodesEqual(node, module);
 }
 
 bool testCallNode0Args() {
   Token name = syntheticToken("test");
   AstNode* node = compileModuleNode(name, "f();");
 
-  AstNode* fn = newVariableNode(intern("f"));
-  AstNode* call = newCallNode(fn);
-  AstNode* target = newModuleNode(tokenString(name));
+  AstNode* var = newVariableNode(intern("f"));
+  AstNode* call = newCallNode(var);
+  AstNode* exprStmt = newExprStmtNode(call);
+  AstNode* module = mkModule(name);
+  pushModuleStmt(module, exprStmt);
 
-  pushAstVec(&target->as.module.stmts, call);
-
-  return assertNodesEqual(node, target);
+  return assertNodesEqual(node, module);
 }
 
 bool testCallNode1Args() {
@@ -55,12 +69,13 @@ bool testCallNode1Args() {
 
   AstNode* fn = newVariableNode(intern("f"));
   AstNode* call = newCallNode(fn);
-  AstNode* target = newModuleNode(tokenString(name));
+  AstNode* exprStmt = newExprStmtNode(call);
+  AstNode* module = mkModule(name);
 
   pushAstVec(&call->as.call.args, newLiteralNode(NUMBER_VAL(1)));
-  pushAstVec(&target->as.module.stmts, call);
+  pushModuleStmt(module, exprStmt);
 
-  return assertNodesEqual(node, target);
+  return assertNodesEqual(node, module);
 }
 
 bool testCallInfixNode() {
@@ -71,11 +86,11 @@ bool testCallInfixNode() {
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* call = newCallInfixNode(inf, lhs, rhs);
-  AstNode* target = newModuleNode(tokenString(name));
+  AstNode* exprStmt = newExprStmtNode(call);
+  AstNode* module = mkModule(name);
+  pushModuleStmt(module, exprStmt);
 
-  pushAstVec(&target->as.module.stmts, call);
-
-  return assertNodesEqual(node, target);
+  return assertNodesEqual(node, module);
 }
 
 bool testCallInfixNodeLeftNested() {
@@ -88,11 +103,11 @@ bool testCallInfixNodeLeftNested() {
 
   AstNode* call = newCallInfixNode(newVariableNode(intern("+")), callLeft,
                                    newLiteralNode(NUMBER_VAL(3)));
+  AstNode* exprStmt = newExprStmtNode(call);
+  AstNode* module = mkModule(name);
+  pushModuleStmt(module, exprStmt);
 
-  AstNode* target = newModuleNode(tokenString(name));
-  pushAstVec(&target->as.module.stmts, call);
-
-  return assertNodesEqual(node, target);
+  return assertNodesEqual(node, module);
 }
 
 bool testCallInfixNodeRightNested() {
@@ -105,29 +120,28 @@ bool testCallInfixNodeRightNested() {
 
   AstNode* call = newCallInfixNode(newVariableNode(intern("+")),
                                    newLiteralNode(NUMBER_VAL(1)), callRight);
+  AstNode* exprStmt = newExprStmtNode(call);
+  AstNode* module = mkModule(name);
+  pushModuleStmt(module, exprStmt);
 
-  AstNode* target = newModuleNode(tokenString(name));
-  pushAstVec(&target->as.module.stmts, call);
-
-  return assertNodesEqual(node, target);
+  return assertNodesEqual(node, module);
 }
 
-bool testClosureNode() {
-  Token modName = syntheticToken("test");
-  AstNode* node = compileModuleNode(modName, "let f = () => 1;");
+bool testFunctionNode() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileModuleNode(name, "let f = () => 1;");
 
-  AstNode* closure = newClosureNode();
-  closure->as.closure.signature = newSignatureNode();
-  closure->as.closure.body = newReturnNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* function = newFunctionNode();
+  function->as.function.signature = newSignatureNode();
+  function->as.function.body = newReturnNode(newLiteralNode(NUMBER_VAL(1)));
 
   ObjString* objLetName = intern("f");
-  AstNode* let = newLetNode(objLetName, closure);
+  AstNode* let = newLetNode(objLetName, function);
 
-  ObjString* objModName = tokenString(modName);
-  AstNode* target = newModuleNode(objModName);
-  pushAstVec(&target->as.module.stmts, let);
+  AstNode* module = mkModule(name);
+  pushModuleStmt(module, let);
 
-  return assertNodesEqual(node, target);
+  return assertNodesEqual(node, module);
 }
 
 /* ============================================================
@@ -164,7 +178,7 @@ int testMain(void) {
   fmt("    ", testCallInfixNode(), "Call Infix");
   fmt("    ", testCallInfixNodeLeftNested(), "Call Infix - Left Nested");
   fmt("    ", testCallInfixNodeRightNested(), "Call Infix - Right Nested");
-  fmt("    ", testClosureNode(), "Closure - Implicit Return - Literal");
+  fmt("    ", testFunctionNode(), "Function - Implicit Return - Literal");
 
   printf("  Memory\n");
 
