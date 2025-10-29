@@ -24,22 +24,22 @@
 #define IS_UPVALUE(value) isObjType(value, OBJ_UPVALUE)
 #define IS_MODULE(value) isObjType(value, OBJ_MODULE)
 
-#define AS_BOUND_FUNCTION(value) ((ObjBoundFunction *)AS_OBJ(value))
-#define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
-#define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
-#define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
-#define AS_OVERLOAD(value) ((ObjOverload *)AS_OBJ(value))
-#define AS_VARIABLE(value) (((ObjVariable *)AS_OBJ(value)))
-#define AS_PATTERN(value) (((ObjPattern *)AS_OBJ(value)))
-#define AS_INSTANCE(value) ((ObjInstance *)AS_OBJ(value))
-#define AS_MAP(value) ((ObjMap *)AS_OBJ(value))
-#define AS_NATIVE(value) (((ObjNative *)AS_OBJ(value)))
-#define AS_STRING(value) ((ObjString *)AS_OBJ(value))
-#define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
-#define AS_SEQUENCE(value) (((ObjSequence *)AS_OBJ(value)))
-#define AS_SPREAD(value) (((ObjSpread *)AS_OBJ(value)))
-#define AS_UPVALUE(value) (((ObjUpvalue *)AS_OBJ(value)))
-#define AS_MODULE(value) (((ObjModule *)AS_OBJ(value)))
+#define AS_BOUND_FUNCTION(value) ((ObjBoundFunction*)AS_OBJ(value))
+#define AS_CLASS(value) ((ObjClass*)AS_OBJ(value))
+#define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
+#define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
+#define AS_OVERLOAD(value) ((ObjOverload*)AS_OBJ(value))
+#define AS_VARIABLE(value) (((ObjVariable*)AS_OBJ(value)))
+#define AS_PATTERN(value) (((ObjPattern*)AS_OBJ(value)))
+#define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
+#define AS_MAP(value) ((ObjMap*)AS_OBJ(value))
+#define AS_NATIVE(value) (((ObjNative*)AS_OBJ(value)))
+#define AS_STRING(value) ((ObjString*)AS_OBJ(value))
+#define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
+#define AS_SEQUENCE(value) (((ObjSequence*)AS_OBJ(value)))
+#define AS_SPREAD(value) (((ObjSpread*)AS_OBJ(value)))
+#define AS_UPVALUE(value) (((ObjUpvalue*)AS_OBJ(value)))
+#define AS_MODULE(value) (((ObjModule*)AS_OBJ(value)))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 
@@ -69,7 +69,7 @@ struct Obj {
   ObjType oType;
   bool isMarked;
   uint32_t hash;
-  struct Obj *next;
+  struct Obj* next;
   ValueArray annotations;
 };
 
@@ -80,28 +80,28 @@ typedef struct {
 
 typedef struct {
   Obj obj;
-  AstNode *node;
+  AstNode* node;
 } ObjAst;
 
 typedef struct {
   Obj obj;
   int count;
   int capacity;
-  MapEntry *entries;
+  MapEntry* entries;
 } ObjMap;
 
 struct ObjString {
   Obj obj;
   int length;
-  char *chars;
+  char* chars;
 };
 
 typedef struct {
   Obj obj;
-  ObjString *name;
+  ObjString* name;
 } ObjVariable;
 
-typedef struct {
+struct ObjFunction {
   Obj obj;
   int arity;
   bool variadic;
@@ -113,60 +113,60 @@ typedef struct {
   int localCount;
 
   ObjMap fields;
-  ObjString *name;
-  ObjModule *module;
+  ObjString* name;
+  ObjModule* module;
 
   // cache from values to constant indices
   // in the function's chunk.constants.
   ObjMap constants;
-} ObjFunction;
+};
 
-typedef bool (*NativeFn)(int argCount, Value *args);
+typedef bool (*NativeFn)(int argCount, Value* args);
 
 typedef struct {
   Obj obj;
   int arity;
   bool variadic;
-  ObjString *name;
+  ObjString* name;
   NativeFn function;
   ObjMap fields;
 } ObjNative;
 
 typedef struct ObjUpvalue {
   Obj obj;
-  Value *location;
+  Value* location;
   Value closed;
-  struct ObjUpvalue *next;
+  struct ObjUpvalue* next;
   // the address of the local that's closed over.
   // we stash this only to reconstruct the ast.
   uint8_t slot;
-  ObjString *name;
+  ObjString* name;
 } ObjUpvalue;
 
 typedef struct {
   Obj obj;
-  ObjFunction *function;
-  ObjUpvalue **upvalues;
+  ObjFunction* function;
+  ObjUpvalue** upvalues;
   int upvalueCount;
 } ObjClosure;
 
 typedef struct {
   Obj obj;
   int cases;
-  ObjClosure **closures;
+  ObjClosure** closures;
   ObjMap fields;
 } ObjOverload;
 
 typedef struct ObjClass {
   Obj obj;
-  ObjString *name;
+  ObjString* name;
   ObjMap fields;
-  struct ObjClass *super;
+  struct ObjClass* super;
 } ObjClass;
 
 typedef struct {
   Obj obj;
-  ObjClass *klass;
+  ObjClass* klass;
   ObjMap fields;
 } ObjInstance;
 
@@ -177,8 +177,8 @@ typedef struct {
   BoundFunctionType type;
   Value receiver;
   union {
-    ObjClosure *method;
-    ObjNative *native;
+    ObjClosure* method;
+    ObjNative* native;
   } bound;
 } ObjBoundFunction;
 
@@ -187,10 +187,10 @@ typedef enum { MODULE_ENTRYPOINT, MODULE_IMPORT } ModuleType;
 struct ObjModule {
   Obj obj;
   ModuleType type;
-  ObjString *dirName;
-  ObjString *baseName;
-  ObjString *source;
-  ObjClosure *closure;
+  ObjString* dirName;
+  ObjString* baseName;
+  ObjString* source;
+  ObjClosure* closure;
   ObjMap namespace;
 };
 
@@ -204,26 +204,26 @@ typedef struct {
   Value value;
 } ObjSpread;
 
-ObjAst *newObjAst(AstNode *root);
-ObjBoundFunction *newBoundMethod(Value receiver, ObjClosure *method);
-ObjBoundFunction *newBoundNative(Value receiver, ObjNative *native);
-ObjClass *newClass(ObjString *name);
-ObjClosure *newClosure(ObjFunction *function);
-ObjFunction *newFunction(ObjModule *module);
-ObjOverload *newOverload(int cases);
-ObjVariable *newVariable(ObjString *name);
-ObjInstance *newInstance(ObjClass *klass);
-ObjModule *newModule(ObjString *dirName, ObjString *baseName, ObjString *source,
+ObjAst* newObjAst(AstNode* root);
+ObjBoundFunction* newBoundMethod(Value receiver, ObjClosure* method);
+ObjBoundFunction* newBoundNative(Value receiver, ObjNative* native);
+ObjClass* newClass(ObjString* name);
+ObjClosure* newClosure(ObjFunction* function);
+ObjFunction* newFunction(ObjModule* module);
+ObjOverload* newOverload(int cases);
+ObjVariable* newVariable(ObjString* name);
+ObjInstance* newInstance(ObjClass* klass);
+ObjModule* newModule(ObjString* dirName, ObjString* baseName, ObjString* source,
                      ModuleType type);
-ObjNative *newNative(int arity, bool variadic, ObjString *name,
+ObjNative* newNative(int arity, bool variadic, ObjString* name,
                      NativeFn function);
-ObjSequence *newSequence();
-ObjString *takeString(char *chars, int length);
-ObjString *copyString(const char *chars, int length);
-ObjString *concatenateStrings(ObjString *a, ObjString *b);
-ObjString *intern(const char *chars);
-ObjUpvalue *newUpvalue(Value *value, uint8_t slot, ObjString *name);
-ObjSpread *newSpread(Value value);
+ObjSequence* newSequence();
+ObjString* takeString(char* chars, int length);
+ObjString* copyString(const char* chars, int length);
+ObjString* concatenateStrings(ObjString* a, ObjString* b);
+ObjString* intern(const char* chars);
+ObjUpvalue* newUpvalue(Value* value, uint8_t slot, ObjString* name);
+ObjSpread* newSpread(Value value);
 
 void printObject(Value value);
 
@@ -231,22 +231,22 @@ static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->oType == type;
 }
 
-void initMap(ObjMap *map);
-void freeMap(ObjMap *map);
-bool mapHas(ObjMap *map, Value key);
-bool mapHasHash(ObjMap *map, Value key, uint32_t hash);
-bool mapGet(ObjMap *map, Value key, Value *value);
-bool mapGetHash(ObjMap *map, Value key, Value *value, uint32_t hash);
-bool mapSet(ObjMap *map, Value key, Value value);
-bool mapSetHash(ObjMap *map, Value key, Value value, uint32_t hash);
-bool mapDelete(ObjMap *map, Value key);
-void mapAddAll(ObjMap *from, ObjMap *to);
-void setStringChar(ObjString *string, ObjString *character, int idx);
-ObjString *mapFindString(ObjMap *map, const char *chars, int length,
+void initMap(ObjMap* map);
+void freeMap(ObjMap* map);
+bool mapHas(ObjMap* map, Value key);
+bool mapHasHash(ObjMap* map, Value key, uint32_t hash);
+bool mapGet(ObjMap* map, Value key, Value* value);
+bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash);
+bool mapSet(ObjMap* map, Value key, Value value);
+bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash);
+bool mapDelete(ObjMap* map, Value key);
+void mapAddAll(ObjMap* from, ObjMap* to);
+void setStringChar(ObjString* string, ObjString* character, int idx);
+ObjString* mapFindString(ObjMap* map, const char* chars, int length,
                          uint32_t hash);
-void mapRemoveWhite(ObjMap *map);
-void markMap(ObjMap *map);
-bool leastCommonAncestor(ObjClass *a, ObjClass *b, ObjClass *ancestor);
+void mapRemoveWhite(ObjMap* map);
+void markMap(ObjMap* map);
+bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor);
 
-ObjString *tokenString(Token token);
+ObjString* tokenString(Token token);
 #endif
