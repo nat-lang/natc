@@ -320,6 +320,7 @@ static void markRoots() {
   markObject((Obj*)vm.gen);
 
   markCompilerRoots(vm.compiler);
+  markNodeCompilerRoots(vm.nodeCompiler);
 }
 
 static void traceReferences() {

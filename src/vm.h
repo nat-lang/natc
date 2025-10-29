@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "compiler.h"
+#include "nodeCompiler.h"
 #include "object.h"
 #include "value.h"
 
@@ -131,6 +132,7 @@ typedef struct {
 
   // root compiler.
   Compiler* compiler;
+  NodeCompiler* nodeCompiler;
 
   // currently executing module.
   ObjModule* module;

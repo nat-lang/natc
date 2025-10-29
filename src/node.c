@@ -267,7 +267,9 @@ void printNodeAt(AstNode* node, int depth) {
     case AST_CALL_INFIX:
       printStrAt("CallInfix\n", depth);
       printNodeAt(node->as.callInfix.callee, depth + 1);
+      printf("\n");
       printNodeAt(node->as.callInfix.lhs, depth + 1);
+      printf("\n");
       printNodeAt(node->as.callInfix.rhs, depth + 1);
       break;
 
@@ -324,13 +326,17 @@ void printNodeAt(AstNode* node, int depth) {
       exit(2);
     }
   }
+}
 
+void printNode(AstNode* node) {
+  printNodeAt(node, 0);
   printf("\n");
 }
 
-void printNode(AstNode* node) { printNodeAt(node, 0); }
-
 bool nodesEqual(AstNode* a, AstNode* b) {
+  if (a == NULL && b == NULL) return true;
+  if (a == NULL || b == NULL) return false;
+
   if (a->type != b->type) return false;
 
   switch (a->type) {
@@ -474,7 +480,7 @@ bool toFunction(AstNode* node, ObjFunction* fn) {
 // ============================================================
 
 void markAstNode(AstNode* n) {
-  if (!n) return;
+  if (n == NULL) return;
 
   switch (n->type) {
     case AST_LITERAL:

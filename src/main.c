@@ -9,7 +9,7 @@
 #include "vm.h"
 
 #ifdef UNIT
-#include "tests/unit/main.h"
+#include "test.h"
 int main(int argc, char* argv[]) { testMain(); }
 #else
 
