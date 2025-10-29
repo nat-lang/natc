@@ -95,15 +95,15 @@ static AstNode* blockOrExpression(NodeCompiler* cmp) {
 }
 
 static AstNode* function(NodeCompiler* enclosing) {
-  AstNode* node = newClosureNode();
+  AstNode* node = newFunctionNode();
   NodeCompiler cmp;
   initNodeCompiler(&cmp, enclosing, node);
 
   consume(TOKEN_PAREN_LEFT, "Expect '(' after function name.");
-  node->as.closure.signature = signature(&cmp);
+  node->as.function.signature = signature(&cmp);
   consume(TOKEN_PAREN_RIGHT, "Expect ')' after parameters.");
   consume(TOKEN_FAT_ARROW, "Expect '=>' after signature.");
-  node->as.closure.body = blockOrExpression(&cmp);
+  node->as.function.body = blockOrExpression(&cmp);
 
   return node;
 }
@@ -126,7 +126,9 @@ static AstNode* tryFunction(NodeCompiler* cmp) {
 
 static AstNode* number(NodeCompiler* cmp, bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
-  return newLiteralNode(NUMBER_VAL(value));
+  AstNode* node = newLiteralNode(NUMBER_VAL(value));
+  node->line = parser.previous.line;
+  return node;
 }
 
 static void argumentList(NodeCompiler* cmp, AstVec* vec) {
@@ -265,15 +267,16 @@ static AstNode* expression(NodeCompiler* cmp) {
 
 static AstNode* letDeclaration(NodeCompiler* cmp) {
   ObjString* name = parseVariable("Expect variable name.");
-  AstNode* value = NULL;
+  AstNode* node = NULL;
 
   if (match(TOKEN_EQUAL)) {
-    value = expression(cmp);
+    node = expression(cmp);
   } else {
-    value = newLiteralNode(UNDEF_VAL);
+    node = newLiteralNode(UNDEF_VAL);
+    node->line = parser.previous.line;
   }
 
-  return newLetNode(name, value);
+  return newLetNode(name, node);
 }
 
 static AstNode* statement(NodeCompiler* cmp) {
@@ -282,6 +285,7 @@ static AstNode* statement(NodeCompiler* cmp) {
     node = letDeclaration(cmp);
   } else {
     node = expression(cmp);
+    node = newExprStmtNode(node);
   }
 
   consume(TOKEN_SEMICOLON, "Expect ';' after statement.");
@@ -291,7 +295,7 @@ static AstNode* statement(NodeCompiler* cmp) {
 static void statements(NodeCompiler* cmp) {
   while (!match(TOKEN_EOF)) {
     AstNode* node = statement(cmp);
-    pushAstVec(&cmp->node->as.module.stmts, node);
+    pushAstVec(&cmp->node->as.function.body->as.block.stmts, node);
   }
 }
 
@@ -299,13 +303,13 @@ AstNode* compileModuleNode(Token path, const char* source) {
   Scanner sc = initScanner(source);
   initParser(sc);
 
-  ObjString* objName = tokenString(path);
-  AstNode* node = newModuleNode(objName);
-
   NodeCompiler cmp;
+  AstNode* node = newFunctionNode();
+  node->as.function.body = newBlockNode();
   initNodeCompiler(&cmp, NULL, node);
 
   statements(&cmp);
 
-  return cmp.node;
+  ObjString* objName = tokenString(path);
+  return newModuleNode(objName, node);
 }

@@ -14,6 +14,8 @@
 #include "debug.h"
 #include "io.h"
 #include "memory.h"
+#include "node.h"
+#include "nodeCompiler.h"
 #include "object.h"
 
 VM vm;
@@ -164,7 +166,8 @@ bool initVM() {
 
   vm.gen = NULL;
 
-  return loadCore() == INTERPRET_OK;
+  return true;
+  // return loadCore() == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -1615,7 +1618,24 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
+ObjClosure* vmCompileAST(Token path, char* source, ObjModule* module) {
+  AstNode* node = compileModuleNode(path, source);
+  ObjFunction* fn = newFunction(module);
+  fn->name = copyString(path.start, path.length);
+
+  toFunction(node, fn);
+
+  vmPush(OBJ_VAL(fn));
+  ObjClosure* closure = newClosure(fn);
+  vmPop();  // function.
+
+  return closure;
+}
+
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
+#ifdef NEW_AST
+  return vmCompileAST(path, source, module);
+#else
   ObjFunction* function = compileModule(vm.compiler, source, path, module);
 
   if (function == NULL) return NULL;
@@ -1625,6 +1645,7 @@ ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
   vmPop();  // function.
 
   return closure;
+#endif
 }
 
 ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {

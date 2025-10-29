@@ -1,10 +1,13 @@
 #include "node.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "chunk.h"
 #include "common.h"
+#include "debug.h"
 #include "memory.h"
 #include "object.h"
 #include "value.h"
@@ -60,7 +63,41 @@ static AstNode* allocNode(AstType kind) {
   AstNode* n = ALLOCATE(AstNode, 1);
   memset(n, 0, sizeof(AstNode));
   n->type = kind;
-  /* n->as.line can be set by parser later */
+  n->line = -1;
+  return n;
+}
+
+AstNode* newBlockNode() {
+  AstNode* n = allocNode(AST_BLOCK);
+  initAstVec(&n->as.block.stmts);
+  return n;
+}
+
+AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs) {
+  AstNode* n = allocNode(AST_CALL_INFIX);
+  n->as.callInfix.callee = callee;
+  n->as.callInfix.lhs = lhs;
+  n->as.callInfix.rhs = rhs;
+  return n;
+}
+
+AstNode* newCallNode(AstNode* callee) {
+  AstNode* n = allocNode(AST_CALL);
+  n->as.call.callee = callee;
+  initAstVec(&n->as.call.args);
+  return n;
+}
+
+AstNode* newExprStmtNode(AstNode* expr) {
+  AstNode* n = allocNode(AST_EXPR_STMT);
+  n->as.exprStmt.expr = expr;
+  return n;
+}
+
+AstNode* newFunctionNode() {
+  AstNode* n = allocNode(AST_FUNCTION);
+  n->as.function.signature = NULL;
+  n->as.function.body = NULL;
   return n;
 }
 
@@ -71,16 +108,16 @@ AstNode* newLetNode(ObjString* name, AstNode* value) {
   return n;
 }
 
-AstNode* newBlockNode() {
-  AstNode* n = allocNode(AST_BLOCK);
-  initAstVec(&n->as.block.stmts);
+AstNode* newLiteralNode(Value v) {
+  AstNode* n = allocNode(AST_LITERAL);
+  n->as.literal.value = v;
   return n;
 }
 
-AstNode* newModuleNode(ObjString* name) {
+AstNode* newModuleNode(ObjString* name, AstNode* fn) {
   AstNode* n = allocNode(AST_MODULE);
   n->as.module.name = name;
-  initAstVec(&n->as.module.stmts);
+  n->as.module.fn = fn;
   return n;
 }
 
@@ -96,30 +133,9 @@ AstNode* newSpreadNode(AstNode* expr) {
   return n;
 }
 
-AstNode* newLiteralNode(Value v) {
-  AstNode* n = allocNode(AST_LITERAL);
-  n->as.literal.value = v;
-  return n;
-}
-
 AstNode* newVariableNode(ObjString* name) {
   AstNode* n = allocNode(AST_VARIABLE);
   n->as.variable.name = name;
-  return n;
-}
-
-AstNode* newCallNode(AstNode* callee) {
-  AstNode* n = allocNode(AST_CALL);
-  n->as.call.callee = callee;
-  initAstVec(&n->as.call.args);
-  return n;
-}
-
-AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs) {
-  AstNode* n = allocNode(AST_CALL_INFIX);
-  n->as.callInfix.callee = callee;
-  n->as.callInfix.lhs = lhs;
-  n->as.callInfix.rhs = rhs;
   return n;
 }
 
@@ -153,13 +169,6 @@ AstNode* newSignatureNode() {
   AstNode* n = allocNode(AST_SIGNATURE);
   initAstVec(&n->as.signature.params);
   n->as.signature.varargs = -1;
-  return n;
-}
-
-AstNode* newClosureNode() {
-  AstNode* n = allocNode(AST_CLOSURE);
-  n->as.closure.signature = NULL;
-  n->as.closure.body = NULL;
   return n;
 }
 
@@ -238,6 +247,11 @@ void printNodeVecAt(AstVec* nodes, int depth) {
 }
 
 void printNodeAt(AstNode* node, int depth) {
+  if (node == NULL) {
+    printStrAt("NULL\n", depth);
+    return;
+  }
+
   switch (node->type) {
     case AST_BLOCK:
       printStrAt("Block\n", depth);
@@ -257,16 +271,21 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.callInfix.rhs, depth + 1);
       break;
 
-    case AST_CLOSURE:
-      printStrAt("Closure\n", depth);
-      printNodeAt(node->as.closure.signature, depth + 1);
-      printNodeAt(node->as.closure.body, depth + 1);
+    case AST_EXPR_STMT:
+      printStrAt("ExprStmt\n", depth);
+      printNodeAt(node->as.exprStmt.expr, depth + 1);
+      break;
+
+    case AST_FUNCTION:
+      printStrAt("Function\n", depth);
+      printNodeAt(node->as.function.signature, depth + 1);
+      printNodeAt(node->as.function.body, depth + 1);
       break;
 
     case AST_LET:
       printStrAt("Let\n", depth);
       printStrAt(node->as.let.name->chars, depth + 1);
-      printNodeAt(node->as.closure.body, depth + 1);
+      printNodeAt(node->as.let.value, depth + 1);
       break;
 
     case AST_LITERAL:
@@ -276,7 +295,7 @@ void printNodeAt(AstNode* node, int depth) {
 
     case AST_MODULE:
       printStrAt("Module\n", depth);
-      printNodeVecAt(&node->as.module.stmts, depth + 1);
+      printNodeAt(node->as.module.fn, depth + 1);
       break;
 
     case AST_RETURN:
@@ -327,9 +346,12 @@ bool nodesEqual(AstNode* a, AstNode* b) {
              nodesEqual(a->as.callInfix.lhs, b->as.callInfix.lhs) &&
              nodesEqual(a->as.callInfix.rhs, b->as.callInfix.rhs);
 
-    case AST_CLOSURE:
-      return nodesEqual(a->as.closure.signature, b->as.closure.signature) &&
-             nodesEqual(a->as.closure.body, b->as.closure.body);
+    case AST_EXPR_STMT:
+      return nodesEqual(a->as.exprStmt.expr, b->as.exprStmt.expr);
+
+    case AST_FUNCTION:
+      return nodesEqual(a->as.function.signature, b->as.function.signature) &&
+             nodesEqual(a->as.function.body, b->as.function.body);
 
     case AST_LET:
       return a->as.let.name == b->as.let.name &&
@@ -340,7 +362,7 @@ bool nodesEqual(AstNode* a, AstNode* b) {
 
     case AST_MODULE:
       return a->as.module.name == b->as.module.name &&
-             astVecsEqual(&a->as.module.stmts, &b->as.module.stmts);
+             nodesEqual(a->as.module.fn, b->as.module.fn);
 
     case AST_RETURN:
       return nodesEqual(a->as.iReturn.value, b->as.iReturn.value);
@@ -359,6 +381,93 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       exit(2);
     }
   }
+}
+
+static void error(ObjFunction* fn, AstNode* node, const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  fprintf(stderr, "Error in AST to bytecode at %s/%s:%d ",
+          fn->module->dirName->chars, fn->module->baseName->chars, node->line);
+  vfprintf(stderr, format, args);
+  printf("\n");
+  va_end(args);
+}
+
+static void emitByte(ObjFunction* fn, AstNode* node, uint8_t byte) {
+  writeChunk(&fn->chunk, byte, node->line);
+}
+
+static void emitBytes(ObjFunction* fn, AstNode* node, uint8_t byte1,
+                      uint8_t byte2) {
+  emitByte(fn, node, byte1);
+  emitByte(fn, node, byte2);
+}
+
+static void emitConstant(ObjFunction* fn, AstNode* node, uint16_t constant) {
+  emitBytes(fn, node, constant >> 8, constant & 0xff);
+}
+
+#if defined(DEBUG_PRINT_CODE)
+#define DEBUG_CHUNK() \
+  disassembleChunk(&fn->chunk, fn->name != NULL ? fn->name->chars : "<script>");
+#else
+#define DEBUG_CHUNK()
+#endif
+
+bool toChunk(AstNode* node, ObjFunction* fn) {
+  switch (node->type) {
+    case AST_BLOCK: {
+      AstVec stmts = node->as.block.stmts;
+      for (int i = 0; i < stmts.count; i++)
+        if (!toChunk(stmts.items[i], fn)) return false;
+      break;
+    }
+    case AST_EXPR_STMT: {
+      toChunk(node->as.exprStmt.expr, fn);
+      emitByte(fn, node, OP_EXPR_STATEMENT);
+      break;
+    }
+    case AST_FUNCTION: {
+      toChunk(node->as.function.body, fn);
+      if (node->as.function.body->type == AST_BLOCK) emitByte(fn, node, OP_NIL);
+      emitByte(fn, node, OP_RETURN);
+      break;
+    }
+
+    case AST_LITERAL: {
+      uint16_t constant = addConstant(&fn->chunk, node->as.literal.value);
+      emitByte(fn, node, OP_CONSTANT);
+      emitConstant(fn, node, constant);
+      break;
+    }
+    case AST_MODULE:
+      toChunk(node->as.module.fn, fn);
+      break;
+    case AST_BINARY:
+    case AST_CALL:
+    case AST_CALL_INFIX:
+    case AST_LET:
+    case AST_RETURN:
+    case AST_SEQUENCE:
+    case AST_SIGNATURE:
+    case AST_SPREAD:
+    case AST_UNARY:
+    case AST_UNKNOWN:
+    case AST_VARIABLE:
+    default: {
+      error(fn, node, "unexpected node type (%d)", node->type);
+      exit(2);
+    }
+  }
+
+  return true;
+}
+
+bool toFunction(AstNode* node, ObjFunction* fn) {
+  printNode(node);
+  if (!toChunk(node, fn)) return false;
+  DEBUG_CHUNK()
+  return true;
 }
 
 // memory.
@@ -382,6 +491,11 @@ void markAstNode(AstNode* n) {
       for (int i = 0; i < n->as.call.args.count; i++) {
         markAstNode((AstNode*)n->as.call.args.items[i]);
       }
+      break;
+
+    case AST_FUNCTION:
+      markAstNode(n->as.function.signature);
+      markAstNode(n->as.function.body);
       break;
 
     case AST_MEMBER:
@@ -408,11 +522,6 @@ void markAstNode(AstNode* n) {
 
     case AST_SPREAD:
       markAstNode(n->as.spread.expr);
-      break;
-
-    case AST_CLOSURE:
-      markAstNode(n->as.closure.signature);
-      markAstNode(n->as.closure.body);
       break;
 
     case AST_RETURN:
@@ -511,11 +620,6 @@ void freeAstNode(AstNode* n) {
 
     case AST_SIGNATURE:
       freeAstVec(&n->as.signature.params);
-      break;
-
-    case AST_CLOSURE:
-      freeAstNode(n->as.closure.signature);
-      freeAstNode(n->as.closure.body);
       break;
 
     case AST_RETURN:

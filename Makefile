@@ -20,6 +20,10 @@ install:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 
+new-ast:
+	@ $(MAKE) configure
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=new-ast SOURCE_DIR=src
+
 # Compile and symlink to local bin.
 dev:
 	@ $(MAKE) configure
@@ -58,6 +62,9 @@ unit:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=test MODE=unit SOURCE_DIR=src
 	@ $(BUILD_DIR)/test
+
+new-integration:
+	@ $(BUILD_DIR)/nat src/tests/integration/exprstmt
 
 integration:
 	@ $(BUILD_DIR)/nat test/integration/index

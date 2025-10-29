@@ -6,11 +6,13 @@
 #include "value.h"
 
 typedef enum {
-  AST_LET,
-  AST_LITERAL,
   AST_BLOCK,
   AST_CALL,
   AST_CALL_INFIX,
+  AST_EXPR_STMT,
+  AST_FUNCTION,
+  AST_LET,
+  AST_LITERAL,
   AST_MODULE,
   AST_RETURN,
   AST_SPREAD,
@@ -26,7 +28,6 @@ typedef enum {
   AST_SUBSCRIPT,
   AST_COMPREHENSION,
   AST_SIGNATURE,
-  AST_CLOSURE,
   AST_CLASS,
   AST_IMPORT,
   AST_THROW,
@@ -72,7 +73,11 @@ struct AstNode {
     struct {
       AstNode* signature;
       AstNode* body;
-    } closure;
+    } function;
+
+    struct {
+      AstNode* expr;
+    } exprStmt;
 
     struct {
       ObjString* name;
@@ -85,7 +90,7 @@ struct AstNode {
 
     struct {
       ObjString* name;
-      AstVec stmts;
+      AstNode* fn;
     } module;
 
     struct {
@@ -142,9 +147,6 @@ struct AstNode {
       AstNode* expr;
     } throw;
     struct {
-      AstNode* expr;
-    } exprStmt;
-    struct {
       ObjString* name;
       AstNode* typeExpr;
     } setType;
@@ -171,10 +173,11 @@ struct AstNode {
 AstNode* newBlockNode();
 AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
-AstNode* newClosureNode();
+AstNode* newExprStmtNode(AstNode* expr);
+AstNode* newFunctionNode();
 AstNode* newLetNode(ObjString* name, AstNode* value);
 AstNode* newLiteralNode(Value v);
-AstNode* newModuleNode(ObjString* name);
+AstNode* newModuleNode(ObjString* name, AstNode* fn);
 AstNode* newSpreadNode(AstNode* expr);
 AstNode* newSequenceNode();
 AstNode* newSignatureNode();
@@ -200,6 +203,8 @@ bool nodesEqual(AstNode* a, AstNode* b);
 void printNode(AstNode* node);
 
 /* api - bytecode */
+
+bool toFunction(AstNode* node, ObjFunction* fn);
 
 /* memory */
 
