@@ -199,6 +199,8 @@ AstNode* newOverloadNode(ObjString* symbol, AstNode* impl);
 bool nodesEqual(AstNode* a, AstNode* b);
 void printNode(AstNode* node);
 
+/* api - bytecode */
+
 /* memory */
 
 void markAstNode(AstNode* n);
