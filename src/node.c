@@ -425,14 +425,27 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
       break;
     }
     case AST_CALL: {
+      // 1. Emit code for the callee, which leaves the function/object to call on the stack
+      if (!toChunk(node->as.call.callee, fn)) return false;
+
+      // 2. Emit code for each argument, in order, leaving them on the stack
+      AstVec* args = &node->as.call.args;
+      for (int i = 0; i < args->count; i++) {
+        if (!toChunk(args->items[i], fn)) return false;
+      }
+
+      // 3. Emit the OP_CALL instruction with argument count
+      emitByte(fn, node, OP_CALL);
+      emitByte(fn, node, (uint8_t)args->count);
+      break;
     }
     case AST_EXPR_STMT: {
-      toChunk(node->as.exprStmt.expr, fn);
+      if (!toChunk(node->as.exprStmt.expr, fn)) return false;
       emitByte(fn, node, OP_EXPR_STATEMENT);
       break;
     }
     case AST_FUNCTION: {
-      toChunk(node->as.function.body, fn);
+      if (!toChunk(node->as.function.body, fn)) return false;
       if (node->as.function.body->type == AST_BLOCK) emitByte(fn, node, OP_NIL);
       emitByte(fn, node, OP_RETURN);
       break;
@@ -445,7 +458,7 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
       break;
     }
     case AST_MODULE:
-      toChunk(node->as.module.fn, fn);
+      if (!toChunk(node->as.module.fn, fn)) return false;
       break;
     case AST_BINARY:
     case AST_CALL_INFIX:
