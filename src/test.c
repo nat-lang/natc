@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "chunk.h"
 #include "memory.h"
 #include "nodeCompiler.h"
 #include "object.h"
@@ -162,6 +163,120 @@ bool testAstGC() {
   return wrapper->node == ret;
 }
 
+/* ============================================================
+ * Bytecode (AST -> Chunk) helpers and tests.
+ * ============================================================ */
+
+static bool buildFunctionForExpr(AstNode* expr, ObjFunction** outFn) {
+  ObjModule* module = newModule(intern("."), intern("test"), intern(""), MODULE_ENTRYPOINT);
+  ObjFunction* fn = newFunction(module);
+
+  // Compile expression statement so OP_EXPR_STATEMENT is emitted
+  AstNode* exprStmt = newExprStmtNode(expr);
+  bool ok = toFunction(exprStmt, fn);
+  if (!ok) return false;
+  *outFn = fn;
+  return true;
+}
+
+static uint16_t read_u16(uint8_t hi, uint8_t lo) { return ((uint16_t)hi << 8) | (uint16_t)lo; }
+
+bool testBytecodeCall0Args() {
+  ObjFunction* fn = NULL;
+  AstNode* callee = newLiteralNode(OBJ_VAL(copyString("f", 3)));
+  AstNode* call = newCallNode(callee);
+  if (!buildFunctionForExpr(call, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  if (c->count != 6) return false;
+  if (c->code[0] != OP_CONSTANT) return false;
+  if (read_u16(c->code[1], c->code[2]) != 0) return false;
+  if (c->code[3] != OP_CALL) return false;
+  if (c->code[4] != 0) return false; // arg count
+  if (c->code[5] != OP_EXPR_STATEMENT) return false;
+  if (c->constants.count != 1) return false;
+  if (!valuesEqual(c->constants.values[0], OBJ_VAL(copyString("f", 3)))) return false;
+  return true;
+}
+
+bool testBytecodeCall1Arg() {
+  ObjFunction* fn = NULL;
+  AstNode* callee = newLiteralNode(OBJ_VAL(copyString("f", 3)));
+  AstNode* call = newCallNode(callee);
+  pushAstVec(&call->as.call.args, newLiteralNode(NUMBER_VAL(1)));
+  if (!buildFunctionForExpr(call, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  if (c->count != 9) return false;
+  if (c->code[0] != OP_CONSTANT) return false;
+  if (read_u16(c->code[1], c->code[2]) != 0) return false; // callee const idx
+  if (c->code[3] != OP_CONSTANT) return false;
+  if (read_u16(c->code[4], c->code[5]) != 1) return false; // arg const idx
+  if (c->code[6] != OP_CALL) return false;
+  if (c->code[7] != 1) return false;
+  if (c->code[8] != OP_EXPR_STATEMENT) return false;
+  if (c->constants.count != 2) return false;
+  if (!valuesEqual(c->constants.values[0], OBJ_VAL(copyString("f", 3)))) return false;
+  if (!valuesEqual(c->constants.values[1], NUMBER_VAL(1))) return false;
+  return true;
+}
+
+bool testBytecodeCall3Args() {
+  ObjFunction* fn = NULL;
+  AstNode* callee = newLiteralNode(OBJ_VAL(copyString("f", 3)));
+  AstNode* call = newCallNode(callee);
+  pushAstVec(&call->as.call.args, newLiteralNode(NUMBER_VAL(1)));
+  pushAstVec(&call->as.call.args, newLiteralNode(NUMBER_VAL(2)));
+  pushAstVec(&call->as.call.args, newLiteralNode(NUMBER_VAL(3)));
+  if (!buildFunctionForExpr(call, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  // Total bytes: 15
+  if (c->count != 15) return false;
+  if (c->code[0] != OP_CONSTANT) return false;
+  if (read_u16(c->code[1], c->code[2]) != 0) return false; // callee
+  if (c->code[3] != OP_CONSTANT || read_u16(c->code[4], c->code[5]) != 1) return false;
+  if (c->code[6] != OP_CONSTANT || read_u16(c->code[7], c->code[8]) != 2) return false;
+  if (c->code[9] != OP_CONSTANT || read_u16(c->code[10], c->code[11]) != 3) return false;
+  if (c->code[12] != OP_CALL) return false;
+  if (c->code[13] != 3) return false;
+  if (c->code[14] != OP_EXPR_STATEMENT) return false;
+  if (c->constants.count != 4) return false;
+  return valuesEqual(c->constants.values[0], OBJ_VAL(copyString("f", 3))) &&
+         valuesEqual(c->constants.values[1], NUMBER_VAL(1)) &&
+         valuesEqual(c->constants.values[2], NUMBER_VAL(2)) &&
+         valuesEqual(c->constants.values[3], NUMBER_VAL(3));
+}
+
+bool testBytecodeCallNestedCallee() {
+  ObjFunction* fn = NULL;
+  // inner: f() where f is string literal "zap"
+  AstNode* innerCallee = newLiteralNode(OBJ_VAL(copyString("zap", 3)));
+  AstNode* innerCall = newCallNode(innerCallee);
+  // outer: (f())(1)
+  AstNode* outerCall = newCallNode(innerCall);
+  pushAstVec(&outerCall->as.call.args, newLiteralNode(NUMBER_VAL(1)));
+  if (!buildFunctionForExpr(outerCall, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  // Sequence: CONST(5), CALL 0, CONST(1), CALL 1, EXPR_STMT
+  // Bytes: [OP_CONSTANT, idx0_hi, idx0_lo, OP_CALL, 0, OP_CONSTANT, idx1_hi, idx1_lo, OP_CALL, 1, OP_EXPR_STATEMENT]
+  if (c->count < 11) return false;
+  if (c->code[0] != OP_CONSTANT) return false;                         // 0
+  if (read_u16(c->code[1], c->code[2]) != 0) return false;             // 1,2
+  if (c->code[3] != OP_CALL) return false;                             // 3
+  if (c->code[4] != 0) return false;                                   // 4
+  if (c->code[5] != OP_CONSTANT) return false;                         // 5
+  if (read_u16(c->code[6], c->code[7]) != 1) return false;             // 6,7
+  if (c->code[8] != OP_CALL) return false;                             // 8
+  if (c->code[9] != 1) return false;                                   // 9
+  if (c->code[10] != OP_EXPR_STATEMENT) return false;                  // 10
+  if (c->constants.count != 2) return false;
+  if (!valuesEqual(c->constants.values[0], OBJ_VAL(copyString("zap", 3)))) return false;
+  if (!valuesEqual(c->constants.values[1], NUMBER_VAL(1))) return false;
+  return true;
+}
+
 void fmt(char* pref, bool success, char* msg) {
   printf("%s%s %s\n", pref, success ? "✔" : "✗", msg);
 }
@@ -185,6 +300,12 @@ int testMain(void) {
   fmt("    ", testAstGC(), "Literal Number - Marked on stack");
 
   printf("  Bytecode\n");
+
+  // Bytecode tests
+  fmt("    ", testBytecodeCall0Args(), "Bytecode: Call (0 args) callee+OP_CALL");
+  fmt("    ", testBytecodeCall1Arg(), "Bytecode: Call (1 arg) order");
+  fmt("    ", testBytecodeCall3Args(), "Bytecode: Call (3 args) order");
+  fmt("    ", testBytecodeCallNestedCallee(), "Bytecode: Call with nested callee");
 
   freeVM();
   return 0;
