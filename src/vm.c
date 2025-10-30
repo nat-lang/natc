@@ -165,8 +165,11 @@ bool initVM() {
 
   defineNatives();
 
+#ifdef NEW_AST
   return true;
-  // return loadCore() == INTERPRET_OK;
+#else
+  return loadCore() == INTERPRET_OK;
+#endif
 }
 
 void freeVM() {

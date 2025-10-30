@@ -267,9 +267,7 @@ void printNodeAt(AstNode* node, int depth) {
     case AST_CALL_INFIX:
       printStrAt("CallInfix\n", depth);
       printNodeAt(node->as.callInfix.callee, depth + 1);
-      printf("\n");
       printNodeAt(node->as.callInfix.lhs, depth + 1);
-      printf("\n");
       printNodeAt(node->as.callInfix.rhs, depth + 1);
       break;
 
@@ -293,6 +291,7 @@ void printNodeAt(AstNode* node, int depth) {
     case AST_LITERAL:
       printStrAt("Literal ", depth);
       printValue(node->as.literal.value);
+      printf("\n");
       break;
 
     case AST_MODULE:
@@ -317,7 +316,7 @@ void printNodeAt(AstNode* node, int depth) {
 
     case AST_VARIABLE:
       printStrAt("Var ", depth);
-      printf("\"%s\"", node->as.variable.name->chars);
+      printf("\"%s\"\n", node->as.variable.name->chars);
       break;
 
     case AST_UNKNOWN:
@@ -328,10 +327,7 @@ void printNodeAt(AstNode* node, int depth) {
   }
 }
 
-void printNode(AstNode* node) {
-  printNodeAt(node, 0);
-  printf("\n");
-}
+void printNode(AstNode* node) { printNodeAt(node, 0); }
 
 bool nodesEqual(AstNode* a, AstNode* b) {
   if (a == NULL && b == NULL) return true;
@@ -428,6 +424,8 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
         if (!toChunk(stmts.items[i], fn)) return false;
       break;
     }
+    case AST_CALL: {
+    }
     case AST_EXPR_STMT: {
       toChunk(node->as.exprStmt.expr, fn);
       emitByte(fn, node, OP_EXPR_STATEMENT);
@@ -450,7 +448,6 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
       toChunk(node->as.module.fn, fn);
       break;
     case AST_BINARY:
-    case AST_CALL:
     case AST_CALL_INFIX:
     case AST_LET:
     case AST_RETURN:
