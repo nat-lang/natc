@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "node.h"
+#include "scanner.h"
 
 typedef struct NodeCompiler {
   struct NodeCompiler* enclosing;

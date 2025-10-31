@@ -95,8 +95,9 @@ AstNode* newExprStmtNode(AstNode* expr) {
   return n;
 }
 
-AstNode* newFunctionNode() {
+AstNode* newFunctionNode(ObjString* name) {
   AstNode* n = allocNode(AST_FUNCTION);
+  n->as.function.name = name;
   n->as.function.signature = NULL;
   n->as.function.body = NULL;
   n->as.function.localCount = 0;

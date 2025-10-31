@@ -1,12 +1,183 @@
 
+#include "nodeCompiler.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "node.h"
-#include "parser.h"
 #include "scanner.h"
 #include "vm.h"
+
+typedef enum { SIG_NAKED, SIG_PAREN, SIG_NOT } SignatureType;
+
+typedef struct {
+  Scanner scanner;
+
+  Token next;
+  Token current;
+  Token previous;
+  Token penult;
+
+  bool hadError;
+  bool panicMode;
+} Parser;
+
+Parser parser;
+
+void initParser(Scanner scanner) {
+  parser.scanner = scanner;
+
+  parser.hadError = false;
+  parser.panicMode = false;
+  parser.current = scanToken();
+  parser.next = scanToken();
+}
+
+Parser saveParser() {
+  Parser checkpoint = parser;
+
+  checkpoint.scanner = saveScanner();
+
+  return checkpoint;
+}
+
+void gotoParser(Parser checkpoint) {
+  gotoScanner(checkpoint.scanner);
+  parser = checkpoint;
+}
+
+bool prev(TokenType type) { return parser.previous.type == type; }
+bool check(TokenType type) { return parser.current.type == type; }
+bool peek(TokenType type) { return parser.next.type == type; }
+
+bool checkVariable() {
+  return check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE);
+}
+
+void errorAt(NodeCompiler* cmp, Token* token, const char* message) {
+  if (parser.panicMode)
+    return;
+  else
+    parser.panicMode = true;
+
+  fprintf(stderr, "Error in %s:%d", cmp->node->as.function.name->chars,
+          token->line);
+
+  if (token->type == TOKEN_EOF) {
+    fprintf(stderr, " at end.");
+  } else if (token->type == TOKEN_ERROR) {
+    // Nothing.
+  } else {
+    fprintf(stderr, " at '%.*s'.", token->length, token->start);
+  }
+  fprintf(stderr, " %s\n", message);
+
+  parser.hadError = true;
+}
+
+void errorAtCurrent(NodeCompiler* cmp, const char* message) {
+  errorAt(cmp, &parser.current, message);
+}
+
+void error(NodeCompiler* cmp, const char* message) {
+  errorAt(cmp, &parser.previous, message);
+}
+
+void checkError(NodeCompiler* cmp) {
+  if (parser.current.type == TOKEN_ERROR)
+    errorAtCurrent(cmp, parser.current.start);
+}
+
+void shiftParser() {
+  parser.penult = parser.previous;
+  parser.previous = parser.current;
+  parser.current = parser.next;
+}
+
+void advance(NodeCompiler* cmp) {
+  shiftParser();
+  parser.next = scanToken();
+  checkError(cmp);
+}
+
+bool match(NodeCompiler* cmp, TokenType type) {
+  if (!check(type)) return false;
+  advance(cmp);
+  return true;
+}
+
+void consume(NodeCompiler* cmp, TokenType type, const char* message) {
+  if (parser.current.type == type)
+    advance(cmp);
+  else
+    errorAtCurrent(cmp, message);
+}
+
+void consumeIdentifier(NodeCompiler* cmp, const char* message) {
+  if (parser.current.type == TOKEN_IDENTIFIER ||
+      parser.current.type == TOKEN_TYPE_VARIABLE)
+    advance(cmp);
+  else
+    errorAtCurrent(cmp, message);
+}
+
+ObjString* parseVariable(NodeCompiler* cmp, const char* errorMessage) {
+  consumeIdentifier(cmp, errorMessage);
+  Token token = parser.previous;
+  return copyString(token.start, token.length);
+}
+
+bool matchParamOrPattern(NodeCompiler* cmp) {
+  return match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_TYPE_VARIABLE) ||
+         match(cmp, TOKEN_NUMBER) || match(cmp, TOKEN_TRUE) ||
+         match(cmp, TOKEN_FALSE) || match(cmp, TOKEN_NIL) ||
+         match(cmp, TOKEN_UNDEFINED) || match(cmp, TOKEN_STRING);
+}
+
+static bool advanceTo(NodeCompiler* cmp, TokenType token, TokenType closing,
+                      int initialDepth) {
+  int depth = initialDepth;
+
+  for (;;) {
+    if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
+        check(TOKEN_PAREN_LEFT))
+      depth++;
+    if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
+        check(TOKEN_PAREN_RIGHT))
+      depth--;
+    // found one.
+    if (check(token) && depth == initialDepth) return true;
+    // found none.
+    if (check(closing) && depth == 0) return false;
+    advance(cmp);
+  }
+}
+
+SignatureType peekSignatureType(NodeCompiler* cmp) {
+  if (match(cmp, TOKEN_PAREN_LEFT)) {
+    if (!check(TOKEN_PAREN_RIGHT)) {
+      do {
+        if (!matchParamOrPattern(cmp)) return SIG_NOT;
+        if (check(TOKEN_COLON)) {
+          advanceTo(cmp, TOKEN_COMMA, TOKEN_PAREN_RIGHT, 1);
+        }
+
+      } while (match(cmp, TOKEN_COMMA));
+    }
+
+    if (!match(cmp, TOKEN_PAREN_RIGHT)) return SIG_NOT;
+    if (!match(cmp, TOKEN_FAT_ARROW)) return SIG_NOT;
+
+    return SIG_PAREN;
+  } else {
+    // can only be naked.
+    if (matchParamOrPattern(cmp)) return peekSignatureType(cmp);
+    if (match(cmp, TOKEN_FAT_ARROW)) return SIG_NAKED;
+  }
+
+  return SIG_NOT;
+}
 
 typedef AstNode* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
 typedef AstNode* (*InfixFn)(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
@@ -43,7 +214,7 @@ static int resolveLocal(NodeCompiler* cmp, Token* name) {
 
     if (identifiersEqual(name, &local->name)) {
       if (local->depth == -1) {
-        error("Can't read local variable in its own initializer.");
+        error(cmp, "Can't read local variable in its own initializer.");
       }
       return i;
     }
@@ -63,7 +234,7 @@ static int addUpvalue(NodeCompiler* cmp, uint8_t index, bool isLocal) {
   }
 
   if (upvalueCount == UINT8_COUNT) {
-    error("Too many closure variables in function.");
+    error(cmp, "Too many closure variables in function.");
     return 0;
   }
 
@@ -91,7 +262,7 @@ static int resolveUpvalue(NodeCompiler* cmp, Token* name) {
 
 static uint8_t addLocal(NodeCompiler* cmp, Token name) {
   if (cmp->node->as.function.localCount == UINT8_COUNT) {
-    error("Too many local variables in function.");
+    error(cmp, "Too many local variables in function.");
     return 0;
   }
 
@@ -113,7 +284,7 @@ static uint8_t declareLocal(NodeCompiler* cmp, Token* name) {
     }
 
     if (identifiersEqual(name, &local->name)) {
-      error("Already a variable with this name in this scope.");
+      error(cmp, "Already a variable with this name in this scope.");
     }
   }
 
@@ -145,7 +316,7 @@ static AstNode* variable(NodeCompiler* cmp, bool canAssign) {
 }
 
 static AstNode* variableParameter(NodeCompiler* cmp) {
-  advance();
+  advance(cmp);
   return variable(cmp, false);
 }
 
@@ -162,7 +333,7 @@ static AstNode* signature(NodeCompiler* cmp) {
     do {
       AstNode* paramNode = parameter(cmp);
       pushAstVec(&node->as.signature.params, paramNode);
-    } while (match(TOKEN_COMMA));
+    } while (match(cmp, TOKEN_COMMA));
   }
 
   return node;
@@ -176,7 +347,7 @@ static AstNode* block(NodeCompiler* cmp) {
     pushAstVec(&node->as.block.stmts, stmtNode);
   }
 
-  consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+  consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 
   return node;
 }
@@ -185,7 +356,7 @@ static AstNode* blockOrExpression(NodeCompiler* cmp) {
   AstNode* node = NULL;
 
   if (check(TOKEN_LEFT_BRACE)) {
-    advance();
+    advance(cmp);
     node = block(cmp);
   } else {
     node = expression(cmp);
@@ -195,30 +366,30 @@ static AstNode* blockOrExpression(NodeCompiler* cmp) {
   return node;
 }
 
-static AstNode* function(NodeCompiler* enclosing) {
-  AstNode* node = newFunctionNode();
+static AstNode* function(NodeCompiler* enclosing, Token name) {
+  AstNode* node = newFunctionNode(tokenString(name));
   NodeCompiler cmp;
   initNodeCompiler(&cmp, enclosing, node);
 
-  consume(TOKEN_PAREN_LEFT, "Expect '(' after function name.");
+  consume(&cmp, TOKEN_PAREN_LEFT, "Expect '(' after function name.");
   node->as.function.signature = signature(&cmp);
-  consume(TOKEN_PAREN_RIGHT, "Expect ')' after parameters.");
-  consume(TOKEN_FAT_ARROW, "Expect '=>' after signature.");
+  consume(&cmp, TOKEN_PAREN_RIGHT, "Expect ')' after parameters.");
+  consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
   node->as.function.body = blockOrExpression(&cmp);
 
   return node;
 }
 
-static AstNode* tryFunction(NodeCompiler* cmp) {
+static AstNode* tryFunction(NodeCompiler* cmp, Token name) {
   Parser checkpoint = saveParser();
-  SignatureType signatureType = peekSignatureType();
+  SignatureType signatureType = peekSignatureType(cmp);
   gotoParser(checkpoint);
 
   switch (signatureType) {
     case SIG_NAKED:
       return NULL;
     case SIG_PAREN:
-      return function(cmp);
+      return function(cmp, name);
     case SIG_NOT:
       return NULL;
   }
@@ -238,19 +409,19 @@ static void argumentList(NodeCompiler* cmp, AstVec* vec) {
     do {
       AstNode* node = NULL;
 
-      if (match(TOKEN_DOUBLE_DOT))
+      if (match(cmp, TOKEN_DOUBLE_DOT))
         node = newSpreadNode(expression(cmp));
       else
         node = expression(cmp);
 
       pushAstVec(vec, node);
 
-      if (argCount == 255) error("Can't have more than 255 arguments.");
+      if (argCount == 255) error(cmp, "Can't have more than 255 arguments.");
 
       argCount++;
-    } while (match(TOKEN_COMMA));
+    } while (match(cmp, TOKEN_COMMA));
   }
-  consume(TOKEN_PAREN_RIGHT, "Expect ')' after arguments.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after arguments.");
 }
 
 static AstNode* userInfix(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
@@ -274,13 +445,13 @@ static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
     AstNode* seq = newSequenceNode();
     pushAstVec(&seq->as.sequence.values, node);
     do {
-      advance();
+      advance(cmp);
       pushAstVec(&node->as.sequence.values, expression(cmp));
     } while (check(TOKEN_COMMA));
 
     node = seq;
   }
-  consume(TOKEN_PAREN_RIGHT, "Expect ')' after expression.");
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after expression.");
   return node;
 }
 
@@ -309,7 +480,7 @@ static void setPrecedence(NodeCompiler* cmp, ParseRule* rule, int prec) {
       rule->leftPrec = rule->rightPrec = prec * -1;
       break;
     default:
-      error("Unexpected precedence");
+      error(cmp, "Unexpected precedence");
   }
 }
 
@@ -334,12 +505,12 @@ static ParseRule* getInfixRule(NodeCompiler* cmp, Token token) {
 static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
   AstNode* node = NULL;
 
-  advance();
+  advance(cmp);
 
   ParseFn prefixRule = rules[parser.previous.type].prefix;
 
   if (prefixRule == NULL) {
-    error("Expect expression.");
+    error(cmp, "Expect expression.");
     return node;
   }
 
@@ -349,17 +520,26 @@ static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
   ParseRule* infixRule;
   while (precedence <=
          (infixRule = getInfixRule(cmp, parser.current))->leftPrec) {
-    advance();
+    advance(cmp);
     node = infixRule->infix(cmp, canAssign, node, infixRule->rightPrec);
   }
 
-  if (canAssign && match(TOKEN_EQUAL)) error("Invalid assignment target.");
+  if (canAssign && match(cmp, TOKEN_EQUAL))
+    error(cmp, "Invalid assignment target.");
 
   return node;
 }
 
 static AstNode* expression(NodeCompiler* cmp) {
-  AstNode* node = tryFunction(cmp);
+  AstNode* node = tryFunction(cmp, syntheticToken("lambda"));
+
+  if (node != NULL) return node;
+
+  return parsePrecedence(cmp, PREC_ASSIGNMENT);
+}
+
+static AstNode* boundExpression(NodeCompiler* cmp, Token name) {
+  AstNode* node = tryFunction(cmp, name);
 
   if (node != NULL) return node;
 
@@ -367,14 +547,14 @@ static AstNode* expression(NodeCompiler* cmp) {
 }
 
 static AstNode* letDeclaration(NodeCompiler* cmp) {
-  consumeIdentifier("Expect variable name.");
+  consumeIdentifier(cmp, "Expect variable name.");
   Token nameToken = parser.previous;
 
   declareLocal(cmp, &nameToken);
 
   AstNode* node = NULL;
-  if (match(TOKEN_EQUAL)) {
-    node = expression(cmp);
+  if (match(cmp, TOKEN_EQUAL)) {
+    node = boundExpression(cmp, nameToken);
   } else {
     node = newLiteralNode(UNDEF_VAL);
     node->line = parser.previous.line;
@@ -388,19 +568,19 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
 
 static AstNode* statement(NodeCompiler* cmp) {
   AstNode* node;
-  if (match(TOKEN_LET)) {
+  if (match(cmp, TOKEN_LET)) {
     node = letDeclaration(cmp);
   } else {
     node = expression(cmp);
     node = newExprStmtNode(node);
   }
 
-  consume(TOKEN_SEMICOLON, "Expect ';' after statement.");
+  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after statement.");
   return node;
 }
 
 static void statements(NodeCompiler* cmp) {
-  while (!match(TOKEN_EOF)) {
+  while (!match(cmp, TOKEN_EOF)) {
     AstNode* node = statement(cmp);
     pushAstVec(&cmp->node->as.function.body->as.block.stmts, node);
   }
@@ -410,14 +590,14 @@ AstNode* compileModuleNode(Token path, const char* source) {
   Scanner sc = initScanner(source);
   initParser(sc);
 
+  ObjString* objName = tokenString(path);
   NodeCompiler cmp;
-  AstNode* node = newFunctionNode();
+  AstNode* node = newFunctionNode(objName);
   node->as.function.body = newBlockNode();
   initNodeCompiler(&cmp, NULL, node);
 
   statements(&cmp);
 
-  ObjString* objName = tokenString(path);
   return newModuleNode(objName, node);
 }
 
