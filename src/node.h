@@ -74,6 +74,7 @@ struct AstNode {
     } callInfix;
 
     struct {
+      ObjString* name;
       AstNode* signature;
       AstNode* body;
 
@@ -196,7 +197,7 @@ AstNode* newBlockNode();
 AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
 AstNode* newExprStmtNode(AstNode* expr);
-AstNode* newFunctionNode();
+AstNode* newFunctionNode(ObjString* name);
 AstNode* newLetNode(ObjString* name, AstNode* value);
 AstNode* newLiteralNode(Value v);
 AstNode* newModuleNode(ObjString* name, AstNode* fn);

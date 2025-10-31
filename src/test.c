@@ -28,7 +28,7 @@ bool assertNodesEqual(AstNode* a, AstNode* b) {
 }
 
 AstNode* mkModule(Token name) {
-  AstNode* fn = newFunctionNode();
+  AstNode* fn = newFunctionNode(tokenString(name));
   AstNode* body = newBlockNode();
   AstNode* module = newModuleNode(tokenString(name), fn);
   module->as.module.fn->as.function.body = body;
@@ -132,7 +132,7 @@ bool testFunctionNode() {
   Token name = syntheticToken("test");
   AstNode* node = compileModuleNode(name, "let f = () => 1;");
 
-  AstNode* function = newFunctionNode();
+  AstNode* function = newFunctionNode(intern("f"));
   function->as.function.signature = newSignatureNode();
   function->as.function.body = newReturnNode(newLiteralNode(NUMBER_VAL(1)));
 
@@ -289,7 +289,7 @@ bool testBytecodeCallNestedCallee() {
 
 bool testBytecodeAstFunctionEmpty() {
   ObjFunction* fn = NULL;
-  AstNode* fun = newFunctionNode();
+  AstNode* fun = newFunctionNode(intern("f"));
   fun->as.function.body = newBlockNode();
   if (!buildFunctionForExpr(fun, &fn)) return false;
 
@@ -303,7 +303,7 @@ bool testBytecodeAstFunctionEmpty() {
 
 bool testBytecodeAstFunctionExpr() {
   ObjFunction* fn = NULL;
-  AstNode* fun = newFunctionNode();
+  AstNode* fun = newFunctionNode(intern("f"));
   fun->as.function.body = newLiteralNode(NUMBER_VAL(42));
   if (!buildFunctionForExpr(fun, &fn)) return false;
 
