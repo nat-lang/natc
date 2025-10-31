@@ -10,6 +10,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
+#include "scanner.h"
 #include "value.h"
 
 bool nodesEqual(AstNode* a, AstNode* b);
@@ -98,6 +99,17 @@ AstNode* newFunctionNode() {
   AstNode* n = allocNode(AST_FUNCTION);
   n->as.function.signature = NULL;
   n->as.function.body = NULL;
+  n->as.function.localCount = 0;
+  n->as.function.upvalueCount = 0;
+
+  for (int i = 0; i < UINT8_COUNT; i++) {
+    initToken(&n->as.function.locals[i].name);
+    n->as.function.locals[i].depth = 0;
+    n->as.function.locals[i].isCaptured = false;
+    n->as.function.upvalues[i].index = 0;
+    n->as.function.upvalues[i].isLocal = false;
+  }
+
   return n;
 }
 
@@ -133,9 +145,23 @@ AstNode* newSpreadNode(AstNode* expr) {
   return n;
 }
 
-AstNode* newVariableNode(ObjString* name) {
-  AstNode* n = allocNode(AST_VARIABLE);
-  n->as.variable.name = name;
+AstNode* newVarGlobalNode(ObjString* name) {
+  AstNode* n = allocNode(AST_VAR_GLOBAL);
+  n->as.global.name = name;
+  return n;
+}
+
+AstNode* newVarLocalNode(uint8_t index, ObjString* name) {
+  AstNode* n = allocNode(AST_VAR_LOCAL);
+  n->as.local.index = index;
+  n->as.local.name = name;
+  return n;
+}
+
+AstNode* newVarUpvalueNode(uint8_t index, ObjString* name) {
+  AstNode* n = allocNode(AST_VAR_UPVALUE);
+  n->as.upvalue.index = index;
+  n->as.upvalue.name = name;
   return n;
 }
 
@@ -313,10 +339,18 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Spread\n", depth);
       printNodeVecAt(&node->as.signature.params, depth + 1);
       break;
-
-    case AST_VARIABLE:
-      printStrAt("Var ", depth);
-      printf("\"%s\"\n", node->as.variable.name->chars);
+    case AST_VAR_GLOBAL:
+      printStrAt("Global ", depth);
+      printf("\"%s\"\n", node->as.global.name->chars);
+      break;
+    case AST_VAR_LOCAL:
+      printStrAt("Local ", depth);
+      printf("[%d] \"%s\"\n", node->as.local.index, node->as.local.name->chars);
+      break;
+    case AST_VAR_UPVALUE:
+      printStrAt("Upvalue ", depth);
+      printf("[%d] \"%s\"\n", node->as.upvalue.index,
+             node->as.upvalue.name->chars);
       break;
 
     case AST_UNKNOWN:
@@ -374,8 +408,12 @@ bool nodesEqual(AstNode* a, AstNode* b) {
              astVecsEqual(&a->as.signature.params, &b->as.signature.params);
     case AST_SPREAD:
       return nodesEqual(a->as.spread.expr, b->as.spread.expr);
-    case AST_VARIABLE:
-      return a->as.variable.name == b->as.variable.name;
+    case AST_VAR_GLOBAL:
+      return a->as.global.name == b->as.global.name;
+    case AST_VAR_LOCAL:
+      return a->as.local.index == b->as.local.index;
+    case AST_VAR_UPVALUE:
+      return a->as.upvalue.index == b->as.upvalue.index;
 
     case AST_UNKNOWN:
     default: {
@@ -425,7 +463,8 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
       break;
     }
     case AST_CALL: {
-      // 1. Emit code for the callee, which leaves the function/object to call on the stack
+      // 1. Emit code for the callee, which leaves the function/object to call
+      // on the stack
       if (!toChunk(node->as.call.callee, fn)) return false;
 
       // 2. Emit code for each argument, in order, leaving them on the stack
@@ -460,6 +499,13 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
     case AST_MODULE:
       if (!toChunk(node->as.module.fn, fn)) return false;
       break;
+    case AST_VAR_GLOBAL: {
+      uint16_t constant =
+          addConstant(&fn->chunk, OBJ_VAL(node->as.global.name));
+      emitByte(fn, node, OP_GET_GLOBAL);
+      emitConstant(fn, node, constant);
+      break;
+    }
     case AST_BINARY:
     case AST_CALL_INFIX:
     case AST_LET:
@@ -469,7 +515,7 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
     case AST_SPREAD:
     case AST_UNARY:
     case AST_UNKNOWN:
-    case AST_VARIABLE:
+    case AST_VAR_LOCAL:
     default: {
       error(fn, node, "unexpected node type (%d)", node->type);
       exit(2);
@@ -480,7 +526,6 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
 }
 
 bool toFunction(AstNode* node, ObjFunction* fn) {
-  printNode(node);
   if (!toChunk(node, fn)) return false;
   DEBUG_CHUNK()
   return true;
@@ -498,8 +543,14 @@ void markAstNode(AstNode* n) {
       markValue(n->as.literal.value);
       break;
 
-    case AST_VARIABLE:
-      markObject((Obj*)n->as.variable.name);
+    case AST_VAR_GLOBAL:
+      markObject((Obj*)n->as.global.name);
+      break;
+    case AST_VAR_LOCAL:
+      markObject((Obj*)n->as.local.name);
+      break;
+    case AST_VAR_UPVALUE:
+      markObject((Obj*)n->as.upvalue.name);
       break;
 
     case AST_CALL:
@@ -600,7 +651,8 @@ void freeAstNode(AstNode* n) {
       /* Value/ObjString inside Value are GC-managed; nothing to free */
       break;
 
-    case AST_VARIABLE:
+    case AST_VAR_GLOBAL:
+    case AST_VAR_LOCAL:
       /* ObjString* name is GC-managed */
       break;
 

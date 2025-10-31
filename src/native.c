@@ -513,7 +513,7 @@ void defineNatives() {
   defineNativeInfixGlobal("/", __div__, PREC_FACTOR);
   defineNativeInfixGlobal("*", __mul__, PREC_FACTOR);
 
-  defineNativePrefixGlobal("__print__", __print__);
+  defineNativePrefixGlobal("print", __print__);
 
   // native classes.
 

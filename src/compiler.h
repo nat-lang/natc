@@ -7,11 +7,6 @@
 #include "scanner.h"
 #include "value.h"
 
-typedef struct {
-  uint8_t index;
-  bool isLocal;
-} Upvalue;
-
 typedef enum {
   TYPE_ANONYMOUS,
   TYPE_IMPLICIT,

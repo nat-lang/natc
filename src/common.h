@@ -147,6 +147,10 @@ typedef struct {
 } Token;
 
 typedef struct {
+  uint8_t index;
+  bool isLocal;
+} Upvalue;
+typedef struct {
   Token name;
   int depth;
   bool isCaptured;
