@@ -478,6 +478,14 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
       emitByte(fn, node, (uint8_t)args->count);
       break;
     }
+    case AST_CALL_INFIX: {
+      if (!toChunk(node->as.callInfix.callee, fn)) return false;
+      if (!toChunk(node->as.callInfix.lhs, fn)) return false;
+      if (!toChunk(node->as.callInfix.rhs, fn)) return false;
+      emitByte(fn, node, OP_CALL);
+      emitByte(fn, node, (uint8_t)2);
+      break;
+    }
     case AST_EXPR_STMT: {
       if (!toChunk(node->as.exprStmt.expr, fn)) return false;
       emitByte(fn, node, OP_EXPR_STATEMENT);
@@ -485,6 +493,7 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
     }
     case AST_FUNCTION: {
       if (!toChunk(node->as.function.body, fn)) return false;
+      // default return.
       if (node->as.function.body->type == AST_BLOCK) emitByte(fn, node, OP_NIL);
       emitByte(fn, node, OP_RETURN);
       break;
@@ -507,7 +516,6 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
       break;
     }
     case AST_BINARY:
-    case AST_CALL_INFIX:
     case AST_LET:
     case AST_RETURN:
     case AST_SEQUENCE:

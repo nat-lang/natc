@@ -287,6 +287,95 @@ bool testBytecodeCallNestedCallee() {
   return true;
 }
 
+bool testBytecodeAstFunctionEmpty() {
+  ObjFunction* fn = NULL;
+  AstNode* fun = newFunctionNode();
+  fun->as.function.body = newBlockNode();
+  if (!buildFunctionForExpr(fun, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  if (c->count != 3) return false;
+  if (c->code[0] != OP_NIL) return false;
+  if (c->code[1] != OP_RETURN) return false;
+  if (c->code[2] != OP_EXPR_STATEMENT) return false;
+  return true;
+}
+
+bool testBytecodeAstFunctionExpr() {
+  ObjFunction* fn = NULL;
+  AstNode* fun = newFunctionNode();
+  fun->as.function.body = newLiteralNode(NUMBER_VAL(42));
+  if (!buildFunctionForExpr(fun, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  // CONSTANT (3 bytes) + OP_RETURN (1) + OP_EXPR_STATEMENT (1) = 5
+  if (c->count != 5) return false;
+  if (c->code[0] != OP_CONSTANT) return false;
+  if (read_u16(c->code[1], c->code[2]) != 0) return false;
+  if (c->code[3] != OP_RETURN) return false;
+  if (c->code[4] != OP_EXPR_STATEMENT) return false;
+  if (c->constants.count != 1) return false;
+  if (!valuesEqual(c->constants.values[0], NUMBER_VAL(42))) return false;
+  return true;
+}
+
+bool testBytecodeAstGlobal() {
+  ObjFunction* fn = NULL;
+  ObjString* name = intern("g");
+  AstNode* g = newVarGlobalNode(name);
+  if (!buildFunctionForExpr(g, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  if (c->count != 4) return false;
+  if (c->code[0] != OP_GET_GLOBAL) return false;
+  if (read_u16(c->code[1], c->code[2]) != 0) return false;
+  if (c->code[3] != OP_EXPR_STATEMENT) return false;
+  if (c->constants.count != 1) return false;
+  if (!valuesEqual(c->constants.values[0], OBJ_VAL(name))) return false;
+  return true;
+}
+
+bool testBytecodeAstGlobalLongName() {
+  ObjFunction* fn = NULL;
+  ObjString* name = copyString("very_long_global_variable_name_123", 33);
+  AstNode* g = newVarGlobalNode(name);
+  if (!buildFunctionForExpr(g, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  if (c->count != 4) return false;
+  if (c->code[0] != OP_GET_GLOBAL) return false;
+  if (read_u16(c->code[1], c->code[2]) != 0) return false;
+  if (c->code[3] != OP_EXPR_STATEMENT) return false;
+  if (c->constants.count != 1) return false;
+  if (!valuesEqual(c->constants.values[0], OBJ_VAL(name))) return false;
+  return true;
+}
+
+bool testBytecodeCallInfix() {
+  ObjFunction* fn = NULL;
+  AstNode* op = newLiteralNode(OBJ_VAL(intern("+")));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* call = newCallInfixNode(op, lhs, rhs);
+  if (!buildFunctionForExpr(call, &fn)) return false;
+
+  Chunk* c = &fn->chunk;
+  // CONST (op, 3) + CONST (lhs, 3) + CONST (rhs, 3) + OP_CALL (1) + argc (1) +
+  // EXPR_STMT (1) = 12
+  if (c->count != 12) return false;
+  if (c->code[0] != OP_CONSTANT || read_u16(c->code[1], c->code[2]) != 0)
+    return false;
+  if (c->code[3] != OP_CONSTANT || read_u16(c->code[4], c->code[5]) != 1)
+    return false;
+  if (c->code[6] != OP_CONSTANT || read_u16(c->code[7], c->code[8]) != 2)
+    return false;
+  if (c->code[9] != OP_CALL) return false;
+  if (c->code[10] != 2) return false;
+  if (c->code[11] != OP_EXPR_STATEMENT) return false;
+  if (c->constants.count != 3) return false;
+  return true;
+}
+
 void fmt(char* pref, bool success, char* msg) {
   printf("%s%s %s\n", pref, success ? "✔" : "✗", msg);
 }
@@ -313,6 +402,11 @@ int testMain(void) {
   fmt("    ", testBytecodeCall1Arg(), "Call (1 arg) order");
   fmt("    ", testBytecodeCall3Args(), "Call (3 args) order");
   fmt("    ", testBytecodeCallNestedCallee(), "Call with nested callee");
+  fmt("    ", testBytecodeAstFunctionEmpty(), "Function empty body");
+  fmt("    ", testBytecodeAstFunctionExpr(), "Function expression body");
+  fmt("    ", testBytecodeAstGlobal(), "Global variable");
+  fmt("    ", testBytecodeAstGlobalLongName(), "Global variable long name");
+  fmt("    ", testBytecodeCallInfix(), "Call infix");
 
   freeVM();
   return 0;
