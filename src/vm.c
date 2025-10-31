@@ -1622,6 +1622,9 @@ InterpretResult vmExecute(int baseFrame) {
 
 ObjClosure* vmCompileAST(Token path, char* source, ObjModule* module) {
   AstNode* node = compileModuleNode(path, source);
+  printf("node: ");
+  printNode(node);
+  printf("\n");
   ObjFunction* fn = newFunction(module);
   fn->name = copyString(path.start, path.length);
 

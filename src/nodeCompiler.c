@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/_types/_null.h>
 
+#include "common.h"
 #include "node.h"
 #include "scanner.h"
 #include "vm.h"
@@ -122,12 +124,6 @@ void consumeIdentifier(NodeCompiler* cmp, const char* message) {
     errorAtCurrent(cmp, message);
 }
 
-ObjString* parseVariable(NodeCompiler* cmp, const char* errorMessage) {
-  consumeIdentifier(cmp, errorMessage);
-  Token token = parser.previous;
-  return copyString(token.start, token.length);
-}
-
 bool matchParamOrPattern(NodeCompiler* cmp) {
   return match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_TYPE_VARIABLE) ||
          match(cmp, TOKEN_NUMBER) || match(cmp, TOKEN_TRUE) ||
@@ -193,6 +189,7 @@ typedef struct {
 static AstNode* statement(NodeCompiler* cmp);
 static AstNode* expression(NodeCompiler* cmp);
 static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence);
+static AstNode* nakedFunction(NodeCompiler* enclosing, Token name);
 
 void initNodeCompiler(NodeCompiler* cmp, NodeCompiler* enclosing,
                       AstNode* node) {
@@ -298,7 +295,9 @@ static void markInitialized(NodeCompiler* cmp) {
       cmp->scopeDepth;
 }
 
-static AstNode* variable(NodeCompiler* cmp, bool canAssign) {
+static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
+  if (check(TOKEN_FAT_ARROW)) return nakedFunction(cmp, parser.previous);
+
   Token name = parser.previous;
   ObjString* objName = tokenString(name);
 
@@ -315,15 +314,13 @@ static AstNode* variable(NodeCompiler* cmp, bool canAssign) {
   return newVarGlobalNode(objName);
 }
 
-static AstNode* variableParameter(NodeCompiler* cmp) {
-  advance(cmp);
-  return variable(cmp, false);
-}
-
 static AstNode* parameter(NodeCompiler* cmp) {
-  if (checkVariable()) return variableParameter(cmp);
+  if (!checkVariable()) {
+    errorAtCurrent(cmp, "Expecting parameter name.");
+    return NULL;
+  }
 
-  return NULL;
+  return newParamNode(tokenString(parser.previous), NULL);
 }
 
 static AstNode* signature(NodeCompiler* cmp) {
@@ -366,6 +363,22 @@ static AstNode* blockOrExpression(NodeCompiler* cmp) {
   return node;
 }
 
+static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
+  AstNode* node = newFunctionNode(tokenString(name));
+  NodeCompiler cmp;
+  initNodeCompiler(&cmp, enclosing, node);
+
+  AstNode* sigNode = newSignatureNode();
+  AstNode* paramNode = newParamNode(tokenString(parser.previous), NULL);
+  pushAstVec(&sigNode->as.signature.params, paramNode);
+  node->as.function.signature = sigNode;
+
+  consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
+  node->as.function.body = blockOrExpression(&cmp);
+
+  return node;
+}
+
 static AstNode* function(NodeCompiler* enclosing, Token name) {
   AstNode* node = newFunctionNode(tokenString(name));
   NodeCompiler cmp;
@@ -380,7 +393,7 @@ static AstNode* function(NodeCompiler* enclosing, Token name) {
   return node;
 }
 
-static AstNode* tryFunction(NodeCompiler* cmp, Token name) {
+AstNode* tryFunction(NodeCompiler* cmp, Token name) {
   Parser checkpoint = saveParser();
   SignatureType signatureType = peekSignatureType(cmp);
   gotoParser(checkpoint);
@@ -426,7 +439,7 @@ static void argumentList(NodeCompiler* cmp, AstVec* vec) {
 
 static AstNode* userInfix(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
                           Precedence prec) {
-  AstNode* fn = variable(cmp, false);
+  AstNode* fn = identifier(cmp, false);
   AstNode* rhs = parsePrecedence(cmp, prec);
   return newCallInfixNode(fn, lhs, rhs);
 }
@@ -456,7 +469,8 @@ static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
 }
 
 static ParseRule rules[] = {
-    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_IDENTIFIER] = {identifier, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_PAREN_LEFT] = {parentheses, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
@@ -508,7 +522,6 @@ static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
   advance(cmp);
 
   ParseFn prefixRule = rules[parser.previous.type].prefix;
-
   if (prefixRule == NULL) {
     error(cmp, "Expect expression.");
     return node;
@@ -531,18 +544,6 @@ static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
 }
 
 static AstNode* expression(NodeCompiler* cmp) {
-  AstNode* node = tryFunction(cmp, syntheticToken("lambda"));
-
-  if (node != NULL) return node;
-
-  return parsePrecedence(cmp, PREC_ASSIGNMENT);
-}
-
-static AstNode* boundExpression(NodeCompiler* cmp, Token name) {
-  AstNode* node = tryFunction(cmp, name);
-
-  if (node != NULL) return node;
-
   return parsePrecedence(cmp, PREC_ASSIGNMENT);
 }
 
@@ -554,7 +555,7 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
 
   AstNode* node = NULL;
   if (match(cmp, TOKEN_EQUAL)) {
-    node = boundExpression(cmp, nameToken);
+    node = expression(cmp);
   } else {
     node = newLiteralNode(UNDEF_VAL);
     node->line = parser.previous.line;

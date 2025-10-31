@@ -134,6 +134,13 @@ AstNode* newModuleNode(ObjString* name, AstNode* fn) {
   return n;
 }
 
+AstNode* newParamNode(ObjString* name, AstNode* annotation) {
+  AstNode* n = allocNode(AST_PARAM);
+  n->as.param.name = name;
+  n->as.param.annotation = annotation;
+  return n;
+}
+
 AstNode* newSequenceNode() {
   AstNode* n = allocNode(AST_SEQUENCE);
   initAstVec(&n->as.sequence.values);
@@ -310,8 +317,8 @@ void printNodeAt(AstNode* node, int depth) {
       break;
 
     case AST_LET:
-      printStrAt("Let\n", depth);
-      printStrAt(node->as.let.name->chars, depth + 1);
+      printStrAt("Let ", depth);
+      printf("\"%s\"\n", node->as.let.name->chars);
       printNodeAt(node->as.let.value, depth + 1);
       break;
 
@@ -324,6 +331,11 @@ void printNodeAt(AstNode* node, int depth) {
     case AST_MODULE:
       printStrAt("Module\n", depth);
       printNodeAt(node->as.module.fn, depth + 1);
+      break;
+
+    case AST_PARAM:
+      printStrAt("Param ", depth);
+      printf("\"%s\"\n", node->as.param.name->chars);
       break;
 
     case AST_RETURN:
@@ -400,6 +412,9 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_MODULE:
       return a->as.module.name == b->as.module.name &&
              nodesEqual(a->as.module.fn, b->as.module.fn);
+
+    case AST_PARAM:
+      return a->as.param.name == b->as.param.name;
 
     case AST_RETURN:
       return nodesEqual(a->as.iReturn.value, b->as.iReturn.value);
@@ -572,6 +587,11 @@ void markAstNode(AstNode* n) {
     case AST_FUNCTION:
       markAstNode(n->as.function.signature);
       markAstNode(n->as.function.body);
+      break;
+
+    case AST_PARAM:
+      markObject((Obj*)n->as.param.name);
+      markAstNode(n->as.param.annotation);
       break;
 
     case AST_MEMBER:

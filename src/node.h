@@ -14,6 +14,7 @@ typedef enum {
   AST_LET,
   AST_LITERAL,
   AST_MODULE,
+  AST_PARAM,
   AST_RETURN,
   AST_SPREAD,
   AST_SEQUENCE,
@@ -104,6 +105,11 @@ struct AstNode {
       ObjString* name;
       AstNode* fn;
     } module;
+
+    struct {
+      ObjString* name;
+      AstNode* annotation;
+    } param;
 
     struct {
       AstNode* value;
@@ -201,6 +207,7 @@ AstNode* newFunctionNode(ObjString* name);
 AstNode* newLetNode(ObjString* name, AstNode* value);
 AstNode* newLiteralNode(Value v);
 AstNode* newModuleNode(ObjString* name, AstNode* fn);
+AstNode* newParamNode(ObjString* name, AstNode* annotation);
 AstNode* newSpreadNode(AstNode* expr);
 AstNode* newSequenceNode();
 AstNode* newSignatureNode();
