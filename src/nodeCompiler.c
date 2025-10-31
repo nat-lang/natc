@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "node.h"
 #include "parser.h"
@@ -26,15 +27,121 @@ void initNodeCompiler(NodeCompiler* cmp, NodeCompiler* enclosing,
                       AstNode* node) {
   cmp->enclosing = NULL;
   cmp->enclosing = enclosing;
-  cmp->scopeDepth = 0;
   cmp->node = NULL;
   cmp->node = node;
+  cmp->scopeDepth = 0;
+}
+
+static bool identifiersEqual(Token* a, Token* b) {
+  if (a->length != b->length) return false;
+  return memcmp(a->start, b->start, a->length) == 0;
+}
+
+static int resolveLocal(NodeCompiler* cmp, Token* name) {
+  for (int i = cmp->node->as.function.localCount - 1; i >= 0; i--) {
+    Local* local = &cmp->node->as.function.locals[i];
+
+    if (identifiersEqual(name, &local->name)) {
+      if (local->depth == -1) {
+        error("Can't read local variable in its own initializer.");
+      }
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+static int addUpvalue(NodeCompiler* cmp, uint8_t index, bool isLocal) {
+  int upvalueCount = cmp->node->as.function.upvalueCount;
+
+  for (int i = 0; i < upvalueCount; i++) {
+    Upvalue* upvalue = &cmp->node->as.function.upvalues[i];
+    if (upvalue->index == index && upvalue->isLocal == isLocal) {
+      return i;
+    }
+  }
+
+  if (upvalueCount == UINT8_COUNT) {
+    error("Too many closure variables in function.");
+    return 0;
+  }
+
+  cmp->node->as.function.upvalues[upvalueCount].isLocal = isLocal;
+  cmp->node->as.function.upvalues[upvalueCount].index = index;
+  return cmp->node->as.function.upvalueCount++;
+}
+
+static int resolveUpvalue(NodeCompiler* cmp, Token* name) {
+  if (cmp->enclosing == NULL) return -1;
+
+  int local = resolveLocal(cmp->enclosing, name);
+  if (local != -1) {
+    cmp->enclosing->node->as.function.locals[local].isCaptured = true;
+    return addUpvalue(cmp, (uint8_t)local, true);
+  }
+
+  int upvalue = resolveUpvalue(cmp->enclosing, name);
+  if (upvalue != -1) {
+    return addUpvalue(cmp, (uint8_t)upvalue, false);
+  }
+
+  return -1;
+}
+
+static uint8_t addLocal(NodeCompiler* cmp, Token name) {
+  if (cmp->node->as.function.localCount == UINT8_COUNT) {
+    error("Too many local variables in function.");
+    return 0;
+  }
+
+  Local* local =
+      &cmp->node->as.function.locals[cmp->node->as.function.localCount++];
+
+  local->name = name;
+  local->depth = -1;
+  local->isCaptured = false;
+
+  return cmp->node->as.function.localCount - 1;
+}
+
+static uint8_t declareLocal(NodeCompiler* cmp, Token* name) {
+  for (int i = cmp->node->as.function.localCount - 1; i >= 0; i--) {
+    Local* local = &cmp->node->as.function.locals[i];
+    if (local->depth != -1 && local->depth < cmp->scopeDepth) {
+      break;
+    }
+
+    if (identifiersEqual(name, &local->name)) {
+      error("Already a variable with this name in this scope.");
+    }
+  }
+
+  return addLocal(cmp, *name);
+}
+
+static void markInitialized(NodeCompiler* cmp) {
+  if (cmp->scopeDepth == 0) return;
+
+  cmp->node->as.function.locals[cmp->node->as.function.localCount - 1].depth =
+      cmp->scopeDepth;
 }
 
 static AstNode* variable(NodeCompiler* cmp, bool canAssign) {
   Token name = parser.previous;
   ObjString* objName = tokenString(name);
-  return newVariableNode(objName);
+
+  int local = resolveLocal(cmp, &name);
+  if (local >= 0) {
+    return newVarLocalNode((uint8_t)local, objName);
+  }
+
+  int upvalue = resolveUpvalue(cmp, &name);
+  if (upvalue >= 0) {
+    return newVarUpvalueNode((uint8_t)upvalue, objName);
+  }
+
+  return newVarGlobalNode(objName);
 }
 
 static AstNode* variableParameter(NodeCompiler* cmp) {
@@ -260,9 +367,12 @@ static AstNode* expression(NodeCompiler* cmp) {
 }
 
 static AstNode* letDeclaration(NodeCompiler* cmp) {
-  ObjString* name = parseVariable("Expect variable name.");
-  AstNode* node = NULL;
+  consumeIdentifier("Expect variable name.");
+  Token nameToken = parser.previous;
 
+  declareLocal(cmp, &nameToken);
+
+  AstNode* node = NULL;
   if (match(TOKEN_EQUAL)) {
     node = expression(cmp);
   } else {
@@ -270,6 +380,9 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
     node->line = parser.previous.line;
   }
 
+  markInitialized(cmp);
+
+  ObjString* name = tokenString(nameToken);
   return newLetNode(name, node);
 }
 

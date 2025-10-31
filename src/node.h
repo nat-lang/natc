@@ -19,8 +19,11 @@ typedef enum {
   AST_SEQUENCE,
 
   AST_UNKNOWN,
+  AST_VAR_GLOBAL,
+  AST_VAR_LOCAL,
+  AST_VAR_UPVALUE,
 
-  AST_VARIABLE,
+  //
   AST_UNARY,
   AST_BINARY,
 
@@ -73,6 +76,14 @@ struct AstNode {
     struct {
       AstNode* signature;
       AstNode* body;
+
+      bool variadic;
+      bool patterned;
+
+      Local locals[UINT8_COUNT];
+      int localCount;
+      Upvalue upvalues[UINT8_COUNT];
+      int upvalueCount;
     } function;
 
     struct {
@@ -102,7 +113,18 @@ struct AstNode {
 
     struct {
       ObjString* name;
-    } variable;
+    } global;
+
+    struct {
+      uint8_t index;
+      ObjString* name;
+    } local;
+
+    struct {
+      uint8_t index;
+      ObjString* name;
+    } upvalue;
+
     struct {
       AstVec values;
     } sequence;
@@ -181,7 +203,9 @@ AstNode* newModuleNode(ObjString* name, AstNode* fn);
 AstNode* newSpreadNode(AstNode* expr);
 AstNode* newSequenceNode();
 AstNode* newSignatureNode();
-AstNode* newVariableNode(ObjString* name);
+AstNode* newVarGlobalNode(ObjString* name);
+AstNode* newVarLocalNode(uint8_t index, ObjString* name);
+AstNode* newVarUpvalueNode(uint8_t index, ObjString* name);
 
 AstNode* newMemberNode(AstNode* object, ObjString* member, int isSet);
 AstNode* newSubscriptNode(AstNode* coll, AstNode* index, int isSet);
