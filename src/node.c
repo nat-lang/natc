@@ -152,12 +152,6 @@ AstNode* newSequenceNode() {
   return n;
 }
 
-AstNode* newSpreadNode(AstNode* expr) {
-  AstNode* n = allocNode(AST_SPREAD);
-  n->as.spread.expr = expr;
-  return n;
-}
-
 AstNode* newVarGlobalNode(ObjString* name) {
   AstNode* n = allocNode(AST_VAR_GLOBAL);
   n->as.global.name = name;
@@ -178,32 +172,6 @@ AstNode* newVarUpvalueNode(uint8_t index, ObjString* name) {
   return n;
 }
 
-AstNode* newMemberNode(AstNode* object, ObjString* member, int isSet) {
-  AstNode* n = allocNode(AST_MEMBER);
-  n->as.member.object = object;
-  n->as.member.member = member;
-  n->as.member.isSet = isSet;
-  return n;
-}
-
-AstNode* newSubscriptNode(AstNode* coll, AstNode* index, int isSet) {
-  AstNode* n = allocNode(AST_SUBSCRIPT);
-  n->as.subscript.collection = coll;
-  n->as.subscript.index = index;
-  n->as.subscript.isSet = isSet;
-  return n;
-}
-
-AstNode* newComprehensionNode(AstNode* body, ObjString* var, AstNode* iterable,
-                              AstNode* pred) {
-  AstNode* n = allocNode(AST_COMPREHENSION);
-  n->as.comprehension.body = body;
-  n->as.comprehension.var = var;
-  n->as.comprehension.iterable = iterable;
-  n->as.comprehension.pred = pred;
-  return n;
-}
-
 AstNode* newSignatureNode() {
   AstNode* n = allocNode(AST_SIGNATURE);
   initAstVec(&n->as.signature.params);
@@ -214,58 +182,6 @@ AstNode* newSignatureNode() {
 AstNode* newReturnNode(AstNode* value) {
   AstNode* n = allocNode(AST_RETURN);
   n->as.xReturn.value = value;
-  return n;
-}
-
-AstNode* newClassNode(ObjString* name, ObjString* super) {
-  AstNode* n = allocNode(AST_CLASS);
-  n->as.classDef.name = name;
-  n->as.classDef.super = super;
-  initAstVec(&n->as.classDef.methods);
-  return n;
-}
-
-AstNode* newImportNode(ObjString* module, ObjString* asName, ObjString* from) {
-  AstNode* n = allocNode(AST_IMPORT);
-  n->as.import.module = module;
-  n->as.import.asName = asName;
-  n->as.import.from = from;
-  return n;
-}
-
-AstNode* newThrowNode(AstNode* expr) {
-  AstNode* n = allocNode(AST_THROW);
-  n->as.throw.expr = expr;
-  return n;
-}
-
-AstNode* newSetTypeNode(ObjString* name, AstNode* typeExpr, int isGlobal) {
-  AstNode* n = allocNode(AST_SET_TYPE);
-  n->as.setType.name = name;
-  n->as.setType.typeExpr = typeExpr;
-  return n;
-}
-
-AstNode* newQuantifyNode(ObjString* quant, ObjString* var, AstNode* scope) {
-  AstNode* n = allocNode(AST_QUANTIFY);
-  n->as.quantify.quant = quant;
-  n->as.quantify.var = var;
-  n->as.quantify.scope = scope;
-  return n;
-}
-
-AstNode* newIterNode(ObjString* var, AstNode* iterable, AstNode* body) {
-  AstNode* n = allocNode(AST_ITER);
-  n->as.iter.var = var;
-  n->as.iter.iterable = iterable;
-  n->as.iter.body = body;
-  return n;
-}
-
-AstNode* newOverloadNode(ObjString* symbol, AstNode* impl) {
-  AstNode* n = allocNode(AST_OVERLOAD);
-  n->as.overload.symbol = symbol;
-  n->as.overload.impl = impl;
   return n;
 }
 
@@ -353,10 +269,6 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeVecAt(&node->as.signature.params, depth + 1);
       break;
 
-    case AST_SPREAD:
-      printStrAt("Spread\n", depth);
-      printNodeVecAt(&node->as.signature.params, depth + 1);
-      break;
     case AST_VAR_GLOBAL:
       printStrAt("Global ", depth);
       printf("\"%s\"\n", node->as.global.name->chars);
@@ -427,8 +339,7 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_SIGNATURE:
       return a->as.signature.varargs == b->as.signature.varargs &&
              astVecsEqual(&a->as.signature.params, &b->as.signature.params);
-    case AST_SPREAD:
-      return nodesEqual(a->as.spread.expr, b->as.spread.expr);
+
     case AST_VAR_GLOBAL:
       return a->as.global.name == b->as.global.name;
     case AST_VAR_LOCAL:
@@ -571,12 +482,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitConstant(chunk, node, node->as.upvalue.index);
       break;
     }
-    case AST_BINARY:
-    case AST_SEQUENCE:
-    case AST_SPREAD:
-    case AST_UNARY:
     case AST_UNKNOWN:
-
     default: {
       error(node, "unexpected node type (%d)", node->type);
       exit(2);
@@ -605,11 +511,60 @@ void markAstNode(AstNode* n) {
   if (n == NULL) return;
 
   switch (n->type) {
+    case AST_BLOCK:
+      for (int i = 0; i < n->as.block.stmts.count; i++) {
+        markAstNode((AstNode*)n->as.block.stmts.items[i]);
+      }
+      break;
+
+    case AST_CALL: {
+      markAstNode(n->as.call.callee);
+      for (int i = 0; i < n->as.call.args.count; i++) {
+        markAstNode((AstNode*)n->as.call.args.items[i]);
+      }
+      break;
+    }
+    case AST_CALL_INFIX: {
+      markAstNode(n->as.callInfix.callee);
+      markAstNode(n->as.callInfix.lhs);
+      markAstNode(n->as.callInfix.rhs);
+      break;
+    }
+    case AST_EXPR_STMT:
+      markAstNode(n->as.exprStmt.expr);
+      break;
+
+    case AST_FUNCTION:
+      markAstNode(n->as.function.signature);
+      markAstNode(n->as.function.body);
+      break;
+    case AST_LET:
+      markObject((Obj*)n->as.let.name);
+      markAstNode(n->as.let.value);
+      break;
     case AST_LITERAL:
       /* Value may reference Obj* (e.g., strings); mark via markValue */
       markValue(n->as.literal.value);
       break;
-
+    case AST_MODULE:
+      markObject((Obj*)n->as.module.name);
+      markAstNode(n->as.module.fn);
+      break;
+    case AST_PARAM:
+      markObject((Obj*)n->as.param.name);
+      markAstNode(n->as.param.annotation);
+      break;
+    case AST_RETURN:
+      markAstNode(n->as.xReturn.value);
+      break;
+    case AST_SEQUENCE:
+      for (int i = 0; i < n->as.sequence.values.count; i++)
+        markAstNode((AstNode*)n->as.sequence.values.items[i]);
+      break;
+    case AST_SIGNATURE:
+      for (int i = 0; i < n->as.signature.params.count; i++)
+        markObject((Obj*)n->as.signature.params.items[i]);
+      break;
     case AST_VAR_GLOBAL:
       markObject((Obj*)n->as.global.name);
       break;
@@ -620,97 +575,7 @@ void markAstNode(AstNode* n) {
       markObject((Obj*)n->as.upvalue.name);
       break;
 
-    case AST_CALL:
-      markAstNode(n->as.call.callee);
-      for (int i = 0; i < n->as.call.args.count; i++) {
-        markAstNode((AstNode*)n->as.call.args.items[i]);
-      }
-      break;
-
-    case AST_FUNCTION:
-      markAstNode(n->as.function.signature);
-      markAstNode(n->as.function.body);
-      break;
-
-    case AST_PARAM:
-      markObject((Obj*)n->as.param.name);
-      markAstNode(n->as.param.annotation);
-      break;
-
-    case AST_MEMBER:
-      markAstNode(n->as.member.object);
-      markObject((Obj*)n->as.member.member);
-      break;
-
-    case AST_SUBSCRIPT:
-      markAstNode(n->as.subscript.collection);
-      markAstNode(n->as.subscript.index);
-      break;
-
-    case AST_COMPREHENSION:
-      markAstNode(n->as.comprehension.body);
-      markObject((Obj*)n->as.comprehension.var);
-      markAstNode(n->as.comprehension.iterable);
-      markAstNode(n->as.comprehension.pred);
-      break;
-
-    case AST_SIGNATURE:
-      for (int i = 0; i < n->as.signature.params.count; i++)
-        markObject((Obj*)n->as.signature.params.items[i]);
-      break;
-
-    case AST_SPREAD:
-      markAstNode(n->as.spread.expr);
-      break;
-
-    case AST_RETURN:
-      markAstNode(n->as.xReturn.value);
-      break;
-
-    case AST_CLASS:
-      markObject((Obj*)n->as.classDef.name);
-      markObject((Obj*)n->as.classDef.super);
-      for (int i = 0; i < n->as.classDef.methods.count; i++) {
-        markAstNode((AstNode*)n->as.classDef.methods.items[i]);
-      }
-      break;
-
-    case AST_IMPORT:
-      markObject((Obj*)n->as.import.module);
-      markObject((Obj*)n->as.import.asName);
-      markObject((Obj*)n->as.import.from);
-      break;
-
-    case AST_THROW:
-      markAstNode(n->as.throw.expr);
-      break;
-
-    case AST_SET_TYPE:
-      markObject((Obj*)n->as.setType.name);
-      markAstNode(n->as.setType.typeExpr);
-      break;
-
-    case AST_QUANTIFY:
-      markObject((Obj*)n->as.quantify.quant);
-      markObject((Obj*)n->as.quantify.var);
-      markAstNode(n->as.quantify.scope);
-      break;
-
-    case AST_ITER:
-      markObject((Obj*)n->as.iter.var);
-      markAstNode(n->as.iter.iterable);
-      markAstNode(n->as.iter.body);
-      break;
-
-    case AST_OVERLOAD:
-      markObject((Obj*)n->as.overload.symbol);
-      markAstNode(n->as.overload.impl);
-      break;
-
-    case AST_UNIT:
     case AST_UNKNOWN:
-    default:
-      /* nothing extra to mark */
       break;
   }
 }
@@ -725,6 +590,7 @@ void freeAstNode(AstNode* n) {
 
     case AST_VAR_GLOBAL:
     case AST_VAR_LOCAL:
+    case AST_VAR_UPVALUE:
       /* ObjString* name is GC-managed */
       break;
 
@@ -741,23 +607,6 @@ void freeAstNode(AstNode* n) {
       freeAstNode(n->as.callInfix.lhs);
       freeAstNode(n->as.callInfix.rhs);
 
-    case AST_MEMBER:
-      freeAstNode(n->as.member.object);
-      /* member (ObjString*) is GC-managed */
-      break;
-
-    case AST_SUBSCRIPT:
-      freeAstNode(n->as.subscript.collection);
-      freeAstNode(n->as.subscript.index);
-      break;
-
-    case AST_COMPREHENSION:
-      freeAstNode(n->as.comprehension.body);
-      /* var (ObjString*) is GC-managed */
-      freeAstNode(n->as.comprehension.iterable);
-      freeAstNode(n->as.comprehension.pred);
-      break;
-
     case AST_SIGNATURE:
       freeAstVec(&n->as.signature.params);
       break;
@@ -766,51 +615,30 @@ void freeAstNode(AstNode* n) {
       freeAstNode(n->as.xReturn.value);
       break;
 
-    case AST_CLASS:
-      /* name/super (ObjString*) are GC-managed */
-      for (int i = 0; i < n->as.classDef.methods.count; i++) {
-        freeAstNode((AstNode*)n->as.classDef.methods.items[i]);
-      }
-      freeAstVec(&n->as.classDef.methods);
-      break;
-
-    case AST_IMPORT:
-      /* module/asName/from are ObjString* (GC-managed) */
-      break;
-
-    case AST_THROW:
-      freeAstNode(n->as.throw.expr);
-      break;
-
-    case AST_SET_TYPE:
-      /* name (ObjString*) is GC-managed */
-      freeAstNode(n->as.setType.typeExpr);
-      break;
-
-    case AST_SPREAD:
-      freeAstNode(n->as.spread.expr);
-      break;
-
-    case AST_QUANTIFY:
-      /* quant/var are ObjString* (GC-managed) */
-      freeAstNode(n->as.quantify.scope);
-      break;
-
-    case AST_ITER:
-      /* var (ObjString*) is GC-managed */
-      freeAstNode(n->as.iter.iterable);
-      freeAstNode(n->as.iter.body);
-      break;
-
-    case AST_OVERLOAD:
-      /* symbol (ObjString*) is GC-managed */
-      freeAstNode(n->as.overload.impl);
-      break;
-
-    case AST_UNIT:
     case AST_UNKNOWN:
-    default:
-      /* nothing extra */
+      break;
+
+    case AST_BLOCK:
+      freeAstVec(&n->as.block.stmts);
+      break;
+    case AST_EXPR_STMT:
+      freeAstNode(n->as.exprStmt.expr);
+      break;
+    case AST_FUNCTION:
+      freeAstNode(n->as.function.signature);
+      freeAstNode(n->as.function.body);
+      break;
+    case AST_LET:
+      freeAstNode(n->as.let.value);
+      break;
+    case AST_MODULE:
+      freeAstNode(n->as.module.fn);
+      break;
+    case AST_PARAM:
+      freeAstNode(n->as.param.annotation);
+      break;
+    case AST_SEQUENCE:
+      freeAstVec(&n->as.sequence.values);
       break;
   }
 
