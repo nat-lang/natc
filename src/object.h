@@ -209,7 +209,7 @@ ObjBoundFunction* newBoundMethod(Value receiver, ObjClosure* method);
 ObjBoundFunction* newBoundNative(Value receiver, ObjNative* native);
 ObjClass* newClass(ObjString* name);
 ObjClosure* newClosure(ObjFunction* function);
-ObjFunction* newFunction(ObjModule* module);
+ObjFunction* newFunction();
 ObjOverload* newOverload(int cases);
 ObjVariable* newVariable(ObjString* name);
 ObjInstance* newInstance(ObjClass* klass);

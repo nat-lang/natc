@@ -20,6 +20,7 @@ typedef struct {
   Token current;
   Token previous;
   Token penult;
+  Token ppenult;
 
   bool hadError;
   bool panicMode;
@@ -92,6 +93,7 @@ void checkError(NodeCompiler* cmp) {
 }
 
 void shiftParser() {
+  parser.ppenult = parser.penult;
   parser.penult = parser.previous;
   parser.previous = parser.current;
   parser.current = parser.next;
@@ -131,50 +133,6 @@ bool matchParamOrPattern(NodeCompiler* cmp) {
          match(cmp, TOKEN_UNDEFINED) || match(cmp, TOKEN_STRING);
 }
 
-static bool advanceTo(NodeCompiler* cmp, TokenType token, TokenType closing,
-                      int initialDepth) {
-  int depth = initialDepth;
-
-  for (;;) {
-    if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
-        check(TOKEN_PAREN_LEFT))
-      depth++;
-    if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
-        check(TOKEN_PAREN_RIGHT))
-      depth--;
-    // found one.
-    if (check(token) && depth == initialDepth) return true;
-    // found none.
-    if (check(closing) && depth == 0) return false;
-    advance(cmp);
-  }
-}
-
-SignatureType peekSignatureType(NodeCompiler* cmp) {
-  if (match(cmp, TOKEN_PAREN_LEFT)) {
-    if (!check(TOKEN_PAREN_RIGHT)) {
-      do {
-        if (!matchParamOrPattern(cmp)) return SIG_NOT;
-        if (check(TOKEN_COLON)) {
-          advanceTo(cmp, TOKEN_COMMA, TOKEN_PAREN_RIGHT, 1);
-        }
-
-      } while (match(cmp, TOKEN_COMMA));
-    }
-
-    if (!match(cmp, TOKEN_PAREN_RIGHT)) return SIG_NOT;
-    if (!match(cmp, TOKEN_FAT_ARROW)) return SIG_NOT;
-
-    return SIG_PAREN;
-  } else {
-    // can only be naked.
-    if (matchParamOrPattern(cmp)) return peekSignatureType(cmp);
-    if (match(cmp, TOKEN_FAT_ARROW)) return SIG_NAKED;
-  }
-
-  return SIG_NOT;
-}
-
 typedef AstNode* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
 typedef AstNode* (*InfixFn)(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
                             Precedence prec);
@@ -205,6 +163,22 @@ static bool identifiersEqual(Token* a, Token* b) {
   return memcmp(a->start, b->start, a->length) == 0;
 }
 
+static uint8_t addLocal(NodeCompiler* cmp, Token name) {
+  if (cmp->node->as.function.localCount == UINT8_COUNT) {
+    error(cmp, "Too many local variables in function.");
+    return 0;
+  }
+
+  Local* local =
+      &cmp->node->as.function.locals[cmp->node->as.function.localCount++];
+
+  local->name = name;
+  local->depth = -1;
+  local->isCaptured = false;
+
+  return cmp->node->as.function.localCount - 1;
+}
+
 static int resolveLocal(NodeCompiler* cmp, Token* name) {
   for (int i = cmp->node->as.function.localCount - 1; i >= 0; i--) {
     Local* local = &cmp->node->as.function.locals[i];
@@ -218,6 +192,26 @@ static int resolveLocal(NodeCompiler* cmp, Token* name) {
   }
 
   return -1;
+}
+
+static uint8_t declareLocal(NodeCompiler* cmp, Token* name) {
+  for (int i = cmp->node->as.function.localCount - 1; i >= 0; i--) {
+    Local* local = &cmp->node->as.function.locals[i];
+    if (local->depth != -1 && local->depth < cmp->scopeDepth) {
+      break;
+    }
+
+    if (identifiersEqual(name, &local->name)) {
+      error(cmp, "Already a variable with this name in this scope.");
+    }
+  }
+
+  return addLocal(cmp, *name);
+}
+
+static void markInitialized(NodeCompiler* cmp) {
+  cmp->node->as.function.locals[cmp->node->as.function.localCount - 1].depth =
+      cmp->scopeDepth;
 }
 
 static int addUpvalue(NodeCompiler* cmp, uint8_t index, bool isLocal) {
@@ -257,46 +251,20 @@ static int resolveUpvalue(NodeCompiler* cmp, Token* name) {
   return -1;
 }
 
-static uint8_t addLocal(NodeCompiler* cmp, Token name) {
-  if (cmp->node->as.function.localCount == UINT8_COUNT) {
-    error(cmp, "Too many local variables in function.");
-    return 0;
+static void beginScope(NodeCompiler* cmp) { cmp->scopeDepth++; }
+
+static void endScope(NodeCompiler* cmp) {
+  cmp->scopeDepth--;
+
+  while (cmp->node->as.function.localCount > 0 &&
+         cmp->node->as.function.locals[cmp->node->as.function.localCount - 1]
+                 .depth > cmp->scopeDepth) {
+    cmp->node->as.function.localCount--;
   }
-
-  Local* local =
-      &cmp->node->as.function.locals[cmp->node->as.function.localCount++];
-
-  local->name = name;
-  local->depth = -1;
-  local->isCaptured = false;
-
-  return cmp->node->as.function.localCount - 1;
-}
-
-static uint8_t declareLocal(NodeCompiler* cmp, Token* name) {
-  for (int i = cmp->node->as.function.localCount - 1; i >= 0; i--) {
-    Local* local = &cmp->node->as.function.locals[i];
-    if (local->depth != -1 && local->depth < cmp->scopeDepth) {
-      break;
-    }
-
-    if (identifiersEqual(name, &local->name)) {
-      error(cmp, "Already a variable with this name in this scope.");
-    }
-  }
-
-  return addLocal(cmp, *name);
-}
-
-static void markInitialized(NodeCompiler* cmp) {
-  if (cmp->scopeDepth == 0) return;
-
-  cmp->node->as.function.locals[cmp->node->as.function.localCount - 1].depth =
-      cmp->scopeDepth;
 }
 
 static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
-  if (check(TOKEN_FAT_ARROW)) return nakedFunction(cmp, parser.previous);
+  if (check(TOKEN_FAT_ARROW)) return nakedFunction(cmp, parser.ppenult);
 
   Token name = parser.previous;
   ObjString* objName = tokenString(name);
@@ -315,11 +283,8 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 }
 
 static AstNode* parameter(NodeCompiler* cmp) {
-  if (!checkVariable()) {
-    errorAtCurrent(cmp, "Expecting parameter name.");
-    return NULL;
-  }
-
+  addLocal(cmp, parser.previous);
+  markInitialized(cmp);
   return newParamNode(tokenString(parser.previous), NULL);
 }
 
@@ -328,6 +293,10 @@ static AstNode* signature(NodeCompiler* cmp) {
 
   if (!check(TOKEN_PAREN_RIGHT)) {
     do {
+      if (!checkVariable()) {
+        errorAtCurrent(cmp, "Expecting parameter name.");
+        return NULL;
+      }
       AstNode* paramNode = parameter(cmp);
       pushAstVec(&node->as.signature.params, paramNode);
     } while (match(cmp, TOKEN_COMMA));
@@ -349,12 +318,13 @@ static AstNode* block(NodeCompiler* cmp) {
   return node;
 }
 
-static AstNode* blockOrExpression(NodeCompiler* cmp) {
+static AstNode* functionBody(NodeCompiler* cmp) {
   AstNode* node = NULL;
 
   if (check(TOKEN_LEFT_BRACE)) {
     advance(cmp);
     node = block(cmp);
+    pushAstVec(&node->as.block.stmts, newReturnNode(newLiteralNode(NIL_VAL)));
   } else {
     node = expression(cmp);
     node = newReturnNode(node);
@@ -367,46 +337,30 @@ static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
   AstNode* node = newFunctionNode(tokenString(name));
   NodeCompiler cmp;
   initNodeCompiler(&cmp, enclosing, node);
-
+  beginScope(&cmp);
   AstNode* sigNode = newSignatureNode();
-  AstNode* paramNode = newParamNode(tokenString(parser.previous), NULL);
+  AstNode* paramNode = parameter(&cmp);
   pushAstVec(&sigNode->as.signature.params, paramNode);
   node->as.function.signature = sigNode;
 
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
-  node->as.function.body = blockOrExpression(&cmp);
-
+  node->as.function.body = functionBody(&cmp);
+  endScope(&cmp);
   return node;
 }
 
-static AstNode* function(NodeCompiler* enclosing, Token name) {
+AstNode* function(NodeCompiler* enclosing, Token name) {
   AstNode* node = newFunctionNode(tokenString(name));
   NodeCompiler cmp;
   initNodeCompiler(&cmp, enclosing, node);
+  beginScope(&cmp);
 
-  consume(&cmp, TOKEN_PAREN_LEFT, "Expect '(' after function name.");
   node->as.function.signature = signature(&cmp);
   consume(&cmp, TOKEN_PAREN_RIGHT, "Expect ')' after parameters.");
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
-  node->as.function.body = blockOrExpression(&cmp);
-
+  node->as.function.body = functionBody(&cmp);
+  endScope(&cmp);
   return node;
-}
-
-AstNode* tryFunction(NodeCompiler* cmp, Token name) {
-  Parser checkpoint = saveParser();
-  SignatureType signatureType = peekSignatureType(cmp);
-  gotoParser(checkpoint);
-
-  switch (signatureType) {
-    case SIG_NAKED:
-      return NULL;
-    case SIG_PAREN:
-      return function(cmp, name);
-    case SIG_NOT:
-      return NULL;
-  }
-  return NULL;
 }
 
 static AstNode* number(NodeCompiler* cmp, bool canAssign) {
@@ -451,7 +405,52 @@ static AstNode* call(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
   return node;
 }
 
+// Find a [token] that isn't nested within braces, brackets,
+// or parentheses, for some initial [depth],
+static bool advanceTo(NodeCompiler* cmp, TokenType token, TokenType closing,
+                      int initialDepth) {
+  int depth = initialDepth;
+
+  for (;;) {
+    if (check(TOKEN_LEFT_BRACE) || check(TOKEN_LEFT_BRACKET) ||
+        check(TOKEN_PAREN_LEFT))
+      depth++;
+    if (check(TOKEN_RIGHT_BRACE) || check(TOKEN_RIGHT_BRACKET) ||
+        check(TOKEN_PAREN_RIGHT))
+      depth--;
+    // found one.
+    if (check(token) && depth == initialDepth) return true;
+    // found none.
+    if (check(closing) && depth == 0) return false;
+    advance(cmp);
+  }
+}
+
+static bool peekFunction(NodeCompiler* cmp) {
+  // 0 arg function.
+  if (check(TOKEN_PAREN_RIGHT) && peek(TOKEN_FAT_ARROW)) return true;
+
+  do {
+    if (!matchParamOrPattern(cmp)) return false;
+    if (check(TOKEN_COLON)) {
+      advanceTo(cmp, TOKEN_COMMA, TOKEN_PAREN_RIGHT, 1);
+    }
+
+  } while (match(cmp, TOKEN_COMMA));
+
+  if (!match(cmp, TOKEN_PAREN_RIGHT)) return false;
+  if (!match(cmp, TOKEN_FAT_ARROW)) return false;
+
+  // n arg function.
+  return true;
+}
+
 static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
+  Parser checkpoint = saveParser();
+  bool isFunction = peekFunction(cmp);
+  gotoParser(checkpoint);
+  if (isFunction) return function(cmp, parser.ppenult);
+
   AstNode* node = expression(cmp);
 
   if (check(TOKEN_COMMA)) {
@@ -587,23 +586,25 @@ static void statements(NodeCompiler* cmp) {
   }
 }
 
-AstNode* compileModuleNode(Token path, const char* source) {
+AstNode* compileFunctionNode(Token path, const char* source) {
   Scanner sc = initScanner(source);
   initParser(sc);
 
   ObjString* objName = tokenString(path);
   NodeCompiler cmp;
   AstNode* node = newFunctionNode(objName);
+  node->as.function.signature = newSignatureNode();
   node->as.function.body = newBlockNode();
   initNodeCompiler(&cmp, NULL, node);
 
   statements(&cmp);
+  pushAstVec(&node->as.function.body->as.block.stmts,
+             newReturnNode(newLiteralNode(NIL_VAL)));
 
-  return newModuleNode(objName, node);
+  return node;
 }
 
 void markNodeCompilerRoots(NodeCompiler* cmp) {
-  printf("\n");
   while (cmp != NULL) {
     markAstNode(cmp->node);
     cmp = cmp->enclosing;

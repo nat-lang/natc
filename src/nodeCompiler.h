@@ -11,7 +11,7 @@ typedef struct NodeCompiler {
   int scopeDepth;
 } NodeCompiler;
 
-AstNode* compileModuleNode(Token path, const char* source);
+AstNode* compileFunctionNode(Token path, const char* source);
 void markNodeCompilerRoots(NodeCompiler* cmp);
 
 #endif

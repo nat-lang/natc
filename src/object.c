@@ -100,7 +100,7 @@ ObjVariable* newVariable(ObjString* name) {
   return variable;
 }
 
-ObjFunction* newFunction(ObjModule* module) {
+ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
 
   function->arity = 0;
@@ -109,7 +109,7 @@ ObjFunction* newFunction(ObjModule* module) {
   function->upvalueCount = 0;
   function->name = NULL;
   function->module = NULL;
-  function->module = module;
+  function->module = NULL;
   initMap(&function->fields);
   initChunk(&function->chunk);
   initMap(&function->constants);
