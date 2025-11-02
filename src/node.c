@@ -110,7 +110,12 @@ AstNode* newFunctionNode(ObjString* name) {
     n->as.function.upvalues[i].index = 0;
     n->as.function.upvalues[i].isLocal = false;
   }
-
+  Local* local = &n->as.function.locals[n->as.function.localCount++];
+  n->as.function.locals[n->as.function.localCount].depth = 0;
+  n->as.function.locals[n->as.function.localCount].isCaptured = false;
+  n->as.function.locals[n->as.function.localCount].name.type = TOKEN_IDENTIFIER;
+  local->name.start = "";
+  local->name.length = 0;
   return n;
 }
 
@@ -208,7 +213,7 @@ AstNode* newSignatureNode() {
 
 AstNode* newReturnNode(AstNode* value) {
   AstNode* n = allocNode(AST_RETURN);
-  n->as.iReturn.value = value;
+  n->as.xReturn.value = value;
   return n;
 }
 
@@ -340,7 +345,7 @@ void printNodeAt(AstNode* node, int depth) {
 
     case AST_RETURN:
       printStrAt("Return\n", depth);
-      printNodeAt(node->as.iReturn.value, depth + 1);
+      printNodeAt(node->as.xReturn.value, depth + 1);
       break;
 
     case AST_SIGNATURE:
@@ -417,7 +422,7 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return a->as.param.name == b->as.param.name;
 
     case AST_RETURN:
-      return nodesEqual(a->as.iReturn.value, b->as.iReturn.value);
+      return nodesEqual(a->as.xReturn.value, b->as.xReturn.value);
 
     case AST_SIGNATURE:
       return a->as.signature.varargs == b->as.signature.varargs &&
@@ -439,28 +444,28 @@ bool nodesEqual(AstNode* a, AstNode* b) {
   }
 }
 
-static void error(ObjFunction* fn, AstNode* node, const char* format, ...) {
+static void error(AstNode* node, const char* format, ...) {
   va_list args;
   va_start(args, format);
-  fprintf(stderr, "Error in AST to bytecode at %s/%s:%d ",
-          fn->module->dirName->chars, fn->module->baseName->chars, node->line);
+  fprintf(stderr, "Error in AST to bytecode at node type %i:%d ", node->type,
+          node->line);
   vfprintf(stderr, format, args);
   printf("\n");
   va_end(args);
 }
 
-static void emitByte(ObjFunction* fn, AstNode* node, uint8_t byte) {
-  writeChunk(&fn->chunk, byte, node->line);
+static void emitByte(Chunk* chunk, AstNode* node, uint8_t byte) {
+  writeChunk(chunk, byte, node->line);
 }
 
-static void emitBytes(ObjFunction* fn, AstNode* node, uint8_t byte1,
+static void emitBytes(Chunk* chunk, AstNode* node, uint8_t byte1,
                       uint8_t byte2) {
-  emitByte(fn, node, byte1);
-  emitByte(fn, node, byte2);
+  emitByte(chunk, node, byte1);
+  emitByte(chunk, node, byte2);
 }
 
-static void emitConstant(ObjFunction* fn, AstNode* node, uint16_t constant) {
-  emitBytes(fn, node, constant >> 8, constant & 0xff);
+static void emitConstant(Chunk* chunk, AstNode* node, uint16_t constant) {
+  emitBytes(chunk, node, constant >> 8, constant & 0xff);
 }
 
 #if defined(DEBUG_PRINT_CODE)
@@ -470,78 +475,110 @@ static void emitConstant(ObjFunction* fn, AstNode* node, uint16_t constant) {
 #define DEBUG_CHUNK()
 #endif
 
-bool toChunk(AstNode* node, ObjFunction* fn) {
+void closeUpvalues(Chunk* chunk, AstNode* node) {
+  for (int i = 0; i < node->as.function.upvalueCount; i++) {
+    emitByte(chunk, node, node->as.function.upvalues[i].isLocal ? 1 : 0);
+    emitByte(chunk, node, node->as.function.upvalues[i].index);
+  }
+}
+
+ObjFunction* toFunction(AstNode* node);
+
+bool toChunk(AstNode* node, Chunk* chunk) {
   switch (node->type) {
     case AST_BLOCK: {
       AstVec stmts = node->as.block.stmts;
       for (int i = 0; i < stmts.count; i++)
-        if (!toChunk(stmts.items[i], fn)) return false;
+        if (!toChunk(stmts.items[i], chunk)) return false;
       break;
     }
     case AST_CALL: {
       // 1. Emit code for the callee, which leaves the function/object to call
       // on the stack
-      if (!toChunk(node->as.call.callee, fn)) return false;
+      if (!toChunk(node->as.call.callee, chunk)) return false;
 
       // 2. Emit code for each argument, in order, leaving them on the stack
       AstVec* args = &node->as.call.args;
       for (int i = 0; i < args->count; i++) {
-        if (!toChunk(args->items[i], fn)) return false;
+        if (!toChunk(args->items[i], chunk)) return false;
       }
 
       // 3. Emit the OP_CALL instruction with argument count
-      emitByte(fn, node, OP_CALL);
-      emitByte(fn, node, (uint8_t)args->count);
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)args->count);
       break;
     }
     case AST_CALL_INFIX: {
-      if (!toChunk(node->as.callInfix.callee, fn)) return false;
-      if (!toChunk(node->as.callInfix.lhs, fn)) return false;
-      if (!toChunk(node->as.callInfix.rhs, fn)) return false;
-      emitByte(fn, node, OP_CALL);
-      emitByte(fn, node, (uint8_t)2);
+      if (!toChunk(node->as.callInfix.callee, chunk)) return false;
+      if (!toChunk(node->as.callInfix.lhs, chunk)) return false;
+      if (!toChunk(node->as.callInfix.rhs, chunk)) return false;
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)2);
       break;
     }
     case AST_EXPR_STMT: {
-      if (!toChunk(node->as.exprStmt.expr, fn)) return false;
-      emitByte(fn, node, OP_EXPR_STATEMENT);
+      if (!toChunk(node->as.exprStmt.expr, chunk)) return false;
+      emitByte(chunk, node, OP_EXPR_STATEMENT);
       break;
     }
     case AST_FUNCTION: {
-      if (!toChunk(node->as.function.body, fn)) return false;
-      // default return.
-      if (node->as.function.body->type == AST_BLOCK) emitByte(fn, node, OP_NIL);
-      emitByte(fn, node, OP_RETURN);
+      ObjFunction* newFn = toFunction(node);
+
+      uint16_t fnConst = addConstant(chunk, OBJ_VAL(newFn));
+
+      emitByte(chunk, node, OP_CLOSURE);
+      emitConstant(chunk, node, fnConst);
       break;
     }
+    case AST_LET:
+      if (!toChunk(node->as.let.value, chunk)) return false;
+      break;
 
     case AST_LITERAL: {
-      uint16_t constant = addConstant(&fn->chunk, node->as.literal.value);
-      emitByte(fn, node, OP_CONSTANT);
-      emitConstant(fn, node, constant);
+      uint16_t constant = addConstant(chunk, node->as.literal.value);
+      emitByte(chunk, node, OP_CONSTANT);
+      emitConstant(chunk, node, constant);
       break;
     }
     case AST_MODULE:
-      if (!toChunk(node->as.module.fn, fn)) return false;
+      if (!toChunk(node->as.module.fn, chunk)) return false;
       break;
+    case AST_PARAM:
+      break;
+    case AST_RETURN: {
+      if (!toChunk(node->as.xReturn.value, chunk)) return false;
+      emitByte(chunk, node, OP_RETURN);
+      break;
+    }
+    case AST_SIGNATURE: {
+      for (int i = 0; i < node->as.signature.params.count; i++)
+        if (!toChunk(node->as.signature.params.items[i], chunk)) return false;
+      break;
+    }
     case AST_VAR_GLOBAL: {
-      uint16_t constant =
-          addConstant(&fn->chunk, OBJ_VAL(node->as.global.name));
-      emitByte(fn, node, OP_GET_GLOBAL);
-      emitConstant(fn, node, constant);
+      uint16_t constant = addConstant(chunk, OBJ_VAL(node->as.global.name));
+      emitByte(chunk, node, OP_GET_GLOBAL);
+      emitConstant(chunk, node, constant);
+      break;
+    }
+    case AST_VAR_LOCAL: {
+      emitByte(chunk, node, OP_GET_LOCAL);
+      emitConstant(chunk, node, node->as.local.index);
+      break;
+    }
+    case AST_VAR_UPVALUE: {
+      emitByte(chunk, node, OP_GET_UPVALUE);
+      emitConstant(chunk, node, node->as.upvalue.index);
       break;
     }
     case AST_BINARY:
-    case AST_LET:
-    case AST_RETURN:
     case AST_SEQUENCE:
-    case AST_SIGNATURE:
     case AST_SPREAD:
     case AST_UNARY:
     case AST_UNKNOWN:
-    case AST_VAR_LOCAL:
+
     default: {
-      error(fn, node, "unexpected node type (%d)", node->type);
+      error(node, "unexpected node type (%d)", node->type);
       exit(2);
     }
   }
@@ -549,10 +586,16 @@ bool toChunk(AstNode* node, ObjFunction* fn) {
   return true;
 }
 
-bool toFunction(AstNode* node, ObjFunction* fn) {
-  if (!toChunk(node, fn)) return false;
+ObjFunction* toFunction(AstNode* node) {
+  ObjFunction* fn = newFunction();
+  fn->name =
+      copyString(node->as.function.name->chars, node->as.function.name->length);
+  fn->arity = node->as.function.signature->as.signature.params.count;
+  if (!toChunk(node->as.function.signature, &fn->chunk)) return false;
+  if (!toChunk(node->as.function.body, &fn->chunk)) return false;
+
   DEBUG_CHUNK()
-  return true;
+  return fn;
 }
 
 // memory.
@@ -621,7 +664,7 @@ void markAstNode(AstNode* n) {
       break;
 
     case AST_RETURN:
-      markAstNode(n->as.iReturn.value);
+      markAstNode(n->as.xReturn.value);
       break;
 
     case AST_CLASS:
@@ -720,7 +763,7 @@ void freeAstNode(AstNode* n) {
       break;
 
     case AST_RETURN:
-      freeAstNode(n->as.iReturn.value);
+      freeAstNode(n->as.xReturn.value);
       break;
 
     case AST_CLASS:

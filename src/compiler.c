@@ -274,7 +274,8 @@ void initCompiler(Compiler* cmp, Compiler* enclosing, Compiler* signature,
   cmp->module = NULL;
   cmp->module = module;
   cmp->function = NULL;
-  cmp->function = newFunction(cmp->module);
+  cmp->function = newFunction();
+  cmp->function->module = module;
   cmp->functionType = functionType;
   cmp->function->localCount = 0;
   cmp->scopeDepth = 0;

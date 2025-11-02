@@ -685,7 +685,6 @@ bool vmCallModule(ObjModule* module) {
 
 bool vmImport(ObjModule* module, ObjMap* target) {
   vmPush(OBJ_VAL(module));
-
   if (!vmCallModule(module)) return false;
 
   vmPush(OBJ_VAL(module));
@@ -1621,14 +1620,15 @@ InterpretResult vmExecute(int baseFrame) {
 // Compilation routines that use the stack.
 
 ObjClosure* vmCompileAST(Token path, char* source, ObjModule* module) {
-  AstNode* node = compileModuleNode(path, source);
+  AstNode* node = compileFunctionNode(path, source);
   printf("node: ");
   printNode(node);
   printf("\n");
-  ObjFunction* fn = newFunction(module);
-  fn->name = copyString(path.start, path.length);
 
-  toFunction(node, fn);
+  ObjFunction* fn = toFunction(node);
+
+  fn->name = copyString(path.start, path.length);
+  fn->module = module;
 
   vmPush(OBJ_VAL(fn));
   ObjClosure* closure = newClosure(fn);
@@ -1673,6 +1673,8 @@ ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
   vmPush(OBJ_VAL(objDirName));
   ObjString* objBaseName = intern(base);
   vmPush(OBJ_VAL(objBaseName));
+  ObjString* objAbsPath = intern(absPath);
+  vmPush(OBJ_VAL(objAbsPath));
 
   free(c1);
   free(c2);
@@ -1685,13 +1687,14 @@ ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
   ObjModule* module = newModule(objDirName, objBaseName, objSource, type);
   vmPush(OBJ_VAL(module));
 
-  ObjClosure* closure = vmCompileClosure(syntheticToken(objBaseName->chars),
+  ObjClosure* closure = vmCompileClosure(syntheticToken(objAbsPath->chars),
                                          objSource->chars, module);
   if (closure == NULL) return NULL;
 
   module->closure = closure;
 
   vmPop();  // module.
+  vmPop();  // objAbsPath.
   vmPop();  // objSource.
   vmPop();  // objBaseName.
   vmPop();  // objDirName.

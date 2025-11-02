@@ -113,9 +113,6 @@ struct AstNode {
 
     struct {
       AstNode* value;
-    } iReturn;
-    struct {
-      AstNode* value;
     } xReturn;
 
     struct {
@@ -236,7 +233,8 @@ void printNode(AstNode* node);
 
 /* api - bytecode */
 
-bool toFunction(AstNode* node, ObjFunction* fn);
+bool toChunk(AstNode* node, Chunk* chunk);
+ObjFunction* toFunction(AstNode* node);
 
 /* memory */
 
