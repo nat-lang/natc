@@ -374,13 +374,7 @@ static void argumentList(NodeCompiler* cmp, AstVec* vec) {
   uint8_t argCount = 0;
   if (!check(TOKEN_PAREN_RIGHT)) {
     do {
-      AstNode* node = NULL;
-
-      if (match(cmp, TOKEN_DOUBLE_DOT))
-        node = newSpreadNode(expression(cmp));
-      else
-        node = expression(cmp);
-
+      AstNode* node = expression(cmp);
       pushAstVec(vec, node);
 
       if (argCount == 255) error(cmp, "Can't have more than 255 arguments.");

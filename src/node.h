@@ -16,31 +16,13 @@ typedef enum {
   AST_MODULE,
   AST_PARAM,
   AST_RETURN,
-  AST_SPREAD,
   AST_SEQUENCE,
-
+  AST_SIGNATURE,
   AST_UNKNOWN,
   AST_VAR_GLOBAL,
   AST_VAR_LOCAL,
   AST_VAR_UPVALUE,
 
-  //
-  AST_UNARY,
-  AST_BINARY,
-
-  AST_MEMBER,
-  AST_SUBSCRIPT,
-  AST_COMPREHENSION,
-  AST_SIGNATURE,
-  AST_CLASS,
-  AST_IMPORT,
-  AST_THROW,
-  AST_DESTRUCTURE,
-  AST_SET_TYPE,
-  AST_UNIT,
-  AST_QUANTIFY,
-  AST_ITER,
-  AST_OVERLOAD,
 } AstType;
 
 typedef struct {
@@ -133,64 +115,13 @@ struct AstNode {
       AstVec values;
     } sequence;
     struct {
-      AstNode* expr;
-    } spread;
-
-    //
-
-    struct {
-      AstNode* object;
-      ObjString* member;
-      int isSet;
-    } member;
-    struct {
-      AstNode* collection;
-      AstNode* index;
-      int isSet;
-    } subscript;
-    struct {
-      AstNode* body;
-      ObjString* var;
-      AstNode* iterable;
-      AstNode* pred;
-    } comprehension;
-    struct {
       AstVec params;
       int varargs;
     } signature;
-
-    struct {
-      ObjString* name;
-      AstVec methods;
-      ObjString* super;
-    } classDef;
-    struct {
-      ObjString* module;
-      ObjString* asName;
-      ObjString* from;
-    } import;
     struct {
       AstNode* expr;
-    } throw;
-    struct {
-      ObjString* name;
-      AstNode* typeExpr;
-    } setType;
+    } spread;
 
-    struct {
-      ObjString* quant;
-      ObjString* var;
-      AstNode* scope;
-    } quantify;
-    struct {
-      AstNode* iterable;
-      ObjString* var;
-      AstNode* body;
-    } iter;
-    struct {
-      ObjString* symbol;
-      AstNode* impl;
-    } overload;
   } as;
 };
 
@@ -205,26 +136,12 @@ AstNode* newLetNode(ObjString* name, AstNode* value);
 AstNode* newLiteralNode(Value v);
 AstNode* newModuleNode(ObjString* name, AstNode* fn);
 AstNode* newParamNode(ObjString* name, AstNode* annotation);
-AstNode* newSpreadNode(AstNode* expr);
+AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
 AstNode* newSignatureNode();
 AstNode* newVarGlobalNode(ObjString* name);
 AstNode* newVarLocalNode(uint8_t index, ObjString* name);
 AstNode* newVarUpvalueNode(uint8_t index, ObjString* name);
-
-AstNode* newMemberNode(AstNode* object, ObjString* member, int isSet);
-AstNode* newSubscriptNode(AstNode* coll, AstNode* index, int isSet);
-AstNode* newComprehensionNode(AstNode* body, ObjString* var, AstNode* iterable,
-                              AstNode* pred);
-
-AstNode* newReturnNode(AstNode* value);
-AstNode* newClassNode(ObjString* name, ObjString* super);
-AstNode* newImportNode(ObjString* module, ObjString* asName, ObjString* from);
-AstNode* newThrowNode(AstNode* expr);
-AstNode* newSetTypeNode(ObjString* name, AstNode* typeExpr, int isGlobal);
-AstNode* newQuantifyNode(ObjString* quant, ObjString* var, AstNode* scope);
-AstNode* newIterNode(ObjString* var, AstNode* iterable, AstNode* body);
-AstNode* newOverloadNode(ObjString* symbol, AstNode* impl);
 
 /* api */
 
