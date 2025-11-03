@@ -465,7 +465,7 @@ static bool peekFunction(NodeCompiler* cmp) {
 
 static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
   // empty sequence.
-  if (check(TOKEN_COMMA)) {
+  if (match(cmp, TOKEN_COMMA)) {
     consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')'.");
     return newSequenceNode();
   }
@@ -483,9 +483,9 @@ static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
     AstNode* seq = newSequenceNode();
     pushAstVec(&seq->as.sequence.values, node);
     do {
+      advance(cmp);
       // allow a trailing comma.
       if (check(TOKEN_PAREN_RIGHT)) break;
-      advance(cmp);
       pushAstVec(&seq->as.sequence.values, expression(cmp));
     } while (check(TOKEN_COMMA));
 

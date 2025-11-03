@@ -396,7 +396,8 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_RETURN:
       return nodesEqual(a->as.xReturn.value, b->as.xReturn.value);
     case AST_SEQUENCE:
-      return astVecsEqual(&a->as.sequence.values, &b->as.sequence.values);
+      return a->as.sequence.values.count == b->as.sequence.values.count &&
+             astVecsEqual(&a->as.sequence.values, &b->as.sequence.values);
     case AST_SIGNATURE:
       return a->as.signature.varargs == b->as.signature.varargs &&
              astVecsEqual(&a->as.signature.params, &b->as.signature.params);
