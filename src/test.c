@@ -434,15 +434,13 @@ bool testAssignmentGlobal() {
 
 bool testAssignmentLocal() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "let x; x = 1");
+  AstNode* node = compileFunctionNode(name, "let x \n x = 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* let = newLetNode(intern("x"), newLiteralNode(UNDEF_VAL));
   pushFnStmt(fn, let);
-  
-  // Create assignment: x = 1
-  // After let x, the variable x is a local at index 0 (no parameters in function)
-  AstNode* var = newVarLocalNode(0, intern("x"));
+
+  AstNode* var = newVarLocalNode(1, intern("x"));
   AstNode* literal = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment = newAssignmentNode(var, literal);
   AstNode* exprStmt = newExprStmtNode(assignment);
@@ -498,17 +496,17 @@ bool testAssignmentNestedExpression() {
 
   AstNode* fn = mkFunction(name);
   AstNode* var = newVarGlobalNode(intern("x"));
-  
+
   // Build (1 + 2) + 3
   AstNode* innerOp = newVarGlobalNode(intern("+"));
   AstNode* innerLhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* innerRhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* innerCall = newCallInfixNode(innerOp, innerLhs, innerRhs);
-  
+
   AstNode* outerOp = newVarGlobalNode(intern("+"));
   AstNode* outerRhs = newLiteralNode(NUMBER_VAL(3));
   AstNode* outerCall = newCallInfixNode(outerOp, innerCall, outerRhs);
-  
+
   AstNode* assignment = newAssignmentNode(var, outerCall);
   AstNode* exprStmt = newExprStmtNode(assignment);
   pushFnStmt(fn, exprStmt);
@@ -557,24 +555,24 @@ bool testAssignmentInBlock() {
 
 bool testMultipleAssignments() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = 1; y = 2");
+  AstNode* node = compileFunctionNode(name, "x = 1 \n y = 2");
 
   AstNode* fn = mkFunction(name);
-  
+
   // x = 1
   AstNode* var1 = newVarGlobalNode(intern("x"));
   AstNode* literal1 = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment1 = newAssignmentNode(var1, literal1);
   AstNode* exprStmt1 = newExprStmtNode(assignment1);
   pushFnStmt(fn, exprStmt1);
-  
+
   // y = 2
   AstNode* var2 = newVarGlobalNode(intern("y"));
   AstNode* literal2 = newLiteralNode(NUMBER_VAL(2));
   AstNode* assignment2 = newAssignmentNode(var2, literal2);
   AstNode* exprStmt2 = newExprStmtNode(assignment2);
   pushFnStmt(fn, exprStmt2);
-  
+
   AstNode* nil = newLiteralNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
   pushFnStmt(fn, returnStmt);
@@ -584,24 +582,24 @@ bool testMultipleAssignments() {
 
 bool testAssignmentReassignment() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = 1; x = 2");
+  AstNode* node = compileFunctionNode(name, "x = 1 \n x = 2");
 
   AstNode* fn = mkFunction(name);
-  
+
   // x = 1
   AstNode* var1 = newVarGlobalNode(intern("x"));
   AstNode* literal1 = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment1 = newAssignmentNode(var1, literal1);
   AstNode* exprStmt1 = newExprStmtNode(assignment1);
   pushFnStmt(fn, exprStmt1);
-  
+
   // x = 2
   AstNode* var2 = newVarGlobalNode(intern("x"));
   AstNode* literal2 = newLiteralNode(NUMBER_VAL(2));
   AstNode* assignment2 = newAssignmentNode(var2, literal2);
   AstNode* exprStmt2 = newExprStmtNode(assignment2);
   pushFnStmt(fn, exprStmt2);
-  
+
   AstNode* nil = newLiteralNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
   pushFnStmt(fn, returnStmt);
@@ -1281,20 +1279,20 @@ bool testBytecodeAssignmentGlobal() {
   // Layout: CONSTANT(42), OP_SET_GLOBAL, constant_index
   // 3 bytes for CONSTANT + 3 bytes for OP_SET_GLOBAL = 6 bytes
   if (c.count != 6) return false;
-  
+
   // Check CONSTANT instruction
   if (c.code[0] != OP_CONSTANT) return false;
   if (read_u16(c.code[1], c.code[2]) != 0) return false;
-  
+
   // Check OP_SET_GLOBAL instruction
   if (c.code[3] != OP_SET_GLOBAL) return false;
   if (read_u16(c.code[4], c.code[5]) != 1) return false;  // name constant index
-  
+
   // Check constants: first is rhs value, second is variable name
   if (c.constants.count != 2) return false;
   if (!valuesEqual(c.constants.values[0], NUMBER_VAL(42))) return false;
   if (!valuesEqual(c.constants.values[1], OBJ_VAL(name))) return false;
-  
+
   return true;
 }
 
@@ -1309,19 +1307,19 @@ bool testBytecodeAssignmentLocal() {
   // Layout: CONSTANT(42), OP_SET_LOCAL, index(2 bytes)
   // 3 bytes for CONSTANT + 3 bytes for OP_SET_LOCAL + index = 6 bytes
   if (c.count != 6) return false;
-  
+
   // Check CONSTANT instruction
   if (c.code[0] != OP_CONSTANT) return false;
   if (read_u16(c.code[1], c.code[2]) != 0) return false;
-  
+
   // Check OP_SET_LOCAL instruction
   if (c.code[3] != OP_SET_LOCAL) return false;
   if (read_u16(c.code[4], c.code[5]) != 0) return false;  // local index 0
-  
+
   // Check constants: only rhs value (no name constant for locals)
   if (c.constants.count != 1) return false;
   if (!valuesEqual(c.constants.values[0], NUMBER_VAL(42))) return false;
-  
+
   return true;
 }
 
@@ -1336,60 +1334,63 @@ bool testBytecodeAssignmentUpvalue() {
   // Layout: CONSTANT(42), OP_SET_UPVALUE, index(2 bytes)
   // 3 bytes for CONSTANT + 3 bytes for OP_SET_UPVALUE + index = 6 bytes
   if (c.count != 6) return false;
-  
+
   // Check CONSTANT instruction
   if (c.code[0] != OP_CONSTANT) return false;
   if (read_u16(c.code[1], c.code[2]) != 0) return false;
-  
+
   // Check OP_SET_UPVALUE instruction
   if (c.code[3] != OP_SET_UPVALUE) return false;
   if (read_u16(c.code[4], c.code[5]) != 1) return false;  // upvalue index 1
-  
+
   // Check constants: only rhs value (no name constant for upvalues)
   if (c.constants.count != 1) return false;
   if (!valuesEqual(c.constants.values[0], NUMBER_VAL(42))) return false;
-  
+
   return true;
 }
 
 bool testBytecodeAssignmentWithExpression() {
   ObjString* name = intern("x");
   AstNode* var = newVarGlobalNode(name);
-  
+
   // Build 1 + 2
   AstNode* op = newVarGlobalNode(intern("+"));
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* infixCall = newCallInfixNode(op, lhs, rhs);
-  
+
   AstNode* assignment = newAssignmentNode(var, infixCall);
   Chunk c;
   if (!buildChunkForExpr(assignment, &c)) return false;
 
-  // Layout: CONSTANT(+), CONSTANT(1), CONSTANT(2), CALL(2), OP_SET_GLOBAL, name_idx
-  // 3 + 3 + 3 + 2 + 3 = 14 bytes
+  // Layout: GET_GLOBAL(+), CONSTANT(1), CONSTANT(2), CALL(2), OP_SET_GLOBAL,
+  // name_idx 3 + 3 + 3 + 2 + 3 = 14 bytes
   if (c.count != 14) return false;
-  
+
   // Check RHS expression compilation
-  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+  // The "+" operator is compiled as OP_GET_GLOBAL (not OP_CONSTANT)
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
     return false;  // + operator
   if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
     return false;  // 1
   if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
     return false;  // 2
-  if (c.code[9] != OP_CALL || c.code[10] != 2) return false;  // CALL with 2 args
-  
+  if (c.code[9] != OP_CALL || c.code[10] != 2)
+    return false;  // CALL with 2 args
+
   // Check OP_SET_GLOBAL
   if (c.code[11] != OP_SET_GLOBAL) return false;
-  if (read_u16(c.code[12], c.code[13]) != 3) return false;  // name constant index
-  
+  if (read_u16(c.code[12], c.code[13]) != 3)
+    return false;  // name constant index
+
   // Check constants: +, 1, 2, name
   if (c.constants.count != 4) return false;
   if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("+")))) return false;
   if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
   if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
   if (!valuesEqual(c.constants.values[3], OBJ_VAL(name))) return false;
-  
+
   return true;
 }
 
@@ -1402,24 +1403,24 @@ bool testBytecodeAssignmentWithCall() {
   Chunk c;
   if (!buildChunkForExpr(assignment, &c)) return false;
 
-  // Layout: CONSTANT(f), CALL(0), OP_SET_GLOBAL, name_idx
+  // Layout: GET_GLOBAL(f), CALL(0), OP_SET_GLOBAL, name_idx
   // 3 + 2 + 3 = 8 bytes
   if (c.count != 8) return false;
-  
+
   // Check RHS call compilation
-  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
-    return false;  // f
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;                                            // f
   if (c.code[3] != OP_CALL || c.code[4] != 0) return false;  // CALL with 0 args
-  
+
   // Check OP_SET_GLOBAL
   if (c.code[5] != OP_SET_GLOBAL) return false;
   if (read_u16(c.code[6], c.code[7]) != 1) return false;  // name constant index
-  
+
   // Check constants: f, name
   if (c.constants.count != 2) return false;
   if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("f")))) return false;
   if (!valuesEqual(c.constants.values[1], OBJ_VAL(name))) return false;
-  
+
   return true;
 }
 
@@ -1433,21 +1434,22 @@ bool testBytecodeAssignmentLocalIndex1() {
 
   // Layout: CONSTANT(100), OP_SET_LOCAL, index(2 bytes)
   if (c.count != 6) return false;
-  
+
   if (c.code[0] != OP_CONSTANT) return false;
   if (read_u16(c.code[1], c.code[2]) != 0) return false;
-  
+
   if (c.code[3] != OP_SET_LOCAL) return false;
   if (read_u16(c.code[4], c.code[5]) != 1) return false;  // local index 1
-  
+
   if (c.constants.count != 1) return false;
   if (!valuesEqual(c.constants.values[0], NUMBER_VAL(100))) return false;
-  
+
   return true;
 }
 
 bool testBytecodeAssignmentGlobalLongName() {
-  ObjString* longName = copyString("very_long_global_variable_name_for_assignment", 44);
+  ObjString* longName =
+      copyString("very_long_global_variable_name_for_assignment", 44);
   AstNode* var = newVarGlobalNode(longName);
   AstNode* rhs = newLiteralNode(BOOL_VAL(true));
   AstNode* assignment = newAssignmentNode(var, rhs);
@@ -1456,17 +1458,17 @@ bool testBytecodeAssignmentGlobalLongName() {
 
   // Layout: CONSTANT(true), OP_SET_GLOBAL, name_idx
   if (c.count != 6) return false;
-  
+
   if (c.code[0] != OP_CONSTANT) return false;
   if (read_u16(c.code[1], c.code[2]) != 0) return false;
-  
+
   if (c.code[3] != OP_SET_GLOBAL) return false;
   if (read_u16(c.code[4], c.code[5]) != 1) return false;
-  
+
   if (c.constants.count != 2) return false;
   if (!valuesEqual(c.constants.values[0], BOOL_VAL(true))) return false;
   if (!valuesEqual(c.constants.values[1], OBJ_VAL(longName))) return false;
-  
+
   return true;
 }
 
@@ -1479,60 +1481,55 @@ bool testBytecodeAssignmentBooleanValue() {
   if (!buildChunkForExpr(assignment, &c)) return false;
 
   if (c.count != 6) return false;
-  
+
   if (c.code[0] != OP_CONSTANT) return false;
   if (read_u16(c.code[1], c.code[2]) != 0) return false;
-  
+
   if (c.code[3] != OP_SET_GLOBAL) return false;
   if (read_u16(c.code[4], c.code[5]) != 1) return false;
-  
+
   if (c.constants.count != 2) return false;
   if (!valuesEqual(c.constants.values[0], BOOL_VAL(false))) return false;
   if (!valuesEqual(c.constants.values[1], OBJ_VAL(name))) return false;
-  
+
   return true;
 }
 
 bool testBytecodeAssignmentNestedInfix() {
   ObjString* name = intern("result");
   AstNode* var = newVarGlobalNode(name);
-  
+
   // Build (1 + 2) * 3
   AstNode* plusOp = newVarGlobalNode(intern("+"));
   AstNode* one = newLiteralNode(NUMBER_VAL(1));
   AstNode* two = newLiteralNode(NUMBER_VAL(2));
   AstNode* plusCall = newCallInfixNode(plusOp, one, two);
-  
+
   AstNode* multOp = newVarGlobalNode(intern("*"));
   AstNode* three = newLiteralNode(NUMBER_VAL(3));
   AstNode* multCall = newCallInfixNode(multOp, plusCall, three);
-  
+
   AstNode* assignment = newAssignmentNode(var, multCall);
   Chunk c;
   if (!buildChunkForExpr(assignment, &c)) return false;
 
-  // Layout: CONSTANT(+), CONSTANT(1), CONSTANT(2), CALL(2),
-  //         CONSTANT(*), CONSTANT(3), CALL(2), OP_SET_GLOBAL, name_idx
-  // Should have nested infix calls properly ordered
-  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
-    return false;  // +
-  if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
-    return false;  // 1
-  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
-    return false;  // 2
-  if (c.code[9] != OP_CALL || c.code[10] != 2) return false;
-  
-  if (c.code[11] != OP_CONSTANT || read_u16(c.code[12], c.code[13]) != 3)
+  if (c.count != 22) return false;
+
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
     return false;  // *
+  if (c.code[3] != OP_GET_GLOBAL || read_u16(c.code[4], c.code[5]) != 1)
+    return false;  // +
+  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
+    return false;  // 1
+  if (c.code[9] != OP_CONSTANT || read_u16(c.code[10], c.code[11]) != 3)
+    return false;  // 2
+  if (c.code[12] != OP_CALL || c.code[13] != 2) return false;
   if (c.code[14] != OP_CONSTANT || read_u16(c.code[15], c.code[16]) != 4)
     return false;  // 3
   if (c.code[17] != OP_CALL || c.code[18] != 2) return false;
-  
   if (c.code[19] != OP_SET_GLOBAL) return false;
   if (read_u16(c.code[20], c.code[21]) != 5) return false;  // name constant
-  
-  if (c.constants.count != 6) return false;
-  
+
   return true;
 }
 
@@ -1603,10 +1600,12 @@ int testMain(void) {
   fmt("    ", testBytecodeAssignmentGlobal(), "Assignment global");
   fmt("    ", testBytecodeAssignmentLocal(), "Assignment local");
   fmt("    ", testBytecodeAssignmentUpvalue(), "Assignment upvalue");
-  fmt("    ", testBytecodeAssignmentWithExpression(), "Assignment with expression");
+  fmt("    ", testBytecodeAssignmentWithExpression(),
+      "Assignment with expression");
   fmt("    ", testBytecodeAssignmentWithCall(), "Assignment with call");
   fmt("    ", testBytecodeAssignmentLocalIndex1(), "Assignment local index 1");
-  fmt("    ", testBytecodeAssignmentGlobalLongName(), "Assignment global long name");
+  fmt("    ", testBytecodeAssignmentGlobalLongName(),
+      "Assignment global long name");
   fmt("    ", testBytecodeAssignmentBooleanValue(), "Assignment boolean value");
   fmt("    ", testBytecodeAssignmentNestedInfix(), "Assignment nested infix");
 

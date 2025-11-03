@@ -9,6 +9,7 @@ typedef struct NodeCompiler {
   struct NodeCompiler* enclosing;
   AstNode* node;
   int scopeDepth;
+  bool hadError;
 } NodeCompiler;
 
 AstNode* compileFunctionNode(Token path, const char* source);

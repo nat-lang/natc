@@ -347,6 +347,10 @@ bool nodesEqual(AstNode* a, AstNode* b) {
   if (a->type != b->type) return false;
 
   switch (a->type) {
+    case AST_ASSIGNMENT:
+      return nodesEqual(a->as.assignment.lhs, b->as.assignment.lhs) &&
+             nodesEqual(a->as.assignment.rhs, b->as.assignment.rhs);
+
     case AST_BLOCK:
       return astVecsEqual(&a->as.block.stmts, &b->as.block.stmts);
 
@@ -391,14 +395,11 @@ bool nodesEqual(AstNode* a, AstNode* b) {
 
     case AST_RETURN:
       return nodesEqual(a->as.xReturn.value, b->as.xReturn.value);
-
+    case AST_SEQUENCE:
+      return astVecsEqual(&a->as.sequence.values, &b->as.sequence.values);
     case AST_SIGNATURE:
       return a->as.signature.varargs == b->as.signature.varargs &&
              astVecsEqual(&a->as.signature.params, &b->as.signature.params);
-
-    case AST_ASSIGNMENT:
-      return nodesEqual(a->as.assignment.lhs, b->as.assignment.lhs) &&
-             nodesEqual(a->as.assignment.rhs, b->as.assignment.rhs);
 
     case AST_VAR_GLOBAL:
       return a->as.global.name == b->as.global.name;
@@ -406,12 +407,8 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return a->as.local.index == b->as.local.index;
     case AST_VAR_UPVALUE:
       return a->as.upvalue.index == b->as.upvalue.index;
-
     case AST_UNKNOWN:
-    default: {
-      fprintf(stderr, "Unexpected ast type (%i)", a->type);
-      exit(2);
-    }
+      return true;
   }
 }
 
