@@ -652,6 +652,119 @@ bool testBytecodeIfElse() {
   return true;
 }
 
+bool testBytecodeIfBlock() {
+  ObjString* name = intern("x");
+  AstNode* cond = newVarGlobalNode(name);
+  AstNode* block = newBlockNode();
+  AstNode* stmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  pushAstVec(&block->as.block.stmts, stmt);
+  AstNode* ifNode = newIfNode(cond, block, NULL);
+  Chunk c;
+  if (!buildChunkForExpr(ifNode, &c)) return false;
+
+  // Layout: GET_GLOBAL, JUMP_IF_FALSE, POP, CONSTANT(1), EXPR_STMT, JUMP,
+  // POP(patch) GET_GLOBAL(3) + JUMP_IF_FALSE(3) + POP(1) + CONSTANT(3) +
+  // EXPR_STMT(1) + JUMP(3) + POP(1) = 15
+  if (c.count != 15) return false;
+
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  if (c.code[3] != OP_JUMP_IF_FALSE) return false;
+  if (c.code[6] != OP_POP) return false;
+  // CONSTANT 1 (index 1, since "x" is at index 0)
+  if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 1)
+    return false;
+  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+  if (c.code[11] != OP_JUMP) return false;
+  if (c.code[14] != OP_POP) return false;
+
+  uint16_t thenJump = read_u16(c.code[4], c.code[5]);
+  if (thenJump != 8) return false;
+
+  uint16_t elseJump = read_u16(c.code[12], c.code[13]);
+  if (elseJump != 1) return false;
+
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(name))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  return true;
+}
+
+bool testBytecodeIfElseBlock() {
+  ObjString* name = intern("x");
+  AstNode* cond = newVarGlobalNode(name);
+  AstNode* thenBlock = newBlockNode();
+  AstNode* thenStmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  pushAstVec(&thenBlock->as.block.stmts, thenStmt);
+  AstNode* elseBlock = newBlockNode();
+  AstNode* elseStmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  pushAstVec(&elseBlock->as.block.stmts, elseStmt);
+  AstNode* ifNode = newIfNode(cond, thenBlock, elseBlock);
+  Chunk c;
+  if (!buildChunkForExpr(ifNode, &c)) return false;
+
+  // Layout: GET_GLOBAL, JUMP_IF_FALSE, POP, CONSTANT(1), EXPR_STMT, JUMP,
+  // POP(patch), CONSTANT(2), EXPR_STMT
+  // Same as regular if-else but with extra block wrappers
+  if (c.count != 19) return false;
+
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(name))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+  return true;
+}
+
+bool testBytecodeIfNested() {
+  AstNode* outerCond = newVarGlobalNode(intern("a"));
+  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* innerThen = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* innerElse = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  AstNode* innerIf = newIfNode(innerCond, innerThen, innerElse);
+  AstNode* outerIf = newIfNode(outerCond, innerIf, NULL);
+  Chunk c;
+  if (!buildChunkForExpr(outerIf, &c)) return false;
+
+  // Nested if: outer if, inner if with else
+  // Outer: GET_GLOBAL a, JUMP_IF_FALSE, POP, [inner if], JUMP, POP
+  // Inner: GET_GLOBAL b, JUMP_IF_FALSE, POP, CONSTANT 1, EXPR_STMT, JUMP,
+  // POP, CONSTANT 2, EXPR_STMT
+  // Total: 3 + 3 + 1 + 3 + 3 + 1 + 3 + 1 + 1 + 3 + 1 + 1 + 3 = 30
+  if (c.count != 30) return false;
+
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("a")))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(intern("b")))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[3], NUMBER_VAL(2))) return false;
+  return true;
+}
+
+bool testBytecodeIfComplexCondition() {
+  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* cond = newCallInfixNode(op, lhs, rhs);
+  AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(3)));
+  AstNode* ifNode = newIfNode(cond, then, NULL);
+  Chunk c;
+  if (!buildChunkForExpr(ifNode, &c)) return false;
+
+  // Layout: COND(lhs + rhs), JUMP_IF_FALSE, POP, CONSTANT(3), EXPR_STMT, JUMP,
+  // POP COND: GET_GLOBAL + (3), CONSTANT 1 (3), CONSTANT 2 (3), CALL 2 (2) = 11
+  // THEN: CONSTANT 3 (3), EXPR_STMT (1) = 4
+  // Control: JUMP_IF_FALSE (3), POP (1), JUMP (3), POP (1) = 8
+  // Total: 11 + 4 + 8 = 23
+  if (c.count != 23) return false;
+
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("+")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+  if (!valuesEqual(c.constants.values[3], NUMBER_VAL(3))) return false;
+  return true;
+}
+
 void fmt(char* pref, bool success, char* msg) {
   printf("%s%s %s\n", pref, success ? "✔" : "✗", msg);
 }
@@ -694,6 +807,10 @@ int testMain(void) {
   fmt("    ", testBytecodeCallInfix(), "Call infix");
   fmt("    ", testBytecodeIfSimple(), "If simple");
   fmt("    ", testBytecodeIfElse(), "If else");
+  fmt("    ", testBytecodeIfBlock(), "If block");
+  fmt("    ", testBytecodeIfElseBlock(), "If else block");
+  fmt("    ", testBytecodeIfNested(), "If nested");
+  fmt("    ", testBytecodeIfComplexCondition(), "If complex condition");
 
   freeVM();
   return 0;
