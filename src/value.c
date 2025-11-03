@@ -69,6 +69,7 @@ void printValueArray(ValueArray* array) {
     printValue(array->values[i]);
     if (i != array->count - 1) printf(", ");
   }
+  if (array->count == 0 || array->count == 1) printf(",");
   printf(")");
 }
 
