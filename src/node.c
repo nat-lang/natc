@@ -119,6 +119,14 @@ AstNode* newFunctionNode(ObjString* name) {
   return n;
 }
 
+AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch) {
+  AstNode* n = allocNode(AST_IF);
+  n->as.ifStmt.cond = cond;
+  n->as.ifStmt.then = then;
+  n->as.ifStmt.elseBranch = elseBranch;
+  return n;
+}
+
 AstNode* newLetNode(ObjString* name, AstNode* value) {
   AstNode* n = allocNode(AST_LET);
   n->as.let.name = name;
@@ -237,6 +245,13 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.function.body, depth + 1);
       break;
 
+    case AST_IF:
+      printStrAt("If\n", depth);
+      printNodeAt(node->as.ifStmt.cond, depth + 1);
+      printNodeAt(node->as.ifStmt.then, depth + 1);
+      printNodeAt(node->as.ifStmt.elseBranch, depth + 1);
+      break;
+
     case AST_LET:
       printStrAt("Let ", depth);
       printf("\"%s\"\n", node->as.let.name->chars);
@@ -319,6 +334,11 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.function.signature, b->as.function.signature) &&
              nodesEqual(a->as.function.body, b->as.function.body);
 
+    case AST_IF:
+      return nodesEqual(a->as.ifStmt.cond, b->as.ifStmt.cond) &&
+             nodesEqual(a->as.ifStmt.then, b->as.ifStmt.then) &&
+             nodesEqual(a->as.ifStmt.elseBranch, b->as.ifStmt.elseBranch);
+
     case AST_LET:
       return a->as.let.name == b->as.let.name &&
              nodesEqual(a->as.let.value, b->as.let.value);
@@ -393,6 +413,26 @@ void closeUpvalues(Chunk* chunk, AstNode* node) {
   }
 }
 
+// Helper functions for control flow bytecode generation
+static int emitJump(Chunk* chunk, AstNode* node, uint8_t instruction) {
+  emitByte(chunk, node, instruction);
+  emitByte(chunk, node, 0xff);
+  emitByte(chunk, node, 0xff);
+  return chunk->count - 2;
+}
+
+static void patchJump(Chunk* chunk, AstNode* node, int offset) {
+  int jump = chunk->count - offset - 2;
+
+  if (jump > UINT16_MAX) {
+    error(node, "Too much code to jump over.");
+    return;
+  }
+
+  chunk->code[offset] = (jump >> 8) & 0xff;
+  chunk->code[offset + 1] = jump & 0xff;
+}
+
 ObjFunction* toFunction(AstNode* node);
 
 bool toChunk(AstNode* node, Chunk* chunk) {
@@ -439,6 +479,33 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       emitByte(chunk, node, OP_CLOSURE);
       emitConstant(chunk, node, fnConst);
+      break;
+    }
+    case AST_IF: {
+      // Emit condition code
+      if (!toChunk(node->as.ifStmt.cond, chunk)) return false;
+
+      // Jump if false (to else branch or end)
+      int thenJump = emitJump(chunk, node, OP_JUMP_IF_FALSE);
+      emitByte(chunk, node, OP_POP);
+
+      // Emit then branch code
+      if (!toChunk(node->as.ifStmt.then, chunk)) return false;
+
+      // Jump to end (skip else branch)
+      int elseJump = emitJump(chunk, node, OP_JUMP);
+
+      // Patch the conditional jump to here
+      patchJump(chunk, node, thenJump);
+      emitByte(chunk, node, OP_POP);
+
+      // Emit else branch if present
+      if (node->as.ifStmt.elseBranch != NULL) {
+        if (!toChunk(node->as.ifStmt.elseBranch, chunk)) return false;
+      }
+
+      // Patch the else jump to here
+      patchJump(chunk, node, elseJump);
       break;
     }
     case AST_LET:
@@ -538,6 +605,11 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.function.signature);
       markAstNode(n->as.function.body);
       break;
+    case AST_IF:
+      markAstNode(n->as.ifStmt.cond);
+      markAstNode(n->as.ifStmt.then);
+      markAstNode(n->as.ifStmt.elseBranch);
+      break;
     case AST_LET:
       markObject((Obj*)n->as.let.name);
       markAstNode(n->as.let.value);
@@ -627,6 +699,11 @@ void freeAstNode(AstNode* n) {
     case AST_FUNCTION:
       freeAstNode(n->as.function.signature);
       freeAstNode(n->as.function.body);
+      break;
+    case AST_IF:
+      freeAstNode(n->as.ifStmt.cond);
+      freeAstNode(n->as.ifStmt.then);
+      freeAstNode(n->as.ifStmt.elseBranch);
       break;
     case AST_LET:
       freeAstNode(n->as.let.value);

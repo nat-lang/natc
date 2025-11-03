@@ -579,16 +579,35 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
   return newLetNode(name, node);
 }
 
+static AstNode* ifStatement(NodeCompiler* cmp) {
+  consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'if'.");
+  AstNode* cond = expression(cmp);
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after condition.");
+
+  AstNode* then = statement(cmp);
+
+  AstNode* elseBranch = NULL;
+  if (match(cmp, TOKEN_ELSE)) {
+    elseBranch = statement(cmp);
+  }
+
+  return newIfNode(cond, then, elseBranch);
+}
+
 static AstNode* statement(NodeCompiler* cmp) {
   AstNode* node;
-  if (match(cmp, TOKEN_LET)) {
+  if (match(cmp, TOKEN_IF)) {
+    node = ifStatement(cmp);
+  } else if (match(cmp, TOKEN_LET)) {
     node = letDeclaration(cmp);
+  } else if (match(cmp, TOKEN_LEFT_BRACE)) {
+    node = block(cmp);
   } else {
     node = expression(cmp);
     node = newExprStmtNode(node);
   }
 
-  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after statement.");
+  // consume(cmp, TOKEN_SEMICOLON, "Expect ';' after statement.");
   return node;
 }
 

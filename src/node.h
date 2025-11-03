@@ -11,6 +11,7 @@ typedef enum {
   AST_CALL_INFIX,
   AST_EXPR_STMT,
   AST_FUNCTION,
+  AST_IF,
   AST_LET,
   AST_LITERAL,
   AST_MODULE,
@@ -69,6 +70,12 @@ struct AstNode {
       Upvalue upvalues[UINT8_COUNT];
       int upvalueCount;
     } function;
+
+    struct {
+      AstNode* cond;
+      AstNode* then;
+      AstNode* elseBranch;
+    } ifStmt;
 
     struct {
       AstNode* expr;
@@ -132,6 +139,7 @@ AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
 AstNode* newExprStmtNode(AstNode* expr);
 AstNode* newFunctionNode(ObjString* name);
+AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
 AstNode* newLetNode(ObjString* name, AstNode* value);
 AstNode* newLiteralNode(Value v);
 AstNode* newModuleNode(ObjString* name, AstNode* fn);

@@ -52,7 +52,7 @@ void pushModuleStmt(AstNode* mod, AstNode* stmt) {
 
 bool testLiteralNumberNode() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1;");
+  AstNode* node = compileFunctionNode(name, "1");
 
   AstNode* fn = mkFunction(name);
   AstNode* literal = newLiteralNode(NUMBER_VAL(1));
@@ -67,7 +67,7 @@ bool testLiteralNumberNode() {
 
 bool testLiteralBooleanTrue() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "true;");
+  AstNode* node = compileFunctionNode(name, "true");
 
   AstNode* fn = mkFunction(name);
   AstNode* literal = newLiteralNode(BOOL_VAL(true));
@@ -82,7 +82,7 @@ bool testLiteralBooleanTrue() {
 
 bool testLiteralBooleanFalse() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "false;");
+  AstNode* node = compileFunctionNode(name, "false");
 
   AstNode* fn = mkFunction(name);
   AstNode* literal = newLiteralNode(BOOL_VAL(false));
@@ -97,7 +97,7 @@ bool testLiteralBooleanFalse() {
 
 bool testCallNode0Args() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "f();");
+  AstNode* node = compileFunctionNode(name, "f()");
 
   AstNode* var = newVarGlobalNode(intern("f"));
   AstNode* call = newCallNode(var);
@@ -113,7 +113,7 @@ bool testCallNode0Args() {
 
 bool testCallNode1Args() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "f(1);");
+  AstNode* node = compileFunctionNode(name, "f(1)");
 
   AstNode* f = newVarGlobalNode(intern("f"));
   AstNode* call = newCallNode(f);
@@ -130,7 +130,7 @@ bool testCallNode1Args() {
 
 bool testCallInfixNode() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1 + 2;");
+  AstNode* node = compileFunctionNode(name, "1 + 2");
 
   AstNode* inf = newVarGlobalNode(intern("+"));
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
@@ -148,7 +148,7 @@ bool testCallInfixNode() {
 
 bool testCallInfixNodeLeftNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1 + 2 + 3;");
+  AstNode* node = compileFunctionNode(name, "1 + 2 + 3");
 
   AstNode* callLeft = newCallInfixNode(newVarGlobalNode(intern("+")),
                                        newLiteralNode(NUMBER_VAL(1)),
@@ -168,7 +168,7 @@ bool testCallInfixNodeLeftNested() {
 
 bool testCallInfixNodeRightNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1 + (2 + 3);");
+  AstNode* node = compileFunctionNode(name, "1 + (2 + 3)");
 
   AstNode* callRight = newCallInfixNode(newVarGlobalNode(intern("+")),
                                         newLiteralNode(NUMBER_VAL(2)),
@@ -188,7 +188,7 @@ bool testCallInfixNodeRightNested() {
 
 bool testFunctionNode() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "let f = () => 1;");
+  AstNode* node = compileFunctionNode(name, "let f = () => 1");
 
   AstNode* f = newFunctionNode(intern("f"));
   f->as.function.signature = newSignatureNode();
@@ -199,6 +199,140 @@ bool testFunctionNode() {
 
   AstNode* fn = mkFunction(name);
   pushFnStmt(fn, let);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+/* ============================================================
+ * If-Else Statement Tests
+ * ============================================================ */
+
+bool testIfSimple() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "if (true) 1");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newLiteralNode(BOOL_VAL(true));
+  AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* ifNode = newIfNode(cond, then, NULL);
+  pushFnStmt(fn, ifNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testIfElse() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "if (x) 1 else 2");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* else_ = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  AstNode* ifNode = newIfNode(cond, then, else_);
+  pushFnStmt(fn, ifNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testIfBlock() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "if (x) { let y = 1 }");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* block = newBlockNode();
+  AstNode* let = newLetNode(intern("y"), newLiteralNode(NUMBER_VAL(1)));
+  pushAstVec(&block->as.block.stmts, let);
+  AstNode* ifNode = newIfNode(cond, block, NULL);
+  pushFnStmt(fn, ifNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testIfElseBlock() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "if (x) { 1 } else { 2 }");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* thenBlock = newBlockNode();
+  AstNode* thenStmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  pushAstVec(&thenBlock->as.block.stmts, thenStmt);
+  AstNode* elseBlock = newBlockNode();
+  AstNode* elseStmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  pushAstVec(&elseBlock->as.block.stmts, elseStmt);
+  AstNode* ifNode = newIfNode(cond, thenBlock, elseBlock);
+  pushFnStmt(fn, ifNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testIfNested() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "if (a) if (b) 1 else 2");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* outerCond = newVarGlobalNode(intern("a"));
+  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* innerThen = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* innerElse = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  AstNode* innerIf = newIfNode(innerCond, innerThen, innerElse);
+  AstNode* ifNode = newIfNode(outerCond, innerIf, NULL);
+  pushFnStmt(fn, ifNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testIfElseIf() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "if (a) 1 else if (b) 2 else 3");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newVarGlobalNode(intern("a"));
+  AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* innerThen = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  AstNode* innerElse = newExprStmtNode(newLiteralNode(NUMBER_VAL(3)));
+  AstNode* innerIf = newIfNode(innerCond, innerThen, innerElse);
+  AstNode* ifNode = newIfNode(cond, then, innerIf);
+  pushFnStmt(fn, ifNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testIfComplexCondition() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "if (1 + 2) 1");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* cond = newCallInfixNode(op, lhs, rhs);
+  AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* ifNode = newIfNode(cond, then, NULL);
+  pushFnStmt(fn, ifNode);
   AstNode* nil = newLiteralNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
   pushFnStmt(fn, returnStmt);
@@ -424,6 +558,100 @@ bool testBytecodeCallInfix() {
   return true;
 }
 
+/* Bytecode tests for If statements */
+
+bool testBytecodeIfSimple() {
+  AstNode* cond = newLiteralNode(BOOL_VAL(true));
+  AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* ifNode = newIfNode(cond, then, NULL);
+  Chunk c;
+  if (!buildChunkForExpr(ifNode, &c)) return false;
+
+  // Layout: COND(true), JUMP_IF_FALSE, POP, THEN(1+EXPR_STMT), JUMP(patch),
+  // POP(patch) CONDANT (3) + JUMP_IF_FALSE (3) + POP (1) + CONSTANT (3) +
+  // EXPR_STMT (1) + JUMP (3) + POP (1) = 15 bytes
+  if (c.count != 15) return false;
+  // CONDANT true
+  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  // JUMP_IF_FALSE (placeholder bytes)
+  if (c.code[3] != OP_JUMP_IF_FALSE) return false;
+  // POP
+  if (c.code[6] != OP_POP) return false;
+  // CONSTANT 1
+  if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 1)
+    return false;
+  // EXPR_STMT
+  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+  // JUMP (placeholder bytes)
+  if (c.code[11] != OP_JUMP) return false;
+  // POP
+  if (c.code[14] != OP_POP) return false;
+
+  // Check jump is patched correctly
+  uint16_t thenJump = read_u16(c.code[4], c.code[5]);
+  if (thenJump != 8)
+    return false;  // should jump from after JUMP_IF_FALSE to POP after JUMP
+
+  uint16_t elseJump = read_u16(c.code[12], c.code[13]);
+  if (elseJump != 1)
+    return false;  // should jump from after JUMP to end (no else code)
+
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], BOOL_VAL(true))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  return true;
+}
+
+bool testBytecodeIfElse() {
+  ObjString* name = intern("x");
+  AstNode* cond = newVarGlobalNode(name);
+  AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* else_ = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  AstNode* ifNode = newIfNode(cond, then, else_);
+  Chunk c;
+  if (!buildChunkForExpr(ifNode, &c)) return false;
+
+  // Layout: GET_GLOBAL, JUMP_IF_FALSE, POP, CONSTANT(1), EXPR_STMT, JUMP,
+  // POP(patch), CONSTANT(2), EXPR_STMT
+  // 3 + 3 + 1 + 3 + 1 + 3 + 1 + 3 + 1 = 19 bytes
+  if (c.count != 19) return false;
+  // GET_GLOBAL x
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  // JUMP_IF_FALSE
+  if (c.code[3] != OP_JUMP_IF_FALSE) return false;
+  // POP
+  if (c.code[6] != OP_POP) return false;
+  // CONSTANT 1
+  if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 1)
+    return false;
+  // EXPR_STMT
+  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+  // JUMP
+  if (c.code[11] != OP_JUMP) return false;
+  // POP (patched by thenJump)
+  if (c.code[14] != OP_POP) return false;
+  // CONSTANT 2
+  if (c.code[15] != OP_CONSTANT || read_u16(c.code[16], c.code[17]) != 2)
+    return false;
+  // EXPR_STMT
+  if (c.code[18] != OP_EXPR_STATEMENT) return false;
+
+  // Check patches
+  uint16_t thenJump = read_u16(c.code[4], c.code[5]);
+  if (thenJump != 8) return false;  // JUMP_IF_FALSE to POP after JUMP
+
+  uint16_t elseJump = read_u16(c.code[12], c.code[13]);
+  if (elseJump != 5) return false;  // JUMP to end
+
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(name))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+  return true;
+}
+
 void fmt(char* pref, bool success, char* msg) {
   printf("%s%s %s\n", pref, success ? "✔" : "✗", msg);
 }
@@ -443,6 +671,13 @@ int testMain(void) {
   fmt("    ", testCallInfixNodeLeftNested(), "Call Infix - Left Nested");
   fmt("    ", testCallInfixNodeRightNested(), "Call Infix - Right Nested");
   fmt("    ", testFunctionNode(), "Function - Implicit Return - Literal");
+  fmt("    ", testIfSimple(), "If simple");
+  fmt("    ", testIfElse(), "If else");
+  fmt("    ", testIfBlock(), "If block");
+  fmt("    ", testIfElseBlock(), "If else block");
+  fmt("    ", testIfNested(), "If nested");
+  fmt("    ", testIfElseIf(), "If else-if");
+  fmt("    ", testIfComplexCondition(), "If complex condition");
 
   printf("  Memory\n");
   fmt("    ", testAstGC(), "Literal Number - Marked on stack");
@@ -457,6 +692,8 @@ int testMain(void) {
   fmt("    ", testBytecodeGlobal(), "Global variable");
   fmt("    ", testBytecodeGlobalLongName(), "Global variable long name");
   fmt("    ", testBytecodeCallInfix(), "Call infix");
+  fmt("    ", testBytecodeIfSimple(), "If simple");
+  fmt("    ", testBytecodeIfElse(), "If else");
 
   freeVM();
   return 0;
