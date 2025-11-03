@@ -6,6 +6,7 @@
 #include "value.h"
 
 typedef enum {
+  AST_ASSIGNMENT,
   AST_BLOCK,
   AST_CALL,
   AST_CALL_INFIX,
@@ -43,6 +44,11 @@ struct AstNode {
   int chr;
 
   union {
+    struct {
+      AstNode* lhs;
+      AstNode* rhs;
+    } assignment;
+
     struct {
       AstVec stmts;
     } block;
@@ -140,6 +146,7 @@ struct AstNode {
 
 /* constructors */
 
+AstNode* newAssignmentNode(AstNode* lhs, AstNode* rhs);
 AstNode* newBlockNode();
 AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
@@ -153,6 +160,7 @@ AstNode* newParamNode(ObjString* name, AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
 AstNode* newSignatureNode();
+AstNode* newUnknownNode();
 AstNode* newVarGlobalNode(ObjString* name);
 AstNode* newVarLocalNode(uint8_t index, ObjString* name);
 AstNode* newVarUpvalueNode(uint8_t index, ObjString* name);

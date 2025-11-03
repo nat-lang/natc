@@ -412,6 +412,204 @@ bool testWhileNested() {
 }
 
 /* ============================================================
+ * Assignment Tests
+ * ============================================================ */
+
+bool testAssignmentGlobal() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "x = 1");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* literal = newLiteralNode(NUMBER_VAL(1));
+  AstNode* assignment = newAssignmentNode(var, literal);
+  AstNode* exprStmt = newExprStmtNode(assignment);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testAssignmentLocal() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "let x; x = 1");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* let = newLetNode(intern("x"), newLiteralNode(UNDEF_VAL));
+  pushFnStmt(fn, let);
+  
+  // Create assignment: x = 1
+  // After let x, the variable x is a local at index 0 (no parameters in function)
+  AstNode* var = newVarLocalNode(0, intern("x"));
+  AstNode* literal = newLiteralNode(NUMBER_VAL(1));
+  AstNode* assignment = newAssignmentNode(var, literal);
+  AstNode* exprStmt = newExprStmtNode(assignment);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testAssignmentWithExpression() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "x = 1 + 2");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* infixCall = newCallInfixNode(op, lhs, rhs);
+  AstNode* assignment = newAssignmentNode(var, infixCall);
+  AstNode* exprStmt = newExprStmtNode(assignment);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testAssignmentWithCall() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "x = f()");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* call = newCallNode(callee);
+  AstNode* assignment = newAssignmentNode(var, call);
+  AstNode* exprStmt = newExprStmtNode(assignment);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testAssignmentNestedExpression() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "x = (1 + 2) + 3");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* var = newVarGlobalNode(intern("x"));
+  
+  // Build (1 + 2) + 3
+  AstNode* innerOp = newVarGlobalNode(intern("+"));
+  AstNode* innerLhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* innerRhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* innerCall = newCallInfixNode(innerOp, innerLhs, innerRhs);
+  
+  AstNode* outerOp = newVarGlobalNode(intern("+"));
+  AstNode* outerRhs = newLiteralNode(NUMBER_VAL(3));
+  AstNode* outerCall = newCallInfixNode(outerOp, innerCall, outerRhs);
+  
+  AstNode* assignment = newAssignmentNode(var, outerCall);
+  AstNode* exprStmt = newExprStmtNode(assignment);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testAssignmentBooleanValue() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "x = true");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* literal = newLiteralNode(BOOL_VAL(true));
+  AstNode* assignment = newAssignmentNode(var, literal);
+  AstNode* exprStmt = newExprStmtNode(assignment);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testAssignmentInBlock() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "{ x = 1 }");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* block = newBlockNode();
+  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* literal = newLiteralNode(NUMBER_VAL(1));
+  AstNode* assignment = newAssignmentNode(var, literal);
+  AstNode* exprStmt = newExprStmtNode(assignment);
+  pushAstVec(&block->as.block.stmts, exprStmt);
+  pushFnStmt(fn, block);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testMultipleAssignments() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "x = 1; y = 2");
+
+  AstNode* fn = mkFunction(name);
+  
+  // x = 1
+  AstNode* var1 = newVarGlobalNode(intern("x"));
+  AstNode* literal1 = newLiteralNode(NUMBER_VAL(1));
+  AstNode* assignment1 = newAssignmentNode(var1, literal1);
+  AstNode* exprStmt1 = newExprStmtNode(assignment1);
+  pushFnStmt(fn, exprStmt1);
+  
+  // y = 2
+  AstNode* var2 = newVarGlobalNode(intern("y"));
+  AstNode* literal2 = newLiteralNode(NUMBER_VAL(2));
+  AstNode* assignment2 = newAssignmentNode(var2, literal2);
+  AstNode* exprStmt2 = newExprStmtNode(assignment2);
+  pushFnStmt(fn, exprStmt2);
+  
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testAssignmentReassignment() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "x = 1; x = 2");
+
+  AstNode* fn = mkFunction(name);
+  
+  // x = 1
+  AstNode* var1 = newVarGlobalNode(intern("x"));
+  AstNode* literal1 = newLiteralNode(NUMBER_VAL(1));
+  AstNode* assignment1 = newAssignmentNode(var1, literal1);
+  AstNode* exprStmt1 = newExprStmtNode(assignment1);
+  pushFnStmt(fn, exprStmt1);
+  
+  // x = 2
+  AstNode* var2 = newVarGlobalNode(intern("x"));
+  AstNode* literal2 = newLiteralNode(NUMBER_VAL(2));
+  AstNode* assignment2 = newAssignmentNode(var2, literal2);
+  AstNode* exprStmt2 = newExprStmtNode(assignment2);
+  pushFnStmt(fn, exprStmt2);
+  
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+/* ============================================================
  * Node GC.
  * ============================================================ */
 
@@ -882,20 +1080,6 @@ bool testBytecodeWhileSimple() {
 
   // Check exit jump is patched correctly
   uint16_t exitJump = read_u16(c.code[4], c.code[5]);
-  // exitJump is from position 6 (after JUMP_IF_FALSE) to position 14 (final
-  // POP) patchJump calculates: jump = chunk->count - offset - 2 When patching:
-  // chunk->count = 14, offset = 4 (position of jump offset bytes) jump = 14 - 4
-  // - 2 = 8 But READ_SHORT() in VM increments ip, so we need to account for
-  // that Actually, JUMP_IF_FALSE: READ_SHORT() increments ip, then
-  // conditionally jumps So after READ_SHORT, ip = 6 + 2 = 8, and we jump offset
-  // bytes forward We want to jump from 8 to 14, which is 6 bytes, but patchJump
-  // uses -2 adjustment Let me check patchJump: jump = chunk->count - offset - 2
-  // = 14 - 4 - 2 = 8 But we want to jump from 6 to 14, which is 8 bytes
-  // forward. After READ_SHORT, ip = 8 So jump = 14 - 8 = 6. But patchJump gives
-  // us 8... Actually, let me verify: JUMP_IF_FALSE at position 3, offset bytes
-  // at 4-5 After READ_BYTE: ip = 4, READ_SHORT: ip = 6, then jumps offset We
-  // want ip to become 14, so offset = 14 - 6 = 8. That matches patchJump's
-  // calculation!
   if (exitJump != 8) return false;
 
   // Check final POP
@@ -961,24 +1145,10 @@ bool testBytecodeWhileEmptyBody() {
 
   // Verify exit jump
   uint16_t exitJump = read_u16(c.code[4], c.code[5]);
-  // exitJump from position 6 to 11 (after LOOP), which is 5 bytes
-  // But after READ_SHORT, ip = 8, so jump = 11 - 8 = 3
-  // Actually, patchJump: jump = chunk->count - offset - 2 = 11 - 4 - 2 = 5
-  // After READ_SHORT in VM: ip = 6 + 2 = 8, jump 5 bytes to 13 (past the end)
-  // Wait, that's wrong. Let me recalculate:
-  // JUMP_IF_FALSE at 3, offset at 4-5, POP at 6, LOOP at 7-9, POP at 10
-  // When patching: chunk->count = 10, offset = 4, jump = 10 - 4 - 2 = 4
-  // But we want to jump from 6 to 10, which is 4 bytes. After READ_SHORT, ip =
-  // 8 So we jump 4 bytes to 12... that's still wrong. Let me check: the final
-  // POP is at position 10, so we want to jump to 10 After READ_SHORT in
-  // JUMP_IF_FALSE: ip = 6, we jump 4 bytes to 10. That works!
   if (exitJump != 4) return false;
 
   // Verify LOOP offset
   uint16_t loopOffset = read_u16(c.code[8], c.code[9]);
-  // LOOP at 7, offset at 8-9, final POP at 10
-  // After READ_SHORT: ip = 10, we want ip - offset = 0 (loopStart)
-  // So offset = 10 - 0 = 10
   if (loopOffset != 10) return false;
 
   if (c.constants.count != 1) return false;
@@ -1098,6 +1268,274 @@ bool testBytecodeWhileComplexBody() {
   return true;
 }
 
+/* Bytecode tests for Assignment */
+
+bool testBytecodeAssignmentGlobal() {
+  ObjString* name = intern("x");
+  AstNode* var = newVarGlobalNode(name);
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(42));
+  AstNode* assignment = newAssignmentNode(var, rhs);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(42), OP_SET_GLOBAL, constant_index
+  // 3 bytes for CONSTANT + 3 bytes for OP_SET_GLOBAL = 6 bytes
+  if (c.count != 6) return false;
+  
+  // Check CONSTANT instruction
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  
+  // Check OP_SET_GLOBAL instruction
+  if (c.code[3] != OP_SET_GLOBAL) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;  // name constant index
+  
+  // Check constants: first is rhs value, second is variable name
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], NUMBER_VAL(42))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(name))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentLocal() {
+  ObjString* name = intern("x");
+  AstNode* var = newVarLocalNode(0, name);
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(42));
+  AstNode* assignment = newAssignmentNode(var, rhs);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(42), OP_SET_LOCAL, index(2 bytes)
+  // 3 bytes for CONSTANT + 3 bytes for OP_SET_LOCAL + index = 6 bytes
+  if (c.count != 6) return false;
+  
+  // Check CONSTANT instruction
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  
+  // Check OP_SET_LOCAL instruction
+  if (c.code[3] != OP_SET_LOCAL) return false;
+  if (read_u16(c.code[4], c.code[5]) != 0) return false;  // local index 0
+  
+  // Check constants: only rhs value (no name constant for locals)
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], NUMBER_VAL(42))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentUpvalue() {
+  ObjString* name = intern("x");
+  AstNode* var = newVarUpvalueNode(1, name);
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(42));
+  AstNode* assignment = newAssignmentNode(var, rhs);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(42), OP_SET_UPVALUE, index(2 bytes)
+  // 3 bytes for CONSTANT + 3 bytes for OP_SET_UPVALUE + index = 6 bytes
+  if (c.count != 6) return false;
+  
+  // Check CONSTANT instruction
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  
+  // Check OP_SET_UPVALUE instruction
+  if (c.code[3] != OP_SET_UPVALUE) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;  // upvalue index 1
+  
+  // Check constants: only rhs value (no name constant for upvalues)
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], NUMBER_VAL(42))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentWithExpression() {
+  ObjString* name = intern("x");
+  AstNode* var = newVarGlobalNode(name);
+  
+  // Build 1 + 2
+  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* infixCall = newCallInfixNode(op, lhs, rhs);
+  
+  AstNode* assignment = newAssignmentNode(var, infixCall);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(+), CONSTANT(1), CONSTANT(2), CALL(2), OP_SET_GLOBAL, name_idx
+  // 3 + 3 + 3 + 2 + 3 = 14 bytes
+  if (c.count != 14) return false;
+  
+  // Check RHS expression compilation
+  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+    return false;  // + operator
+  if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
+    return false;  // 1
+  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
+    return false;  // 2
+  if (c.code[9] != OP_CALL || c.code[10] != 2) return false;  // CALL with 2 args
+  
+  // Check OP_SET_GLOBAL
+  if (c.code[11] != OP_SET_GLOBAL) return false;
+  if (read_u16(c.code[12], c.code[13]) != 3) return false;  // name constant index
+  
+  // Check constants: +, 1, 2, name
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("+")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+  if (!valuesEqual(c.constants.values[3], OBJ_VAL(name))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentWithCall() {
+  ObjString* name = intern("x");
+  AstNode* var = newVarGlobalNode(name);
+  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* call = newCallNode(callee);
+  AstNode* assignment = newAssignmentNode(var, call);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(f), CALL(0), OP_SET_GLOBAL, name_idx
+  // 3 + 2 + 3 = 8 bytes
+  if (c.count != 8) return false;
+  
+  // Check RHS call compilation
+  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+    return false;  // f
+  if (c.code[3] != OP_CALL || c.code[4] != 0) return false;  // CALL with 0 args
+  
+  // Check OP_SET_GLOBAL
+  if (c.code[5] != OP_SET_GLOBAL) return false;
+  if (read_u16(c.code[6], c.code[7]) != 1) return false;  // name constant index
+  
+  // Check constants: f, name
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("f")))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(name))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentLocalIndex1() {
+  ObjString* name = intern("y");
+  AstNode* var = newVarLocalNode(1, name);
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(100));
+  AstNode* assignment = newAssignmentNode(var, rhs);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(100), OP_SET_LOCAL, index(2 bytes)
+  if (c.count != 6) return false;
+  
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  
+  if (c.code[3] != OP_SET_LOCAL) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;  // local index 1
+  
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], NUMBER_VAL(100))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentGlobalLongName() {
+  ObjString* longName = copyString("very_long_global_variable_name_for_assignment", 44);
+  AstNode* var = newVarGlobalNode(longName);
+  AstNode* rhs = newLiteralNode(BOOL_VAL(true));
+  AstNode* assignment = newAssignmentNode(var, rhs);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(true), OP_SET_GLOBAL, name_idx
+  if (c.count != 6) return false;
+  
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  
+  if (c.code[3] != OP_SET_GLOBAL) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;
+  
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], BOOL_VAL(true))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(longName))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentBooleanValue() {
+  ObjString* name = intern("flag");
+  AstNode* var = newVarGlobalNode(name);
+  AstNode* rhs = newLiteralNode(BOOL_VAL(false));
+  AstNode* assignment = newAssignmentNode(var, rhs);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  if (c.count != 6) return false;
+  
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  
+  if (c.code[3] != OP_SET_GLOBAL) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;
+  
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], BOOL_VAL(false))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(name))) return false;
+  
+  return true;
+}
+
+bool testBytecodeAssignmentNestedInfix() {
+  ObjString* name = intern("result");
+  AstNode* var = newVarGlobalNode(name);
+  
+  // Build (1 + 2) * 3
+  AstNode* plusOp = newVarGlobalNode(intern("+"));
+  AstNode* one = newLiteralNode(NUMBER_VAL(1));
+  AstNode* two = newLiteralNode(NUMBER_VAL(2));
+  AstNode* plusCall = newCallInfixNode(plusOp, one, two);
+  
+  AstNode* multOp = newVarGlobalNode(intern("*"));
+  AstNode* three = newLiteralNode(NUMBER_VAL(3));
+  AstNode* multCall = newCallInfixNode(multOp, plusCall, three);
+  
+  AstNode* assignment = newAssignmentNode(var, multCall);
+  Chunk c;
+  if (!buildChunkForExpr(assignment, &c)) return false;
+
+  // Layout: CONSTANT(+), CONSTANT(1), CONSTANT(2), CALL(2),
+  //         CONSTANT(*), CONSTANT(3), CALL(2), OP_SET_GLOBAL, name_idx
+  // Should have nested infix calls properly ordered
+  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+    return false;  // +
+  if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
+    return false;  // 1
+  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
+    return false;  // 2
+  if (c.code[9] != OP_CALL || c.code[10] != 2) return false;
+  
+  if (c.code[11] != OP_CONSTANT || read_u16(c.code[12], c.code[13]) != 3)
+    return false;  // *
+  if (c.code[14] != OP_CONSTANT || read_u16(c.code[15], c.code[16]) != 4)
+    return false;  // 3
+  if (c.code[17] != OP_CALL || c.code[18] != 2) return false;
+  
+  if (c.code[19] != OP_SET_GLOBAL) return false;
+  if (read_u16(c.code[20], c.code[21]) != 5) return false;  // name constant
+  
+  if (c.constants.count != 6) return false;
+  
+  return true;
+}
+
 void fmt(char* pref, bool success, char* msg) {
   printf("%s%s %s\n", pref, success ? "✔" : "✗", msg);
 }
@@ -1128,6 +1566,15 @@ int testMain(void) {
   fmt("    ", testWhileBlock(), "While block");
   fmt("    ", testWhileComplexCondition(), "While complex condition");
   fmt("    ", testWhileNested(), "While nested");
+  fmt("    ", testAssignmentGlobal(), "Assignment global");
+  fmt("    ", testAssignmentLocal(), "Assignment local");
+  fmt("    ", testAssignmentWithExpression(), "Assignment with expression");
+  fmt("    ", testAssignmentWithCall(), "Assignment with call");
+  fmt("    ", testAssignmentNestedExpression(), "Assignment nested expression");
+  fmt("    ", testAssignmentBooleanValue(), "Assignment boolean value");
+  fmt("    ", testAssignmentInBlock(), "Assignment in block");
+  fmt("    ", testMultipleAssignments(), "Multiple assignments");
+  fmt("    ", testAssignmentReassignment(), "Assignment reassignment");
 
   printf("  Memory\n");
   fmt("    ", testAstGC(), "Literal Number - Marked on stack");
@@ -1153,6 +1600,15 @@ int testMain(void) {
   fmt("    ", testBytecodeWhileEmptyBody(), "While empty body");
   fmt("    ", testBytecodeWhileNested(), "While nested");
   fmt("    ", testBytecodeWhileComplexBody(), "While complex body");
+  fmt("    ", testBytecodeAssignmentGlobal(), "Assignment global");
+  fmt("    ", testBytecodeAssignmentLocal(), "Assignment local");
+  fmt("    ", testBytecodeAssignmentUpvalue(), "Assignment upvalue");
+  fmt("    ", testBytecodeAssignmentWithExpression(), "Assignment with expression");
+  fmt("    ", testBytecodeAssignmentWithCall(), "Assignment with call");
+  fmt("    ", testBytecodeAssignmentLocalIndex1(), "Assignment local index 1");
+  fmt("    ", testBytecodeAssignmentGlobalLongName(), "Assignment global long name");
+  fmt("    ", testBytecodeAssignmentBooleanValue(), "Assignment boolean value");
+  fmt("    ", testBytecodeAssignmentNestedInfix(), "Assignment nested infix");
 
   freeVM();
   return 0;

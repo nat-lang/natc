@@ -104,6 +104,17 @@ bool __ord__(int argCount, Value* args) {
   return true;
 }
 
+bool __seq__(int argCount, Value* args) {
+  ObjSequence* seq = newSequence();
+  vm.stackTop[-argCount - 1] = OBJ_VAL(seq);
+
+  int i = argCount;
+  while (i-- > 0) writeValueArray(&seq->values, vmPeek(i));
+  while (++i < argCount) vmPop();
+
+  return true;
+}
+
 bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
   ObjString* string;
@@ -490,6 +501,7 @@ void defineNatives() {
   // native functions.
 
   defineNativeFnGlobal("len", 1, __length__);
+  defineNativeFn("seq", 0, true, __seq__, &vm.globals);
   defineNativeFnGlobal("__str__", 1, __str__);
   defineNativeFnGlobal("ord", 1, __ord__);
   defineNativeFnGlobal("hash", 1, __hash__);
