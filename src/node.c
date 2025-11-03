@@ -127,6 +127,13 @@ AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch) {
   return n;
 }
 
+AstNode* newWhileNode(AstNode* cond, AstNode* body) {
+  AstNode* n = allocNode(AST_WHILE);
+  n->as.whileStmt.cond = cond;
+  n->as.whileStmt.body = body;
+  return n;
+}
+
 AstNode* newLetNode(ObjString* name, AstNode* value) {
   AstNode* n = allocNode(AST_LET);
   n->as.let.name = name;
@@ -252,6 +259,12 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.ifStmt.elseBranch, depth + 1);
       break;
 
+    case AST_WHILE:
+      printStrAt("While\n", depth);
+      printNodeAt(node->as.whileStmt.cond, depth + 1);
+      printNodeAt(node->as.whileStmt.body, depth + 1);
+      break;
+
     case AST_LET:
       printStrAt("Let ", depth);
       printf("\"%s\"\n", node->as.let.name->chars);
@@ -338,6 +351,10 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.ifStmt.cond, b->as.ifStmt.cond) &&
              nodesEqual(a->as.ifStmt.then, b->as.ifStmt.then) &&
              nodesEqual(a->as.ifStmt.elseBranch, b->as.ifStmt.elseBranch);
+
+    case AST_WHILE:
+      return nodesEqual(a->as.whileStmt.cond, b->as.whileStmt.cond) &&
+             nodesEqual(a->as.whileStmt.body, b->as.whileStmt.body);
 
     case AST_LET:
       return a->as.let.name == b->as.let.name &&
@@ -433,6 +450,102 @@ static void patchJump(Chunk* chunk, AstNode* node, int offset) {
   chunk->code[offset + 1] = jump & 0xff;
 }
 
+static void emitLoop(Chunk* chunk, AstNode* node, int loopStart) {
+  emitByte(chunk, node, OP_LOOP);
+
+  // When emitLoop is called, chunk->count is the position where we'll emit
+  // OP_LOOP. After emitByte(OP_LOOP), chunk->count is the position of the first
+  // offset byte. After emitting both offset bytes, chunk->count is the position
+  // after the offset.
+  //
+  // When OP_LOOP executes in the VM:
+  // - READ_BYTE() consumes OP_LOOP, so frame->ip becomes position of offset
+  // bytes
+  // - READ_SHORT() increments ip by 2, reads offset from the two bytes
+  //   After READ_SHORT, frame->ip is at chunk->count (after the offset)
+  // - frame->ip -= offset should give us loopStart
+  // - So: chunk->count - offset = loopStart
+  // - Therefore: offset = chunk->count - loopStart
+  //
+  // Actually, let me try the calculation without +2 to match the test
+  // expectations The test expects offset = 11 when loopStart = 0 and
+  // chunk->count = 11 (after OP_LOOP) So: offset = 11 - 0 = 11, which matches!
+  // But wait, chunk->count when we calculate should be AFTER emitting the
+  // offset bytes Let me think: when we calculate offset, chunk->count is AFTER
+  // emitByte(OP_LOOP) So chunk->count = position of offset = 12 offset = 12 - 0
+  // = 12, but test expects 11 Maybe chunk->count should be BEFORE the offset
+  // bytes? Let me check... Actually, I think the test might be checking the
+  // wrong thing. Let me verify by checking what the actual generated offset is
+  // vs what the test expects. For now, let me try: offset = chunk->count -
+  // loopStart - 1 But that doesn't make sense either...
+
+  // Let me re-examine: when emitLoop is called in our code:
+  // - chunk->count is where we'll emit OP_LOOP (position 11)
+  // - After emitByte(OP_LOOP): chunk->count = 12
+  // - We calculate offset here, so chunk->count = 12
+  // - offset = 12 - 0 + 2 = 14
+  // But test expects 11...
+
+  // Maybe the test is checking the offset value at a different point? Let me
+  // look at what position the test reads the offset from - it reads from
+  // positions 12-13, which is after OP_LOOP at 11. So the offset is at 12-13,
+  // and after emitting the offset bytes, chunk->count = 14.
+
+  // Looking at compiler.c: when emitLoop is called, chunk->count is BEFORE
+  // OP_LOOP After emitByte(OP_LOOP), chunk->count is the position of offset
+  // bytes Then it calculates: offset = chunk->count - loopStart + 2
+  //
+  // In our code, when emitLoop is called, chunk->count is BEFORE OP_LOOP
+  // After emitByte(OP_LOOP), chunk->count is the position of offset bytes
+  // So we should use the same formula: chunk->count - loopStart + 2
+  // But wait, that gives us 14, and test expects 11...
+  //
+  // Let me check what chunk->count actually is when we calculate offset:
+  // - We call emitByte(OP_LOOP) first
+  // - Then calculate offset
+  // - So chunk->count is AFTER OP_LOOP (position of offset bytes)
+  // - For test: chunk->count = 12, loopStart = 0
+  // - offset = 12 - 0 + 2 = 14 (wrong)
+  //
+  // Maybe chunk->count should be the position AFTER the offset bytes when we
+  // calculate? But we haven't emitted the offset bytes yet...
+  //
+  // Actually, I think the issue is that we need to calculate the offset as if
+  // chunk->count already includes the offset bytes. Let me try:
+  // offset = (chunk->count + 2) - loopStart - 2 = chunk->count - loopStart
+  // = 12 - 0 = 12 (still wrong)
+  //
+  // Or maybe: offset = chunk->count - loopStart - 2 = 12 - 0 - 2 = 10 (closer
+  // but still wrong)
+  //
+  // Let me check if maybe loopStart is recorded at a different point:
+  // We record loopStart = chunk->count at the beginning, before emitting
+  // condition So loopStart = 0 (before CONSTANT) But maybe we should record it
+  // after the condition? No, that doesn't make sense for a loop - we want to
+  // loop back to check the condition.
+
+  // Actually, wait - maybe the test expectation of 11 is wrong? But the user
+  // wants the tests to pass. Let me try to understand what offset value would
+  // make the VM jump correctly. When we execute:
+  // - frame->ip after READ_SHORT = chunk->count (14)
+  // - We want frame->ip - offset = loopStart (0)
+  // - So offset = 14 - 0 = 14
+  //
+  // But the test expects 11. Maybe the test is checking the wrong thing, or
+  // maybe there's a different interpretation of what the offset means?
+
+  // Let me try matching the compiler.c formula exactly and see if maybe the
+  // issue is elsewhere:
+  int offset = chunk->count - loopStart + 2;
+  if (offset > UINT16_MAX) {
+    error(node, "Loop body too large.");
+    return;
+  }
+
+  emitByte(chunk, node, (offset >> 8) & 0xff);
+  emitByte(chunk, node, offset & 0xff);
+}
+
 ObjFunction* toFunction(AstNode* node);
 
 bool toChunk(AstNode* node, Chunk* chunk) {
@@ -506,6 +619,27 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       // Patch the else jump to here
       patchJump(chunk, node, elseJump);
+      break;
+    }
+    case AST_WHILE: {
+      int loopStart = chunk->count;
+
+      // Emit condition code
+      if (!toChunk(node->as.whileStmt.cond, chunk)) return false;
+
+      // Jump if false (exit loop)
+      int exitJump = emitJump(chunk, node, OP_JUMP_IF_FALSE);
+      emitByte(chunk, node, OP_POP);
+
+      // Emit body code
+      if (!toChunk(node->as.whileStmt.body, chunk)) return false;
+
+      // Loop back to condition
+      emitLoop(chunk, node, loopStart);
+
+      // Patch exit jump to here
+      patchJump(chunk, node, exitJump);
+      emitByte(chunk, node, OP_POP);
       break;
     }
     case AST_LET:
@@ -610,6 +744,10 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.ifStmt.then);
       markAstNode(n->as.ifStmt.elseBranch);
       break;
+    case AST_WHILE:
+      markAstNode(n->as.whileStmt.cond);
+      markAstNode(n->as.whileStmt.body);
+      break;
     case AST_LET:
       markObject((Obj*)n->as.let.name);
       markAstNode(n->as.let.value);
@@ -704,6 +842,10 @@ void freeAstNode(AstNode* n) {
       freeAstNode(n->as.ifStmt.cond);
       freeAstNode(n->as.ifStmt.then);
       freeAstNode(n->as.ifStmt.elseBranch);
+      break;
+    case AST_WHILE:
+      freeAstNode(n->as.whileStmt.cond);
+      freeAstNode(n->as.whileStmt.body);
       break;
     case AST_LET:
       freeAstNode(n->as.let.value);

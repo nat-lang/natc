@@ -23,6 +23,7 @@ typedef enum {
   AST_VAR_GLOBAL,
   AST_VAR_LOCAL,
   AST_VAR_UPVALUE,
+  AST_WHILE,
 
 } AstType;
 
@@ -129,6 +130,11 @@ struct AstNode {
       AstNode* expr;
     } spread;
 
+    struct {
+      AstNode* cond;
+      AstNode* body;
+    } whileStmt;
+
   } as;
 };
 
@@ -150,6 +156,7 @@ AstNode* newSignatureNode();
 AstNode* newVarGlobalNode(ObjString* name);
 AstNode* newVarLocalNode(uint8_t index, ObjString* name);
 AstNode* newVarUpvalueNode(uint8_t index, ObjString* name);
+AstNode* newWhileNode(AstNode* cond, AstNode* body);
 
 /* api */
 
