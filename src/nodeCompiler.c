@@ -85,6 +85,7 @@ void errorAtCurrent(NodeCompiler* cmp, const char* message) {
 
 void error(NodeCompiler* cmp, const char* message) {
   errorAt(cmp, &parser.previous, message);
+  cmp->hadError = true;
 }
 
 void checkError(NodeCompiler* cmp) {
