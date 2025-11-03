@@ -65,6 +65,36 @@ bool testLiteralNumberNode() {
   return assertNodesEqual(node, fn);
 }
 
+bool testLiteralBooleanTrue() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "true;");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* literal = newLiteralNode(BOOL_VAL(true));
+  AstNode* exprStmt = newExprStmtNode(literal);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testLiteralBooleanFalse() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "false;");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* literal = newLiteralNode(BOOL_VAL(false));
+  AstNode* exprStmt = newExprStmtNode(literal);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
 bool testCallNode0Args() {
   Token name = syntheticToken("test");
   AstNode* node = compileFunctionNode(name, "f();");
@@ -405,6 +435,8 @@ int testMain(void) {
 
   printf("  Compilation\n");
   fmt("    ", testLiteralNumberNode(), "Literal Number");
+  fmt("    ", testLiteralBooleanTrue(), "Literal Boolean True");
+  fmt("    ", testLiteralBooleanFalse(), "Literal Boolean False");
   fmt("    ", testCallNode0Args(), "Call (0 args)");
   fmt("    ", testCallNode1Args(), "Call (1 args)");
   fmt("    ", testCallInfixNode(), "Call Infix");

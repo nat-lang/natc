@@ -363,6 +363,23 @@ AstNode* function(NodeCompiler* enclosing, Token name) {
   return node;
 }
 
+static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
+  Value value;
+  switch (parser.previous.type) {
+    case TOKEN_TRUE:
+      value = BOOL_VAL(true);
+      break;
+    case TOKEN_FALSE:
+      value = BOOL_VAL(false);
+      break;
+    default:
+      return NULL;
+  }
+  AstNode* node = newLiteralNode(value);
+  node->line = parser.previous.line;
+  return node;
+}
+
 static AstNode* number(NodeCompiler* cmp, bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
   AstNode* node = newLiteralNode(NUMBER_VAL(value));
@@ -469,6 +486,8 @@ static ParseRule rules[] = {
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_USER_INFIX] = {NULL, userInfix, PREC_NONE, PREC_NONE},
+    [TOKEN_TRUE] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FALSE] = {literal, NULL, PREC_NONE, PREC_NONE},
 };
 
 #define PREC_STEP 1
