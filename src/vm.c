@@ -81,6 +81,8 @@ void initCore(Core* core) {
   core->sExecMain = NULL;
   core->sOut = NULL;
 
+  core->sSeq = NULL;
+
   core->base = NULL;
   core->object = NULL;
   core->module = NULL;
@@ -160,6 +162,8 @@ bool initVM() {
   vm.core.sMain = intern("main");
   vm.core.sExecMain = intern("let out = main();");
   vm.core.sOut = intern("out");
+
+  vm.core.sSeq = intern("seq");
 
   vm.gen = NULL;
 

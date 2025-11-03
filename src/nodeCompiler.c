@@ -269,19 +269,25 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
   Token name = parser.previous;
   ObjString* objName = tokenString(name);
 
-  int local = resolveLocal(cmp, &name);
-  if (local >= 0) {
-    return newVarLocalNode((uint8_t)local, objName);
+  AstNode* node = NULL;
+  int address = -1;
+
+  if ((address = resolveLocal(cmp, &name)) >= 0) {
+    node = newVarLocalNode((uint8_t)address, objName);
+  } else if ((address = resolveUpvalue(cmp, &name)) >= 0) {
+    node = newVarUpvalueNode((uint8_t)address, objName);
+  } else {
+    node = newVarGlobalNode(objName);
   }
 
-  int upvalue = resolveUpvalue(cmp, &name);
-  if (upvalue >= 0) {
-    return newVarUpvalueNode((uint8_t)upvalue, objName);
+  if (match(cmp, TOKEN_EQUAL)) {
+    if (!canAssign) error(cmp, "Invalid assignment target.");
+    AstNode* rhs = expression(cmp);
+    node = newAssignmentNode(node, rhs);
   }
 
-  return newVarGlobalNode(objName);
+  return node;
 }
-
 static AstNode* parameter(NodeCompiler* cmp) {
   addLocal(cmp, parser.previous);
   markInitialized(cmp);
@@ -457,19 +463,29 @@ static bool peekFunction(NodeCompiler* cmp) {
 }
 
 static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
+  // empty sequence.
+  if (check(TOKEN_COMMA)) {
+    consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')'.");
+    return newSequenceNode();
+  }
+
+  // function?
   Parser checkpoint = saveParser();
   bool isFunction = peekFunction(cmp);
   gotoParser(checkpoint);
   if (isFunction) return function(cmp, parser.ppenult);
 
+  // sequence.
   AstNode* node = expression(cmp);
 
   if (check(TOKEN_COMMA)) {
     AstNode* seq = newSequenceNode();
     pushAstVec(&seq->as.sequence.values, node);
     do {
+      // allow a trailing comma.
+      if (check(TOKEN_PAREN_RIGHT)) break;
       advance(cmp);
-      pushAstVec(&node->as.sequence.values, expression(cmp));
+      pushAstVec(&seq->as.sequence.values, expression(cmp));
     } while (check(TOKEN_COMMA));
 
     node = seq;
