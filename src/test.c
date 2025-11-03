@@ -340,6 +340,77 @@ bool testIfComplexCondition() {
   return assertNodesEqual(node, fn);
 }
 
+bool testWhileSimple() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "while (true) 1");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newLiteralNode(BOOL_VAL(true));
+  AstNode* body = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* whileNode = newWhileNode(cond, body);
+  pushFnStmt(fn, whileNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testWhileBlock() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "while (x) { let y = 1 }");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* block = newBlockNode();
+  AstNode* let = newLetNode(intern("y"), newLiteralNode(NUMBER_VAL(1)));
+  pushAstVec(&block->as.block.stmts, let);
+  AstNode* whileNode = newWhileNode(cond, block);
+  pushFnStmt(fn, whileNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testWhileComplexCondition() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "while (1 + 2) 1");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* cond = newCallInfixNode(op, lhs, rhs);
+  AstNode* body = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* whileNode = newWhileNode(cond, body);
+  pushFnStmt(fn, whileNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testWhileNested() {
+  Token name = syntheticToken("test");
+  AstNode* node = compileFunctionNode(name, "while (a) while (b) 1");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* outerCond = newVarGlobalNode(intern("a"));
+  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* innerBody = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* innerWhile = newWhileNode(innerCond, innerBody);
+  AstNode* whileNode = newWhileNode(outerCond, innerWhile);
+  pushFnStmt(fn, whileNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
 /* ============================================================
  * Node GC.
  * ============================================================ */
@@ -765,6 +836,268 @@ bool testBytecodeIfComplexCondition() {
   return true;
 }
 
+bool testBytecodeWhileSimple() {
+  AstNode* cond = newLiteralNode(BOOL_VAL(true));
+  AstNode* body = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* whileNode = newWhileNode(cond, body);
+  Chunk c;
+  if (!buildChunkForExpr(whileNode, &c)) return false;
+
+  // Layout: loop-start: CONSTANT(true), JUMP_IF_FALSE, POP, CONSTANT(1),
+  // EXPR_STMT, LOOP, [patch], POP
+  // loop-start: 0
+  // CONSTANT(true): 0-2 (3 bytes)
+  // JUMP_IF_FALSE: 3-5 (3 bytes, placeholder)
+  // POP: 6 (1 byte)
+  // CONSTANT(1): 7-9 (3 bytes)
+  // EXPR_STMT: 10 (1 byte)
+  // LOOP: 11-13 (3 bytes, jumps back to 0)
+  // POP: 14 (1 byte, exit jump lands here)
+  // Total: 15 bytes
+  if (c.count != 15) return false;
+
+  // Check loop-start: CONSTANT(true)
+  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+
+  // Check JUMP_IF_FALSE
+  if (c.code[3] != OP_JUMP_IF_FALSE) return false;
+
+  // Check POP
+  if (c.code[6] != OP_POP) return false;
+
+  // Check CONSTANT(1)
+  if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 1)
+    return false;
+
+  // Check EXPR_STMT
+  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+
+  // Check LOOP (jumps back to 0)
+  if (c.code[11] != OP_LOOP) return false;
+  uint16_t loopOffset = read_u16(c.code[12], c.code[13]);
+  // When OP_LOOP executes: READ_BYTE() skips OP_LOOP, READ_SHORT() reads offset
+  // and increments ip to 14 We want: 14 - offset = 0, so offset = 14
+  if (loopOffset != 14) return false;
+
+  // Check exit jump is patched correctly
+  uint16_t exitJump = read_u16(c.code[4], c.code[5]);
+  // exitJump is from position 6 (after JUMP_IF_FALSE) to position 14 (final
+  // POP) patchJump calculates: jump = chunk->count - offset - 2 When patching:
+  // chunk->count = 14, offset = 4 (position of jump offset bytes) jump = 14 - 4
+  // - 2 = 8 But READ_SHORT() in VM increments ip, so we need to account for
+  // that Actually, JUMP_IF_FALSE: READ_SHORT() increments ip, then
+  // conditionally jumps So after READ_SHORT, ip = 6 + 2 = 8, and we jump offset
+  // bytes forward We want to jump from 8 to 14, which is 6 bytes, but patchJump
+  // uses -2 adjustment Let me check patchJump: jump = chunk->count - offset - 2
+  // = 14 - 4 - 2 = 8 But we want to jump from 6 to 14, which is 8 bytes
+  // forward. After READ_SHORT, ip = 8 So jump = 14 - 8 = 6. But patchJump gives
+  // us 8... Actually, let me verify: JUMP_IF_FALSE at position 3, offset bytes
+  // at 4-5 After READ_BYTE: ip = 4, READ_SHORT: ip = 6, then jumps offset We
+  // want ip to become 14, so offset = 14 - 6 = 8. That matches patchJump's
+  // calculation!
+  if (exitJump != 8) return false;
+
+  // Check final POP
+  if (c.code[14] != OP_POP) return false;
+
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], BOOL_VAL(true))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  return true;
+}
+
+bool testBytecodeWhileFalseCondition() {
+  AstNode* cond = newLiteralNode(BOOL_VAL(false));
+  AstNode* body = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* whileNode = newWhileNode(cond, body);
+  Chunk c;
+  if (!buildChunkForExpr(whileNode, &c)) return false;
+
+  // Loop should exit immediately when condition is false
+  // Verify exit jump is patched correctly (same calculation as
+  // testBytecodeWhileSimple)
+  uint16_t exitJump = read_u16(c.code[4], c.code[5]);
+  if (exitJump != 8)
+    return false;  // Should jump from position 6 to position 14
+
+  // Verify LOOP instruction exists (even though it won't execute)
+  if (c.code[11] != OP_LOOP) return false;
+
+  // Verify loop offset
+  uint16_t loopOffset = read_u16(c.code[12], c.code[13]);
+  if (loopOffset != 14) return false;
+
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], BOOL_VAL(false))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  return true;
+}
+
+bool testBytecodeWhileEmptyBody() {
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* body = newBlockNode();
+  AstNode* whileNode = newWhileNode(cond, body);
+  Chunk c;
+  if (!buildChunkForExpr(whileNode, &c)) return false;
+
+  // Layout: loop-start: GET_GLOBAL(x), JUMP_IF_FALSE, POP, [empty block], LOOP,
+  // POP
+  // Empty block should generate no code, so body is just empty
+  // GET_GLOBAL: 0-2 (3 bytes)
+  // JUMP_IF_FALSE: 3-5 (3 bytes)
+  // POP: 6 (1 byte)
+  // [empty block]: no code
+  // LOOP: 7-9 (3 bytes)
+  // POP: 10 (1 byte)
+  // Total: 11 bytes
+  if (c.count != 11) return false;
+
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (c.code[3] != OP_JUMP_IF_FALSE) return false;
+  if (c.code[6] != OP_POP) return false;
+  if (c.code[7] != OP_LOOP) return false;
+  if (c.code[10] != OP_POP) return false;
+
+  // Verify exit jump
+  uint16_t exitJump = read_u16(c.code[4], c.code[5]);
+  // exitJump from position 6 to 11 (after LOOP), which is 5 bytes
+  // But after READ_SHORT, ip = 8, so jump = 11 - 8 = 3
+  // Actually, patchJump: jump = chunk->count - offset - 2 = 11 - 4 - 2 = 5
+  // After READ_SHORT in VM: ip = 6 + 2 = 8, jump 5 bytes to 13 (past the end)
+  // Wait, that's wrong. Let me recalculate:
+  // JUMP_IF_FALSE at 3, offset at 4-5, POP at 6, LOOP at 7-9, POP at 10
+  // When patching: chunk->count = 10, offset = 4, jump = 10 - 4 - 2 = 4
+  // But we want to jump from 6 to 10, which is 4 bytes. After READ_SHORT, ip =
+  // 8 So we jump 4 bytes to 12... that's still wrong. Let me check: the final
+  // POP is at position 10, so we want to jump to 10 After READ_SHORT in
+  // JUMP_IF_FALSE: ip = 6, we jump 4 bytes to 10. That works!
+  if (exitJump != 4) return false;
+
+  // Verify LOOP offset
+  uint16_t loopOffset = read_u16(c.code[8], c.code[9]);
+  // LOOP at 7, offset at 8-9, final POP at 10
+  // After READ_SHORT: ip = 10, we want ip - offset = 0 (loopStart)
+  // So offset = 10 - 0 = 10
+  if (loopOffset != 10) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("x")))) return false;
+  return true;
+}
+
+bool testBytecodeWhileNested() {
+  AstNode* outerCond = newVarGlobalNode(intern("a"));
+  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* innerBody = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* innerWhile = newWhileNode(innerCond, innerBody);
+  AstNode* outerWhile = newWhileNode(outerCond, innerWhile);
+  Chunk c;
+  if (!buildChunkForExpr(outerWhile, &c)) return false;
+
+  // Verify nested structure
+  // Outer: GET_GLOBAL a, JUMP_IF_FALSE, POP, [inner while], LOOP, POP
+  // Inner: GET_GLOBAL b, JUMP_IF_FALSE, POP, CONSTANT 1, EXPR_STMT, LOOP, POP
+  // Should have two LOOP instructions with correct offsets
+  int loopCount = 0;
+  int firstLoopPos = -1;
+  int secondLoopPos = -1;
+  for (int i = 0; i < c.count; i++) {
+    if (c.code[i] == OP_LOOP) {
+      loopCount++;
+      if (firstLoopPos == -1) {
+        firstLoopPos = i;
+      } else {
+        secondLoopPos = i;
+      }
+    }
+  }
+
+  if (loopCount != 2) return false;
+  if (firstLoopPos == -1 || secondLoopPos == -1) return false;
+
+  // Inner LOOP should come before outer LOOP (inner loop body is nested inside
+  // outer) The first LOOP encountered is the inner loop, the second is the
+  // outer loop
+  int innerLoopPos = firstLoopPos;
+  int outerLoopPos = secondLoopPos;
+
+  if (innerLoopPos >= outerLoopPos) return false;
+
+  // Verify both loops have valid non-zero offsets
+  uint16_t innerLoopOffset =
+      read_u16(c.code[innerLoopPos + 1], c.code[innerLoopPos + 2]);
+  uint16_t outerLoopOffset =
+      read_u16(c.code[outerLoopPos + 1], c.code[outerLoopPos + 2]);
+
+  // Offsets should be positive and valid
+  if (innerLoopOffset == 0) return false;
+  if (outerLoopOffset == 0) return false;
+
+  // The offsets represent backwards jumps, so they should be positive values
+  // that allow the loops to jump back to their respective starts
+  // We just verify they're non-zero and reasonable (not checking exact values
+  // since the bytecode layout depends on the exact generated code)
+
+  return true;
+}
+
+bool testBytecodeWhileComplexBody() {
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* block = newBlockNode();
+  AstNode* stmt1 = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
+  AstNode* stmt2 = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
+  pushAstVec(&block->as.block.stmts, stmt1);
+  pushAstVec(&block->as.block.stmts, stmt2);
+  AstNode* whileNode = newWhileNode(cond, block);
+  Chunk c;
+  if (!buildChunkForExpr(whileNode, &c)) return false;
+
+  // Layout: loop-start: GET_GLOBAL(x), JUMP_IF_FALSE, POP, CONSTANT(1),
+  // EXPR_STMT, CONSTANT(2), EXPR_STMT, LOOP, POP
+  // Verify all body statements are between condition check and LOOP
+  int getGlobalPos = -1;
+  int jumpIfFalsePos = -1;
+  int firstExprStmtPos = -1;
+  int secondExprStmtPos = -1;
+  int loopPos = -1;
+
+  for (int i = 0; i < c.count; i++) {
+    if (c.code[i] == OP_GET_GLOBAL && getGlobalPos == -1) {
+      getGlobalPos = i;
+    } else if (c.code[i] == OP_JUMP_IF_FALSE && jumpIfFalsePos == -1) {
+      jumpIfFalsePos = i;
+    } else if (c.code[i] == OP_EXPR_STATEMENT) {
+      if (firstExprStmtPos == -1) {
+        firstExprStmtPos = i;
+      } else if (secondExprStmtPos == -1) {
+        secondExprStmtPos = i;
+      }
+    } else if (c.code[i] == OP_LOOP && loopPos == -1) {
+      loopPos = i;
+    }
+  }
+
+  // Verify order: GET_GLOBAL < JUMP_IF_FALSE < first EXPR_STMT < second
+  // EXPR_STMT < LOOP
+  if (getGlobalPos == -1 || jumpIfFalsePos == -1 || firstExprStmtPos == -1 ||
+      secondExprStmtPos == -1 || loopPos == -1)
+    return false;
+
+  if (getGlobalPos >= jumpIfFalsePos) return false;
+  if (jumpIfFalsePos >= firstExprStmtPos) return false;
+  if (firstExprStmtPos >= secondExprStmtPos) return false;
+  if (secondExprStmtPos >= loopPos) return false;
+
+  // Verify constants
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("x")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+
+  return true;
+}
+
 void fmt(char* pref, bool success, char* msg) {
   printf("%s%s %s\n", pref, success ? "✔" : "✗", msg);
 }
@@ -791,6 +1124,10 @@ int testMain(void) {
   fmt("    ", testIfNested(), "If nested");
   fmt("    ", testIfElseIf(), "If else-if");
   fmt("    ", testIfComplexCondition(), "If complex condition");
+  fmt("    ", testWhileSimple(), "While simple");
+  fmt("    ", testWhileBlock(), "While block");
+  fmt("    ", testWhileComplexCondition(), "While complex condition");
+  fmt("    ", testWhileNested(), "While nested");
 
   printf("  Memory\n");
   fmt("    ", testAstGC(), "Literal Number - Marked on stack");
@@ -811,6 +1148,11 @@ int testMain(void) {
   fmt("    ", testBytecodeIfElseBlock(), "If else block");
   fmt("    ", testBytecodeIfNested(), "If nested");
   fmt("    ", testBytecodeIfComplexCondition(), "If complex condition");
+  fmt("    ", testBytecodeWhileSimple(), "While simple");
+  fmt("    ", testBytecodeWhileFalseCondition(), "While false condition");
+  fmt("    ", testBytecodeWhileEmptyBody(), "While empty body");
+  fmt("    ", testBytecodeWhileNested(), "While nested");
+  fmt("    ", testBytecodeWhileComplexBody(), "While complex body");
 
   freeVM();
   return 0;

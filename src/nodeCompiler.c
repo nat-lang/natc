@@ -594,10 +594,20 @@ static AstNode* ifStatement(NodeCompiler* cmp) {
   return newIfNode(cond, then, elseBranch);
 }
 
+static AstNode* whileStatement(NodeCompiler* cmp) {
+  consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'while'.");
+  AstNode* cond = expression(cmp);
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after condition.");
+  AstNode* body = statement(cmp);
+  return newWhileNode(cond, body);
+}
+
 static AstNode* statement(NodeCompiler* cmp) {
   AstNode* node;
   if (match(cmp, TOKEN_IF)) {
     node = ifStatement(cmp);
+  } else if (match(cmp, TOKEN_WHILE)) {
+    node = whileStatement(cmp);
   } else if (match(cmp, TOKEN_LET)) {
     node = letDeclaration(cmp);
   } else if (match(cmp, TOKEN_LEFT_BRACE)) {
