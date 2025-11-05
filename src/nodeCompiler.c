@@ -398,6 +398,17 @@ static AstNode* number(NodeCompiler* cmp, bool canAssign) {
   return node;
 }
 
+static AstNode* string(NodeCompiler* cmp, bool canAssign) {
+  // Extract string content (excluding quotes)
+  // parser.previous.start points to the opening quote
+  // parser.previous.length includes both quotes
+  ObjString* str =
+      copyString(parser.previous.start + 1, parser.previous.length - 2);
+  AstNode* node = newLiteralNode(OBJ_VAL(str));
+  node->line = parser.previous.line;
+  return node;
+}
+
 static void argumentList(NodeCompiler* cmp, AstVec* vec) {
   uint8_t argCount = 0;
   if (!check(TOKEN_PAREN_RIGHT)) {
@@ -503,6 +514,7 @@ static ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_PAREN_LEFT] = {parentheses, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},

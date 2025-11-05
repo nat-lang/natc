@@ -202,6 +202,42 @@ bool testFunctionNode() {
 }
 
 /* ============================================================
+ * String Tests
+ * ============================================================ */
+
+bool testStringLiteral() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "\"hello\"");
+
+  AstNode* fn = mkFunction(name);
+  ObjString* str = copyString("hello", 5);
+  AstNode* literal = newLiteralNode(OBJ_VAL(str));
+  AstNode* exprStmt = newExprStmtNode(literal);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testStringEmpty() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "\"\"");
+
+  AstNode* fn = mkFunction(name);
+  ObjString* str = copyString("", 0);
+  AstNode* literal = newLiteralNode(OBJ_VAL(str));
+  AstNode* exprStmt = newExprStmtNode(literal);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+/* ============================================================
  * If-Else Statement Tests
  * ============================================================ */
 
@@ -906,6 +942,78 @@ bool testBytecodeCallInfix() {
   if (c.code[9] != OP_CALL) return false;
   if (c.code[10] != 2) return false;
   if (c.constants.count != 3) return false;
+  return true;
+}
+
+/* Bytecode tests for Strings */
+
+bool testBytecodeString() {
+  ObjString* str = copyString("hello", 5);
+  AstNode* literal = newLiteralNode(OBJ_VAL(str));
+  Chunk c;
+  if (!buildChunkForExpr(literal, &c)) return false;
+
+  // Layout: OP_CONSTANT (1 byte) + constant index (2 bytes) = 3 bytes
+  if (c.count != 3) return false;
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(str))) return false;
+
+  return true;
+}
+
+bool testBytecodeStringEmpty() {
+  ObjString* str = copyString("", 0);
+  AstNode* literal = newLiteralNode(OBJ_VAL(str));
+  Chunk c;
+  if (!buildChunkForExpr(literal, &c)) return false;
+
+  // Layout: OP_CONSTANT (1 byte) + constant index (2 bytes) = 3 bytes
+  if (c.count != 3) return false;
+  if (c.code[0] != OP_CONSTANT) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(str))) return false;
+
+  // Verify it's an empty string
+  if (!IS_STRING(c.constants.values[0])) return false;
+  if (AS_STRING(c.constants.values[0])->length != 0) return false;
+
+  return true;
+}
+
+bool testBytecodeStringLong() {
+  // Create a string longer than 256 characters to verify 16-bit constant index
+  char longStr[300];
+  for (int i = 0; i < 299; i++) {
+    longStr[i] = 'a' + (i % 26);
+  }
+  longStr[299] = '\0';
+
+  ObjString* str = copyString(longStr, 299);
+  AstNode* literal = newLiteralNode(OBJ_VAL(str));
+  Chunk c;
+  if (!buildChunkForExpr(literal, &c)) return false;
+
+  // Layout: OP_CONSTANT (1 byte) + constant index (2 bytes) = 3 bytes
+  // Should use 16-bit constant index even for large constant pool
+  if (c.count != 3) return false;
+  if (c.code[0] != OP_CONSTANT) return false;
+
+  // Read the 16-bit constant index
+  uint16_t constIdx = read_u16(c.code[1], c.code[2]);
+  if (constIdx >= c.constants.count) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[constIdx], OBJ_VAL(str))) return false;
+
+  // Verify string length
+  if (!IS_STRING(c.constants.values[constIdx])) return false;
+  if (AS_STRING(c.constants.values[constIdx])->length != 299) return false;
+
   return true;
 }
 
@@ -2198,6 +2306,8 @@ int testMain(void) {
   fmt("    ", testCallInfixNodeLeftNested(), "Call Infix - Left Nested");
   fmt("    ", testCallInfixNodeRightNested(), "Call Infix - Right Nested");
   fmt("    ", testFunctionNode(), "Function - Implicit Return - Literal");
+  fmt("    ", testStringLiteral(), "String literal");
+  fmt("    ", testStringEmpty(), "String empty");
   fmt("    ", testIfSimple(), "If simple");
   fmt("    ", testIfElse(), "If else");
   fmt("    ", testIfBlock(), "If block");
@@ -2245,6 +2355,9 @@ int testMain(void) {
   fmt("    ", testBytecodeGlobal(), "Global variable");
   fmt("    ", testBytecodeGlobalLongName(), "Global variable long name");
   fmt("    ", testBytecodeCallInfix(), "Call infix");
+  fmt("    ", testBytecodeString(), "String");
+  fmt("    ", testBytecodeStringEmpty(), "String empty");
+  fmt("    ", testBytecodeStringLong(), "String long");
   fmt("    ", testBytecodeIfSimple(), "If simple");
   fmt("    ", testBytecodeIfElse(), "If else");
   fmt("    ", testBytecodeIfBlock(), "If block");
