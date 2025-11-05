@@ -16,6 +16,11 @@
  * Node compilation.
  * ============================================================ */
 
+AstNode* compile(Token name, char* source) {
+  ObjString* objName = tokenString(name);
+  return compileFunctionNode(objName, source, NULL);
+}
+
 bool assertNodesEqual(AstNode* a, AstNode* b) {
   if (!nodesEqual(a, b)) {
     printf("Nodes not equal: \n");
@@ -30,29 +35,19 @@ bool assertNodesEqual(AstNode* a, AstNode* b) {
 }
 
 AstNode* mkFunction(Token name) {
-  AstNode* fn = newFunctionNode(tokenString(name));
+  AstNode* fn = newFunctionNode(tokenString(name), NULL);
   fn->as.function.signature = newSignatureNode();
   fn->as.function.body = newBlockNode();
   return fn;
-}
-
-AstNode* mkModule(Token name) {
-  AstNode* fn = mkFunction(name);
-  AstNode* module = newModuleNode(tokenString(name), fn);
-  return module;
 }
 
 void pushFnStmt(AstNode* fn, AstNode* stmt) {
   pushAstVec(&fn->as.function.body->as.block.stmts, stmt);
 }
 
-void pushModuleStmt(AstNode* mod, AstNode* stmt) {
-  pushAstVec(&mod->as.module.fn->as.function.body->as.block.stmts, stmt);
-}
-
 bool testLiteralNumberNode() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1");
+  AstNode* node = compile(name, "1");
 
   AstNode* fn = mkFunction(name);
   AstNode* literal = newLiteralNode(NUMBER_VAL(1));
@@ -67,7 +62,7 @@ bool testLiteralNumberNode() {
 
 bool testLiteralBooleanTrue() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "true");
+  AstNode* node = compile(name, "true");
 
   AstNode* fn = mkFunction(name);
   AstNode* literal = newLiteralNode(BOOL_VAL(true));
@@ -82,7 +77,7 @@ bool testLiteralBooleanTrue() {
 
 bool testLiteralBooleanFalse() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "false");
+  AstNode* node = compile(name, "false");
 
   AstNode* fn = mkFunction(name);
   AstNode* literal = newLiteralNode(BOOL_VAL(false));
@@ -97,7 +92,7 @@ bool testLiteralBooleanFalse() {
 
 bool testCallNode0Args() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "f()");
+  AstNode* node = compile(name, "f()");
 
   AstNode* var = newVarGlobalNode(intern("f"));
   AstNode* call = newCallNode(var);
@@ -113,7 +108,7 @@ bool testCallNode0Args() {
 
 bool testCallNode1Args() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "f(1)");
+  AstNode* node = compile(name, "f(1)");
 
   AstNode* f = newVarGlobalNode(intern("f"));
   AstNode* call = newCallNode(f);
@@ -130,7 +125,7 @@ bool testCallNode1Args() {
 
 bool testCallInfixNode() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1 + 2");
+  AstNode* node = compile(name, "1 + 2");
 
   AstNode* inf = newVarGlobalNode(intern("+"));
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
@@ -148,7 +143,7 @@ bool testCallInfixNode() {
 
 bool testCallInfixNodeLeftNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1 + 2 + 3");
+  AstNode* node = compile(name, "1 + 2 + 3");
 
   AstNode* callLeft = newCallInfixNode(newVarGlobalNode(intern("+")),
                                        newLiteralNode(NUMBER_VAL(1)),
@@ -168,7 +163,7 @@ bool testCallInfixNodeLeftNested() {
 
 bool testCallInfixNodeRightNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "1 + (2 + 3)");
+  AstNode* node = compile(name, "1 + (2 + 3)");
 
   AstNode* callRight = newCallInfixNode(newVarGlobalNode(intern("+")),
                                         newLiteralNode(NUMBER_VAL(2)),
@@ -188,9 +183,9 @@ bool testCallInfixNodeRightNested() {
 
 bool testFunctionNode() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "let f = () => 1");
+  AstNode* node = compile(name, "let f = () => 1");
 
-  AstNode* f = newFunctionNode(intern("f"));
+  AstNode* f = newFunctionNode(intern("f"), NULL);
   f->as.function.signature = newSignatureNode();
   f->as.function.body = newReturnNode(newLiteralNode(NUMBER_VAL(1)));
 
@@ -212,7 +207,7 @@ bool testFunctionNode() {
 
 bool testIfSimple() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "if (true) 1");
+  AstNode* node = compile(name, "if (true) 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* cond = newLiteralNode(BOOL_VAL(true));
@@ -228,7 +223,7 @@ bool testIfSimple() {
 
 bool testIfElse() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "if (x) 1 else 2");
+  AstNode* node = compile(name, "if (x) 1 else 2");
 
   AstNode* fn = mkFunction(name);
   AstNode* cond = newVarGlobalNode(intern("x"));
@@ -245,7 +240,7 @@ bool testIfElse() {
 
 bool testIfBlock() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "if (x) { let y = 1 }");
+  AstNode* node = compile(name, "if (x) { let y = 1 }");
 
   AstNode* fn = mkFunction(name);
   AstNode* cond = newVarGlobalNode(intern("x"));
@@ -263,7 +258,7 @@ bool testIfBlock() {
 
 bool testIfElseBlock() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "if (x) { 1 } else { 2 }");
+  AstNode* node = compile(name, "if (x) { 1 } else { 2 }");
 
   AstNode* fn = mkFunction(name);
   AstNode* cond = newVarGlobalNode(intern("x"));
@@ -284,7 +279,7 @@ bool testIfElseBlock() {
 
 bool testIfNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "if (a) if (b) 1 else 2");
+  AstNode* node = compile(name, "if (a) if (b) 1 else 2");
 
   AstNode* fn = mkFunction(name);
   AstNode* outerCond = newVarGlobalNode(intern("a"));
@@ -303,7 +298,7 @@ bool testIfNested() {
 
 bool testIfElseIf() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "if (a) 1 else if (b) 2 else 3");
+  AstNode* node = compile(name, "if (a) 1 else if (b) 2 else 3");
 
   AstNode* fn = mkFunction(name);
   AstNode* cond = newVarGlobalNode(intern("a"));
@@ -323,7 +318,7 @@ bool testIfElseIf() {
 
 bool testIfComplexCondition() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "if (1 + 2) 1");
+  AstNode* node = compile(name, "if (1 + 2) 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* op = newVarGlobalNode(intern("+"));
@@ -342,7 +337,7 @@ bool testIfComplexCondition() {
 
 bool testWhileSimple() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "while (true) 1");
+  AstNode* node = compile(name, "while (true) 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* cond = newLiteralNode(BOOL_VAL(true));
@@ -358,7 +353,7 @@ bool testWhileSimple() {
 
 bool testWhileBlock() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "while (x) { let y = 1 }");
+  AstNode* node = compile(name, "while (x) { let y = 1 }");
 
   AstNode* fn = mkFunction(name);
   AstNode* cond = newVarGlobalNode(intern("x"));
@@ -376,7 +371,7 @@ bool testWhileBlock() {
 
 bool testWhileComplexCondition() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "while (1 + 2) 1");
+  AstNode* node = compile(name, "while (1 + 2) 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* op = newVarGlobalNode(intern("+"));
@@ -395,7 +390,7 @@ bool testWhileComplexCondition() {
 
 bool testWhileNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "while (a) while (b) 1");
+  AstNode* node = compile(name, "while (a) while (b) 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* outerCond = newVarGlobalNode(intern("a"));
@@ -412,12 +407,76 @@ bool testWhileNested() {
 }
 
 /* ============================================================
+ * Import Statement Tests
+ * ============================================================ */
+
+bool testImportSimple() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "use module");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  AstNode* importNode = newUseNode(module, NULL);
+  pushFnStmt(fn, importNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testImportWithAlias() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "use module as m");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  AstNode* importNode = newUseNode(module, intern("m"));
+  pushFnStmt(fn, importNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testImportRelative() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "use ../local");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  AstNode* importNode = newUseNode(module, NULL);
+  pushFnStmt(fn, importNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testImportNested() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "use path/to/module");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  AstNode* importNode = newUseNode(module, NULL);
+  pushFnStmt(fn, importNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+/* ============================================================
  * Assignment Tests
  * ============================================================ */
 
 bool testAssignmentGlobal() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = 1");
+  AstNode* node = compile(name, "x = 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* var = newVarGlobalNode(intern("x"));
@@ -434,7 +493,7 @@ bool testAssignmentGlobal() {
 
 bool testAssignmentLocal() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "let x \n x = 1");
+  AstNode* node = compile(name, "let x \n x = 1");
 
   AstNode* fn = mkFunction(name);
   AstNode* let = newLetNode(intern("x"), newLiteralNode(UNDEF_VAL));
@@ -454,7 +513,7 @@ bool testAssignmentLocal() {
 
 bool testAssignmentWithExpression() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = 1 + 2");
+  AstNode* node = compile(name, "x = 1 + 2");
 
   AstNode* fn = mkFunction(name);
   AstNode* var = newVarGlobalNode(intern("x"));
@@ -474,7 +533,7 @@ bool testAssignmentWithExpression() {
 
 bool testAssignmentWithCall() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = f()");
+  AstNode* node = compile(name, "x = f()");
 
   AstNode* fn = mkFunction(name);
   AstNode* var = newVarGlobalNode(intern("x"));
@@ -492,7 +551,7 @@ bool testAssignmentWithCall() {
 
 bool testAssignmentNestedExpression() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = (1 + 2) + 3");
+  AstNode* node = compile(name, "x = (1 + 2) + 3");
 
   AstNode* fn = mkFunction(name);
   AstNode* var = newVarGlobalNode(intern("x"));
@@ -519,7 +578,7 @@ bool testAssignmentNestedExpression() {
 
 bool testAssignmentBooleanValue() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = true");
+  AstNode* node = compile(name, "x = true");
 
   AstNode* fn = mkFunction(name);
   AstNode* var = newVarGlobalNode(intern("x"));
@@ -536,7 +595,7 @@ bool testAssignmentBooleanValue() {
 
 bool testAssignmentInBlock() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "{ x = 1 }");
+  AstNode* node = compile(name, "{ x = 1 }");
 
   AstNode* fn = mkFunction(name);
   AstNode* block = newBlockNode();
@@ -555,7 +614,7 @@ bool testAssignmentInBlock() {
 
 bool testMultipleAssignments() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = 1 \n y = 2");
+  AstNode* node = compile(name, "x = 1 \n y = 2");
 
   AstNode* fn = mkFunction(name);
 
@@ -582,7 +641,7 @@ bool testMultipleAssignments() {
 
 bool testAssignmentReassignment() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "x = 1 \n x = 2");
+  AstNode* node = compile(name, "x = 1 \n x = 2");
 
   AstNode* fn = mkFunction(name);
 
@@ -732,7 +791,7 @@ bool testBytecodeCallNestedCallee() {
 }
 
 bool testBytecodeFunctionEmpty() {
-  AstNode* fun = newFunctionNode(intern("f"));
+  AstNode* fun = newFunctionNode(intern("f"), NULL);
   fun->as.function.signature = newSignatureNode();
   fun->as.function.body = newBlockNode();
 
@@ -749,7 +808,7 @@ bool testBytecodeFunctionEmpty() {
 }
 
 bool testBytecodeFunctionExpr() {
-  AstNode* fun = newFunctionNode(intern("f"));
+  AstNode* fun = newFunctionNode(intern("f"), NULL);
   fun->as.function.signature = newSignatureNode();
   fun->as.function.body = newLiteralNode(NUMBER_VAL(42));
 
@@ -1267,12 +1326,77 @@ bool testBytecodeWhileComplexBody() {
 }
 
 /* ============================================================
+ * Import Bytecode Tests
+ * ============================================================ */
+
+bool testBytecodeImportSimple() {
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  AstNode* importNode = newUseNode(module, NULL);
+  Chunk c;
+  if (!buildChunkForExpr(importNode, &c)) return false;
+
+  // Layout: OP_IMPORT, module_const_idx (2 bytes)
+  // OP_IMPORT (1) + constant index (2) = 3 bytes
+  if (c.count != 3) return false;
+  if (c.code[0] != OP_IMPORT) return false;
+  uint16_t moduleIdx = read_u16(c.code[1], c.code[2]);
+  if (moduleIdx != 0) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("module"))))
+    return false;
+  return true;
+}
+
+bool testBytecodeImportWithAlias() {
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  AstNode* importNode = newUseNode(module, intern("m"));
+  Chunk c;
+  if (!buildChunkForExpr(importNode, &c)) return false;
+
+  // Layout: OP_IMPORT_AS, module_const_idx (2 bytes), alias_const_idx (2 bytes)
+  // OP_IMPORT_AS (1) + module index (2) + alias index (2) = 5 bytes
+  if (c.count != 5) return false;
+  if (c.code[0] != OP_IMPORT_AS) return false;
+  uint16_t moduleIdx = read_u16(c.code[1], c.code[2]);
+  uint16_t aliasIdx = read_u16(c.code[3], c.code[4]);
+  if (moduleIdx != 0) return false;
+  if (aliasIdx != 1) return false;
+
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("module"))))
+    return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(intern("m")))) return false;
+  return true;
+}
+
+bool testBytecodeImportLongPath() {
+  ObjString* longPath =
+      copyString("very/long/path/to/a/module/that/has/many/segments", 48);
+  AstNode* module = newModuleNode(longPath, NULL, NULL);
+  AstNode* importNode = newUseNode(module, NULL);
+  Chunk c;
+  if (!buildChunkForExpr(importNode, &c)) return false;
+
+  // Layout: OP_IMPORT, path_const_idx (2 bytes)
+  // Should still use 2-byte constant index (16-bit)
+  if (c.count != 3) return false;
+  if (c.code[0] != OP_IMPORT) return false;
+  uint16_t pathIdx = read_u16(c.code[1], c.code[2]);
+  if (pathIdx != 0) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(longPath))) return false;
+  return true;
+}
+
+/* ============================================================
  * Sequence Tests
  * ============================================================ */
 
 bool testSequenceEmpty() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "(,)");
+  AstNode* node = compile(name, "(,)");
 
   AstNode* fn = mkFunction(name);
   AstNode* seq = newSequenceNode();
@@ -1287,7 +1411,7 @@ bool testSequenceEmpty() {
 
 bool testSequenceOneElement() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "(1,)");
+  AstNode* node = compile(name, "(1,)");
 
   AstNode* fn = mkFunction(name);
   AstNode* seq = newSequenceNode();
@@ -1303,7 +1427,7 @@ bool testSequenceOneElement() {
 
 bool testSequenceTwoElements() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "(1, 2)");
+  AstNode* node = compile(name, "(1, 2)");
 
   AstNode* fn = mkFunction(name);
   AstNode* seq = newSequenceNode();
@@ -1320,7 +1444,7 @@ bool testSequenceTwoElements() {
 
 bool testSequenceThreeElements() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "(1, 2, 3)");
+  AstNode* node = compile(name, "(1, 2, 3)");
 
   AstNode* fn = mkFunction(name);
   AstNode* seq = newSequenceNode();
@@ -1338,7 +1462,7 @@ bool testSequenceThreeElements() {
 
 bool testSequenceVariables() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "(x, y)");
+  AstNode* node = compile(name, "(x, y)");
 
   AstNode* fn = mkFunction(name);
   AstNode* seq = newSequenceNode();
@@ -1355,7 +1479,7 @@ bool testSequenceVariables() {
 
 bool testSequenceComplexExpression() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "(1 + 2, f(3), x)");
+  AstNode* node = compile(name, "(1 + 2, f(3), x)");
 
   AstNode* fn = mkFunction(name);
   AstNode* seq = newSequenceNode();
@@ -1387,7 +1511,7 @@ bool testSequenceComplexExpression() {
 
 bool testSequenceNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "((1, 2), 3)");
+  AstNode* node = compile(name, "((1, 2), 3)");
 
   AstNode* fn = mkFunction(name);
 
@@ -1412,7 +1536,7 @@ bool testSequenceNested() {
 
 bool testSequenceInCall() {
   Token name = syntheticToken("test");
-  AstNode* node = compileFunctionNode(name, "f((1, 2))");
+  AstNode* node = compile(name, "f((1, 2))");
 
   AstNode* fn = mkFunction(name);
   AstNode* callee = newVarGlobalNode(intern("f"));
@@ -1937,6 +2061,12 @@ int testMain(void) {
   fmt("    ", testWhileBlock(), "While block");
   fmt("    ", testWhileComplexCondition(), "While complex condition");
   fmt("    ", testWhileNested(), "While nested");
+
+  printf("  Import\n");
+  fmt("    ", testImportSimple(), "Import simple");
+  fmt("    ", testImportWithAlias(), "Import with alias");
+  fmt("    ", testImportRelative(), "Import relative");
+  fmt("    ", testImportNested(), "Import nested");
   fmt("    ", testAssignmentGlobal(), "Assignment global");
   fmt("    ", testAssignmentLocal(), "Assignment local");
   fmt("    ", testAssignmentWithExpression(), "Assignment with expression");
@@ -1979,6 +2109,9 @@ int testMain(void) {
   fmt("    ", testBytecodeWhileEmptyBody(), "While empty body");
   fmt("    ", testBytecodeWhileNested(), "While nested");
   fmt("    ", testBytecodeWhileComplexBody(), "While complex body");
+  fmt("    ", testBytecodeImportSimple(), "Import simple");
+  fmt("    ", testBytecodeImportWithAlias(), "Import with alias");
+  fmt("    ", testBytecodeImportLongPath(), "Import long path");
   fmt("    ", testBytecodeAssignmentGlobal(), "Assignment global");
   fmt("    ", testBytecodeAssignmentLocal(), "Assignment local");
   fmt("    ", testBytecodeAssignmentUpvalue(), "Assignment upvalue");

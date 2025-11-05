@@ -163,6 +163,8 @@ char* vmGenerate_wasm(char* path);
 void vmInit_wasm();
 void vmFree_wasm();
 
+AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
+                                   Token path);
 ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
 bool vmImport(ObjModule* module, ObjMap* target);
