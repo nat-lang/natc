@@ -407,6 +407,95 @@ bool testWhileNested() {
 }
 
 /* ============================================================
+ * Throw Statement Tests
+ * ============================================================ */
+
+bool testThrowGlobal() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "throw error");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* throwNode = newThrowNode(errorVar);
+  pushFnStmt(fn, throwNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testThrowCall() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "throw Error(1)");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* errorVar = newVarGlobalNode(intern("Error"));
+  AstNode* call = newCallNode(errorVar);
+  AstNode* message = newLiteralNode(NUMBER_VAL(1));
+  pushAstVec(&call->as.call.args, message);
+  AstNode* throwNode = newThrowNode(call);
+  pushFnStmt(fn, throwNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testThrowInfix() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "throw 1 + 2");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* expr = newCallInfixNode(op, lhs, rhs);
+  AstNode* throwNode = newThrowNode(expr);
+  pushFnStmt(fn, throwNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testThrowInBlock() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "{ throw error }");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* block = newBlockNode();
+  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* throwNode = newThrowNode(errorVar);
+  pushAstVec(&block->as.block.stmts, throwNode);
+  pushFnStmt(fn, block);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testThrowInConditional() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "if (x) throw error");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* throwNode = newThrowNode(errorVar);
+  AstNode* ifNode = newIfNode(cond, throwNode, NULL);
+  pushFnStmt(fn, ifNode);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+/* ============================================================
  * Assignment Tests
  * ============================================================ */
 
@@ -1327,6 +1416,129 @@ bool testBytecodeImportLongPath() {
 }
 
 /* ============================================================
+ * Throw Bytecode Tests
+ * ============================================================ */
+
+bool testBytecodeThrowSimple() {
+  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* throwNode = newThrowNode(errorVar);
+  Chunk c;
+  if (!buildChunkForExpr(throwNode, &c)) return false;
+
+  // Layout: GET_GLOBAL, [error-const-idx], OP_THROW
+  // GET_GLOBAL (1) + constant index (2) + OP_THROW (1) = 4 bytes
+  if (c.count != 4) return false;
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  uint16_t errorIdx = read_u16(c.code[1], c.code[2]);
+  if (errorIdx != 0) return false;
+  if (c.code[3] != OP_THROW) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("error"))))
+    return false;
+  return true;
+}
+
+bool testBytecodeThrowLiteral() {
+  AstNode* literal = newLiteralNode(NUMBER_VAL(42));
+  AstNode* throwNode = newThrowNode(literal);
+  Chunk c;
+  if (!buildChunkForExpr(throwNode, &c)) return false;
+
+  // Layout: CONSTANT, [const-idx], OP_THROW
+  // CONSTANT (1) + constant index (2) + OP_THROW (1) = 4 bytes
+  if (c.count != 4) return false;
+  if (c.code[0] != OP_CONSTANT) return false;
+  uint16_t constIdx = read_u16(c.code[1], c.code[2]);
+  if (constIdx != 0) return false;
+  if (c.code[3] != OP_THROW) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], NUMBER_VAL(42))) return false;
+  return true;
+}
+
+bool testBytecodeThrowInfix() {
+  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* expr = newCallInfixNode(op, lhs, rhs);
+  AstNode* throwNode = newThrowNode(expr);
+  Chunk c;
+  if (!buildChunkForExpr(throwNode, &c)) return false;
+
+  // Layout: CONSTANT op (3) + CONSTANT lhs (3) + CONSTANT rhs (3) + OP_CALL (1)
+  // + argc (1) + OP_THROW (1) = 12 bytes
+  if (c.count != 12) return false;
+  // CONSTANT op
+  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  // CONSTANT lhs
+  if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
+    return false;
+  // CONSTANT rhs
+  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
+    return false;
+  // OP_CALL
+  if (c.code[9] != OP_CALL) return false;
+  // argc
+  if (c.code[10] != 2) return false;
+  // OP_THROW
+  if (c.code[11] != OP_THROW) return false;
+
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("+")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+  return true;
+}
+
+bool testBytecodeThrowInConditional() {
+  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* throwNode = newThrowNode(errorVar);
+  AstNode* ifNode = newIfNode(cond, throwNode, NULL);
+  Chunk c;
+  if (!buildChunkForExpr(ifNode, &c)) return false;
+
+  // Layout: GET_GLOBAL x (3) + JUMP_IF_FALSE (3) + POP (1) + GET_GLOBAL error
+  // (3)
+  // + OP_THROW (1) + JUMP (3) + POP (1) = 15 bytes
+  if (c.count != 15) return false;
+  // GET_GLOBAL x
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  // JUMP_IF_FALSE
+  if (c.code[3] != OP_JUMP_IF_FALSE) return false;
+  // POP
+  if (c.code[6] != OP_POP) return false;
+  // GET_GLOBAL error
+  if (c.code[7] != OP_GET_GLOBAL || read_u16(c.code[8], c.code[9]) != 1)
+    return false;
+  // OP_THROW
+  if (c.code[10] != OP_THROW) return false;
+  // JUMP
+  if (c.code[11] != OP_JUMP) return false;
+  // POP
+  if (c.code[14] != OP_POP) return false;
+
+  // Verify jump offsets are patched correctly
+  uint16_t thenJump = read_u16(c.code[4], c.code[5]);
+  if (thenJump != 8)
+    return false;  // Should jump from after JUMP_IF_FALSE to POP after JUMP
+
+  uint16_t elseJump = read_u16(c.code[12], c.code[13]);
+  if (elseJump != 1)
+    return false;  // Should jump from after JUMP to end (no else code)
+
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("x")))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(intern("error"))))
+    return false;
+  return true;
+}
+
+/* ============================================================
  * Sequence Tests
  * ============================================================ */
 
@@ -1997,6 +2209,11 @@ int testMain(void) {
   fmt("    ", testWhileBlock(), "While block");
   fmt("    ", testWhileComplexCondition(), "While complex condition");
   fmt("    ", testWhileNested(), "While nested");
+  fmt("    ", testThrowGlobal(), "Throw global");
+  fmt("    ", testThrowCall(), "Throw call");
+  fmt("    ", testThrowInfix(), "Throw infix");
+  fmt("    ", testThrowInBlock(), "Throw in block");
+  fmt("    ", testThrowInConditional(), "Throw in conditional");
   fmt("    ", testAssignmentGlobal(), "Assignment global");
   fmt("    ", testAssignmentLocal(), "Assignment local");
   fmt("    ", testAssignmentWithExpression(), "Assignment with expression");
@@ -2042,6 +2259,10 @@ int testMain(void) {
   fmt("    ", testBytecodeImportSimple(), "Import simple");
   fmt("    ", testBytecodeImportWithAlias(), "Import with alias");
   fmt("    ", testBytecodeImportLongPath(), "Import long path");
+  fmt("    ", testBytecodeThrowSimple(), "Throw simple");
+  fmt("    ", testBytecodeThrowLiteral(), "Throw literal");
+  fmt("    ", testBytecodeThrowInfix(), "Throw infix");
+  fmt("    ", testBytecodeThrowInConditional(), "Throw in conditional");
   fmt("    ", testBytecodeAssignmentGlobal(), "Assignment global");
   fmt("    ", testBytecodeAssignmentLocal(), "Assignment local");
   fmt("    ", testBytecodeAssignmentUpvalue(), "Assignment upvalue");

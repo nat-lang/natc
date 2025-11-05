@@ -227,6 +227,12 @@ AstNode* newReturnNode(AstNode* value) {
   return n;
 }
 
+AstNode* newThrowNode(AstNode* expr) {
+  AstNode* n = allocNode(AST_THROW);
+  n->as.throwStmt.expr = expr;
+  return n;
+}
+
 // api.
 // ============================================================
 
@@ -336,6 +342,11 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Return\n", depth);
       printNodeAt(node->as.xReturn.value, depth + 1);
       break;
+    case AST_THROW: {
+      printStrAt("Throw\n", depth);
+      printNodeAt(node->as.throwStmt.expr, depth + 1);
+      break;
+    }
     case AST_SEQUENCE:
       printStrAt("Sequence\n", depth);
       printNodeVecAt(&node->as.sequence.values, depth + 1);
@@ -427,6 +438,8 @@ bool nodesEqual(AstNode* a, AstNode* b) {
 
     case AST_RETURN:
       return nodesEqual(a->as.xReturn.value, b->as.xReturn.value);
+    case AST_THROW:
+      return nodesEqual(a->as.throwStmt.expr, b->as.throwStmt.expr);
     case AST_SEQUENCE:
       return a->as.sequence.values.count == b->as.sequence.values.count &&
              astVecsEqual(&a->as.sequence.values, &b->as.sequence.values);
@@ -668,6 +681,11 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, OP_RETURN);
       break;
     }
+    case AST_THROW: {
+      if (!toChunk(node->as.throwStmt.expr, chunk)) return false;
+      emitByte(chunk, node, OP_THROW);
+      break;
+    }
     case AST_SEQUENCE: {
       emitByte(chunk, node, OP_GET_GLOBAL);
       uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sSeq));
@@ -800,6 +818,9 @@ void markAstNode(AstNode* n) {
     case AST_RETURN:
       markAstNode(n->as.xReturn.value);
       break;
+    case AST_THROW:
+      markAstNode(n->as.throwStmt.expr);
+      break;
     case AST_SEQUENCE:
       for (int i = 0; i < n->as.sequence.values.count; i++)
         markAstNode((AstNode*)n->as.sequence.values.items[i]);
@@ -898,6 +919,9 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_PARAM:
       freeAstNode(n->as.param.annotation);
+      break;
+    case AST_THROW:
+      freeAstNode(n->as.throwStmt.expr);
       break;
     case AST_SEQUENCE:
       freeAstVec(&n->as.sequence.values);

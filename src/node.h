@@ -21,6 +21,7 @@ typedef enum {
   AST_RETURN,
   AST_SEQUENCE,
   AST_SIGNATURE,
+  AST_THROW,
   AST_UNKNOWN,
   AST_VAR_GLOBAL,
   AST_VAR_LOCAL,
@@ -121,6 +122,10 @@ struct AstNode {
     } xReturn;
 
     struct {
+      AstNode* expr;
+    } throwStmt;
+
+    struct {
       ObjString* name;
     } global;
 
@@ -169,6 +174,7 @@ AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
 AstNode* newParamNode(ObjString* name, AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
+AstNode* newThrowNode(AstNode* expr);
 AstNode* newSignatureNode();
 AstNode* newUnknownNode();
 AstNode* newUseNode(AstNode* module, ObjString* alias);
