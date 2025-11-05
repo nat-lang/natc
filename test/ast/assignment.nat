@@ -1,0 +1,14 @@
+let x = 1
+x = 2
+__print__(x)
+x = 1 + 2
+__print__(x)
+
+// upvalue assignment.
+let f = () => {
+  x = 1;
+};
+
+f()
+
+__print__(x)

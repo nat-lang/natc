@@ -1,0 +1,7 @@
+
+// native function calls.
+
+1 + 1 
+1 + 2 - 3 
+
+__print__(1 + 1) 
