@@ -654,6 +654,11 @@ static AstNode* importStatement(NodeCompiler* cmp) {
   return newUseNode(module, alias);
 }
 
+static AstNode* throwStatement(NodeCompiler* cmp) {
+  AstNode* expr = expression(cmp);
+  return newThrowNode(expr);
+}
+
 static AstNode* statement(NodeCompiler* cmp) {
   AstNode* node;
   if (match(cmp, TOKEN_IF)) {
@@ -662,6 +667,8 @@ static AstNode* statement(NodeCompiler* cmp) {
     node = whileStatement(cmp);
   } else if (match(cmp, TOKEN_USE)) {
     node = importStatement(cmp);
+  } else if (match(cmp, TOKEN_THROW)) {
+    node = throwStatement(cmp);
   } else if (match(cmp, TOKEN_LET)) {
     node = letDeclaration(cmp);
   } else if (match(cmp, TOKEN_LEFT_BRACE)) {
@@ -684,7 +691,6 @@ static void statements(NodeCompiler* cmp, AstVec* target) {
 void compileModuleImportBody(NodeCompiler* cmp, AstNode* module) {
   Scanner sc = initScanner(module->as.module.source->chars);
   initParser(sc);
-
   statements(cmp, &module->as.module.stmts);
 }
 
