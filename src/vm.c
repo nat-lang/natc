@@ -1378,6 +1378,18 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_THROW: {
         Value value = vmPop();
 
+        if (IS_MAP(value)) {
+          ObjMap* map = AS_MAP(value);
+          Value msg;
+          if (!mapGet(map, INTERN("message"), &msg) || !IS_STRING(msg)) {
+            vmRuntimeError("Error must define a 'message' string.");
+            return INTERPRET_RUNTIME_ERROR;
+          }
+
+          vmRuntimeError("%s", AS_STRING(msg)->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
         if (!IS_INSTANCE(value)) {
           vmRuntimeError("Can only throw instance of 'Error'.");
           return INTERPRET_RUNTIME_ERROR;
