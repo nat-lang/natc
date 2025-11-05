@@ -2083,7 +2083,7 @@ static void declarations(Compiler* cmp) {
 
 ObjFunction* compileModule(Compiler* enclosing, const char* source, Token path,
                            ObjModule* module) {
-  Scanner sc = initScanner(source);
+  Scanner sc = initScanner(module->source->chars);
   initParser(sc);
 
   Compiler cmp;

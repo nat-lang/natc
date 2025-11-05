@@ -1623,16 +1623,14 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
-ObjClosure* vmCompileAST(Token path, char* source, ObjModule* module) {
-  AstNode* node = compileFunctionNode(path, source);
+ObjClosure* vmCompileAST(char* source, AstNode* module) {
+  AstNode* node =
+      compileFunctionNode(module->as.module.baseName, source, module);
   printf("node: ");
   printNode(node);
   printf("\n");
 
   ObjFunction* fn = toFunction(node);
-
-  fn->name = copyString(path.start, path.length);
-  fn->module = module;
 
   vmPush(OBJ_VAL(fn));
   ObjClosure* closure = newClosure(fn);
@@ -1642,22 +1640,14 @@ ObjClosure* vmCompileAST(Token path, char* source, ObjModule* module) {
 }
 
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
-#ifdef NEW_AST
-  return vmCompileAST(path, source, module);
-#else
-  ObjFunction* function = compileModule(vm.compiler, source, path, module);
-
-  if (function == NULL) return NULL;
-
-  vmPush(OBJ_VAL(function));
-  ObjClosure* closure = newClosure(function);
-  vmPop();  // function.
-
+  AstNode* moduleNode =
+      newModuleNode(module->dirName, module->baseName, module->source);
+  ObjClosure* closure = vmCompileAST(source, moduleNode);
+  closure->function->module = module;
   return closure;
-#endif
 }
 
-ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
+bool vmPathBits(char* enclosingDir, Token path) {
   // path can be of the form a/b/c, in which case we need to
   // separate a/b from c.
   ObjString* objPath = copyString(path.start, path.length);
@@ -1665,7 +1655,7 @@ ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
 
   char* absPath = pathToUri(enclosingDir, objPath->chars);
   char *c1 = malloc(strlen(absPath) + 1), *c2 = malloc(strlen(absPath) + 1);
-  if (c1 == 0 || c2 == 0) return NULL;
+  if (c1 == 0 || c2 == 0) return false;
   strcpy(c1, absPath);
   strcpy(c2, absPath);
   char* dir = dirname(c1);
@@ -1682,8 +1672,40 @@ ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
 
   free(c1);
   free(c2);
+  return true;
+}
 
-  char* source = readFile(absPath);
+AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
+                                   Token path) {
+  if (!vmPathBits(enclosingDir, path)) return NULL;
+
+  ObjString* objDirName = AS_STRING(vmPeek(2));
+  ObjString* objBaseName = AS_STRING(vmPeek(1));
+  ObjString* objAbsPath = AS_STRING(vmPeek(0));
+  char* source = readFile(objAbsPath->chars);
+  ObjString* objSource = intern(source);
+  vmPush(OBJ_VAL(objSource));
+  free(source);
+
+  AstNode* module = newModuleNode(objDirName, objBaseName, objSource);
+  compileModuleImportBody(cmp, module);
+
+  vmPop();  // objSource.
+  vmPop();  // objAbsPath.
+  vmPop();  // objBaseName.
+  vmPop();  // objDirName.
+
+  return module;
+}
+
+ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
+  if (!vmPathBits(enclosingDir, path)) return NULL;
+
+  ObjString* objDirName = AS_STRING(vmPeek(2));
+  ObjString* objBaseName = AS_STRING(vmPeek(1));
+  ObjString* objAbsPath = AS_STRING(vmPeek(0));
+
+  char* source = readFile(objAbsPath->chars);
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
   free(source);

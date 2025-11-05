@@ -13,6 +13,7 @@ typedef enum {
   AST_EXPR_STMT,
   AST_FUNCTION,
   AST_IF,
+  AST_IMPORT,
   AST_LET,
   AST_LITERAL,
   AST_MODULE,
@@ -68,6 +69,7 @@ struct AstNode {
       ObjString* name;
       AstNode* signature;
       AstNode* body;
+      AstNode* module;
 
       bool variadic;
       bool patterned;
@@ -89,6 +91,11 @@ struct AstNode {
     } exprStmt;
 
     struct {
+      AstNode* module;
+      ObjString* alias;  // can be NULL
+    } use;
+
+    struct {
       ObjString* name;
       AstNode* value;
     } let;
@@ -98,8 +105,10 @@ struct AstNode {
     } literal;
 
     struct {
-      ObjString* name;
-      AstNode* fn;
+      ObjString* dirName;
+      ObjString* baseName;
+      ObjString* source;
+      AstVec stmts;
     } module;
 
     struct {
@@ -151,16 +160,18 @@ AstNode* newBlockNode();
 AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
 AstNode* newExprStmtNode(AstNode* expr);
-AstNode* newFunctionNode(ObjString* name);
+AstNode* newFunctionNode(ObjString* name, AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
 AstNode* newLetNode(ObjString* name, AstNode* value);
 AstNode* newLiteralNode(Value v);
-AstNode* newModuleNode(ObjString* name, AstNode* fn);
+AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
+                       ObjString* source);
 AstNode* newParamNode(ObjString* name, AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
 AstNode* newSignatureNode();
 AstNode* newUnknownNode();
+AstNode* newUseNode(AstNode* module, ObjString* alias);
 AstNode* newVarGlobalNode(ObjString* name);
 AstNode* newVarLocalNode(uint8_t index, ObjString* name);
 AstNode* newVarUpvalueNode(uint8_t index, ObjString* name);

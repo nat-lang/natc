@@ -103,11 +103,14 @@ AstNode* newExprStmtNode(AstNode* expr) {
   return n;
 }
 
-AstNode* newFunctionNode(ObjString* name) {
+AstNode* newFunctionNode(ObjString* name, AstNode* module) {
   AstNode* n = allocNode(AST_FUNCTION);
+  n->as.function.name = NULL;
   n->as.function.name = name;
   n->as.function.signature = NULL;
   n->as.function.body = NULL;
+  n->as.function.module = NULL;
+  n->as.function.module = module;
   n->as.function.localCount = 0;
   n->as.function.upvalueCount = 0;
 
@@ -118,6 +121,7 @@ AstNode* newFunctionNode(ObjString* name) {
     n->as.function.upvalues[i].index = 0;
     n->as.function.upvalues[i].isLocal = false;
   }
+  // the first local slot is always reserved.
   Local* local = &n->as.function.locals[n->as.function.localCount++];
   n->as.function.locals[n->as.function.localCount].depth = 0;
   n->as.function.locals[n->as.function.localCount].isCaptured = false;
@@ -132,6 +136,13 @@ AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch) {
   n->as.ifStmt.cond = cond;
   n->as.ifStmt.then = then;
   n->as.ifStmt.elseBranch = elseBranch;
+  return n;
+}
+
+AstNode* newUseNode(AstNode* module, ObjString* alias) {
+  AstNode* n = allocNode(AST_IMPORT);
+  n->as.use.module = module;
+  n->as.use.alias = alias;
   return n;
 }
 
@@ -160,10 +171,13 @@ AstNode* newLiteralNode(Value v) {
   return n;
 }
 
-AstNode* newModuleNode(ObjString* name, AstNode* fn) {
+AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
+                       ObjString* source) {
   AstNode* n = allocNode(AST_MODULE);
-  n->as.module.name = name;
-  n->as.module.fn = fn;
+  n->as.module.dirName = dirName;
+  n->as.module.baseName = baseName;
+  n->as.module.source = source;
+  initAstVec(&n->as.module.stmts);
   return n;
 }
 
@@ -236,68 +250,81 @@ void printNodeAt(AstNode* node, int depth) {
   }
 
   switch (node->type) {
-    case AST_ASSIGNMENT:
+    case AST_ASSIGNMENT: {
       printStrAt("Assignment\n", depth);
       printNodeAt(node->as.assignment.lhs, depth + 1);
       printNodeAt(node->as.assignment.rhs, depth + 1);
       break;
+    }
     case AST_BLOCK:
       printStrAt("Block\n", depth);
       printNodeVecAt(&node->as.block.stmts, depth + 1);
       break;
 
-    case AST_CALL:
+    case AST_CALL: {
       printStrAt("Call\n", depth);
       printNodeAt(node->as.call.callee, depth + 1);
       printNodeVecAt(&node->as.call.args, depth + 1);
       break;
-
-    case AST_CALL_INFIX:
+    }
+    case AST_CALL_INFIX: {
       printStrAt("CallInfix\n", depth);
       printNodeAt(node->as.callInfix.callee, depth + 1);
       printNodeAt(node->as.callInfix.lhs, depth + 1);
       printNodeAt(node->as.callInfix.rhs, depth + 1);
       break;
-
+    }
     case AST_EXPR_STMT:
       printStrAt("ExprStmt\n", depth);
       printNodeAt(node->as.exprStmt.expr, depth + 1);
       break;
 
-    case AST_FUNCTION:
-      printStrAt("Function\n", depth);
+    case AST_FUNCTION: {
+      printStrAt("Function", depth);
+      printf(" (%s)\n", node->as.function.name->chars);
       printNodeAt(node->as.function.signature, depth + 1);
       printNodeAt(node->as.function.body, depth + 1);
       break;
-
-    case AST_IF:
+    }
+    case AST_IF: {
       printStrAt("If\n", depth);
       printNodeAt(node->as.ifStmt.cond, depth + 1);
       printNodeAt(node->as.ifStmt.then, depth + 1);
       printNodeAt(node->as.ifStmt.elseBranch, depth + 1);
       break;
-
-    case AST_WHILE:
+    }
+    case AST_IMPORT: {
+      printStrAt("Import ", depth);
+      printf("\"%s/%s\"", node->as.use.module->as.module.dirName->chars,
+             node->as.use.module->as.module.baseName->chars);
+      if (node->as.use.alias != NULL) {
+        printf(" as \"%s\"", node->as.use.alias->chars);
+      }
+      printf("\n");
+      printNodeAt(node->as.use.module, depth + 1);
+      break;
+    }
+    case AST_WHILE: {
       printStrAt("While\n", depth);
       printNodeAt(node->as.whileStmt.cond, depth + 1);
       printNodeAt(node->as.whileStmt.body, depth + 1);
       break;
-
-    case AST_LET:
+    }
+    case AST_LET: {
       printStrAt("Let ", depth);
       printf("\"%s\"\n", node->as.let.name->chars);
       printNodeAt(node->as.let.value, depth + 1);
       break;
-
-    case AST_LITERAL:
+    }
+    case AST_LITERAL: {
       printStrAt("Literal ", depth);
       printValue(node->as.literal.value);
       printf("\n");
       break;
-
+    }
     case AST_MODULE:
       printStrAt("Module\n", depth);
-      printNodeAt(node->as.module.fn, depth + 1);
+      printNodeVecAt(&node->as.module.stmts, depth + 1);
       break;
 
     case AST_PARAM:
@@ -375,6 +402,10 @@ bool nodesEqual(AstNode* a, AstNode* b) {
              nodesEqual(a->as.ifStmt.then, b->as.ifStmt.then) &&
              nodesEqual(a->as.ifStmt.elseBranch, b->as.ifStmt.elseBranch);
 
+    case AST_IMPORT:
+      return nodesEqual(a->as.use.module, b->as.use.module) &&
+             a->as.use.alias == b->as.use.alias;
+
     case AST_WHILE:
       return nodesEqual(a->as.whileStmt.cond, b->as.whileStmt.cond) &&
              nodesEqual(a->as.whileStmt.body, b->as.whileStmt.body);
@@ -387,8 +418,9 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return valuesEqual(a->as.literal.value, b->as.literal.value);
 
     case AST_MODULE:
-      return a->as.module.name == b->as.module.name &&
-             nodesEqual(a->as.module.fn, b->as.module.fn);
+      return a->as.module.dirName == b->as.module.dirName &&
+             a->as.module.baseName == b->as.module.baseName &&
+             astVecsEqual(&a->as.module.stmts, &b->as.module.stmts);
 
     case AST_PARAM:
       return a->as.param.name == b->as.param.name;
@@ -485,6 +517,13 @@ static void emitLoop(Chunk* chunk, AstNode* node, int loopStart) {
 
 ObjFunction* toFunction(AstNode* node);
 
+bool toChunkVec(AstVec* nodes, Chunk* chunk) {
+  for (int i = 0; i < nodes->count; i++) {
+    if (!toChunk(nodes->items[i], chunk)) return false;
+  }
+  return true;
+}
+
 bool toChunk(AstNode* node, Chunk* chunk) {
   switch (node->type) {
     case AST_ASSIGNMENT: {
@@ -518,8 +557,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
     }
     case AST_BLOCK: {
       AstVec stmts = node->as.block.stmts;
-      for (int i = 0; i < stmts.count; i++)
-        if (!toChunk(stmts.items[i], chunk)) return false;
+      if (!toChunkVec(&stmts, chunk)) return false;
       break;
     }
     case AST_CALL: {
@@ -529,9 +567,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       // 2. Emit code for each argument, in order, leaving them on the stack
       AstVec* args = &node->as.call.args;
-      for (int i = 0; i < args->count; i++) {
-        if (!toChunk(args->items[i], chunk)) return false;
-      }
+      if (!toChunkVec(args, chunk)) return false;
 
       // 3. Emit the OP_CALL instruction with argument count
       emitByte(chunk, node, OP_CALL);
@@ -608,6 +644,10 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, OP_POP);
       break;
     }
+    case AST_IMPORT: {
+      if (!toChunk(node->as.use.module, chunk)) return false;
+      break;
+    }
     case AST_LET:
       if (!toChunk(node->as.let.value, chunk)) return false;
       break;
@@ -619,7 +659,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_MODULE:
-      if (!toChunk(node->as.module.fn, chunk)) return false;
+      if (!toChunkVec(&node->as.module.stmts, chunk)) return false;
       break;
     case AST_PARAM:
       break;
@@ -632,16 +672,14 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, OP_GET_GLOBAL);
       uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sSeq));
       emitConstant(chunk, node, constant);
-      for (int i = 0; i < node->as.sequence.values.count; i++) {
-        if (!toChunk(node->as.sequence.values.items[i], chunk)) return false;
-      }
+      if (!toChunkVec(&node->as.sequence.values, chunk)) return false;
+
       emitByte(chunk, node, OP_CALL);
       emitByte(chunk, node, (uint8_t)node->as.sequence.values.count);
       break;
     }
     case AST_SIGNATURE: {
-      for (int i = 0; i < node->as.signature.params.count; i++)
-        if (!toChunk(node->as.signature.params.items[i], chunk)) return false;
+      if (!toChunkVec(&node->as.signature.params, chunk)) return false;
       break;
     }
     case AST_VAR_GLOBAL: {
@@ -716,14 +754,23 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.exprStmt.expr);
       break;
 
-    case AST_FUNCTION:
+    case AST_FUNCTION: {
+      markAstNode(n->as.function.module);
       markAstNode(n->as.function.signature);
       markAstNode(n->as.function.body);
       break;
-    case AST_IF:
+    }
+    case AST_IF: {
       markAstNode(n->as.ifStmt.cond);
       markAstNode(n->as.ifStmt.then);
       markAstNode(n->as.ifStmt.elseBranch);
+      break;
+    }
+    case AST_IMPORT:
+      markAstNode(n->as.use.module);
+      if (n->as.use.alias != NULL) {
+        markObject((Obj*)n->as.use.alias);
+      }
       break;
     case AST_WHILE:
       markAstNode(n->as.whileStmt.cond);
@@ -737,10 +784,15 @@ void markAstNode(AstNode* n) {
       /* Value may reference Obj* (e.g., strings); mark via markValue */
       markValue(n->as.literal.value);
       break;
-    case AST_MODULE:
-      markObject((Obj*)n->as.module.name);
-      markAstNode(n->as.module.fn);
+    case AST_MODULE: {
+      markObject((Obj*)n->as.module.dirName);
+      markObject((Obj*)n->as.module.baseName);
+      markObject((Obj*)n->as.module.source);
+      for (int i = 0; i < n->as.module.stmts.count; i++) {
+        markAstNode((AstNode*)n->as.module.stmts.items[i]);
+      }
       break;
+    }
     case AST_PARAM:
       markObject((Obj*)n->as.param.name);
       markAstNode(n->as.param.annotation);
@@ -789,10 +841,14 @@ void freeAstNode(AstNode* n) {
       /* ObjString* name is GC-managed */
       break;
 
+    case AST_IMPORT:
+      /* ObjString* modulePath and alias are GC-managed; nothing to free */
+      break;
+
     case AST_CALL:
       freeAstNode(n->as.call.callee);
       for (int i = 0; i < n->as.call.args.count; i++) {
-        freeAstNode((AstNode*)n->as.call.args.items[i]);
+        freeAstNode(n->as.call.args.items[i]);
       }
       freeAstVec(&n->as.call.args);
       break;
@@ -836,7 +892,9 @@ void freeAstNode(AstNode* n) {
       freeAstNode(n->as.let.value);
       break;
     case AST_MODULE:
-      freeAstNode(n->as.module.fn);
+      for (int i = 0; i < n->as.module.stmts.count; i++) {
+        freeAstNode((AstNode*)n->as.module.stmts.items[i]);
+      }
       break;
     case AST_PARAM:
       freeAstNode(n->as.param.annotation);
