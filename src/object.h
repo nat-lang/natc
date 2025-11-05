@@ -217,6 +217,7 @@ ObjModule* newModule(ObjString* dirName, ObjString* baseName, ObjString* source,
                      ModuleType type);
 ObjNative* newNative(int arity, bool variadic, ObjString* name,
                      NativeFn function);
+ObjMap* newMap();
 ObjSequence* newSequence();
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);

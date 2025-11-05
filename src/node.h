@@ -17,6 +17,8 @@ typedef enum {
   AST_LET,
   AST_LITERAL,
   AST_MODULE,
+  AST_OBJECT,
+  AST_OBJECT_ENTRY,
   AST_PARAM,
   AST_RETURN,
   AST_SEQUENCE,
@@ -143,6 +145,13 @@ struct AstNode {
       AstVec values;
     } sequence;
     struct {
+      AstVec entries;
+    } object;
+    struct {
+      AstNode* key;
+      AstNode* value;
+    } objectEntry;
+    struct {
       AstVec params;
       int varargs;
     } signature;
@@ -171,6 +180,8 @@ AstNode* newLetNode(ObjString* name, AstNode* value);
 AstNode* newLiteralNode(Value v);
 AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
                        ObjString* source);
+AstNode* newObjectNode();
+AstNode* newObjectEntryNode(AstNode* key, AstNode* value);
 AstNode* newParamNode(ObjString* name, AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();

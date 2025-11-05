@@ -134,6 +134,12 @@ ObjNative* newNative(int arity, bool variadic, ObjString* name,
   return native;
 }
 
+ObjMap* newMap() {
+  ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
+  initMap(map);
+  return map;
+}
+
 ObjSequence* newSequence() {
   ObjSequence* sequence = ALLOCATE_OBJ(ObjSequence, OBJ_SEQUENCE);
   initValueArray(&sequence->values);

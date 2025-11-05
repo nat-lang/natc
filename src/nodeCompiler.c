@@ -478,6 +478,45 @@ static bool peekFunction(NodeCompiler* cmp) {
   return true;
 }
 
+static AstNode* objectLiteral(NodeCompiler* cmp, bool canAssign) {
+  AstNode* obj = newObjectNode();
+
+  if (check(TOKEN_RIGHT_BRACE)) {
+    advance(cmp);
+    return obj;
+  }
+
+  do {
+    AstNode* key;
+    if (check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) {
+      advance(cmp);
+      ObjString* keyName = tokenString(parser.previous);
+      key = newLiteralNode(OBJ_VAL(keyName));
+    } else if (match(cmp, TOKEN_STRING)) {
+      key = string(cmp, false);
+    } else {
+      errorAtCurrent(cmp,
+                     "Expect identifier or string literal for object key.");
+      return obj;
+    }
+
+    consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
+
+    AstNode* value = expression(cmp);
+    AstNode* entry = newObjectEntryNode(key, value);
+    pushAstVec(&obj->as.object.entries, entry);
+
+    if (check(TOKEN_RIGHT_BRACE)) break;
+    if (!match(cmp, TOKEN_COMMA)) {
+      errorAtCurrent(cmp, "Expect ',' or '}' after object value.");
+      break;
+    }
+  } while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF));
+
+  consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after object literal.");
+  return obj;
+}
+
 static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
   // empty sequence.
   if (match(cmp, TOKEN_COMMA)) {
@@ -515,6 +554,8 @@ static ParseRule rules[] = {
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {objectLiteral, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_PAREN_LEFT] = {parentheses, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},

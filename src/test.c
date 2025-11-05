@@ -1795,6 +1795,371 @@ bool testSequenceInCall() {
   return assertNodesEqual(node, fn);
 }
 
+/* ============================================================
+ * Object Tests
+ * ============================================================ */
+
+bool testObjectEmpty() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* obj = newObjectNode();
+  AstNode* exprStmt = newExprStmtNode(obj);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testObjectOneProperty() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({x: 1})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* obj = newObjectNode();
+  ObjString* keyX = intern("x");
+  AstNode* entry = newObjectEntryNode(newLiteralNode(OBJ_VAL(keyX)),
+                                      newLiteralNode(NUMBER_VAL(1)));
+  pushAstVec(&obj->as.object.entries, entry);
+  AstNode* exprStmt = newExprStmtNode(obj);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testObjectMultipleProperties() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({x: 1, y: 2, z: 3})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* obj = newObjectNode();
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("x"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("y"))),
+                                newLiteralNode(NUMBER_VAL(2))));
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("z"))),
+                                newLiteralNode(NUMBER_VAL(3))));
+  AstNode* exprStmt = newExprStmtNode(obj);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testObjectStringKeys() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({\"key\": value})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* obj = newObjectNode();
+  ObjString* keyStr = copyString("key", 3);
+  AstNode* entry = newObjectEntryNode(newLiteralNode(OBJ_VAL(keyStr)),
+                                      newVarGlobalNode(intern("value")));
+  pushAstVec(&obj->as.object.entries, entry);
+  AstNode* exprStmt = newExprStmtNode(obj);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testObjectComplexValues() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({x: 1 + 2, y: f()})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* obj = newObjectNode();
+
+  AstNode* plusOp = newVarGlobalNode(intern("+"));
+  AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
+  AstNode* infix = newCallInfixNode(plusOp, lhs, rhs);
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("x"))), infix));
+
+  AstNode* f = newVarGlobalNode(intern("f"));
+  AstNode* call = newCallNode(f);
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("y"))), call));
+
+  AstNode* exprStmt = newExprStmtNode(obj);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testObjectNested() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({outer: {inner: 1}})");
+
+  AstNode* fn = mkFunction(name);
+
+  AstNode* innerObj = newObjectNode();
+  pushAstVec(&innerObj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("inner"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+
+  AstNode* outerObj = newObjectNode();
+  pushAstVec(
+      &outerObj->as.object.entries,
+      newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("outer"))), innerObj));
+
+  AstNode* exprStmt = newExprStmtNode(outerObj);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testObjectInExpression() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "f({x: 1})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* call = newCallNode(callee);
+
+  AstNode* obj = newObjectNode();
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("x"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+  pushAstVec(&call->as.call.args, obj);
+
+  AstNode* exprStmt = newExprStmtNode(call);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testObjectTrailingComma() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({x: 1,})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* obj = newObjectNode();
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("x"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+  AstNode* exprStmt = newExprStmtNode(obj);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+/* Bytecode tests for Object */
+
+bool testBytecodeObjectEmpty() {
+  AstNode* obj = newObjectNode();
+  Chunk c;
+  if (!buildChunkForExpr(obj, &c)) return false;
+
+  // OP_GET_GLOBAL (3) + OP_CALL (2) = 5 bytes
+  if (c.count != 5) return false;
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  if (c.code[3] != OP_CALL) return false;
+  if (c.code[4] != 0) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("obj")))) return false;
+
+  return true;
+}
+
+bool testBytecodeObjectOneProperty() {
+  AstNode* obj = newObjectNode();
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("key"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+  Chunk c;
+  if (!buildChunkForExpr(obj, &c)) return false;
+
+  // OP_GET_GLOBAL(3) + key bytecode + value bytecode + OP_CALL(2) =
+  // OP_GET_GLOBAL(3) + OP_CONSTANT key(3) + OP_CONSTANT 1(3) + OP_CALL(2) = 11
+  // bytes
+  if (c.count != 11) return false;
+
+  // Check OP_GET_GLOBAL for obj
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+
+  // Check OP_CONSTANT for key
+  if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
+    return false;
+
+  // Check OP_CONSTANT for value
+  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
+    return false;
+
+  // Check OP_CALL with 2 args (key, value)
+  if (c.code[9] != OP_CALL || c.code[10] != 2) return false;
+
+  // Constants: obj, key, 1
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("obj")))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(intern("key")))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(1))) return false;
+
+  return true;
+}
+
+bool testBytecodeObjectMultipleProperties() {
+  AstNode* obj = newObjectNode();
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("x"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("y"))),
+                                newLiteralNode(NUMBER_VAL(2))));
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("z"))),
+                                newLiteralNode(NUMBER_VAL(3))));
+  Chunk c;
+  if (!buildChunkForExpr(obj, &c)) return false;
+
+  // OP_GET_GLOBAL(3) + 3 pairs * (OP_CONSTANT key(3) + OP_CONSTANT value(3)) +
+  // OP_CALL(2) = 3 + 3*6 + 2 = 23 bytes
+  if (c.count != 23) return false;
+
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (c.code[21] != OP_CALL || c.code[22] != 6)
+    return false;  // 3 pairs * 2 = 6 args
+
+  if (c.constants.count != 7) return false;  // obj + 3 keys + 3 values
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("obj")))) return false;
+
+  return true;
+}
+
+bool testBytecodeObjectNested() {
+  AstNode* innerObj = newObjectNode();
+  pushAstVec(&innerObj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("inner"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+
+  AstNode* outerObj = newObjectNode();
+  pushAstVec(
+      &outerObj->as.object.entries,
+      newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("outer"))), innerObj));
+
+  Chunk c;
+  if (!buildChunkForExpr(outerObj, &c)) return false;
+
+  // Outer: OP_GET_GLOBAL(obj, 3) + inner full bytecode + OP_CONSTANT(outer, 3)
+  // + OP_CALL(2, 2) Inner: OP_GET_GLOBAL(obj, 3) + OP_CONSTANT(inner, 3) +
+  // OP_CONSTANT(1, 3) + OP_CALL(2, 2) = 3 + 11 + 3 + 2 = 19 bytes
+  if (c.count < 15) return false;
+
+  // Check outer OP_GET_GLOBAL for obj
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+
+  // Verify constants contain obj, inner, 1, outer
+  bool hasObj = false;
+  bool hasInner = false;
+  bool has1 = false;
+  bool hasOuter = false;
+  for (int i = 0; i < c.constants.count; i++) {
+    if (valuesEqual(c.constants.values[i], OBJ_VAL(intern("obj"))))
+      hasObj = true;
+    if (valuesEqual(c.constants.values[i], OBJ_VAL(intern("inner"))))
+      hasInner = true;
+    if (valuesEqual(c.constants.values[i], NUMBER_VAL(1))) has1 = true;
+    if (valuesEqual(c.constants.values[i], OBJ_VAL(intern("outer"))))
+      hasOuter = true;
+  }
+
+  if (!hasObj || !hasInner || !has1 || !hasOuter) return false;
+
+  return true;
+}
+
+bool testBytecodeObjectComplexKeys() {
+  AstNode* obj = newObjectNode();
+  ObjString* keyStr = copyString("string-key", 10);
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(keyStr)),
+                                newLiteralNode(NUMBER_VAL(42))));
+  Chunk c;
+  if (!buildChunkForExpr(obj, &c)) return false;
+
+  // OP_GET_GLOBAL(3) + OP_CONSTANT(string-key, 3) + OP_CONSTANT(42, 3) +
+  // OP_CALL(2, 2)
+  if (c.count != 11) return false;
+
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (c.code[9] != OP_CALL || c.code[10] != 2) return false;
+
+  // Verify string key is in constants
+  bool hasStringKey = false;
+  for (int i = 0; i < c.constants.count; i++) {
+    if (IS_STRING(c.constants.values[i]) &&
+        strcmp(AS_STRING(c.constants.values[i])->chars, "string-key") == 0) {
+      hasStringKey = true;
+      break;
+    }
+  }
+  if (!hasStringKey) return false;
+
+  return true;
+}
+
+bool testBytecodeObjectInCall() {
+  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* call = newCallNode(callee);
+
+  AstNode* obj = newObjectNode();
+  pushAstVec(&obj->as.object.entries,
+             newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("x"))),
+                                newLiteralNode(NUMBER_VAL(1))));
+  pushAstVec(&call->as.call.args, obj);
+
+  Chunk c;
+  if (!buildChunkForExpr(call, &c)) return false;
+
+  // OP_GET_GLOBAL(f, 3) + object full (11) + OP_CALL(1, 2) = 16 bytes
+  if (c.count != 16) return false;
+
+  // Check OP_GET_GLOBAL for f
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+
+  // Check OP_GET_GLOBAL for inner obj
+  if (c.code[3] != OP_GET_GLOBAL) return false;
+
+  // Check last OP_CALL with 1 arg
+  if (c.code[14] != OP_CALL || c.code[15] != 1) return false;
+
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("f")))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(intern("obj")))) return false;
+
+  return true;
+}
+
 /* Bytecode tests for Sequence */
 
 bool testBytecodeSequenceEmpty() {
@@ -2332,6 +2697,14 @@ int testMain(void) {
   fmt("    ", testSequenceComplexExpression(), "Sequence complex expression");
   fmt("    ", testSequenceNested(), "Sequence nested");
   fmt("    ", testSequenceInCall(), "Sequence in call");
+  fmt("    ", testObjectEmpty(), "Object empty");
+  fmt("    ", testObjectOneProperty(), "Object one property");
+  fmt("    ", testObjectMultipleProperties(), "Object multiple properties");
+  fmt("    ", testObjectStringKeys(), "Object string keys");
+  fmt("    ", testObjectComplexValues(), "Object complex values");
+  fmt("    ", testObjectNested(), "Object nested");
+  fmt("    ", testObjectInExpression(), "Object in expression");
+  fmt("    ", testObjectTrailingComma(), "Object trailing comma");
 
   printf("  Memory\n");
   fmt("    ", testAstGC(), "Literal Number - Marked on stack");
@@ -2384,6 +2757,13 @@ int testMain(void) {
   fmt("    ", testBytecodeSequenceNestedCallee(), "Sequence nested callee");
   fmt("    ", testBytecodeSequenceNested(), "Sequence nested");
   fmt("    ", testBytecodeSequenceInCall(), "Sequence in call");
+  fmt("    ", testBytecodeObjectEmpty(), "Object empty");
+  fmt("    ", testBytecodeObjectOneProperty(), "Object one property");
+  fmt("    ", testBytecodeObjectMultipleProperties(),
+      "Object multiple properties");
+  fmt("    ", testBytecodeObjectNested(), "Object nested");
+  fmt("    ", testBytecodeObjectComplexKeys(), "Object complex keys");
+  fmt("    ", testBytecodeObjectInCall(), "Object in call");
 
   freeVM();
   return 0;
