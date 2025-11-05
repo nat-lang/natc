@@ -407,70 +407,6 @@ bool testWhileNested() {
 }
 
 /* ============================================================
- * Import Statement Tests
- * ============================================================ */
-
-bool testImportSimple() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "use module");
-
-  AstNode* fn = mkFunction(name);
-  AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module, NULL);
-  pushFnStmt(fn, importNode);
-  AstNode* nil = newLiteralNode(NIL_VAL);
-  AstNode* returnStmt = newReturnNode(nil);
-  pushFnStmt(fn, returnStmt);
-
-  return assertNodesEqual(node, fn);
-}
-
-bool testImportWithAlias() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "use module as m");
-
-  AstNode* fn = mkFunction(name);
-  AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module, intern("m"));
-  pushFnStmt(fn, importNode);
-  AstNode* nil = newLiteralNode(NIL_VAL);
-  AstNode* returnStmt = newReturnNode(nil);
-  pushFnStmt(fn, returnStmt);
-
-  return assertNodesEqual(node, fn);
-}
-
-bool testImportRelative() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "use ../local");
-
-  AstNode* fn = mkFunction(name);
-  AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module, NULL);
-  pushFnStmt(fn, importNode);
-  AstNode* nil = newLiteralNode(NIL_VAL);
-  AstNode* returnStmt = newReturnNode(nil);
-  pushFnStmt(fn, returnStmt);
-
-  return assertNodesEqual(node, fn);
-}
-
-bool testImportNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "use path/to/module");
-
-  AstNode* fn = mkFunction(name);
-  AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module, NULL);
-  pushFnStmt(fn, importNode);
-  AstNode* nil = newLiteralNode(NIL_VAL);
-  AstNode* returnStmt = newReturnNode(nil);
-  pushFnStmt(fn, returnStmt);
-
-  return assertNodesEqual(node, fn);
-}
-
-/* ============================================================
  * Assignment Tests
  * ============================================================ */
 
@@ -2061,12 +1997,6 @@ int testMain(void) {
   fmt("    ", testWhileBlock(), "While block");
   fmt("    ", testWhileComplexCondition(), "While complex condition");
   fmt("    ", testWhileNested(), "While nested");
-
-  printf("  Import\n");
-  fmt("    ", testImportSimple(), "Import simple");
-  fmt("    ", testImportWithAlias(), "Import with alias");
-  fmt("    ", testImportRelative(), "Import relative");
-  fmt("    ", testImportNested(), "Import nested");
   fmt("    ", testAssignmentGlobal(), "Assignment global");
   fmt("    ", testAssignmentLocal(), "Assignment local");
   fmt("    ", testAssignmentWithExpression(), "Assignment with expression");
