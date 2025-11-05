@@ -121,8 +121,8 @@ bool __obj__(int argCount, Value* args) {
   vm.stackTop[-argCount - 1] = OBJ_VAL(map);
 
   for (int i = argCount - 1; i >= 1; i -= 2) {
-    Value value = vmPeek(i);
-    Value key = vmPeek(i - 1);
+    Value key = vmPeek(i);
+    Value value = vmPeek(i - 1);
     mapSet(map, key, value);
   }
 
