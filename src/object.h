@@ -103,6 +103,9 @@ typedef struct {
 
 struct ObjFunction {
   Obj obj;
+
+  AstNode* node;
+
   int arity;
   bool variadic;
   bool patterned;

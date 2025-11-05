@@ -6,8 +6,8 @@ __print__(x)
 
 // upvalue assignment.
 let f = () => {
-  x = 1;
-};
+  x = 1
+}
 
 f()
 

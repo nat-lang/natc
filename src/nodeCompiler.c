@@ -272,12 +272,15 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
   Token name = parser.previous;
   ObjString* objName = tokenString(name);
 
-  AstNode* node = NULL;
+  AstNode* node = newUnknownNode();
   int address = -1;
 
+  printf("resolving identifier: %s\n", objName->chars);
   if ((address = resolveLocal(cmp, &name)) >= 0) {
+    printf("resolved local: %s\n", objName->chars);
     node = newVarLocalNode((uint8_t)address, objName);
   } else if ((address = resolveUpvalue(cmp, &name)) >= 0) {
+    printf("resolved upvalue: %s\n", objName->chars);
     node = newVarUpvalueNode((uint8_t)address, objName);
   } else {
     node = newVarGlobalNode(objName);
@@ -304,7 +307,7 @@ static AstNode* signature(NodeCompiler* cmp) {
     do {
       if (!checkVariable()) {
         errorAtCurrent(cmp, "Expecting parameter name.");
-        return NULL;
+        return newUnknownNode();
       }
       AstNode* paramNode = parameter(cmp);
       pushAstVec(&node->as.signature.params, paramNode);
@@ -384,7 +387,7 @@ static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
       value = BOOL_VAL(false);
       break;
     default:
-      return NULL;
+      return newUnknownNode();
   }
   AstNode* node = newLiteralNode(value);
   node->line = parser.previous.line;
@@ -603,7 +606,7 @@ static ParseRule* getInfixRule(NodeCompiler* cmp, Token token) {
 }
 
 static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
-  AstNode* node = NULL;
+  AstNode* node = newUnknownNode();
 
   advance(cmp);
 
@@ -639,7 +642,7 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
 
   declareLocal(cmp, &nameToken);
 
-  AstNode* node = NULL;
+  AstNode* node = newUnknownNode();
   if (match(cmp, TOKEN_EQUAL)) {
     node = expression(cmp);
   } else {
@@ -660,7 +663,7 @@ static AstNode* ifStatement(NodeCompiler* cmp) {
 
   AstNode* then = statement(cmp);
 
-  AstNode* elseBranch = NULL;
+  AstNode* elseBranch = newUnknownNode();
   if (match(cmp, TOKEN_ELSE)) {
     elseBranch = statement(cmp);
   }

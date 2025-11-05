@@ -1,0 +1,4 @@
+"Set objects are equipped with the familiar relations,
+which you can access with the \textit{set-a.relation(set-b)} syntax. Some relations
+have terser symbolic aliases that can be used as infixes. For instance,
+\codefont{union} and \codefont{&} are interchangable.";

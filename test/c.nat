@@ -1,0 +1,6 @@
+let FunctionApplication = (a: x -> y, b: x) => a(b) | (a: x, b: x -> y) => b(a);
+
+let z <- FunctionApplication;
+
+print z.children[0].signature().children[0].type;
+print z.tex();

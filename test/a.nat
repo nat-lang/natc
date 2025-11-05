@@ -1,0 +1,3 @@
+let f <- x => !x;
+
+print f.viz().render();
