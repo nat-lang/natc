@@ -14,6 +14,15 @@
       "args": [
         "test/integration/index",
       ],
+    },
+    {
+      "name": "New Integration",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/nat",
+      "args": [
+        "test/ast/assignment",
+      ],
     }
   ],
 }
