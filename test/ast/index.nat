@@ -1,9 +1,8 @@
 use assignment
-// use conditional
-// use expression
-// use function
-// use native
-// use sequence
-// use string
-// use throw_
-// use while_
+use conditional
+use expression
+use function
+use native
+use sequence
+use string
+use while_

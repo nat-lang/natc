@@ -93,6 +93,17 @@ bool __address__(int argCount, Value* args) {
   return true;
 }
 
+bool __assert__(int argCount, Value* args) {
+  Value value = vmPop();
+  vmPop();  // native fn.
+  if (!AS_BOOL(value)) {
+    vmRuntimeError("Assertion failed.");
+    return false;
+  }
+  vmPush(NIL_VAL);
+  return true;
+}
+
 bool __ord__(int argCount, Value* args) {
   Value value = vmPop();
   if (!IS_STRING(value) || AS_STRING(value)->length != 1) {
@@ -198,6 +209,71 @@ bool __str__(int argCount, Value* args) {
   vmPop();  // native fn.
   vmPush(OBJ_VAL(string));
 
+  return true;
+}
+
+bool __valuesEqual__(Value a, Value b);
+
+bool __subMap__(ObjMap* a, ObjMap* b) {
+  for (int i = 0; i < a->count; i++) {
+    MapEntry* entry = &a->entries[i];
+    if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
+    Value bValue;
+    if (!mapGet(b, entry->key, &bValue)) return false;
+    if (!__valuesEqual__(entry->value, bValue)) return false;
+  }
+  return true;
+}
+
+bool __valuesEqual__(Value a, Value b) {
+  if (a.vmType != b.vmType) return false;
+
+  switch (a.vmType) {
+    case VAL_UNDEF:
+    case VAL_UNIT:
+    case VAL_NIL:
+      return true;
+    case VAL_BOOL:
+      return AS_BOOL(a) == AS_BOOL(b);
+      break;
+    case VAL_NUMBER:
+      return AS_NUMBER(a) == AS_NUMBER(b);
+    case VAL_OBJ: {
+      Obj* aObj = AS_OBJ(a);
+      Obj* bObj = AS_OBJ(b);
+
+      if (aObj->oType != bObj->oType) return false;
+
+      switch (aObj->oType) {
+        case OBJ_SEQUENCE: {
+          ObjSequence* aSeq = AS_SEQUENCE(a);
+          ObjSequence* bSeq = AS_SEQUENCE(b);
+          if (aSeq->values.count != bSeq->values.count) return false;
+          for (int i = 0; i < aSeq->values.count; i++) {
+            if (!__valuesEqual__(aSeq->values.values[i],
+                                 bSeq->values.values[i]))
+              return false;
+          }
+          return true;
+        }
+        case OBJ_MAP: {
+          ObjMap* aMap = AS_MAP(a);
+          ObjMap* bMap = AS_MAP(b);
+          return __subMap__(aMap, bMap) && __subMap__(bMap, aMap);
+        }
+        default:
+          return false;
+      }
+    }
+  }
+}
+
+bool __eq__(int argCount, Value* args) {
+  Value a = vmPop();
+  Value b = vmPop();
+  vmPop();  // native fn.
+
+  vmPush(BOOL_VAL(__valuesEqual__(a, b)));
   return true;
 }
 
@@ -517,10 +593,26 @@ bool __objKeys__(int argCount, Value* args) {
 void defineNatives() {
   // native functions.
 
+  defineNativeFnGlobal("assert", 1, __assert__);
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFn("seq", 0, true, __seq__, &vm.globals);
   defineNativeFn("obj", 0, true, __obj__, &vm.globals);
-  defineNativeFnGlobal("__str__", 1, __str__);
+
+  defineNativeInfixGlobal("==", __eq__, PREC_COMPARISON);
+  defineNativeInfixGlobal(">", __gt__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<", __lt__, PREC_COMPARISON);
+  defineNativeInfixGlobal(">=", __gte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("<=", __lte__, PREC_COMPARISON);
+  defineNativeInfixGlobal("+", __add__, PREC_TERM);
+  defineNativeInfixGlobal("-", __sub__, PREC_TERM);
+  defineNativeInfixGlobal("/", __div__, PREC_FACTOR);
+  defineNativeInfixGlobal("*", __mul__, PREC_FACTOR);
+
+  defineNativePrefixGlobal("__print__", __print__);
+
+  //
+
+  defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("ord", 1, __ord__);
   defineNativeFnGlobal("hash", 1, __hash__);
   defineNativeFnGlobal("vmHashable", 1, __vmHashable__);
@@ -533,17 +625,6 @@ void defineNatives() {
   defineNativeFnGlobal("address", 1, __address__);
   defineNativeFnGlobal("annotations", 1, __annotations__);
   defineNativeFnGlobal("compile", 3, __compile__);
-
-  defineNativeInfixGlobal(">", __gt__, PREC_COMPARISON);
-  defineNativeInfixGlobal("<", __lt__, PREC_COMPARISON);
-  defineNativeInfixGlobal(">=", __gte__, PREC_COMPARISON);
-  defineNativeInfixGlobal("<=", __lte__, PREC_COMPARISON);
-  defineNativeInfixGlobal("+", __add__, PREC_TERM);
-  defineNativeInfixGlobal("-", __sub__, PREC_TERM);
-  defineNativeInfixGlobal("/", __div__, PREC_FACTOR);
-  defineNativeInfixGlobal("*", __mul__, PREC_FACTOR);
-
-  defineNativePrefixGlobal("__print__", __print__);
 
   // native classes.
 

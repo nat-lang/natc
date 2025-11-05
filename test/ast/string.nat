@@ -1,4 +1,8 @@
 
+""
+"1"
 "foo"
 
-let x = "foo"
+assert(len("") == 0)
+assert(len("1") == 1)
+assert(len("foo") == 3)

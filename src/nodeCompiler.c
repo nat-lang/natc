@@ -196,21 +196,6 @@ static int resolveLocal(NodeCompiler* cmp, Token* name) {
   return -1;
 }
 
-static uint8_t declareLocal(NodeCompiler* cmp, Token* name) {
-  for (int i = cmp->fn->as.function.localCount - 1; i >= 0; i--) {
-    Local* local = &cmp->fn->as.function.locals[i];
-    if (local->depth != -1 && local->depth < cmp->scopeDepth) {
-      break;
-    }
-
-    if (identifiersEqual(name, &local->name)) {
-      error(cmp, "Already a variable with this name in this scope.");
-    }
-  }
-
-  return addLocal(cmp, *name);
-}
-
 static void markInitialized(NodeCompiler* cmp) {
   cmp->fn->as.function.locals[cmp->fn->as.function.localCount - 1].depth =
       cmp->scopeDepth;
@@ -274,13 +259,9 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 
   AstNode* node = newUnknownNode();
   int address = -1;
-
-  printf("resolving identifier: %s\n", objName->chars);
   if ((address = resolveLocal(cmp, &name)) >= 0) {
-    printf("resolved local: %s\n", objName->chars);
     node = newVarLocalNode((uint8_t)address, objName);
   } else if ((address = resolveUpvalue(cmp, &name)) >= 0) {
-    printf("resolved upvalue: %s\n", objName->chars);
     node = newVarUpvalueNode((uint8_t)address, objName);
   } else {
     node = newVarGlobalNode(objName);
@@ -640,7 +621,7 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
   consumeIdentifier(cmp, "Expect variable name.");
   Token nameToken = parser.previous;
 
-  declareLocal(cmp, &nameToken);
+  addLocal(cmp, nameToken);
 
   AstNode* node = newUnknownNode();
   if (match(cmp, TOKEN_EQUAL)) {
@@ -663,7 +644,7 @@ static AstNode* ifStatement(NodeCompiler* cmp) {
 
   AstNode* then = statement(cmp);
 
-  AstNode* elseBranch = newUnknownNode();
+  AstNode* elseBranch = NULL;
   if (match(cmp, TOKEN_ELSE)) {
     elseBranch = statement(cmp);
   }

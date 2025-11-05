@@ -222,7 +222,6 @@ static void freeObject(Obj* object) {
     }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
-      freeAstNode(function->node);
       freeChunk(&function->chunk);
       freeMap(&function->fields);
       freeMap(&function->constants);
