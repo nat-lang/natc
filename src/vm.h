@@ -58,6 +58,7 @@ typedef struct {
   ObjString* sExecMain;
   ObjString* sOut;
   ObjString* sSeq;
+  ObjString* sObj;
 
   ObjClass* base;
   ObjClass* object;

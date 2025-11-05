@@ -4,6 +4,7 @@
 
 #include "core.h"
 #include "debug.h"
+#include "memory.h"
 #include "object.h"
 #include "value.h"
 #include "vm.h"
@@ -111,6 +112,22 @@ bool __seq__(int argCount, Value* args) {
   int i = argCount;
   while (i-- > 0) writeValueArray(&seq->values, vmPeek(i));
   while (++i < argCount) vmPop();
+
+  return true;
+}
+
+bool __obj__(int argCount, Value* args) {
+  ObjMap* map = newMap();
+  vm.stackTop[-argCount - 1] = OBJ_VAL(map);
+
+  for (int i = argCount - 1; i >= 1; i -= 2) {
+    Value value = vmPeek(i);
+    Value key = vmPeek(i - 1);
+    mapSet(map, key, value);
+  }
+
+  int i = argCount;
+  while (i-- > 0) vmPop();
 
   return true;
 }
@@ -502,6 +519,7 @@ void defineNatives() {
 
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFn("seq", 0, true, __seq__, &vm.globals);
+  defineNativeFn("obj", 0, true, __obj__, &vm.globals);
   defineNativeFnGlobal("__str__", 1, __str__);
   defineNativeFnGlobal("ord", 1, __ord__);
   defineNativeFnGlobal("hash", 1, __hash__);

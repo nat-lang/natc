@@ -194,6 +194,19 @@ AstNode* newSequenceNode() {
   return n;
 }
 
+AstNode* newObjectNode() {
+  AstNode* n = allocNode(AST_OBJECT);
+  initAstVec(&n->as.object.entries);
+  return n;
+}
+
+AstNode* newObjectEntryNode(AstNode* key, AstNode* value) {
+  AstNode* n = allocNode(AST_OBJECT_ENTRY);
+  n->as.objectEntry.key = key;
+  n->as.objectEntry.value = value;
+  return n;
+}
+
 AstNode* newVarGlobalNode(ObjString* name) {
   AstNode* n = allocNode(AST_VAR_GLOBAL);
   n->as.global.name = name;
@@ -351,6 +364,15 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Sequence\n", depth);
       printNodeVecAt(&node->as.sequence.values, depth + 1);
       break;
+    case AST_OBJECT:
+      printStrAt("Object\n", depth);
+      printNodeVecAt(&node->as.object.entries, depth + 1);
+      break;
+    case AST_OBJECT_ENTRY:
+      printStrAt("Entry\n", depth);
+      printNodeAt(node->as.objectEntry.key, depth + 1);
+      printNodeAt(node->as.objectEntry.value, depth + 1);
+      break;
     case AST_SIGNATURE:
       printStrAt("Signature\n", depth);
       printNodeVecAt(&node->as.signature.params, depth + 1);
@@ -443,6 +465,12 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_SEQUENCE:
       return a->as.sequence.values.count == b->as.sequence.values.count &&
              astVecsEqual(&a->as.sequence.values, &b->as.sequence.values);
+    case AST_OBJECT:
+      return a->as.object.entries.count == b->as.object.entries.count &&
+             astVecsEqual(&a->as.object.entries, &b->as.object.entries);
+    case AST_OBJECT_ENTRY:
+      return nodesEqual(a->as.objectEntry.key, b->as.objectEntry.key) &&
+             nodesEqual(a->as.objectEntry.value, b->as.objectEntry.value);
     case AST_SIGNATURE:
       return a->as.signature.varargs == b->as.signature.varargs &&
              astVecsEqual(&a->as.signature.params, &b->as.signature.params);
@@ -696,6 +724,22 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, (uint8_t)node->as.sequence.values.count);
       break;
     }
+    case AST_OBJECT: {
+      emitByte(chunk, node, OP_GET_GLOBAL);
+      uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sObj));
+      emitConstant(chunk, node, constant);
+
+      if (!toChunkVec(&node->as.object.entries, chunk)) return false;
+
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)(node->as.object.entries.count * 2));
+      break;
+    }
+    case AST_OBJECT_ENTRY: {
+      if (!toChunk(node->as.objectEntry.key, chunk)) return false;
+      if (!toChunk(node->as.objectEntry.value, chunk)) return false;
+      break;
+    }
     case AST_SIGNATURE: {
       if (!toChunkVec(&node->as.signature.params, chunk)) return false;
       break;
@@ -825,6 +869,14 @@ void markAstNode(AstNode* n) {
       for (int i = 0; i < n->as.sequence.values.count; i++)
         markAstNode((AstNode*)n->as.sequence.values.items[i]);
       break;
+    case AST_OBJECT:
+      for (int i = 0; i < n->as.object.entries.count; i++)
+        markAstNode((AstNode*)n->as.object.entries.items[i]);
+      break;
+    case AST_OBJECT_ENTRY:
+      markAstNode(n->as.objectEntry.key);
+      markAstNode(n->as.objectEntry.value);
+      break;
     case AST_SIGNATURE:
       for (int i = 0; i < n->as.signature.params.count; i++)
         markObject((Obj*)n->as.signature.params.items[i]);
@@ -925,6 +977,13 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_SEQUENCE:
       freeAstVec(&n->as.sequence.values);
+      break;
+    case AST_OBJECT:
+      freeAstVec(&n->as.object.entries);
+      break;
+    case AST_OBJECT_ENTRY:
+      freeAstNode(n->as.objectEntry.key);
+      freeAstNode(n->as.objectEntry.value);
       break;
   }
 

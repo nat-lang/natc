@@ -164,6 +164,7 @@ bool initVM() {
   vm.core.sOut = intern("out");
 
   vm.core.sSeq = intern("seq");
+  vm.core.sObj = intern("obj");
 
   vm.gen = NULL;
 
