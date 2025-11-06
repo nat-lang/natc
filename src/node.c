@@ -512,13 +512,6 @@ static void emitConstant(Chunk* chunk, AstNode* node, uint16_t constant) {
   emitBytes(chunk, node, constant >> 8, constant & 0xff);
 }
 
-#if defined(DEBUG_PRINT_CODE)
-#define DEBUG_CHUNK() \
-  disassembleChunk(&fn->chunk, fn->name != NULL ? fn->name->chars : "<script>");
-#else
-#define DEBUG_CHUNK()
-#endif
-
 void closeUpvalues(Chunk* chunk, AstNode* node) {
   for (int i = 0; i < node->as.function.upvalueCount; i++) {
     emitByte(chunk, node, node->as.function.upvalues[i].isLocal ? 1 : 0);
@@ -778,6 +771,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
 ObjFunction* toFunction(AstNode* node) {
   ObjFunction* fn = newFunction();
+  vmPush(OBJ_VAL(fn));
   fn->name =
       copyString(node->as.function.name->chars, node->as.function.name->length);
   fn->arity = node->as.function.signature->as.signature.params.count;
@@ -787,7 +781,10 @@ ObjFunction* toFunction(AstNode* node) {
   if (!toChunk(node->as.function.signature, &fn->chunk)) return false;
   if (!toChunk(node->as.function.body, &fn->chunk)) return false;
 
-  DEBUG_CHUNK()
+#if defined(DEBUG_PRINT_CODE)
+  disassembleChunk(&fn->chunk, fn->name != NULL ? fn->name->chars : "<script>");
+#endif
+  vmPop();
   return fn;
 }
 
