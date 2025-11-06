@@ -55,7 +55,7 @@ static bool isSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
           c == '+' || c == '-' || c == '/' || c == '\\' || c == '*' ||
-          c == '|' || c == '=' || c == '_' || c == '%');
+          c == '|' || c == '=' || c == '_' || c == '%' || c == '!');
 }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }
@@ -375,8 +375,6 @@ Token consumeToken(char c) {
         return makeToken(TOKEN_PIPE);
       break;
     }
-    case '!':
-      return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=': {
       if (match('>')) {
         return makeToken(TOKEN_FAT_ARROW);

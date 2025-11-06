@@ -105,10 +105,9 @@ AstNode* newExprStmtNode(AstNode* expr) {
   return n;
 }
 
-AstNode* newFunctionNode(ObjString* name, AstNode* module) {
+AstNode* newFunctionNode(AstNode* module) {
   AstNode* n = allocNode(AST_FUNCTION);
   n->as.function.name = NULL;
-  n->as.function.name = name;
   n->as.function.signature = NULL;
   n->as.function.body = NULL;
   n->as.function.module = NULL;
@@ -167,11 +166,17 @@ AstNode* newLetNode(AstNode* value) {
   return n;
 }
 
-AstNode* newLiteralNode(Value v) {
+AstNode* newLiteralValueNode(Value value) {
+  if (IS_OBJ(value)) {
+    vmRuntimeError("Can't create literal node with object value.");
+    exit(1);
+  }
   AstNode* n = allocNode(AST_LITERAL);
-  n->as.literal.value = v;
+  n->as.literal.value = value;
   return n;
 }
+
+AstNode* newLiteralNode() { return newLiteralValueNode(UNDEF_VAL); }
 
 AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
                        ObjString* source) {
@@ -579,6 +584,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
         case AST_VAR_GLOBAL: {
           toChunk(node->as.assignment.rhs, chunk);
           emitByte(chunk, node, OP_SET_GLOBAL);
+
           uint16_t constant = addConstant(
               chunk, OBJ_VAL(node->as.assignment.lhs->as.global.name));
           emitConstant(chunk, node, constant);
@@ -624,9 +630,11 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_FUNCTION: {
-      ObjFunction* newFn = toFunction(node);
+      ObjFunction* fn = toFunction(node);
 
-      uint16_t fnConst = addConstant(chunk, OBJ_VAL(newFn));
+      vmPush(OBJ_VAL(fn));
+      uint16_t fnConst = addConstant(chunk, OBJ_VAL(fn));
+      vmPop();
 
       emitByte(chunk, node, OP_CLOSURE);
       emitConstant(chunk, node, fnConst);
@@ -772,8 +780,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 ObjFunction* toFunction(AstNode* node) {
   ObjFunction* fn = newFunction();
   vmPush(OBJ_VAL(fn));
-  fn->name =
-      copyString(node->as.function.name->chars, node->as.function.name->length);
+  fn->name = node->as.function.name;
   fn->arity = node->as.function.signature->as.signature.params.count;
   fn->node = node;
   fn->upvalueCount = node->as.function.upvalueCount;
@@ -823,6 +830,7 @@ void markAstNode(AstNode* n) {
       break;
 
     case AST_FUNCTION: {
+      markObject((Obj*)n->as.function.name);
       markAstNode(n->as.function.module);
       markAstNode(n->as.function.signature);
       markAstNode(n->as.function.body);
