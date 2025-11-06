@@ -7,6 +7,7 @@
 #include "common.h"
 #include "debug.h"
 #include "memory.h"
+#include "node.h"
 #include "nodeCompiler.h"
 #include "object.h"
 #include "value.h"
@@ -1908,7 +1909,7 @@ bool testObjectEmpty() {
 
 bool testObjectOneProperty() {
   Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({x: 1})");
+  AstNode* node = compile(name, "({\"x\": 1})");
 
   AstNode* fn = mkFunction(name);
   AstNode* obj = newObjectNode();
@@ -1929,7 +1930,7 @@ bool testObjectOneProperty() {
 
 bool testObjectMultipleProperties() {
   Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({x: 1, y: 2, z: 3})");
+  AstNode* node = compile(name, "({\"x\": 1, \"y\": 2, \"z\": 3})");
 
   AstNode* fn = mkFunction(name);
   AstNode* obj = newObjectNode();
@@ -1954,16 +1955,15 @@ bool testObjectMultipleProperties() {
   return assertNodesEqual(node, fn);
 }
 
-bool testObjectStringKeys() {
+bool testObjectIdentifierKey() {
   Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({\"key\": value})");
+  AstNode* node = compile(name, "({key: value})");
 
   AstNode* fn = mkFunction(name);
   AstNode* obj = newObjectNode();
-  AstNode* keyLiteral = newLiteralNode();
-  ObjString* keyStr = intern("key");
-  keyLiteral->as.literal.value = OBJ_VAL(keyStr);
-  AstNode* entry = newObjectEntryNode(keyLiteral, newVarGlobalNode());
+  AstNode* key = newVarGlobalNode();
+  key->as.global.name = intern("key");
+  AstNode* entry = newObjectEntryNode(key, newVarGlobalNode());
   entry->as.objectEntry.value->as.global.name = intern("value");
   pushAstVec(&obj->as.object.entries, entry);
   AstNode* exprStmt = newExprStmtNode(obj);
@@ -1977,7 +1977,7 @@ bool testObjectStringKeys() {
 
 bool testObjectComplexValues() {
   Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({x: 1 + 2, y: f()})");
+  AstNode* node = compile(name, "({\"x\": 1 + 2, \"y\": f()})");
 
   AstNode* fn = mkFunction(name);
   AstNode* obj = newObjectNode();
@@ -2009,7 +2009,7 @@ bool testObjectComplexValues() {
 
 bool testObjectNested() {
   Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({outer: {inner: 1}})");
+  AstNode* node = compile(name, "({\"outer\": {\"inner\": 1}})");
 
   AstNode* fn = mkFunction(name);
 
@@ -2036,7 +2036,7 @@ bool testObjectNested() {
 
 bool testObjectInExpression() {
   Token name = syntheticToken("test");
-  AstNode* node = compile(name, "f({x: 1})");
+  AstNode* node = compile(name, "f({\"x\": 1})");
 
   AstNode* fn = mkFunction(name);
   AstNode* callee = newVarGlobalNode();
@@ -2061,7 +2061,7 @@ bool testObjectInExpression() {
 
 bool testObjectTrailingComma() {
   Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({x: 1,})");
+  AstNode* node = compile(name, "({\"x\": 1,})");
 
   AstNode* fn = mkFunction(name);
   AstNode* obj = newObjectNode();
@@ -2834,7 +2834,7 @@ int testMain(void) {
   fmt("    ", testObjectEmpty(), "Object empty");
   fmt("    ", testObjectOneProperty(), "Object one property");
   fmt("    ", testObjectMultipleProperties(), "Object multiple properties");
-  fmt("    ", testObjectStringKeys(), "Object string keys");
+  fmt("    ", testObjectIdentifierKey(), "Object identifier key");
   fmt("    ", testObjectComplexValues(), "Object complex values");
   fmt("    ", testObjectNested(), "Object nested");
   fmt("    ", testObjectInExpression(), "Object in expression");
