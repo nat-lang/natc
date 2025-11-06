@@ -42,10 +42,21 @@ void initAstVec(AstVec* v);
 void pushAstVec(AstVec* v, AstNode* item);
 void freeAstVec(AstVec* v);
 
+typedef struct AstFunction AstFunction;
+typedef struct AstBlock AstBlock;
+typedef struct AstCall AstCall;
+typedef struct AstCallInfix AstCallInfix;
+typedef struct AstFunction AstFunction;
+typedef struct AstIfStmt AstIfStmt;
+typedef struct AstExprStmt AstExprStmt;
+typedef struct AstUse AstUse;
+typedef struct AstLet AstLet;
 struct AstNode {
   AstType type;
   int line;
   int chr;
+
+  AstNode* fn;
 
   union {
     struct {
@@ -68,7 +79,7 @@ struct AstNode {
       AstNode* rhs;
     } callInfix;
 
-    struct {
+    struct AstFunction {
       ObjString* name;
       AstNode* signature;
       AstNode* body;
@@ -77,6 +88,7 @@ struct AstNode {
       bool variadic;
       bool patterned;
 
+      bool depth;
       Local locals[UINT8_COUNT];
       int localCount;
       Upvalue upvalues[UINT8_COUNT];
@@ -95,7 +107,7 @@ struct AstNode {
 
     struct {
       AstNode* module;
-      ObjString* alias;  // can be NULL
+      ObjString* alias;  // can be NULLå
     } use;
 
     struct {
@@ -104,14 +116,14 @@ struct AstNode {
     } let;
 
     struct {
-      Value value;
+      Value* value;
     } literal;
 
     struct {
       ObjString* dirName;
       ObjString* baseName;
       ObjString* source;
-      AstVec stmts;
+      AstNode* fn;
     } module;
 
     struct {
@@ -174,24 +186,23 @@ AstNode* newBlockNode();
 AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
 AstNode* newExprStmtNode(AstNode* expr);
-AstNode* newFunctionNode(ObjString* name, AstNode* module);
+AstFunction* newFunctionNode(AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
-AstNode* newLetNode(ObjString* name, AstNode* value);
-AstNode* newLiteralNode(Value v);
-AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
-                       ObjString* source);
+AstNode* newLetNode(AstNode* value);
+AstNode* newLiteralNode();
+AstNode* newModuleNode();
 AstNode* newObjectNode();
 AstNode* newObjectEntryNode(AstNode* key, AstNode* value);
-AstNode* newParamNode(ObjString* name, AstNode* annotation);
+AstNode* newParamNode(AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
 AstNode* newThrowNode(AstNode* expr);
 AstNode* newSignatureNode();
 AstNode* newUnknownNode();
-AstNode* newUseNode(AstNode* module, ObjString* alias);
-AstNode* newVarGlobalNode(ObjString* name);
-AstNode* newVarLocalNode(uint8_t index, ObjString* name);
-AstNode* newVarUpvalueNode(uint8_t index, ObjString* name);
+AstNode* newUseNode(AstNode* module);
+AstNode* newVarGlobalNode();
+AstNode* newVarLocalNode(uint8_t index);
+AstNode* newVarUpvalueNode(uint8_t index);
 AstNode* newWhileNode(AstNode* cond, AstNode* body);
 
 /* api */
@@ -203,6 +214,7 @@ void printNode(AstNode* node);
 
 bool toChunk(AstNode* node, Chunk* chunk);
 ObjFunction* toFunction(AstNode* node);
+ObjModule* toModule(AstNode* node);
 
 /* memory */
 

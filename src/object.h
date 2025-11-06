@@ -63,8 +63,6 @@ typedef enum {
   OBJ_MODULE,
 } ObjType;
 
-typedef struct ObjModule ObjModule;
-
 struct Obj {
   ObjType oType;
   bool isMarked;

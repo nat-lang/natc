@@ -134,7 +134,7 @@ bool initVM() {
   vm.grayStack = NULL;
 
   vm.compiler = NULL;
-  vm.nodeCompiler = NULL;
+  vm.root = NULL;
   vm.module = NULL;
 
   vm.comprehensionDepth = 0;
@@ -1655,6 +1655,7 @@ ObjClosure* vmCompileAST(char* source, AstNode* module) {
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
   AstNode* moduleNode =
       newModuleNode(module->dirName, module->baseName, module->source);
+
   ObjClosure* closure = vmCompileAST(source, moduleNode);
   closure->function->module = module;
   return closure;
@@ -1723,15 +1724,17 @@ ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type) {
   vmPush(OBJ_VAL(objSource));
   free(source);
 
-  ObjModule* module = newModule(objDirName, objBaseName, objSource, type);
+  vm.root = newModuleNode(objDirName, objBaseName, objSource);
+
+  compileModuleNode(vm.root);
+
+  ObjModule* module = toModule(vm.root);
   vmPush(OBJ_VAL(module));
+  ObjFunction* fn = toFunction(vm.root->as.module.fn);
+  vmPush(OBJ_VAL(fn));
+  module->closure = newClosure(fn);
 
-  ObjClosure* closure = vmCompileClosure(syntheticToken(objAbsPath->chars),
-                                         objSource->chars, module);
-  if (closure == NULL) return NULL;
-
-  module->closure = closure;
-
+  vmPop();  // function.
   vmPop();  // module.
   vmPop();  // objAbsPath.
   vmPop();  // objSource.
