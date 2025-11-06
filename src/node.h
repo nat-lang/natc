@@ -176,10 +176,11 @@ AstNode* newBlockNode();
 AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
 AstNode* newExprStmtNode(AstNode* expr);
-AstNode* newFunctionNode(ObjString* name, AstNode* module);
+AstNode* newFunctionNode(AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
 AstNode* newLetNode(AstNode* value);
-AstNode* newLiteralNode(Value v);
+AstNode* newLiteralValueNode(Value value);
+AstNode* newLiteralNode();
 AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
                        ObjString* source);
 AstNode* newObjectNode();

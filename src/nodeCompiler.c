@@ -321,7 +321,8 @@ static AstNode* functionBody(NodeCompiler* cmp) {
   if (check(TOKEN_LEFT_BRACE)) {
     advance(cmp);
     node = block(cmp);
-    pushAstVec(&node->as.block.stmts, newReturnNode(newLiteralNode(NIL_VAL)));
+    AstNode* defaultReturn = newReturnNode(newLiteralValueNode(NIL_VAL));
+    pushAstVec(&node->as.block.stmts, defaultReturn);
   } else {
     node = expression(cmp);
     node = newReturnNode(node);
@@ -331,8 +332,8 @@ static AstNode* functionBody(NodeCompiler* cmp) {
 }
 
 static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
-  AstNode* node =
-      newFunctionNode(tokenString(name), enclosing->fn->as.function.module);
+  AstNode* node = newFunctionNode(enclosing->fn->as.function.module);
+  node->as.function.name = tokenString(name);
   NodeCompiler cmp;
   initNodeCompiler(&cmp, enclosing, node);
   beginScope(&cmp);
@@ -348,8 +349,8 @@ static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
 }
 
 AstNode* function(NodeCompiler* enclosing, Token name) {
-  AstNode* node =
-      newFunctionNode(tokenString(name), enclosing->fn->as.function.module);
+  AstNode* node = newFunctionNode(enclosing->fn->as.function.module);
+  node->as.function.name = tokenString(name);
   NodeCompiler cmp;
   initNodeCompiler(&cmp, enclosing, node);
   beginScope(&cmp);
@@ -362,7 +363,7 @@ AstNode* function(NodeCompiler* enclosing, Token name) {
   return node;
 }
 
-static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
+static AstNode* boolean(NodeCompiler* cmp, bool canAssign) {
   Value value;
   switch (parser.previous.type) {
     case TOKEN_TRUE:
@@ -374,25 +375,22 @@ static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
     default:
       return newUnknownNode();
   }
-  AstNode* node = newLiteralNode(value);
+  AstNode* node = newLiteralValueNode(value);
   node->line = parser.previous.line;
   return node;
 }
 
 static AstNode* number(NodeCompiler* cmp, bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
-  AstNode* node = newLiteralNode(NUMBER_VAL(value));
+  AstNode* node = newLiteralValueNode(NUMBER_VAL(value));
   node->line = parser.previous.line;
   return node;
 }
 
 static AstNode* string(NodeCompiler* cmp, bool canAssign) {
-  // Extract string content (excluding quotes)
-  // parser.previous.start points to the opening quote
-  // parser.previous.length includes both quotes
-  ObjString* str =
-      copyString(parser.previous.start + 1, parser.previous.length - 2);
-  AstNode* node = newLiteralNode(OBJ_VAL(str));
+  AstNode* node = newLiteralNode();
+  node->as.literal.value = OBJ_VAL(
+      copyString(parser.previous.start + 1, parser.previous.length - 2));
   node->line = parser.previous.line;
   return node;
 }
@@ -466,7 +464,28 @@ static bool peekFunction(NodeCompiler* cmp) {
   return true;
 }
 
-static AstNode* objectLiteral(NodeCompiler* cmp, bool canAssign) {
+static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
+  advance(cmp);
+  switch (parser.previous.type) {
+    case TOKEN_NIL:
+      return newLiteralValueNode(NIL_VAL);
+    case TOKEN_TRUE:
+      return boolean(cmp, canAssign);
+    case TOKEN_FALSE:
+      return boolean(cmp, canAssign);
+    case TOKEN_IDENTIFIER:
+    case TOKEN_TYPE_VARIABLE:
+      return identifier(cmp, canAssign);
+    case TOKEN_STRING:
+      return string(cmp, canAssign);
+    case TOKEN_NUMBER:
+      return number(cmp, canAssign);
+    default:
+      return newUnknownNode();
+  }
+}
+
+static AstNode* object(NodeCompiler* cmp, bool canAssign) {
   AstNode* obj = newObjectNode();
 
   if (check(TOKEN_RIGHT_BRACE)) {
@@ -475,17 +494,9 @@ static AstNode* objectLiteral(NodeCompiler* cmp, bool canAssign) {
   }
 
   do {
-    AstNode* key;
-    if (check(TOKEN_IDENTIFIER) || check(TOKEN_TYPE_VARIABLE)) {
-      advance(cmp);
-      ObjString* keyName = tokenString(parser.previous);
-      key = newLiteralNode(OBJ_VAL(keyName));
-    } else if (match(cmp, TOKEN_STRING)) {
-      key = string(cmp, false);
-    } else {
-      errorAtCurrent(cmp,
-                     "Expect identifier or string literal for object key.");
-      return obj;
+    AstNode* key = literal(cmp, false);
+    if (key->type == AST_UNKNOWN) {
+      errorAtCurrent(cmp, "Expect identifier or literal for object key.");
     }
 
     consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
@@ -542,14 +553,14 @@ static ParseRule rules[] = {
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_LEFT_BRACE] = {objectLiteral, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {object, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_PAREN_LEFT] = {parentheses, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_USER_INFIX] = {NULL, userInfix, PREC_NONE, PREC_NONE},
-    [TOKEN_TRUE] = {literal, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_FALSE] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TRUE] = {boolean, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FALSE] = {boolean, NULL, PREC_NONE, PREC_NONE},
 };
 
 #define PREC_STEP 1
@@ -631,7 +642,7 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
   if (match(cmp, TOKEN_EQUAL)) {
     node = expression(cmp);
   } else {
-    node = newLiteralNode(UNDEF_VAL);
+    node = newLiteralValueNode(UNDEF_VAL);
     node->line = parser.previous.line;
   }
 
@@ -740,14 +751,15 @@ AstNode* compileFunctionNode(ObjString* name, char* source, AstNode* module) {
   Scanner sc = initScanner(source);
   initParser(sc);
   NodeCompiler cmp;
-  AstNode* node = newFunctionNode(name, module);
+  AstNode* node = newFunctionNode(module);
+  node->as.function.name = name;
   node->as.function.signature = newSignatureNode();
   node->as.function.body = newBlockNode();
   initNodeCompiler(&cmp, NULL, node);
 
   statements(&cmp, &node->as.function.body->as.block.stmts);
-  pushAstVec(&node->as.function.body->as.block.stmts,
-             newReturnNode(newLiteralNode(NIL_VAL)));
+  AstNode* defaultReturn = newReturnNode(newLiteralValueNode(NIL_VAL));
+  pushAstVec(&node->as.function.body->as.block.stmts, defaultReturn);
   return node;
 }
 

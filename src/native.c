@@ -277,6 +277,15 @@ bool __eq__(int argCount, Value* args) {
   return true;
 }
 
+bool __neq__(int argCount, Value* args) {
+  Value a = vmPop();
+  Value b = vmPop();
+  vmPop();  // native fn.
+
+  vmPush(BOOL_VAL(!__valuesEqual__(a, b)));
+  return true;
+}
+
 #define BINARY_NATIVE(name, valueType, op)                  \
   static bool name(int argCount, Value* args) {             \
     do {                                                    \
@@ -599,6 +608,7 @@ void defineNatives() {
   defineNativeFn("obj", 0, true, __obj__, &vm.globals);
 
   defineNativeInfixGlobal("==", __eq__, PREC_COMPARISON);
+  defineNativeInfixGlobal("!=", __neq__, PREC_COMPARISON);
   defineNativeInfixGlobal(">", __gt__, PREC_COMPARISON);
   defineNativeInfixGlobal("<", __lt__, PREC_COMPARISON);
   defineNativeInfixGlobal(">=", __gte__, PREC_COMPARISON);
