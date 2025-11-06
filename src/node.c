@@ -635,6 +635,10 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       emitByte(chunk, node, OP_CLOSURE);
       emitConstant(chunk, node, fnConst);
+      for (int i = 0; i < node->as.function.upvalueCount; i++) {
+        emitByte(chunk, node, node->as.function.upvalues[i].isLocal ? 1 : 0);
+        emitByte(chunk, node, node->as.function.upvalues[i].index);
+      }
       break;
     }
     case AST_IF: {
@@ -761,7 +765,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_UNKNOWN: {
-      error(node, "unexpected node type (%d)", node->type);
+      error(node, "Unknown node.");
       exit(2);
       break;
     }
@@ -775,6 +779,9 @@ ObjFunction* toFunction(AstNode* node) {
   fn->name =
       copyString(node->as.function.name->chars, node->as.function.name->length);
   fn->arity = node->as.function.signature->as.signature.params.count;
+  fn->node = node;
+  fn->upvalueCount = node->as.function.upvalueCount;
+
   if (!toChunk(node->as.function.signature, &fn->chunk)) return false;
   if (!toChunk(node->as.function.body, &fn->chunk)) return false;
 

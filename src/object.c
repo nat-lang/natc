@@ -102,7 +102,7 @@ ObjVariable* newVariable(ObjString* name) {
 
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
-
+  function->node = NULL;
   function->arity = 0;
   function->variadic = false;
   function->patterned = false;

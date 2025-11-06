@@ -141,6 +141,7 @@ static void blackenObject(Obj* object) {
     }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
+      markObject((Obj*)function->node);
       markObject((Obj*)function->name);
       markMap(&function->fields);
       markArray(&function->chunk.constants);
