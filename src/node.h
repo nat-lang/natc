@@ -47,6 +47,8 @@ struct AstNode {
   int line;
   int chr;
 
+  AstNode* next;
+
   union {
     struct {
       AstNode* lhs;
@@ -208,5 +210,7 @@ ObjFunction* toFunction(AstNode* node);
 
 void markAstNode(AstNode* n);
 void freeAstNode(AstNode* n);
+void markAstNodes(AstNode* node);
+void freeAstNodes(AstNode* node);
 
 #endif

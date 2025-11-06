@@ -299,16 +299,16 @@ static AstNode* signature(NodeCompiler* cmp) {
 }
 
 static AstNode* block(NodeCompiler* cmp) {
-  AstNode* node = newBlockNode();
+  AstNode* block = newBlockNode();
 
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
     AstNode* stmtNode = statement(cmp);
-    pushAstVec(&node->as.block.stmts, stmtNode);
+    pushAstVec(&block->as.block.stmts, stmtNode);
   }
 
   consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 
-  return node;
+  return block;
 }
 
 static AstNode* functionBody(NodeCompiler* cmp) {
