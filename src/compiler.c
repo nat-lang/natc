@@ -2095,11 +2095,3 @@ ObjFunction* compileModule(Compiler* enclosing, const char* source, Token path,
 
   return parser.hadError ? NULL : function;
 }
-
-void markCompilerRoots(Compiler* cmp) {
-  while (cmp != NULL) {
-    markObject((Obj*)cmp->function);
-    if (cmp->signature != NULL) markObject((Obj*)cmp->signature->function);
-    cmp = cmp->enclosing;
-  }
-}

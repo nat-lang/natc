@@ -141,10 +141,10 @@ AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch) {
   return n;
 }
 
-AstNode* newUseNode(AstNode* module, ObjString* alias) {
+AstNode* newUseNode(AstNode* module) {
   AstNode* n = allocNode(AST_IMPORT);
   n->as.use.module = module;
-  n->as.use.alias = alias;
+  n->as.use.alias = NULL;
   return n;
 }
 
@@ -160,9 +160,9 @@ AstNode* newWhileNode(AstNode* cond, AstNode* body) {
   return n;
 }
 
-AstNode* newLetNode(ObjString* name, AstNode* value) {
+AstNode* newLetNode(AstNode* value) {
   AstNode* n = allocNode(AST_LET);
-  n->as.let.name = name;
+  n->as.let.name = NULL;
   n->as.let.value = value;
   return n;
 }
@@ -183,9 +183,9 @@ AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
   return n;
 }
 
-AstNode* newParamNode(ObjString* name, AstNode* annotation) {
+AstNode* newParamNode(AstNode* annotation) {
   AstNode* n = allocNode(AST_PARAM);
-  n->as.param.name = name;
+  n->as.param.name = NULL;
   n->as.param.annotation = annotation;
   return n;
 }
@@ -209,23 +209,23 @@ AstNode* newObjectEntryNode(AstNode* key, AstNode* value) {
   return n;
 }
 
-AstNode* newVarGlobalNode(ObjString* name) {
+AstNode* newVarGlobalNode() {
   AstNode* n = allocNode(AST_VAR_GLOBAL);
-  n->as.global.name = name;
+  n->as.global.name = NULL;
   return n;
 }
 
-AstNode* newVarLocalNode(uint8_t index, ObjString* name) {
+AstNode* newVarLocalNode(uint8_t index) {
   AstNode* n = allocNode(AST_VAR_LOCAL);
   n->as.local.index = index;
-  n->as.local.name = name;
+  n->as.local.name = NULL;
   return n;
 }
 
-AstNode* newVarUpvalueNode(uint8_t index, ObjString* name) {
+AstNode* newVarUpvalueNode(uint8_t index) {
   AstNode* n = allocNode(AST_VAR_UPVALUE);
   n->as.upvalue.index = index;
-  n->as.upvalue.name = name;
+  n->as.upvalue.name = NULL;
   return n;
 }
 
@@ -1004,7 +1004,7 @@ void freeAstNode(AstNode* n) {
   }
 
   /* finally free the node struct itself */
-  FREE(AstNode, n);
+  // FREE(AstNode, n);
 }
 
 void freeAstNodes(AstNode* node) {

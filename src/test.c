@@ -94,7 +94,8 @@ bool testCallNode0Args() {
   Token name = syntheticToken("test");
   AstNode* node = compile(name, "f()");
 
-  AstNode* var = newVarGlobalNode(intern("f"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = intern("f");
   AstNode* call = newCallNode(var);
   AstNode* exprStmt = newExprStmtNode(call);
   AstNode* fn = mkFunction(name);
@@ -110,7 +111,8 @@ bool testCallNode1Args() {
   Token name = syntheticToken("test");
   AstNode* node = compile(name, "f(1)");
 
-  AstNode* f = newVarGlobalNode(intern("f"));
+  AstNode* f = newVarGlobalNode();
+  f->as.global.name = intern("f");
   AstNode* call = newCallNode(f);
   AstNode* exprStmt = newExprStmtNode(call);
   AstNode* fn = mkFunction(name);
@@ -127,7 +129,8 @@ bool testCallInfixNode() {
   Token name = syntheticToken("test");
   AstNode* node = compile(name, "1 + 2");
 
-  AstNode* inf = newVarGlobalNode(intern("+"));
+  AstNode* inf = newVarGlobalNode();
+  inf->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* call = newCallInfixNode(inf, lhs, rhs);
@@ -145,12 +148,15 @@ bool testCallInfixNodeLeftNested() {
   Token name = syntheticToken("test");
   AstNode* node = compile(name, "1 + 2 + 3");
 
-  AstNode* callLeft = newCallInfixNode(newVarGlobalNode(intern("+")),
-                                       newLiteralNode(NUMBER_VAL(1)),
+  AstNode* plusOp1 = newVarGlobalNode();
+  plusOp1->as.global.name = intern("+");
+  AstNode* callLeft = newCallInfixNode(plusOp1, newLiteralNode(NUMBER_VAL(1)),
                                        newLiteralNode(NUMBER_VAL(2)));
 
-  AstNode* call = newCallInfixNode(newVarGlobalNode(intern("+")), callLeft,
-                                   newLiteralNode(NUMBER_VAL(3)));
+  AstNode* plusOp2 = newVarGlobalNode();
+  plusOp2->as.global.name = intern("+");
+  AstNode* call =
+      newCallInfixNode(plusOp2, callLeft, newLiteralNode(NUMBER_VAL(3)));
   AstNode* exprStmt = newExprStmtNode(call);
   AstNode* fn = mkFunction(name);
   pushFnStmt(fn, exprStmt);
@@ -165,12 +171,15 @@ bool testCallInfixNodeRightNested() {
   Token name = syntheticToken("test");
   AstNode* node = compile(name, "1 + (2 + 3)");
 
-  AstNode* callRight = newCallInfixNode(newVarGlobalNode(intern("+")),
-                                        newLiteralNode(NUMBER_VAL(2)),
+  AstNode* plusOp1 = newVarGlobalNode();
+  plusOp1->as.global.name = intern("+");
+  AstNode* callRight = newCallInfixNode(plusOp1, newLiteralNode(NUMBER_VAL(2)),
                                         newLiteralNode(NUMBER_VAL(3)));
 
-  AstNode* call = newCallInfixNode(newVarGlobalNode(intern("+")),
-                                   newLiteralNode(NUMBER_VAL(1)), callRight);
+  AstNode* plusOp2 = newVarGlobalNode();
+  plusOp2->as.global.name = intern("+");
+  AstNode* call =
+      newCallInfixNode(plusOp2, newLiteralNode(NUMBER_VAL(1)), callRight);
   AstNode* exprStmt = newExprStmtNode(call);
   AstNode* fn = mkFunction(name);
   pushFnStmt(fn, exprStmt);
@@ -190,7 +199,8 @@ bool testFunctionNode() {
   f->as.function.body = newReturnNode(newLiteralNode(NUMBER_VAL(1)));
 
   ObjString* objLetName = intern("f");
-  AstNode* let = newLetNode(objLetName, f);
+  AstNode* let = newLetNode(f);
+  let->as.let.name = objLetName;
 
   AstNode* fn = mkFunction(name);
   pushFnStmt(fn, let);
@@ -262,7 +272,8 @@ bool testIfElse() {
   AstNode* node = compile(name, "if (x) 1 else 2");
 
   AstNode* fn = mkFunction(name);
-  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
   AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   AstNode* else_ = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
   AstNode* ifNode = newIfNode(cond, then, else_);
@@ -279,9 +290,11 @@ bool testIfBlock() {
   AstNode* node = compile(name, "if (x) { let y = 1 }");
 
   AstNode* fn = mkFunction(name);
-  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
   AstNode* block = newBlockNode();
-  AstNode* let = newLetNode(intern("y"), newLiteralNode(NUMBER_VAL(1)));
+  AstNode* let = newLetNode(newLiteralNode(NUMBER_VAL(1)));
+  let->as.let.name = intern("y");
   pushAstVec(&block->as.block.stmts, let);
   AstNode* ifNode = newIfNode(cond, block, NULL);
   pushFnStmt(fn, ifNode);
@@ -297,7 +310,8 @@ bool testIfElseBlock() {
   AstNode* node = compile(name, "if (x) { 1 } else { 2 }");
 
   AstNode* fn = mkFunction(name);
-  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
   AstNode* thenBlock = newBlockNode();
   AstNode* thenStmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   pushAstVec(&thenBlock->as.block.stmts, thenStmt);
@@ -318,8 +332,10 @@ bool testIfNested() {
   AstNode* node = compile(name, "if (a) if (b) 1 else 2");
 
   AstNode* fn = mkFunction(name);
-  AstNode* outerCond = newVarGlobalNode(intern("a"));
-  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* outerCond = newVarGlobalNode();
+  outerCond->as.global.name = intern("a");
+  AstNode* innerCond = newVarGlobalNode();
+  innerCond->as.global.name = intern("b");
   AstNode* innerThen = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   AstNode* innerElse = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
   AstNode* innerIf = newIfNode(innerCond, innerThen, innerElse);
@@ -337,9 +353,11 @@ bool testIfElseIf() {
   AstNode* node = compile(name, "if (a) 1 else if (b) 2 else 3");
 
   AstNode* fn = mkFunction(name);
-  AstNode* cond = newVarGlobalNode(intern("a"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("a");
   AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
-  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* innerCond = newVarGlobalNode();
+  innerCond->as.global.name = intern("b");
   AstNode* innerThen = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
   AstNode* innerElse = newExprStmtNode(newLiteralNode(NUMBER_VAL(3)));
   AstNode* innerIf = newIfNode(innerCond, innerThen, innerElse);
@@ -357,7 +375,8 @@ bool testIfComplexCondition() {
   AstNode* node = compile(name, "if (1 + 2) 1");
 
   AstNode* fn = mkFunction(name);
-  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* op = newVarGlobalNode();
+  op->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* cond = newCallInfixNode(op, lhs, rhs);
@@ -392,9 +411,11 @@ bool testWhileBlock() {
   AstNode* node = compile(name, "while (x) { let y = 1 }");
 
   AstNode* fn = mkFunction(name);
-  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
   AstNode* block = newBlockNode();
-  AstNode* let = newLetNode(intern("y"), newLiteralNode(NUMBER_VAL(1)));
+  AstNode* let = newLetNode(newLiteralNode(NUMBER_VAL(1)));
+  let->as.let.name = intern("y");
   pushAstVec(&block->as.block.stmts, let);
   AstNode* whileNode = newWhileNode(cond, block);
   pushFnStmt(fn, whileNode);
@@ -410,7 +431,8 @@ bool testWhileComplexCondition() {
   AstNode* node = compile(name, "while (1 + 2) 1");
 
   AstNode* fn = mkFunction(name);
-  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* op = newVarGlobalNode();
+  op->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* cond = newCallInfixNode(op, lhs, rhs);
@@ -429,8 +451,10 @@ bool testWhileNested() {
   AstNode* node = compile(name, "while (a) while (b) 1");
 
   AstNode* fn = mkFunction(name);
-  AstNode* outerCond = newVarGlobalNode(intern("a"));
-  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* outerCond = newVarGlobalNode();
+  outerCond->as.global.name = intern("a");
+  AstNode* innerCond = newVarGlobalNode();
+  innerCond->as.global.name = intern("b");
   AstNode* innerBody = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   AstNode* innerWhile = newWhileNode(innerCond, innerBody);
   AstNode* whileNode = newWhileNode(outerCond, innerWhile);
@@ -451,7 +475,8 @@ bool testThrowGlobal() {
   AstNode* node = compile(name, "throw error");
 
   AstNode* fn = mkFunction(name);
-  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* errorVar = newVarGlobalNode();
+  errorVar->as.global.name = intern("error");
   AstNode* throwNode = newThrowNode(errorVar);
   pushFnStmt(fn, throwNode);
   AstNode* nil = newLiteralNode(NIL_VAL);
@@ -466,7 +491,8 @@ bool testThrowCall() {
   AstNode* node = compile(name, "throw Error(1)");
 
   AstNode* fn = mkFunction(name);
-  AstNode* errorVar = newVarGlobalNode(intern("Error"));
+  AstNode* errorVar = newVarGlobalNode();
+  errorVar->as.global.name = intern("Error");
   AstNode* call = newCallNode(errorVar);
   AstNode* message = newLiteralNode(NUMBER_VAL(1));
   pushAstVec(&call->as.call.args, message);
@@ -484,7 +510,8 @@ bool testThrowInfix() {
   AstNode* node = compile(name, "throw 1 + 2");
 
   AstNode* fn = mkFunction(name);
-  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* op = newVarGlobalNode();
+  op->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* expr = newCallInfixNode(op, lhs, rhs);
@@ -503,7 +530,8 @@ bool testThrowInBlock() {
 
   AstNode* fn = mkFunction(name);
   AstNode* block = newBlockNode();
-  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* errorVar = newVarGlobalNode();
+  errorVar->as.global.name = intern("error");
   AstNode* throwNode = newThrowNode(errorVar);
   pushAstVec(&block->as.block.stmts, throwNode);
   pushFnStmt(fn, block);
@@ -519,8 +547,10 @@ bool testThrowInConditional() {
   AstNode* node = compile(name, "if (x) throw error");
 
   AstNode* fn = mkFunction(name);
-  AstNode* cond = newVarGlobalNode(intern("x"));
-  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
+  AstNode* errorVar = newVarGlobalNode();
+  errorVar->as.global.name = intern("error");
   AstNode* throwNode = newThrowNode(errorVar);
   AstNode* ifNode = newIfNode(cond, throwNode, NULL);
   pushFnStmt(fn, ifNode);
@@ -540,7 +570,8 @@ bool testAssignmentGlobal() {
   AstNode* node = compile(name, "x = 1");
 
   AstNode* fn = mkFunction(name);
-  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = intern("x");
   AstNode* literal = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment = newAssignmentNode(var, literal);
   AstNode* exprStmt = newExprStmtNode(assignment);
@@ -557,10 +588,12 @@ bool testAssignmentLocal() {
   AstNode* node = compile(name, "let x \n x = 1");
 
   AstNode* fn = mkFunction(name);
-  AstNode* let = newLetNode(intern("x"), newLiteralNode(UNDEF_VAL));
+  AstNode* let = newLetNode(newLiteralNode(UNDEF_VAL));
+  let->as.let.name = intern("x");
   pushFnStmt(fn, let);
 
-  AstNode* var = newVarLocalNode(1, intern("x"));
+  AstNode* var = newVarLocalNode(1);
+  var->as.local.name = intern("x");
   AstNode* literal = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment = newAssignmentNode(var, literal);
   AstNode* exprStmt = newExprStmtNode(assignment);
@@ -577,8 +610,10 @@ bool testAssignmentWithExpression() {
   AstNode* node = compile(name, "x = 1 + 2");
 
   AstNode* fn = mkFunction(name);
-  AstNode* var = newVarGlobalNode(intern("x"));
-  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = intern("x");
+  AstNode* op = newVarGlobalNode();
+  op->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* infixCall = newCallInfixNode(op, lhs, rhs);
@@ -597,8 +632,10 @@ bool testAssignmentWithCall() {
   AstNode* node = compile(name, "x = f()");
 
   AstNode* fn = mkFunction(name);
-  AstNode* var = newVarGlobalNode(intern("x"));
-  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = intern("x");
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
   AstNode* assignment = newAssignmentNode(var, call);
   AstNode* exprStmt = newExprStmtNode(assignment);
@@ -615,15 +652,18 @@ bool testAssignmentNestedExpression() {
   AstNode* node = compile(name, "x = (1 + 2) + 3");
 
   AstNode* fn = mkFunction(name);
-  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = intern("x");
 
   // Build (1 + 2) + 3
-  AstNode* innerOp = newVarGlobalNode(intern("+"));
+  AstNode* innerOp = newVarGlobalNode();
+  innerOp->as.global.name = intern("+");
   AstNode* innerLhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* innerRhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* innerCall = newCallInfixNode(innerOp, innerLhs, innerRhs);
 
-  AstNode* outerOp = newVarGlobalNode(intern("+"));
+  AstNode* outerOp = newVarGlobalNode();
+  outerOp->as.global.name = intern("+");
   AstNode* outerRhs = newLiteralNode(NUMBER_VAL(3));
   AstNode* outerCall = newCallInfixNode(outerOp, innerCall, outerRhs);
 
@@ -642,7 +682,8 @@ bool testAssignmentBooleanValue() {
   AstNode* node = compile(name, "x = true");
 
   AstNode* fn = mkFunction(name);
-  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = intern("x");
   AstNode* literal = newLiteralNode(BOOL_VAL(true));
   AstNode* assignment = newAssignmentNode(var, literal);
   AstNode* exprStmt = newExprStmtNode(assignment);
@@ -660,7 +701,8 @@ bool testAssignmentInBlock() {
 
   AstNode* fn = mkFunction(name);
   AstNode* block = newBlockNode();
-  AstNode* var = newVarGlobalNode(intern("x"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = intern("x");
   AstNode* literal = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment = newAssignmentNode(var, literal);
   AstNode* exprStmt = newExprStmtNode(assignment);
@@ -680,14 +722,16 @@ bool testMultipleAssignments() {
   AstNode* fn = mkFunction(name);
 
   // x = 1
-  AstNode* var1 = newVarGlobalNode(intern("x"));
+  AstNode* var1 = newVarGlobalNode();
+  var1->as.global.name = intern("x");
   AstNode* literal1 = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment1 = newAssignmentNode(var1, literal1);
   AstNode* exprStmt1 = newExprStmtNode(assignment1);
   pushFnStmt(fn, exprStmt1);
 
   // y = 2
-  AstNode* var2 = newVarGlobalNode(intern("y"));
+  AstNode* var2 = newVarGlobalNode();
+  var2->as.global.name = intern("y");
   AstNode* literal2 = newLiteralNode(NUMBER_VAL(2));
   AstNode* assignment2 = newAssignmentNode(var2, literal2);
   AstNode* exprStmt2 = newExprStmtNode(assignment2);
@@ -707,14 +751,16 @@ bool testAssignmentReassignment() {
   AstNode* fn = mkFunction(name);
 
   // x = 1
-  AstNode* var1 = newVarGlobalNode(intern("x"));
+  AstNode* var1 = newVarGlobalNode();
+  var1->as.global.name = intern("x");
   AstNode* literal1 = newLiteralNode(NUMBER_VAL(1));
   AstNode* assignment1 = newAssignmentNode(var1, literal1);
   AstNode* exprStmt1 = newExprStmtNode(assignment1);
   pushFnStmt(fn, exprStmt1);
 
   // x = 2
-  AstNode* var2 = newVarGlobalNode(intern("x"));
+  AstNode* var2 = newVarGlobalNode();
+  var2->as.global.name = intern("x");
   AstNode* literal2 = newLiteralNode(NUMBER_VAL(2));
   AstNode* assignment2 = newAssignmentNode(var2, literal2);
   AstNode* exprStmt2 = newExprStmtNode(assignment2);
@@ -896,7 +942,8 @@ bool testBytecodeFunctionExpr() {
 
 bool testBytecodeGlobal() {
   ObjString* name = intern("g");
-  AstNode* g = newVarGlobalNode(name);
+  AstNode* g = newVarGlobalNode();
+  g->as.global.name = name;
   Chunk c;
   if (!buildChunkForExpr(g, &c)) return false;
 
@@ -910,7 +957,8 @@ bool testBytecodeGlobal() {
 
 bool testBytecodeGlobalLongName() {
   ObjString* name = copyString("very_long_global_variable_name_123", 33);
-  AstNode* g = newVarGlobalNode(name);
+  AstNode* g = newVarGlobalNode();
+  g->as.global.name = name;
   Chunk c;
   if (!buildChunkForExpr(g, &c)) return false;
 
@@ -1064,7 +1112,8 @@ bool testBytecodeIfSimple() {
 
 bool testBytecodeIfElse() {
   ObjString* name = intern("x");
-  AstNode* cond = newVarGlobalNode(name);
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = name;
   AstNode* then = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   AstNode* else_ = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
   AstNode* ifNode = newIfNode(cond, then, else_);
@@ -1113,7 +1162,8 @@ bool testBytecodeIfElse() {
 
 bool testBytecodeIfBlock() {
   ObjString* name = intern("x");
-  AstNode* cond = newVarGlobalNode(name);
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = name;
   AstNode* block = newBlockNode();
   AstNode* stmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   pushAstVec(&block->as.block.stmts, stmt);
@@ -1151,7 +1201,8 @@ bool testBytecodeIfBlock() {
 
 bool testBytecodeIfElseBlock() {
   ObjString* name = intern("x");
-  AstNode* cond = newVarGlobalNode(name);
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = name;
   AstNode* thenBlock = newBlockNode();
   AstNode* thenStmt = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   pushAstVec(&thenBlock->as.block.stmts, thenStmt);
@@ -1175,8 +1226,10 @@ bool testBytecodeIfElseBlock() {
 }
 
 bool testBytecodeIfNested() {
-  AstNode* outerCond = newVarGlobalNode(intern("a"));
-  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* outerCond = newVarGlobalNode();
+  outerCond->as.global.name = intern("a");
+  AstNode* innerCond = newVarGlobalNode();
+  innerCond->as.global.name = intern("b");
   AstNode* innerThen = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   AstNode* innerElse = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
   AstNode* innerIf = newIfNode(innerCond, innerThen, innerElse);
@@ -1200,7 +1253,8 @@ bool testBytecodeIfNested() {
 }
 
 bool testBytecodeIfComplexCondition() {
-  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* op = newVarGlobalNode();
+  op->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* cond = newCallInfixNode(op, lhs, rhs);
@@ -1309,7 +1363,8 @@ bool testBytecodeWhileFalseCondition() {
 }
 
 bool testBytecodeWhileEmptyBody() {
-  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
   AstNode* body = newBlockNode();
   AstNode* whileNode = newWhileNode(cond, body);
   Chunk c;
@@ -1347,8 +1402,10 @@ bool testBytecodeWhileEmptyBody() {
 }
 
 bool testBytecodeWhileNested() {
-  AstNode* outerCond = newVarGlobalNode(intern("a"));
-  AstNode* innerCond = newVarGlobalNode(intern("b"));
+  AstNode* outerCond = newVarGlobalNode();
+  outerCond->as.global.name = intern("a");
+  AstNode* innerCond = newVarGlobalNode();
+  innerCond->as.global.name = intern("b");
   AstNode* innerBody = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   AstNode* innerWhile = newWhileNode(innerCond, innerBody);
   AstNode* outerWhile = newWhileNode(outerCond, innerWhile);
@@ -1403,7 +1460,8 @@ bool testBytecodeWhileNested() {
 }
 
 bool testBytecodeWhileComplexBody() {
-  AstNode* cond = newVarGlobalNode(intern("x"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
   AstNode* block = newBlockNode();
   AstNode* stmt1 = newExprStmtNode(newLiteralNode(NUMBER_VAL(1)));
   AstNode* stmt2 = newExprStmtNode(newLiteralNode(NUMBER_VAL(2)));
@@ -1464,7 +1522,7 @@ bool testBytecodeWhileComplexBody() {
 
 bool testBytecodeImportSimple() {
   AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module, NULL);
+  AstNode* importNode = newUseNode(module);
   Chunk c;
   if (!buildChunkForExpr(importNode, &c)) return false;
 
@@ -1477,7 +1535,8 @@ bool testBytecodeImportSimple() {
 
 bool testBytecodeImportWithAlias() {
   AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module, intern("m"));
+  AstNode* importNode = newUseNode(module);
+  importNode->as.use.alias = intern("m");
   Chunk c;
   if (!buildChunkForExpr(importNode, &c)) return false;
 
@@ -1493,7 +1552,7 @@ bool testBytecodeImportLongPath() {
   ObjString* longPath =
       copyString("very/long/path/to/a/module/that/has/many/segments", 48);
   AstNode* module = newModuleNode(longPath, NULL, NULL);
-  AstNode* importNode = newUseNode(module, NULL);
+  AstNode* importNode = newUseNode(module);
   Chunk c;
   if (!buildChunkForExpr(importNode, &c)) return false;
 
@@ -1509,7 +1568,8 @@ bool testBytecodeImportLongPath() {
  * ============================================================ */
 
 bool testBytecodeThrowSimple() {
-  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* errorVar = newVarGlobalNode();
+  errorVar->as.global.name = intern("error");
   AstNode* throwNode = newThrowNode(errorVar);
   Chunk c;
   if (!buildChunkForExpr(throwNode, &c)) return false;
@@ -1548,7 +1608,8 @@ bool testBytecodeThrowLiteral() {
 }
 
 bool testBytecodeThrowInfix() {
-  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* op = newVarGlobalNode();
+  op->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* expr = newCallInfixNode(op, lhs, rhs);
@@ -1585,8 +1646,10 @@ bool testBytecodeThrowInfix() {
 }
 
 bool testBytecodeThrowInConditional() {
-  AstNode* cond = newVarGlobalNode(intern("x"));
-  AstNode* errorVar = newVarGlobalNode(intern("error"));
+  AstNode* cond = newVarGlobalNode();
+  cond->as.global.name = intern("x");
+  AstNode* errorVar = newVarGlobalNode();
+  errorVar->as.global.name = intern("error");
   AstNode* throwNode = newThrowNode(errorVar);
   AstNode* ifNode = newIfNode(cond, throwNode, NULL);
   Chunk c;
@@ -1705,8 +1768,12 @@ bool testSequenceVariables() {
 
   AstNode* fn = mkFunction(name);
   AstNode* seq = newSequenceNode();
-  pushAstVec(&seq->as.sequence.values, newVarGlobalNode(intern("x")));
-  pushAstVec(&seq->as.sequence.values, newVarGlobalNode(intern("y")));
+  AstNode* xVar = newVarGlobalNode();
+  xVar->as.global.name = intern("x");
+  AstNode* yVar = newVarGlobalNode();
+  yVar->as.global.name = intern("y");
+  pushAstVec(&seq->as.sequence.values, xVar);
+  pushAstVec(&seq->as.sequence.values, yVar);
   AstNode* exprStmt = newExprStmtNode(seq);
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralNode(NIL_VAL);
@@ -1724,20 +1791,24 @@ bool testSequenceComplexExpression() {
   AstNode* seq = newSequenceNode();
 
   // 1 + 2
-  AstNode* plusOp = newVarGlobalNode(intern("+"));
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* infix = newCallInfixNode(plusOp, lhs, rhs);
   pushAstVec(&seq->as.sequence.values, infix);
 
   // f(3)
-  AstNode* f = newVarGlobalNode(intern("f"));
+  AstNode* f = newVarGlobalNode();
+  f->as.global.name = intern("f");
   AstNode* call = newCallNode(f);
   pushAstVec(&call->as.call.args, newLiteralNode(NUMBER_VAL(3)));
   pushAstVec(&seq->as.sequence.values, call);
 
   // x
-  pushAstVec(&seq->as.sequence.values, newVarGlobalNode(intern("x")));
+  AstNode* xVar = newVarGlobalNode();
+  xVar->as.global.name = intern("x");
+  pushAstVec(&seq->as.sequence.values, xVar);
 
   AstNode* exprStmt = newExprStmtNode(seq);
   pushFnStmt(fn, exprStmt);
@@ -1778,7 +1849,8 @@ bool testSequenceInCall() {
   AstNode* node = compile(name, "f((1, 2))");
 
   AstNode* fn = mkFunction(name);
-  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
 
   AstNode* seq = newSequenceNode();
@@ -1864,8 +1936,8 @@ bool testObjectStringKeys() {
   AstNode* fn = mkFunction(name);
   AstNode* obj = newObjectNode();
   ObjString* keyStr = copyString("key", 3);
-  AstNode* entry = newObjectEntryNode(newLiteralNode(OBJ_VAL(keyStr)),
-                                      newVarGlobalNode(intern("value")));
+  AstNode* entry =
+      newObjectEntryNode(newLiteralNode(OBJ_VAL(keyStr)), newVarGlobalNode());
   pushAstVec(&obj->as.object.entries, entry);
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
@@ -1883,14 +1955,16 @@ bool testObjectComplexValues() {
   AstNode* fn = mkFunction(name);
   AstNode* obj = newObjectNode();
 
-  AstNode* plusOp = newVarGlobalNode(intern("+"));
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* infix = newCallInfixNode(plusOp, lhs, rhs);
   pushAstVec(&obj->as.object.entries,
              newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("x"))), infix));
 
-  AstNode* f = newVarGlobalNode(intern("f"));
+  AstNode* f = newVarGlobalNode();
+  f->as.global.name = intern("f");
   AstNode* call = newCallNode(f);
   pushAstVec(&obj->as.object.entries,
              newObjectEntryNode(newLiteralNode(OBJ_VAL(intern("y"))), call));
@@ -1934,7 +2008,8 @@ bool testObjectInExpression() {
   AstNode* node = compile(name, "f({x: 1})");
 
   AstNode* fn = mkFunction(name);
-  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
 
   AstNode* obj = newObjectNode();
@@ -2128,7 +2203,8 @@ bool testBytecodeObjectComplexKeys() {
 }
 
 bool testBytecodeObjectInCall() {
-  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
 
   AstNode* obj = newObjectNode();
@@ -2245,7 +2321,8 @@ bool testBytecodeSequenceThreeElements() {
 
 bool testBytecodeSequenceNestedCallee() {
   // (f(), 1)
-  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
 
   AstNode* seq = newSequenceNode();
@@ -2335,7 +2412,8 @@ bool testBytecodeSequenceNested() {
 
 bool testBytecodeSequenceInCall() {
   // f((1, 2))
-  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
 
   AstNode* seq = newSequenceNode();
@@ -2372,7 +2450,8 @@ bool testBytecodeSequenceInCall() {
 
 bool testBytecodeAssignmentGlobal() {
   ObjString* name = intern("x");
-  AstNode* var = newVarGlobalNode(name);
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = name;
   AstNode* rhs = newLiteralNode(NUMBER_VAL(42));
   AstNode* assignment = newAssignmentNode(var, rhs);
   Chunk c;
@@ -2400,7 +2479,8 @@ bool testBytecodeAssignmentGlobal() {
 
 bool testBytecodeAssignmentLocal() {
   ObjString* name = intern("x");
-  AstNode* var = newVarLocalNode(0, name);
+  AstNode* var = newVarLocalNode(0);
+  var->as.local.name = name;
   AstNode* rhs = newLiteralNode(NUMBER_VAL(42));
   AstNode* assignment = newAssignmentNode(var, rhs);
   Chunk c;
@@ -2427,7 +2507,8 @@ bool testBytecodeAssignmentLocal() {
 
 bool testBytecodeAssignmentUpvalue() {
   ObjString* name = intern("x");
-  AstNode* var = newVarUpvalueNode(1, name);
+  AstNode* var = newVarUpvalueNode(1);
+  var->as.upvalue.name = name;
   AstNode* rhs = newLiteralNode(NUMBER_VAL(42));
   AstNode* assignment = newAssignmentNode(var, rhs);
   Chunk c;
@@ -2454,10 +2535,12 @@ bool testBytecodeAssignmentUpvalue() {
 
 bool testBytecodeAssignmentWithExpression() {
   ObjString* name = intern("x");
-  AstNode* var = newVarGlobalNode(name);
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = name;
 
   // Build 1 + 2
-  AstNode* op = newVarGlobalNode(intern("+"));
+  AstNode* op = newVarGlobalNode();
+  op->as.global.name = intern("+");
   AstNode* lhs = newLiteralNode(NUMBER_VAL(1));
   AstNode* rhs = newLiteralNode(NUMBER_VAL(2));
   AstNode* infixCall = newCallInfixNode(op, lhs, rhs);
@@ -2498,8 +2581,10 @@ bool testBytecodeAssignmentWithExpression() {
 
 bool testBytecodeAssignmentWithCall() {
   ObjString* name = intern("x");
-  AstNode* var = newVarGlobalNode(name);
-  AstNode* callee = newVarGlobalNode(intern("f"));
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = name;
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
   AstNode* assignment = newAssignmentNode(var, call);
   Chunk c;
@@ -2528,7 +2613,8 @@ bool testBytecodeAssignmentWithCall() {
 
 bool testBytecodeAssignmentLocalIndex1() {
   ObjString* name = intern("y");
-  AstNode* var = newVarLocalNode(1, name);
+  AstNode* var = newVarLocalNode(1);
+  var->as.local.name = name;
   AstNode* rhs = newLiteralNode(NUMBER_VAL(100));
   AstNode* assignment = newAssignmentNode(var, rhs);
   Chunk c;
@@ -2552,7 +2638,8 @@ bool testBytecodeAssignmentLocalIndex1() {
 bool testBytecodeAssignmentGlobalLongName() {
   ObjString* longName =
       copyString("very_long_global_variable_name_for_assignment", 44);
-  AstNode* var = newVarGlobalNode(longName);
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = longName;
   AstNode* rhs = newLiteralNode(BOOL_VAL(true));
   AstNode* assignment = newAssignmentNode(var, rhs);
   Chunk c;
@@ -2576,7 +2663,8 @@ bool testBytecodeAssignmentGlobalLongName() {
 
 bool testBytecodeAssignmentBooleanValue() {
   ObjString* name = intern("flag");
-  AstNode* var = newVarGlobalNode(name);
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = name;
   AstNode* rhs = newLiteralNode(BOOL_VAL(false));
   AstNode* assignment = newAssignmentNode(var, rhs);
   Chunk c;
@@ -2599,15 +2687,18 @@ bool testBytecodeAssignmentBooleanValue() {
 
 bool testBytecodeAssignmentNestedInfix() {
   ObjString* name = intern("result");
-  AstNode* var = newVarGlobalNode(name);
+  AstNode* var = newVarGlobalNode();
+  var->as.global.name = name;
 
   // Build (1 + 2) * 3
-  AstNode* plusOp = newVarGlobalNode(intern("+"));
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
   AstNode* one = newLiteralNode(NUMBER_VAL(1));
   AstNode* two = newLiteralNode(NUMBER_VAL(2));
   AstNode* plusCall = newCallInfixNode(plusOp, one, two);
 
-  AstNode* multOp = newVarGlobalNode(intern("*"));
+  AstNode* multOp = newVarGlobalNode();
+  multOp->as.global.name = intern("*");
   AstNode* three = newLiteralNode(NUMBER_VAL(3));
   AstNode* multCall = newCallInfixNode(multOp, plusCall, three);
 
