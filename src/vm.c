@@ -132,6 +132,7 @@ bool initVM() {
   vm.grayCount = 0;
   vm.grayCapacity = 0;
   vm.grayStack = NULL;
+  vm.astRoot = NULL;
 
   vm.compiler = NULL;
   vm.nodeCompiler = NULL;
@@ -186,6 +187,7 @@ void freeVM() {
 
   initCore(&vm.core);
 
+  freeAstNodes(vm.astRoot);
   freeObjects();
 }
 

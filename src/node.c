@@ -66,6 +66,8 @@ static AstNode* allocNode(AstType kind) {
   memset(n, 0, sizeof(AstNode));
   n->type = kind;
   n->line = -1;
+  n->next = vm.astRoot;
+  vm.astRoot = n;
   return n;
 }
 
@@ -903,6 +905,13 @@ void markAstNode(AstNode* n) {
   }
 }
 
+void markAstNodes(AstNode* node) {
+  while (node != NULL) {
+    markAstNode(node);
+    node = node->next;
+  }
+}
+
 void freeAstNode(AstNode* n) {
   if (!n) return;
 
@@ -996,4 +1005,11 @@ void freeAstNode(AstNode* n) {
 
   /* finally free the node struct itself */
   FREE(AstNode, n);
+}
+
+void freeAstNodes(AstNode* node) {
+  while (node != NULL) {
+    freeAstNode(node);
+    node = node->next;
+  }
 }

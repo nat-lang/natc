@@ -25,7 +25,7 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 #endif
 
     if (vm.bytesAllocated > vm.nextGC) {
-      // collectGarbage();
+      collectGarbage();
     }
   }
 
@@ -321,7 +321,7 @@ static void markRoots() {
   markObject((Obj*)vm.gen);
 
   markCompilerRoots(vm.compiler);
-  markNodeCompilerRoots(vm.nodeCompiler);
+  markAstNodes(vm.astRoot);
 }
 
 static void traceReferences() {

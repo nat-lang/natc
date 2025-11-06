@@ -111,6 +111,7 @@ typedef struct {
 
   // heap.
   Obj* objects;
+  AstNode* astRoot;
   ObjUpvalue* openUpvalues;
   ObjMap strings;
   ObjMap globals;
