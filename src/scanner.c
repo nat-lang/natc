@@ -380,8 +380,8 @@ Token consumeToken(char c) {
     case '=': {
       if (match('>')) {
         return makeToken(TOKEN_FAT_ARROW);
-      } else {
-        return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+      } else if (!isWhite(peekNext())) {
+        return makeToken(TOKEN_EQUAL);
       }
     }
     case '<': {
@@ -427,7 +427,8 @@ Token scanVirtualToken(char c) {
 }
 
 Token scanPathIdentifier() {
-  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/' || peek() == '.')
+  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/' || peek() == '.' ||
+         peek() == '_')
     advance();
 
   return scanner.current == scanner.start ? errorToken("Unexpected character.")
