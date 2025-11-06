@@ -320,7 +320,6 @@ static void markRoots() {
 
   markObject((Obj*)vm.gen);
 
-  markCompilerRoots(vm.compiler);
   markAstNodes(vm.astRoot);
 }
 

@@ -42,6 +42,5 @@ typedef struct Compiler {
 
 ObjFunction* compileModule(Compiler* root, const char* source, Token path,
                            ObjModule* module);
-void markCompilerRoots(Compiler* cmp);
 
 #endif

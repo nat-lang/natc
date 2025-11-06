@@ -255,16 +255,18 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
   if (check(TOKEN_FAT_ARROW)) return nakedFunction(cmp, parser.ppenult);
 
   Token name = parser.previous;
-  ObjString* objName = tokenString(name);
 
   AstNode* node = newUnknownNode();
   int address = -1;
   if ((address = resolveLocal(cmp, &name)) >= 0) {
-    node = newVarLocalNode((uint8_t)address, objName);
+    node = newVarLocalNode((uint8_t)address);
+    node->as.local.name = tokenString(name);
   } else if ((address = resolveUpvalue(cmp, &name)) >= 0) {
-    node = newVarUpvalueNode((uint8_t)address, objName);
+    node = newVarUpvalueNode((uint8_t)address);
+    node->as.upvalue.name = tokenString(name);
   } else {
-    node = newVarGlobalNode(objName);
+    node = newVarGlobalNode();
+    node->as.global.name = tokenString(name);
   }
 
   if (match(cmp, TOKEN_EQUAL)) {
@@ -278,7 +280,9 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 static AstNode* parameter(NodeCompiler* cmp) {
   addLocal(cmp, parser.previous);
   markInitialized(cmp);
-  return newParamNode(tokenString(parser.previous), NULL);
+  AstNode* node = newParamNode(NULL);
+  node->as.param.name = tokenString(parser.previous);
+  return node;
 }
 
 static AstNode* signature(NodeCompiler* cmp) {
@@ -633,8 +637,9 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
 
   markInitialized(cmp);
 
-  ObjString* name = tokenString(nameToken);
-  return newLetNode(name, node);
+  node = newLetNode(node);
+  node->as.let.name = tokenString(nameToken);
+  return node;
 }
 
 static AstNode* ifStatement(NodeCompiler* cmp) {
@@ -681,14 +686,14 @@ static AstNode* importStatement(NodeCompiler* cmp) {
       parser.previous);
   gotoParser(checkpoint);
 
-  ObjString* alias = NULL;
+  AstNode* node = newUseNode(module);
+
   if (match(cmp, TOKEN_AS)) {
     consume(cmp, TOKEN_IDENTIFIER, "Expect identifier for alias.");
-    Token aliasToken = parser.previous;
-    alias = tokenString(aliasToken);
+    node->as.use.alias = tokenString(parser.previous);
   }
 
-  return newUseNode(module, alias);
+  return node;
 }
 
 static AstNode* throwStatement(NodeCompiler* cmp) {

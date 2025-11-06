@@ -178,22 +178,22 @@ AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
 AstNode* newExprStmtNode(AstNode* expr);
 AstNode* newFunctionNode(ObjString* name, AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
-AstNode* newLetNode(ObjString* name, AstNode* value);
+AstNode* newLetNode(AstNode* value);
 AstNode* newLiteralNode(Value v);
 AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
                        ObjString* source);
 AstNode* newObjectNode();
 AstNode* newObjectEntryNode(AstNode* key, AstNode* value);
-AstNode* newParamNode(ObjString* name, AstNode* annotation);
+AstNode* newParamNode(AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
 AstNode* newThrowNode(AstNode* expr);
 AstNode* newSignatureNode();
 AstNode* newUnknownNode();
-AstNode* newUseNode(AstNode* module, ObjString* alias);
-AstNode* newVarGlobalNode(ObjString* name);
-AstNode* newVarLocalNode(uint8_t index, ObjString* name);
-AstNode* newVarUpvalueNode(uint8_t index, ObjString* name);
+AstNode* newUseNode(AstNode* module);
+AstNode* newVarGlobalNode();
+AstNode* newVarLocalNode(uint8_t index);
+AstNode* newVarUpvalueNode(uint8_t index);
 AstNode* newWhileNode(AstNode* cond, AstNode* body);
 
 /* api */
