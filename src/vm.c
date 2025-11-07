@@ -706,7 +706,11 @@ InterpretResult vmExecute(int baseFrame) {
         frame->ip += offset;
         break;
       }
-      case OP_JUMP_IF_FALSE:
+      case OP_JUMP_IF_FALSE: {
+        uint16_t offset = READ_SHORT();
+        if (isFalsey(vmPeek(0))) frame->ip += offset;
+        break;
+      }
       case OP_LOOP: {
         uint16_t offset = READ_SHORT();
         frame->ip -= offset;
