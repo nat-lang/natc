@@ -132,8 +132,7 @@ static inline uint32_t hashNumber(double num) {
 
 bool vHashable(Value value) {
   return (IS_BOOL(value) || IS_NIL(value) || IS_UNDEF(value) ||
-          IS_UNIT(value) || IS_NUMBER(value) || IS_STRING(value)) ||
-         IS_CLASS(value);
+          IS_UNIT(value) || IS_NUMBER(value) || IS_STRING(value));
 }
 
 // Generates a hash code for [value], which must be one of
@@ -152,12 +151,7 @@ uint32_t hashValue(Value value) {
       return hashNumber(AS_NUMBER(value));
     case VAL_OBJ: {
       Obj* object = AS_OBJ(value);
-      switch (object->oType) {
-        case OBJ_CLASS:
-          return hashNumber((uintptr_t)object);
-        default:
-          return object->hash;
-      }
+      return object->hash;
     }
   }
 

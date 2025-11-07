@@ -3,7 +3,6 @@
 
 #include "chunk.h"
 #include "compiler.h"
-#include "nodeCompiler.h"
 #include "object.h"
 #include "value.h"
 
@@ -60,46 +59,6 @@ typedef struct {
   ObjString* sSeq;
   ObjString* sObj;
 
-  ObjClass* base;
-  ObjClass* object;
-  ObjClass* module;
-  ObjClass* tuple;
-  ObjClass* sequence;
-  ObjClass* map;
-  ObjClass* set;
-  ObjClass* generator;
-
-  ObjClass* astClosure;
-  ObjClass* astComprehension;
-  ObjClass* astClassMethod;
-  ObjClass* astMethod;
-
-  ObjClass* astExternalUpvalue;
-  ObjClass* astInternalUpvalue;
-  ObjClass* astLocal;
-  ObjClass* astGlobal;
-  ObjClass* astOverload;
-  ObjClass* astMembership;
-  ObjClass* astBlock;
-  ObjClass* astQuantification;
-
-  ObjClass* vmTypeUnit;
-  ObjClass* vmTypeBool;
-  ObjClass* vmTypeNil;
-  ObjClass* vmTypeNumber;
-  ObjClass* vmTypeUndef;
-  ObjClass* oTypeVariable;
-  ObjClass* oTypeClass;
-  ObjClass* oTypeInstance;
-  ObjClass* oTypeString;
-  ObjClass* oTypeNative;
-  ObjClass* oTypeFunction;
-  ObjClass* oTypeBoundFunction;
-  ObjClass* oTypeOverload;
-  ObjClass* oTypeSequence;
-
-  ObjClosure* unify;
-  ObjInstance* typeSystem;
 } Core;
 
 typedef struct {
@@ -115,13 +74,8 @@ typedef struct {
   ObjUpvalue* openUpvalues;
   ObjMap strings;
   ObjMap globals;
-  ObjMap typeEnv;
   ObjMap prefixes;
   ObjMap infixes;
-  ObjMap methodInfixes;
-
-  // generator.
-  ObjInstance* gen;
 
   // core defs.
   Core core;
@@ -132,10 +86,6 @@ typedef struct {
   Obj** grayStack;
   size_t bytesAllocated;
   size_t nextGC;
-
-  // root compiler.
-  Compiler* compiler;
-  NodeCompiler* nodeCompiler;
 
   // currently executing module.
   ObjModule* module;
@@ -167,7 +117,7 @@ void vmFree_wasm();
 
 AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
                                    Token path);
-ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type);
+ObjModule* vmCompileModule(char* enclosingDir, Token path);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
 bool vmImport(ObjModule* module, ObjMap* target);
 bool vmImportAsInstance(ObjModule* module);
@@ -175,7 +125,6 @@ InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
-bool vmInitInstance(ObjClass* klass, int argCount);
 bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount);
 bool vmHashValue(Value value, uint32_t* hash);
@@ -186,7 +135,6 @@ void vmClosure(CallFrame* frame);
 bool vmOverload(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
-bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
 ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot, ObjString* name);
 

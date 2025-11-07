@@ -92,27 +92,6 @@ static void blackenObject(Obj* object) {
       markObjAST((ObjAst*)object);
       break;
 
-    case OBJ_BOUND_FUNCTION: {
-      ObjBoundFunction* obj = (ObjBoundFunction*)object;
-      markValue(obj->receiver);
-
-      switch (obj->type) {
-        case BOUND_METHOD:
-          markObject((Obj*)obj->bound.method);
-          break;
-        case BOUND_NATIVE:
-          markObject((Obj*)obj->bound.native);
-          break;
-      }
-      break;
-    }
-    case OBJ_CLASS: {
-      ObjClass* klass = (ObjClass*)object;
-      markObject((Obj*)klass->name);
-      markObject((Obj*)klass->super);
-      markMap(&klass->fields);
-      break;
-    }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
@@ -125,12 +104,6 @@ static void blackenObject(Obj* object) {
       for (int i = 0; i < overload->cases; i++)
         markObject((Obj*)overload->closures[i]);
       markMap(&overload->fields);
-      break;
-    }
-    case OBJ_INSTANCE: {
-      ObjInstance* instance = (ObjInstance*)object;
-      markObject((Obj*)instance->klass);
-      markMap(&instance->fields);
       break;
     }
     case OBJ_UPVALUE: {
@@ -180,7 +153,6 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)module->closure);
       markObject((Obj*)module->dirName);
       markObject((Obj*)module->baseName);
-      markMap(&module->namespace);
       break;
     }
   }
@@ -204,16 +176,6 @@ static void freeObject(Obj* object) {
     case OBJ_AST:
       freeObjAST((ObjAst*)object);
       break;
-    case OBJ_BOUND_FUNCTION:
-      FREE(ObjBoundFunction, object);
-      break;
-    case OBJ_CLASS: {
-      ObjClass* klass = (ObjClass*)object;
-      klass->super = NULL;
-      freeMap(&klass->fields);
-      FREE(ObjClass, object);
-      break;
-    }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
@@ -226,12 +188,6 @@ static void freeObject(Obj* object) {
       freeMap(&function->fields);
       freeMap(&function->constants);
       FREE(ObjFunction, object);
-      break;
-    }
-    case OBJ_INSTANCE: {
-      ObjInstance* instance = (ObjInstance*)object;
-      freeMap(&instance->fields);
-      FREE(ObjInstance, object);
       break;
     }
     case OBJ_OVERLOAD: {
@@ -247,8 +203,6 @@ static void freeObject(Obj* object) {
       break;
     }
     case OBJ_MODULE: {
-      ObjModule* module = (ObjModule*)object;
-      freeMap(&module->namespace);
       FREE(ObjModule, object);
       break;
     }
@@ -299,7 +253,6 @@ static void markRoots() {
   markMap(&vm.globals);
   markMap(&vm.prefixes);
   markMap(&vm.infixes);
-  markMap(&vm.methodInfixes);
 
   markObject((Obj*)vm.module);
 
@@ -320,8 +273,6 @@ static void markRoots() {
 
   markObject((Obj*)vm.core.sSeq);
   markObject((Obj*)vm.core.sObj);
-
-  markObject((Obj*)vm.gen);
 
   markAstNodes(vm.astRoot);
 }
