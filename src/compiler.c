@@ -456,8 +456,8 @@ static bool peekFunction(NodeCompiler* cmp) {
 
   } while (match(cmp, TOKEN_COMMA));
 
-  if (!match(cmp, TOKEN_PAREN_RIGHT)) return false;
-  if (!match(cmp, TOKEN_FAT_ARROW)) return false;
+  if (!check(TOKEN_PAREN_RIGHT)) return false;
+  if (!peek(TOKEN_FAT_ARROW)) return false;
 
   // n arg function.
   return true;
@@ -484,14 +484,74 @@ static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
   }
 }
 
-static AstNode* object(NodeCompiler* cmp, bool canAssign) {
-  AstNode* obj = newObjectNode();
+static AstNode* parseComprehensionConditions(NodeCompiler* cmp,
+                                             AstNode* comprehension,
+                                             TokenType closingToken) {
+  int scopesOpened = 0;
 
-  if (check(TOKEN_RIGHT_BRACE)) {
-    advance(cmp);
-    return obj;
+  // Parse conditions until closing token
+  while (!check(closingToken) && !check(TOKEN_EOF)) {
+    // Check if this is an iteration condition: var in iterable
+    if (checkVariable() && peek(TOKEN_IN)) {
+      beginScope(cmp);
+      scopesOpened++;
+
+      consumeIdentifier(cmp, "Expect variable name.");
+      Token varName = parser.previous;
+      uint8_t localIndex = addLocal(cmp, varName);
+      markInitialized(cmp);
+
+      AstNode* var = newVarLocalNode(localIndex);
+      var->as.local.name = tokenString(varName);
+
+      consume(cmp, TOKEN_IN, "Expect 'in' after variable name.");
+      AstNode* iterable = expression(cmp);
+
+      AstNode* iterCond = newComprehensionIterNode(var, iterable);
+      pushAstVec(&comprehension->as.comprehension.conditions, iterCond);
+    } else {
+      AstNode* predicate = expression(cmp);
+      AstNode* predCond = newComprehensionPredNode(predicate);
+      pushAstVec(&comprehension->as.comprehension.conditions, predCond);
+    }
+
+    if (!check(closingToken)) {
+      if (!match(cmp, TOKEN_COMMA)) {
+        errorAtCurrent(cmp,
+                       "Expect ',' or closing token after comprehension "
+                       "condition.");
+        break;
+      }
+    }
   }
 
+  for (int i = 0; i < scopesOpened; i++) {
+    endScope(cmp);
+  }
+
+  return comprehension;
+}
+
+static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
+  if (check(TOKEN_RIGHT_BRACE)) {
+    advance(cmp);
+    return newObjectNode();
+  }
+
+  Parser checkpoint = saveParser();
+  bool isComprehension = advanceTo(cmp, TOKEN_PIPE, TOKEN_RIGHT_BRACE, 1);
+  gotoParser(checkpoint);
+
+  if (isComprehension) {
+    AstNode* body = expression(cmp);
+    consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
+    AstNode* comprehension = newComprehensionNode(body, COMPREHENSION_SET);
+    parseComprehensionConditions(cmp, comprehension, TOKEN_RIGHT_BRACE);
+    consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after comprehension.");
+    return comprehension;
+  }
+
+  AstNode* obj = newObjectNode();
   do {
     AstNode* key = literal(cmp, false);
     if (key->type == AST_UNKNOWN) {
@@ -515,7 +575,7 @@ static AstNode* object(NodeCompiler* cmp, bool canAssign) {
   return obj;
 }
 
-static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
+static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
   // empty sequence.
   if (match(cmp, TOKEN_COMMA)) {
     consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')'.");
@@ -528,8 +588,16 @@ static AstNode* parentheses(NodeCompiler* cmp, bool canAssign) {
   gotoParser(checkpoint);
   if (isFunction) return function(cmp, parser.ppenult);
 
-  // sequence.
+  // sequence or comprehension.
   AstNode* node = expression(cmp);
+
+  if (check(TOKEN_PIPE)) {
+    advance(cmp);  // consume pipe
+    AstNode* comprehension = newComprehensionNode(node, COMPREHENSION_SEQUENCE);
+    parseComprehensionConditions(cmp, comprehension, TOKEN_PAREN_RIGHT);
+    consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after comprehension.");
+    return comprehension;
+  }
 
   if (check(TOKEN_COMMA)) {
     AstNode* seq = newSequenceNode();
@@ -552,9 +620,9 @@ static ParseRule rules[] = {
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_LEFT_BRACE] = {object, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_LEFT_BRACE] = {leftBrace, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_PAREN_LEFT] = {parentheses, call, PREC_CALL, PREC_NONE},
+    [TOKEN_PAREN_LEFT] = {parenLeft, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_USER_INFIX] = {NULL, userInfix, PREC_NONE, PREC_NONE},
@@ -614,8 +682,9 @@ static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
   node = prefixRule(cmp, canAssign);
 
   ParseRule* infixRule;
-  while (precedence <=
-         (infixRule = getInfixRule(cmp, parser.current))->leftPrec) {
+  while (parser.current.type != TOKEN_PIPE &&
+         precedence <=
+             (infixRule = getInfixRule(cmp, parser.current))->leftPrec) {
     advance(cmp);
     node = infixRule->infix(cmp, canAssign, node, infixRule->rightPrec);
   }

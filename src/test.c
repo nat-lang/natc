@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 
@@ -1428,9 +1427,9 @@ bool testBytecodeWhileNested() {
   innerCond->as.global.name = intern("b");
   AstNode* innerBody = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(1)));
   AstNode* innerWhile = newWhileNode(innerCond, innerBody);
-  AstNode* outerWhile = newWhileNode(outerCond, innerWhile);
+  AstNode* whileNode = newWhileNode(outerCond, innerWhile);
   Chunk c;
-  if (!buildChunkForExpr(outerWhile, &c)) return false;
+  if (!buildChunkForExpr(whileNode, &c)) return false;
 
   // Verify nested structure
   // Outer: GET_GLOBAL a, JUMP_IF_FALSE, POP, [inner while], LOOP, POP
@@ -1885,6 +1884,322 @@ bool testSequenceInCall() {
   pushFnStmt(fn, returnStmt);
 
   return assertNodesEqual(node, fn);
+}
+
+bool testSequenceComprehensionParse() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "(x | x in (1,2), x != 2)");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* body = newVarGlobalNode();
+  body->as.global.name = intern("x");
+  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQUENCE);
+
+  AstNode* iterable = newSequenceNode();
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* iterVar = newVarLocalNode(1);
+  iterVar->as.local.name = intern("x");
+  AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  pushAstVec(&comp->as.comprehension.conditions, iterCond);
+
+  AstNode* neqOp = newVarGlobalNode();
+  neqOp->as.global.name = intern("!=");
+  AstNode* predVar = newVarLocalNode(1);
+  predVar->as.local.name = intern("x");
+  AstNode* predExpr =
+      newCallInfixNode(neqOp, predVar, newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* predCond = newComprehensionPredNode(predExpr);
+  pushAstVec(&comp->as.comprehension.conditions, predCond);
+
+  AstNode* exprStmt = newExprStmtNode(comp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSetComprehensionParse() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "({x | x in (1,2), x != 2})");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* body = newVarGlobalNode();
+  body->as.global.name = intern("x");
+  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SET);
+
+  AstNode* iterable = newSequenceNode();
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* iterVar = newVarLocalNode(1);
+  iterVar->as.local.name = intern("x");
+  AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  pushAstVec(&comp->as.comprehension.conditions, iterCond);
+
+  AstNode* neqOp = newVarGlobalNode();
+  neqOp->as.global.name = intern("!=");
+  AstNode* predVar = newVarLocalNode(1);
+  predVar->as.local.name = intern("x");
+  AstNode* predExpr =
+      newCallInfixNode(neqOp, predVar, newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* predCond = newComprehensionPredNode(predExpr);
+  pushAstVec(&comp->as.comprehension.conditions, predCond);
+
+  AstNode* exprStmt = newExprStmtNode(comp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSetComprehensionComplexBody() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "({x + 1 | x in (1,2)})");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
+  AstNode* bodyLeft = newVarGlobalNode();
+  bodyLeft->as.global.name = intern("x");
+  AstNode* bodyRight = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* bodyExpr = newCallInfixNode(plusOp, bodyLeft, bodyRight);
+  AstNode* comp = newComprehensionNode(bodyExpr, COMPREHENSION_SET);
+
+  AstNode* iterable = newSequenceNode();
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* iterVar = newVarLocalNode(1);
+  iterVar->as.local.name = intern("x");
+  AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  pushAstVec(&comp->as.comprehension.conditions, iterCond);
+
+  AstNode* exprStmt = newExprStmtNode(comp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSetComprehensionNestedBody() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "({{x + 1 | x in y} | y in (1,2,3)})");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* innerPlus = newVarGlobalNode();
+  innerPlus->as.global.name = intern("+");
+  AstNode* innerX = newVarGlobalNode();
+  innerX->as.global.name = intern("x");
+  AstNode* innerOne = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* innerBodyExpr = newCallInfixNode(innerPlus, innerX, innerOne);
+  AstNode* innerComp = newComprehensionNode(innerBodyExpr, COMPREHENSION_SET);
+
+  AstNode* innerIterVar = newVarLocalNode(1);
+  innerIterVar->as.local.name = intern("x");
+  AstNode* iterableY = newVarGlobalNode();
+  iterableY->as.global.name = intern("y");
+  AstNode* innerIter = newComprehensionIterNode(innerIterVar, iterableY);
+  pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
+
+  AstNode* outerComp = newComprehensionNode(innerComp, COMPREHENSION_SET);
+
+  AstNode* outerIterable = newSequenceNode();
+  pushAstVec(&outerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&outerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(2)));
+  pushAstVec(&outerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(3)));
+  AstNode* outerIterVar = newVarLocalNode(1);
+  outerIterVar->as.local.name = intern("y");
+  AstNode* outerIter = newComprehensionIterNode(outerIterVar, outerIterable);
+  pushAstVec(&outerComp->as.comprehension.conditions, outerIter);
+
+  AstNode* exprStmt = newExprStmtNode(outerComp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSetComprehensionNestedCondition() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "({x | x in {y | y in (1,2)}})");
+  AstNode* expected = mkFunction(name);
+
+  AstNode* body = newVarGlobalNode();
+  body->as.global.name = intern("x");
+  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SET);
+
+  AstNode* innerBody = newVarGlobalNode();
+  innerBody->as.global.name = intern("y");
+  AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SET);
+  AstNode* innerIterable = newSequenceNode();
+  pushAstVec(&innerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&innerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* innerIterVar = newVarLocalNode(2);
+  innerIterVar->as.local.name = intern("y");
+  AstNode* innerIter = newComprehensionIterNode(innerIterVar, innerIterable);
+  pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
+
+  AstNode* outerIterVar = newVarLocalNode(1);
+  outerIterVar->as.local.name = intern("x");
+  AstNode* outerIter = newComprehensionIterNode(outerIterVar, innerComp);
+  pushAstVec(&comp->as.comprehension.conditions, outerIter);
+
+  AstNode* exprStmt = newExprStmtNode(comp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSetComprehensionFunctionBody() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "({() => 1 | true})");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* fnExpr = newFunctionNode(NULL);
+  fnExpr->as.function.signature = newSignatureNode();
+  fnExpr->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+
+  AstNode* comp = newComprehensionNode(fnExpr, COMPREHENSION_SET);
+
+  AstNode* predicate = newLiteralValueNode(BOOL_VAL(true));
+  AstNode* predCond = newComprehensionPredNode(predicate);
+  pushAstVec(&comp->as.comprehension.conditions, predCond);
+
+  AstNode* exprStmt = newExprStmtNode(comp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSequenceComprehensionComplexBody() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "(x + 1 | x in (1,2))");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
+  AstNode* bodyLeft = newVarGlobalNode();
+  bodyLeft->as.global.name = intern("x");
+  AstNode* bodyRight = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* bodyExpr = newCallInfixNode(plusOp, bodyLeft, bodyRight);
+  AstNode* comp = newComprehensionNode(bodyExpr, COMPREHENSION_SEQUENCE);
+
+  AstNode* iterable = newSequenceNode();
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* iterVar = newVarLocalNode(1);
+  iterVar->as.local.name = intern("x");
+  AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  pushAstVec(&comp->as.comprehension.conditions, iterCond);
+
+  AstNode* exprStmt = newExprStmtNode(comp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSequenceComprehensionNestedBody() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "((y | y in (1,2)) | x in (1,2))");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* innerBody = newVarGlobalNode();
+  innerBody->as.global.name = intern("y");
+  AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQUENCE);
+  AstNode* innerIterable = newSequenceNode();
+  pushAstVec(&innerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&innerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* innerVar = newVarLocalNode(1);
+  innerVar->as.local.name = intern("y");
+  AstNode* innerIter = newComprehensionIterNode(innerVar, innerIterable);
+  pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
+
+  AstNode* outerComp = newComprehensionNode(innerComp, COMPREHENSION_SEQUENCE);
+
+  AstNode* outerIterable = newSequenceNode();
+  pushAstVec(&outerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&outerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* outerVar = newVarLocalNode(1);
+  outerVar->as.local.name = intern("x");
+  AstNode* outerIter = newComprehensionIterNode(outerVar, outerIterable);
+  pushAstVec(&outerComp->as.comprehension.conditions, outerIter);
+
+  AstNode* exprStmt = newExprStmtNode(outerComp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSequenceComprehensionNestedCondition() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "(x | x in (y | y in (1,2)))");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* body = newVarGlobalNode();
+  body->as.global.name = intern("x");
+  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQUENCE);
+
+  AstNode* innerBody = newVarGlobalNode();
+  innerBody->as.global.name = intern("y");
+  AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQUENCE);
+  AstNode* innerIterable = newSequenceNode();
+  pushAstVec(&innerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&innerIterable->as.sequence.values,
+             newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* innerVar = newVarLocalNode(2);
+  innerVar->as.local.name = intern("y");
+  AstNode* innerIter = newComprehensionIterNode(innerVar, innerIterable);
+  pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
+
+  AstNode* outerVar = newVarLocalNode(1);
+  outerVar->as.local.name = intern("x");
+  AstNode* outerIter = newComprehensionIterNode(outerVar, innerComp);
+  pushAstVec(&comp->as.comprehension.conditions, outerIter);
+
+  AstNode* exprStmt = newExprStmtNode(comp);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
 }
 
 /* ============================================================
@@ -2830,6 +3145,22 @@ int testMain(void) {
   fmt("    ", testSequenceComplexExpression(), "Sequence complex expression");
   fmt("    ", testSequenceNested(), "Sequence nested");
   fmt("    ", testSequenceInCall(), "Sequence in call");
+  fmt("    ", testSequenceComprehensionParse(), "Sequence comprehension parse");
+  fmt("    ", testSequenceComprehensionComplexBody(),
+      "Sequence comprehension complex body");
+  fmt("    ", testSequenceComprehensionNestedBody(),
+      "Sequence comprehension nested body");
+  fmt("    ", testSequenceComprehensionNestedCondition(),
+      "Sequence comprehension nested condition");
+  fmt("    ", testSetComprehensionParse(), "Set comprehension parse");
+  fmt("    ", testSetComprehensionComplexBody(),
+      "Set comprehension complex body");
+  fmt("    ", testSetComprehensionNestedBody(),
+      "Set comprehension nested body");
+  fmt("    ", testSetComprehensionNestedCondition(),
+      "Set comprehension nested condition");
+  fmt("    ", testSetComprehensionFunctionBody(),
+      "Set comprehension function body");
   fmt("    ", testObjectEmpty(), "Object empty");
   fmt("    ", testObjectOneProperty(), "Object one property");
   fmt("    ", testObjectMultipleProperties(), "Object multiple properties");

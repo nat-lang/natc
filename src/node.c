@@ -99,6 +99,27 @@ AstNode* newCallNode(AstNode* callee) {
   return n;
 }
 
+AstNode* newComprehensionNode(AstNode* body, ComprehensionType type) {
+  AstNode* n = allocNode(AST_COMPREHENSION);
+  n->as.comprehension.body = body;
+  n->as.comprehension.type = type;
+  initAstVec(&n->as.comprehension.conditions);
+  return n;
+}
+
+AstNode* newComprehensionIterNode(AstNode* var, AstNode* iterable) {
+  AstNode* n = allocNode(AST_COMPREHENSION_ITER);
+  n->as.comprehensionIter.var = var;
+  n->as.comprehensionIter.iterable = iterable;
+  return n;
+}
+
+AstNode* newComprehensionPredNode(AstNode* predicate) {
+  AstNode* n = allocNode(AST_COMPREHENSION_PRED);
+  n->as.comprehensionPred.predicate = predicate;
+  return n;
+}
+
 AstNode* newExprStmtNode(AstNode* expr) {
   AstNode* n = allocNode(AST_EXPR_STMT);
   n->as.exprStmt.expr = expr;
@@ -300,6 +321,26 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.callInfix.rhs, depth + 1);
       break;
     }
+    case AST_COMPREHENSION: {
+      printStrAt("Comprehension ", depth);
+      printf("(%s)\n", node->as.comprehension.type == COMPREHENSION_SEQUENCE
+                           ? "Sequence"
+                           : "Set");
+      printNodeAt(node->as.comprehension.body, depth + 1);
+      printNodeVecAt(&node->as.comprehension.conditions, depth + 1);
+      break;
+    }
+    case AST_COMPREHENSION_ITER: {
+      printStrAt("ComprehensionIter\n", depth);
+      printNodeAt(node->as.comprehensionIter.var, depth + 1);
+      printNodeAt(node->as.comprehensionIter.iterable, depth + 1);
+      break;
+    }
+    case AST_COMPREHENSION_PRED: {
+      printStrAt("ComprehensionPred\n", depth);
+      printNodeAt(node->as.comprehensionPred.predicate, depth + 1);
+      break;
+    }
     case AST_EXPR_STMT:
       printStrAt("ExprStmt\n", depth);
       printNodeAt(node->as.exprStmt.expr, depth + 1);
@@ -429,6 +470,22 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.callInfix.callee, b->as.callInfix.callee) &&
              nodesEqual(a->as.callInfix.lhs, b->as.callInfix.lhs) &&
              nodesEqual(a->as.callInfix.rhs, b->as.callInfix.rhs);
+
+    case AST_COMPREHENSION:
+      return a->as.comprehension.type == b->as.comprehension.type &&
+             nodesEqual(a->as.comprehension.body, b->as.comprehension.body) &&
+             astVecsEqual(&a->as.comprehension.conditions,
+                          &b->as.comprehension.conditions);
+
+    case AST_COMPREHENSION_ITER:
+      return nodesEqual(a->as.comprehensionIter.var,
+                        b->as.comprehensionIter.var) &&
+             nodesEqual(a->as.comprehensionIter.iterable,
+                        b->as.comprehensionIter.iterable);
+
+    case AST_COMPREHENSION_PRED:
+      return nodesEqual(a->as.comprehensionPred.predicate,
+                        b->as.comprehensionPred.predicate);
 
     case AST_EXPR_STMT:
       return nodesEqual(a->as.exprStmt.expr, b->as.exprStmt.expr);
@@ -624,6 +681,18 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, (uint8_t)2);
       break;
     }
+    case AST_COMPREHENSION:
+      // TODO: Implement comprehension compilation
+      error(node, "Comprehension compilation not yet implemented.");
+      return false;
+    case AST_COMPREHENSION_ITER:
+      // Should not be compiled directly - only as part of comprehension
+      error(node, "ComprehensionIter should not be compiled directly.");
+      return false;
+    case AST_COMPREHENSION_PRED:
+      // Should not be compiled directly - only as part of comprehension
+      error(node, "ComprehensionPred should not be compiled directly.");
+      return false;
     case AST_EXPR_STMT: {
       if (!toChunk(node->as.exprStmt.expr, chunk)) return false;
       emitByte(chunk, node, OP_POP);
@@ -825,6 +894,21 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.callInfix.rhs);
       break;
     }
+    case AST_COMPREHENSION: {
+      markAstNode(n->as.comprehension.body);
+      for (int i = 0; i < n->as.comprehension.conditions.count; i++) {
+        markAstNode(n->as.comprehension.conditions.items[i]);
+      }
+      break;
+    }
+    case AST_COMPREHENSION_ITER: {
+      markAstNode(n->as.comprehensionIter.var);
+      markAstNode(n->as.comprehensionIter.iterable);
+      break;
+    }
+    case AST_COMPREHENSION_PRED:
+      markAstNode(n->as.comprehensionPred.predicate);
+      break;
     case AST_EXPR_STMT:
       markAstNode(n->as.exprStmt.expr);
       break;
@@ -935,6 +1019,13 @@ void freeAstNode(AstNode* n) {
       freeAstVec(&n->as.call.args);
       break;
     case AST_CALL_INFIX:
+      break;
+    case AST_COMPREHENSION:
+      freeAstVec(&n->as.comprehension.conditions);
+      break;
+    case AST_COMPREHENSION_ITER:
+      break;
+    case AST_COMPREHENSION_PRED:
       break;
     case AST_SIGNATURE:
       freeAstVec(&n->as.signature.params);

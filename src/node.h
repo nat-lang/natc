@@ -10,6 +10,9 @@ typedef enum {
   AST_BLOCK,
   AST_CALL,
   AST_CALL_INFIX,
+  AST_COMPREHENSION,
+  AST_COMPREHENSION_ITER,
+  AST_COMPREHENSION_PRED,
   AST_EXPR_STMT,
   AST_FUNCTION,
   AST_IF,
@@ -31,6 +34,11 @@ typedef enum {
   AST_WHILE,
 
 } AstType;
+
+typedef enum {
+  COMPREHENSION_SEQUENCE,
+  COMPREHENSION_SET,
+} ComprehensionType;
 
 typedef struct {
   AstNode** items;
@@ -166,6 +174,21 @@ struct AstNode {
       AstNode* body;
     } whileStmt;
 
+    struct {
+      AstNode* body;
+      AstVec conditions;
+      ComprehensionType type;
+    } comprehension;
+
+    struct {
+      AstNode* var;
+      AstNode* iterable;
+    } comprehensionIter;
+
+    struct {
+      AstNode* predicate;
+    } comprehensionPred;
+
   } as;
 };
 
@@ -175,6 +198,9 @@ AstNode* newAssignmentNode(AstNode* lhs, AstNode* rhs);
 AstNode* newBlockNode();
 AstNode* newCallNode(AstNode* callee);
 AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
+AstNode* newComprehensionNode(AstNode* body, ComprehensionType type);
+AstNode* newComprehensionIterNode(AstNode* var, AstNode* iterable);
+AstNode* newComprehensionPredNode(AstNode* predicate);
 AstNode* newExprStmtNode(AstNode* expr);
 AstNode* newFunctionNode(AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
