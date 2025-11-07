@@ -922,79 +922,45 @@ void freeAstNode(AstNode* n) {
 
   switch (n->type) {
     case AST_ASSIGNMENT:
-      freeAstNode(n->as.assignment.lhs);
-      freeAstNode(n->as.assignment.rhs);
       break;
     case AST_LITERAL:
-      /* Value/ObjString inside Value are GC-managed; nothing to free */
       break;
-
     case AST_VAR_GLOBAL:
     case AST_VAR_LOCAL:
     case AST_VAR_UPVALUE:
-      /* ObjString* name is GC-managed */
       break;
-
     case AST_IMPORT:
-      /* ObjString* modulePath and alias are GC-managed; nothing to free */
       break;
-
     case AST_CALL:
-      freeAstNode(n->as.call.callee);
-      for (int i = 0; i < n->as.call.args.count; i++) {
-        freeAstNode(n->as.call.args.items[i]);
-      }
       freeAstVec(&n->as.call.args);
       break;
-
     case AST_CALL_INFIX:
-      freeAstNode(n->as.callInfix.callee);
-      freeAstNode(n->as.callInfix.lhs);
-      freeAstNode(n->as.callInfix.rhs);
-
+      break;
     case AST_SIGNATURE:
       freeAstVec(&n->as.signature.params);
       break;
-
     case AST_RETURN:
-      freeAstNode(n->as.xReturn.value);
       break;
-
     case AST_UNKNOWN:
       break;
-
     case AST_BLOCK:
-      freeAstVec(&n->as.block.stmts);
       break;
     case AST_EXPR_STMT:
-      freeAstNode(n->as.exprStmt.expr);
       break;
     case AST_FUNCTION:
-      freeAstNode(n->as.function.signature);
-      freeAstNode(n->as.function.body);
       break;
     case AST_IF:
-      freeAstNode(n->as.ifStmt.cond);
-      freeAstNode(n->as.ifStmt.then);
-      freeAstNode(n->as.ifStmt.elseBranch);
       break;
     case AST_WHILE:
-      freeAstNode(n->as.whileStmt.cond);
-      freeAstNode(n->as.whileStmt.body);
       break;
     case AST_LET:
-      freeAstNode(n->as.let.value);
       break;
     case AST_MODULE:
-      for (int i = 0; i < n->as.module.stmts.count; i++) {
-        freeAstNode((AstNode*)n->as.module.stmts.items[i]);
-      }
+      freeAstVec(&n->as.module.stmts);
       break;
     case AST_PARAM:
-      freeAstNode(n->as.param.annotation);
       break;
     case AST_THROW:
-      freeAstNode(n->as.throwStmt.expr);
       break;
     case AST_SEQUENCE:
       freeAstVec(&n->as.sequence.values);
@@ -1003,13 +969,11 @@ void freeAstNode(AstNode* n) {
       freeAstVec(&n->as.object.entries);
       break;
     case AST_OBJECT_ENTRY:
-      freeAstNode(n->as.objectEntry.key);
-      freeAstNode(n->as.objectEntry.value);
       break;
   }
 
   /* finally free the node struct itself */
-  // FREE(AstNode, n);
+  FREE(AstNode, n);
 }
 
 void freeAstNodes(AstNode* node) {
