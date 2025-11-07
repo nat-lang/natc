@@ -2,45 +2,19 @@
 #define nat_compiler_h
 
 #include "common.h"
-#include "memory.h"
-#include "object.h"
+#include "node.h"
 #include "scanner.h"
-#include "value.h"
 
-typedef enum {
-  TYPE_ANONYMOUS,
-  TYPE_IMPLICIT,
-  TYPE_BOUND,
-  TYPE_METHOD,
-  TYPE_MODULE,
-  TYPE_INITIALIZER,
-} FunctionType;
-
-typedef struct {
-  // local slot of the bound variable.
-  int var;
-  // local slot of the object that implements the protocol.
-  int obj;
-  // stack offset of the first instruction of the body.
-  int loopStart;
-} Iterator;
-
-typedef struct ClassCompiler {
-  struct ClassCompiler* enclosing;
-} ClassCompiler;
-
-typedef struct Compiler {
-  struct Compiler* enclosing;
-  struct Compiler* signature;
-  ObjFunction* function;
-  ObjModule* module;
-  FunctionType functionType;
-
-  Upvalue upvalues[UINT8_COUNT];
+typedef struct NodeCompiler {
+  struct NodeCompiler* enclosing;
+  AstNode* fn;
   int scopeDepth;
-} Compiler;
+  bool hadError;
+} NodeCompiler;
 
-ObjFunction* compileModule(Compiler* root, const char* source, Token path,
-                           ObjModule* module);
+void compileModuleImportBody(NodeCompiler* cmp, AstNode* module);
+AstNode* compileFunctionNode(ObjString* name, char* source, AstNode* module);
+
+void markNodeCompilerRoots(NodeCompiler* cmp);
 
 #endif

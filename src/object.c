@@ -36,30 +36,6 @@ ObjAst* newObjAst(AstNode* node) {
   return obj;
 }
 
-ObjBoundFunction* newBoundMethod(Value receiver, ObjClosure* method) {
-  ObjBoundFunction* obj = ALLOCATE_OBJ(ObjBoundFunction, OBJ_BOUND_FUNCTION);
-  obj->type = BOUND_METHOD;
-  obj->receiver = receiver;
-  obj->bound.method = method;
-  return obj;
-}
-
-ObjBoundFunction* newBoundNative(Value receiver, ObjNative* native) {
-  ObjBoundFunction* obj = ALLOCATE_OBJ(ObjBoundFunction, OBJ_BOUND_FUNCTION);
-  obj->type = BOUND_NATIVE;
-  obj->receiver = receiver;
-  obj->bound.native = native;
-  return obj;
-}
-
-ObjClass* newClass(ObjString* name) {
-  ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
-  klass->name = name;
-  klass->super = NULL;
-  initMap(&klass->fields);
-  return klass;
-}
-
 ObjClosure* newClosure(ObjFunction* function) {
   ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
   for (int i = 0; i < function->upvalueCount; i++) upvalues[i] = NULL;
@@ -71,15 +47,13 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
-ObjModule* newModule(ObjString* dirName, ObjString* baseName, ObjString* source,
-                     ModuleType type) {
+ObjModule* newModule(ObjString* dirName, ObjString* baseName,
+                     ObjString* source) {
   ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
-  module->type = type;
   module->dirName = dirName;
   module->baseName = baseName;
   module->source = source;
   module->closure = NULL;
-  initMap(&module->namespace);
   return module;
 }
 
@@ -114,13 +88,6 @@ ObjFunction* newFunction() {
   initChunk(&function->chunk);
   initMap(&function->constants);
   return function;
-}
-
-ObjInstance* newInstance(ObjClass* klass) {
-  ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
-  instance->klass = klass;
-  initMap(&instance->fields);
-  return instance;
 }
 
 ObjNative* newNative(int arity, bool variadic, ObjString* name,
@@ -404,56 +371,12 @@ void markMap(ObjMap* map) {
 
 static void printMap(ObjMap* map) { printf("<map>"); }
 
-// Is [a] a subclass of [b]?
-bool isSubclass(ObjClass* a, ObjClass* b) {
-  ObjClass* k = a;
-  while (k != NULL) {
-    if (k == b) return true;
-    k = k->super;
-  }
-  return false;
-}
-
-bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
-  ObjClass* k = a;
-
-  while (k != NULL) {
-    if (isSubclass(b, k)) {
-      *ancestor = *k;
-      return true;
-    }
-
-    k = k->super;
-  }
-
-  return false;
-}
-
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_AST: {
       printf("<ast>");
       break;
     }
-    case OBJ_BOUND_FUNCTION: {
-      ObjBoundFunction* obj = AS_BOUND_FUNCTION(value);
-
-      switch (obj->type) {
-        case BOUND_METHOD: {
-          printf("<bound method %s at %p>",
-                 obj->bound.method->function->name->chars, obj);
-          break;
-        }
-        case BOUND_NATIVE: {
-          printf("<bound native %s>", obj->bound.native->name->chars);
-          break;
-        }
-      }
-      break;
-    }
-    case OBJ_CLASS:
-      printf("<class %s>", AS_CLASS(value)->name->chars);
-      break;
     case OBJ_CLOSURE:
       printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
              AS_CLOSURE(value));
@@ -467,10 +390,6 @@ void printObject(Value value) {
       break;
     case OBJ_VARIABLE:
       printf("<var %s>", AS_VARIABLE(value)->name->chars);
-      break;
-    case OBJ_INSTANCE:
-      printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
-             AS_INSTANCE(value));
       break;
     case OBJ_MAP:
       printMap(AS_MAP(value));

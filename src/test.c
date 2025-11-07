@@ -2,13 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ast.h"
 #include "chunk.h"
 #include "common.h"
+#include "compiler.h"
 #include "debug.h"
 #include "memory.h"
 #include "node.h"
-#include "nodeCompiler.h"
 #include "object.h"
 #include "value.h"
 #include "vm.h"

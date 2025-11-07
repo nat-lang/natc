@@ -626,7 +626,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
     }
     case AST_EXPR_STMT: {
       if (!toChunk(node->as.exprStmt.expr, chunk)) return false;
-      emitByte(chunk, node, OP_EXPR_STATEMENT);
+      emitByte(chunk, node, OP_POP);
       break;
     }
     case AST_FUNCTION: {
