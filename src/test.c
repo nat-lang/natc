@@ -894,7 +894,7 @@ bool testBytecodeCallNestedCallee() {
 
   // Sequence: CONST(5), CALL 0, CONST(1), CALL 1, EXPR_STMT
   // Bytes: [OP_CONSTANT, idx0_hi, idx0_lo, OP_CALL, 0, OP_CONSTANT, idx1_hi,
-  // idx1_lo, OP_CALL, 1, OP_EXPR_STATEMENT]
+  // idx1_lo, OP_CALL, 1, OP_POP]
   if (c.count != 10) return false;
   if (c.code[0] != OP_CONSTANT) return false;             // 0
   if (read_u16(c.code[1], c.code[2]) != 0) return false;  // 1,2
@@ -1109,7 +1109,7 @@ bool testBytecodeIfSimple() {
   if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 1)
     return false;
   // EXPR_STMT
-  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+  if (c.code[10] != OP_POP) return false;
   // JUMP (placeholder bytes)
   if (c.code[11] != OP_JUMP) return false;
   // POP
@@ -1155,7 +1155,7 @@ bool testBytecodeIfElse() {
   if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 1)
     return false;
   // EXPR_STMT
-  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+  if (c.code[10] != OP_POP) return false;
   // JUMP
   if (c.code[11] != OP_JUMP) return false;
   // POP (patched by thenJump)
@@ -1164,7 +1164,7 @@ bool testBytecodeIfElse() {
   if (c.code[15] != OP_CONSTANT || read_u16(c.code[16], c.code[17]) != 2)
     return false;
   // EXPR_STMT
-  if (c.code[18] != OP_EXPR_STATEMENT) return false;
+  if (c.code[18] != OP_POP) return false;
 
   // Check patches
   uint16_t thenJump = read_u16(c.code[4], c.code[5]);
@@ -1203,7 +1203,7 @@ bool testBytecodeIfBlock() {
   // CONSTANT 1 (index 1, since "x" is at index 0)
   if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 1)
     return false;
-  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+  if (c.code[10] != OP_POP) return false;
   if (c.code[11] != OP_JUMP) return false;
   if (c.code[14] != OP_POP) return false;
 
@@ -1333,7 +1333,7 @@ bool testBytecodeWhileSimple() {
     return false;
 
   // Check EXPR_STMT
-  if (c.code[10] != OP_EXPR_STATEMENT) return false;
+  if (c.code[10] != OP_POP) return false;
 
   // Check LOOP (jumps back to 0)
   if (c.code[11] != OP_LOOP) return false;
@@ -1505,7 +1505,7 @@ bool testBytecodeWhileComplexBody() {
       getGlobalPos = i;
     } else if (c.code[i] == OP_JUMP_IF_FALSE && jumpIfFalsePos == -1) {
       jumpIfFalsePos = i;
-    } else if (c.code[i] == OP_EXPR_STATEMENT) {
+    } else if (c.code[i] == OP_POP) {
       if (firstExprStmtPos == -1) {
         firstExprStmtPos = i;
       } else if (secondExprStmtPos == -1) {
