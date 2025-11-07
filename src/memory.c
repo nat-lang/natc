@@ -158,13 +158,6 @@ static void blackenObject(Obj* object) {
   }
 }
 
-static void freeObjAST(ObjAst* ast) {
-  if (ast && ast->node) {
-    freeAstNode(ast->node);
-  }
-  FREE(ObjAst, ast);
-}
-
 static void freeObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
   printf("%p free type %d\n", (void*)object, object->type);
@@ -174,7 +167,6 @@ static void freeObject(Obj* object) {
 
   switch (object->oType) {
     case OBJ_AST:
-      freeObjAST((ObjAst*)object);
       break;
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;

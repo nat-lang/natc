@@ -1,8 +1,14 @@
+// declaration and immediate assignment.
 let x = 1
+assert(x == 1)
+
+// local assignment.
 x = 2
-__print__(x)
+assert(x == 2)
+
+// expression assignment.
 x = 1 + 2
-__print__(x)
+assert(x == 3)
 
 // upvalue assignment.
 let f = () => {
@@ -10,5 +16,4 @@ let f = () => {
 }
 
 f()
-
-__print__(x)
+assert(x == 1)
