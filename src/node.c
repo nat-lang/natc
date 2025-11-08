@@ -228,6 +228,21 @@ AstNode* newSetNode() {
   return n;
 }
 
+AstNode* newSubscriptGetNode(AstNode* object, AstNode* index) {
+  AstNode* n = allocNode(AST_SUBSCRIPT_GET);
+  n->as.subscript.object = object;
+  n->as.subscript.index = index;
+  return n;
+}
+
+AstNode* newSubscriptSetNode(AstNode* object, AstNode* index, AstNode* value) {
+  AstNode* n = allocNode(AST_SUBSCRIPT_SET);
+  n->as.subscriptSet.object = object;
+  n->as.subscriptSet.index = index;
+  n->as.subscriptSet.value = value;
+  return n;
+}
+
 AstNode* newObjectNode() {
   AstNode* n = allocNode(AST_OBJECT);
   initAstVec(&n->as.object.entries);
@@ -422,6 +437,17 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Set\n", depth);
       printNodeVecAt(&node->as.set.values, depth + 1);
       break;
+    case AST_SUBSCRIPT_GET:
+      printStrAt("SubscriptGet\n", depth);
+      printNodeAt(node->as.subscript.object, depth + 1);
+      printNodeAt(node->as.subscript.index, depth + 1);
+      break;
+    case AST_SUBSCRIPT_SET:
+      printStrAt("SubscriptSet\n", depth);
+      printNodeAt(node->as.subscriptSet.object, depth + 1);
+      printNodeAt(node->as.subscriptSet.index, depth + 1);
+      printNodeAt(node->as.subscriptSet.value, depth + 1);
+      break;
     case AST_OBJECT:
       printStrAt("Object\n", depth);
       printNodeVecAt(&node->as.object.entries, depth + 1);
@@ -542,6 +568,13 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_SET:
       return a->as.set.values.count == b->as.set.values.count &&
              astVecsEqual(&a->as.set.values, &b->as.set.values);
+    case AST_SUBSCRIPT_GET:
+      return nodesEqual(a->as.subscript.object, b->as.subscript.object) &&
+             nodesEqual(a->as.subscript.index, b->as.subscript.index);
+    case AST_SUBSCRIPT_SET:
+      return nodesEqual(a->as.subscriptSet.object, b->as.subscriptSet.object) &&
+             nodesEqual(a->as.subscriptSet.index, b->as.subscriptSet.index) &&
+             nodesEqual(a->as.subscriptSet.value, b->as.subscriptSet.value);
     case AST_OBJECT:
       return a->as.object.entries.count == b->as.object.entries.count &&
              astVecsEqual(&a->as.object.entries, &b->as.object.entries);
@@ -695,16 +728,13 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_COMPREHENSION:
-      // TODO: Implement comprehension compilation
       error(node, "Comprehension compilation not yet implemented.");
       return false;
     case AST_COMPREHENSION_ITER:
-      // Should not be compiled directly - only as part of comprehension
-      error(node, "ComprehensionIter should not be compiled directly.");
+      error(node, "Not implemented.");
       return false;
     case AST_COMPREHENSION_PRED:
-      // Should not be compiled directly - only as part of comprehension
-      error(node, "ComprehensionPred should not be compiled directly.");
+      error(node, "Not implemented.");
       return false;
     case AST_EXPR_STMT: {
       if (!toChunk(node->as.exprStmt.expr, chunk)) return false;
@@ -821,6 +851,19 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       emitByte(chunk, node, OP_CALL);
       emitByte(chunk, node, (uint8_t)node->as.set.values.count);
+      break;
+    }
+    case AST_SUBSCRIPT_GET: {
+      if (!toChunk(node->as.subscript.object, chunk)) return false;
+      if (!toChunk(node->as.subscript.index, chunk)) return false;
+      emitByte(chunk, node, OP_SUBSCRIPT_GET);
+      break;
+    }
+    case AST_SUBSCRIPT_SET: {
+      if (!toChunk(node->as.subscriptSet.object, chunk)) return false;
+      if (!toChunk(node->as.subscriptSet.index, chunk)) return false;
+      if (!toChunk(node->as.subscriptSet.value, chunk)) return false;
+      emitByte(chunk, node, OP_SUBSCRIPT_SET);
       break;
     }
     case AST_OBJECT: {
@@ -994,6 +1037,15 @@ void markAstNode(AstNode* n) {
       for (int i = 0; i < n->as.set.values.count; i++)
         markAstNode((AstNode*)n->as.set.values.items[i]);
       break;
+    case AST_SUBSCRIPT_GET:
+      markAstNode(n->as.subscript.object);
+      markAstNode(n->as.subscript.index);
+      break;
+    case AST_SUBSCRIPT_SET:
+      markAstNode(n->as.subscriptSet.object);
+      markAstNode(n->as.subscriptSet.index);
+      markAstNode(n->as.subscriptSet.value);
+      break;
     case AST_OBJECT:
       for (int i = 0; i < n->as.object.entries.count; i++)
         markAstNode((AstNode*)n->as.object.entries.items[i]);
@@ -1085,6 +1137,9 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_SET:
       freeAstVec(&n->as.set.values);
+      break;
+    case AST_SUBSCRIPT_GET:
+    case AST_SUBSCRIPT_SET:
       break;
     case AST_OBJECT:
       freeAstVec(&n->as.object.entries);

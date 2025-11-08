@@ -2024,7 +2024,76 @@ bool testSetInCall() {
   return assertNodesEqual(node, fn);
 }
 
-bool testSequenceComprehensionParse() {
+bool testSubscriptGet() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "arr[1]");
+
+  AstNode* expected = mkFunction(name);
+  AstNode* arr = newVarGlobalNode();
+  arr->as.global.name = intern("arr");
+  AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* sub = newSubscriptGetNode(arr, one);
+  AstNode* exprStmt = newExprStmtNode(sub);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSubscriptSet() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "arr[foo[0]] = seq[1]");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* arr = newVarGlobalNode();
+  arr->as.global.name = intern("arr");
+
+  AstNode* foo = newVarGlobalNode();
+  foo->as.global.name = intern("foo");
+  AstNode* zero = newLiteralValueNode(NUMBER_VAL(0));
+  AstNode* fooIndex = newSubscriptGetNode(foo, zero);
+
+  AstNode* seq = newVarGlobalNode();
+  seq->as.global.name = intern("seq");
+  AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* value = newSubscriptGetNode(seq, one);
+
+  AstNode* set = newSubscriptSetNode(arr, fooIndex, value);
+  AstNode* exprStmt = newExprStmtNode(set);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSubscriptNested() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "meta[0][1]");
+
+  AstNode* expected = mkFunction(name);
+
+  AstNode* meta = newVarGlobalNode();
+  meta->as.global.name = intern("meta");
+  AstNode* zero = newLiteralValueNode(NUMBER_VAL(0));
+  AstNode* first = newSubscriptGetNode(meta, zero);
+  AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* second = newSubscriptGetNode(first, one);
+
+  AstNode* exprStmt = newExprStmtNode(second);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testSequenceComprehension() {
   Token name = syntheticToken("test");
   AstNode* actual = compile(name, "(x | x in (1,2), x != 2)");
 
@@ -3039,6 +3108,56 @@ bool testBytecodeSetInCall() {
   return true;
 }
 
+bool testBytecodeSubscriptGet() {
+  AstNode* arr = newVarGlobalNode();
+  arr->as.global.name = intern("arr");
+  AstNode* index = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* sub = newSubscriptGetNode(arr, index);
+
+  Chunk c;
+  if (!buildChunkForExpr(sub, &c)) return false;
+
+  if (c.count != 7) return false;
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  if (c.code[3] != OP_CONSTANT) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;
+  if (c.code[6] != OP_SUBSCRIPT_GET) return false;
+
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("arr")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+
+  return true;
+}
+
+bool testBytecodeSubscriptSet() {
+  AstNode* arr = newVarGlobalNode();
+  arr->as.global.name = intern("arr");
+  AstNode* index = newLiteralValueNode(NUMBER_VAL(0));
+  AstNode* value = newLiteralValueNode(NUMBER_VAL(42));
+  AstNode* sub = newSubscriptSetNode(arr, index, value);
+
+  Chunk c;
+  if (!buildChunkForExpr(sub, &c)) return false;
+
+  if (c.count != 10) return false;
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+  if (c.code[3] != OP_CONSTANT) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;
+  if (c.code[6] != OP_CONSTANT) return false;
+  if (read_u16(c.code[7], c.code[8]) != 2) return false;
+  if (c.code[9] != OP_SUBSCRIPT_SET) return false;
+
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("arr")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(0))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(42))) return false;
+
+  return true;
+}
+
 /* Bytecode tests for Assignment */
 
 bool testBytecodeAssignmentGlobal() {
@@ -3388,7 +3507,10 @@ int testMain(void) {
   fmt("    ", testSetComplexExpression(), "Set complex expression");
   fmt("    ", testSetNested(), "Set nested");
   fmt("    ", testSetInCall(), "Set in call");
-  fmt("    ", testSequenceComprehensionParse(), "Sequence comprehension parse");
+  fmt("    ", testSubscriptGet(), "Subscript get");
+  fmt("    ", testSubscriptSet(), "Subscript set");
+  fmt("    ", testSubscriptNested(), "Subscript nested");
+  fmt("    ", testSequenceComprehension(), "Sequence comprehension");
   fmt("    ", testSequenceComprehensionComplexBody(),
       "Sequence comprehension complex body");
   fmt("    ", testSequenceComprehensionNestedBody(),
@@ -3468,6 +3590,8 @@ int testMain(void) {
   fmt("    ", testBytecodeSetTwoElements(), "Set two elements");
   fmt("    ", testBytecodeSetThreeElements(), "Set three elements");
   fmt("    ", testBytecodeSetInCall(), "Set in call");
+  fmt("    ", testBytecodeSubscriptGet(), "Subscript get bytecode");
+  fmt("    ", testBytecodeSubscriptSet(), "Subscript set bytecode");
   fmt("    ", testBytecodeObjectEmpty(), "Object empty");
   fmt("    ", testBytecodeObjectOneProperty(), "Object one property");
   fmt("    ", testBytecodeObjectMultipleProperties(),

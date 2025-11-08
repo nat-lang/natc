@@ -148,6 +148,8 @@ static AstNode* statement(NodeCompiler* cmp);
 static AstNode* expression(NodeCompiler* cmp);
 static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence);
 static AstNode* nakedFunction(NodeCompiler* enclosing, Token name);
+static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
+                          Precedence prec);
 
 void initNodeCompiler(NodeCompiler* cmp, NodeCompiler* enclosing,
                       AstNode* node) {
@@ -379,6 +381,18 @@ static AstNode* boolean(NodeCompiler* cmp, bool canAssign) {
   return node;
 }
 
+static AstNode* literalNil(NodeCompiler* cmp, bool canAssign) {
+  AstNode* node = newLiteralValueNode(NIL_VAL);
+  node->line = parser.previous.line;
+  return node;
+}
+
+static AstNode* literalUndefined(NodeCompiler* cmp, bool canAssign) {
+  AstNode* node = newLiteralValueNode(UNDEF_VAL);
+  node->line = parser.previous.line;
+  return node;
+}
+
 static AstNode* number(NodeCompiler* cmp, bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
   AstNode* node = newLiteralValueNode(NUMBER_VAL(value));
@@ -421,6 +435,22 @@ static AstNode* call(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
   AstNode* node = newCallNode(lhs);
   argumentList(cmp, &node->as.call.args);
   return node;
+}
+
+static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
+                          Precedence prec) {
+  AstNode* index = expression(cmp);
+  consume(cmp, TOKEN_RIGHT_BRACKET, "Expect ']' after subscript.");
+
+  if (match(cmp, TOKEN_EQUAL)) {
+    AstNode* value = expression(cmp);
+    if (!canAssign) {
+      error(cmp, "Invalid assignment target.");
+    }
+    return newSubscriptSetNode(lhs, index, value);
+  }
+
+  return newSubscriptGetNode(lhs, index);
 }
 
 // Find a [token] that isn't nested within braces, brackets,
@@ -651,14 +681,18 @@ static ParseRule rules[] = {
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TRUE] = {boolean, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FALSE] = {boolean, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_NIL] = {literalNil, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_UNDEFINED] = {literalUndefined, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {leftBrace, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_LEFT_BRACKET] = {NULL, subscript, PREC_CALL, PREC_NONE},
+    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_PAREN_LEFT] = {parenLeft, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_USER_INFIX] = {NULL, userInfix, PREC_NONE, PREC_NONE},
-    [TOKEN_TRUE] = {boolean, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_FALSE] = {boolean, NULL, PREC_NONE, PREC_NONE},
 };
 
 #define PREC_STEP 1

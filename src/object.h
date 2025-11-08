@@ -14,6 +14,7 @@
 #define IS_VARIABLE(value) isObjType(value, OBJ_VARIABLE)
 #define IS_PATTERN(value) isObjType(value, OBJ_PATTERN)
 #define IS_MAP(value) isObjType(value, OBJ_MAP)
+#define IS_SET(value) isObjType(value, OBJ_SET)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_SEQUENCE(value) isObjType(value, OBJ_SEQUENCE)
@@ -27,6 +28,7 @@
 #define AS_VARIABLE(value) (((ObjVariable*)AS_OBJ(value)))
 #define AS_PATTERN(value) (((ObjPattern*)AS_OBJ(value)))
 #define AS_MAP(value) ((ObjMap*)AS_OBJ(value))
+#define AS_SET(value) ((ObjSet*)AS_OBJ(value))
 #define AS_NATIVE(value) (((ObjNative*)AS_OBJ(value)))
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
@@ -46,6 +48,7 @@ typedef enum {
   OBJ_OVERLOAD,
   OBJ_NATIVE,
   OBJ_SEQUENCE,
+  OBJ_SET,
   OBJ_MAP,
   OBJ_STRING,
   OBJ_UPVALUE,
@@ -149,6 +152,7 @@ struct ObjModule {
 
 typedef struct {
   Obj obj;
+  Map elements;
 } ObjSet;
 
 typedef struct {
@@ -176,6 +180,7 @@ ObjNative* newNative(int arity, bool variadic, ObjString* name,
                      NativeFn function);
 ObjSequence* newSequence();
 ObjMap* newMap();
+ObjSet* newSet();
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
 ObjString* concatenateStrings(ObjString* a, ObjString* b);

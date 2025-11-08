@@ -1,0 +1,29 @@
+let seq
+let matrix
+let obj
+let setVal
+
+seq = (10, 20, 30)
+assert(seq[0] == 10)
+assert(seq[2] == 30)
+seq[1] = 25
+assert(seq[1] == 25)
+
+matrix = ((1, 2), (3, 4))
+assert(matrix[0][1] == 2)
+assert(matrix[1][0] == 3)
+
+obj = {"x": 1}
+assert(obj["x"] == 1)
+obj["y"] = 5
+assert(obj["y"] == 5)
+
+setVal = ({1, 2, 3})
+assert(setVal[1])
+assert(setVal[4] == false)
+
+let getZero = () => 0
+assert(getZero() == 0)
+seq[getZero()] = 99
+assert(seq[0] == 99)
+

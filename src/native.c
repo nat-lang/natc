@@ -100,13 +100,13 @@ bool __seq__(int argCount, Value* args) {
 }
 
 bool __set__(int argCount, Value* args) {
-  ObjMap* set = newMap();
+  ObjSet* set = newSet();
   vm.stackTop[-argCount - 1] = OBJ_VAL(set);
 
   int i = argCount;
   while (i-- > 0) {
     Value element = vmPeek(i);
-    mapSet(&set->obj.fields, element, BOOL_VAL(true));
+    mapSet(&set->elements, element, BOOL_VAL(true));
   }
 
   while (++i < argCount) vmPop();
