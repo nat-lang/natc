@@ -131,46 +131,6 @@ Value vmPop() {
 
 Value vmPeek(int distance) { return vm.stackTop[-1 - distance]; }
 
-bool vmGetProperty(ObjString* name, int argCount, Value* method) {
-  Value receiver = vmPeek(argCount);
-
-  char* error = "Only instances, classes, and functions have properties.";
-
-  ObjMap* fields;
-  switch (OBJ_TYPE(receiver)) {
-    case OBJ_CLOSURE:
-      fields = &AS_CLOSURE(receiver)->function->fields;
-      break;
-    default:
-      vmRuntimeError(error);
-      return false;
-  }
-
-  return mapGet(fields, OBJ_VAL(name), method);
-}
-
-bool vmInvoke(ObjString* name, int argCount) {
-  Value receiver = vmPeek(argCount);
-  Value method = NIL_VAL;
-
-  if (!vmGetProperty(name, argCount, &method)) return false;
-
-  vm.stackTop[-argCount - 1] = receiver;
-  return vmCallValue(method, argCount);
-}
-
-bool vmExecuteMethod(char* name, int argCount) {
-  Value receiver = vmPeek(argCount);
-  Value method = NIL_VAL;
-  if (!vmGetProperty(intern(name), argCount, &method)) return false;
-  vm.stackTop[-argCount - 1] = receiver;
-  if (!vmCallValue(method, argCount)) return false;
-
-  int frames = IS_NATIVE(method) ? 0 : 1;
-
-  return (vmExecute(vm.frameCount - frames) == INTERPRET_OK);
-}
-
 // If [value] is natively hashable, then hash it.
 bool vmHashValue(Value value, uint32_t* hash) {
   if (vHashable(value)) {
@@ -446,26 +406,11 @@ void vmClosure(CallFrame* frame) {
 
   vmPush(OBJ_VAL(closure));
   vmCaptureUpvalues(closure, frame);
-
-  mapSet(&function->fields, OBJ_VAL(vm.core.sName), OBJ_VAL(function->name));
-  mapSet(&function->fields, OBJ_VAL(vm.core.sArity),
-         NUMBER_VAL(function->arity));
-  mapSet(&function->fields, OBJ_VAL(vm.core.sPatterned),
-         BOOL_VAL(function->patterned));
-  mapSet(&function->fields, OBJ_VAL(vm.core.sVariadic),
-         BOOL_VAL(function->variadic));
-}
-
-void vmSign(CallFrame* frame) {
-  ObjClosure* closure = AS_CLOSURE(vmPeek(1));
-
-  mapSet(&closure->function->fields, OBJ_VAL(vm.core.sSignature), vmPeek(0));
-  vmPop();
 }
 
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
-  Value name = READ_CONSTANT();
+  READ_CONSTANT();  // name.
   int arity = 0;
   ObjOverload* overload = newOverload(cases);
 
@@ -489,8 +434,6 @@ bool vmOverload(CallFrame* frame) {
 
   while (cases--) vmPop();
   vmPush(OBJ_VAL(overload));
-  mapSet(&overload->fields, OBJ_VAL(vm.core.sArity), NUMBER_VAL(arity));
-  mapSet(&overload->fields, OBJ_VAL(vm.core.sName), name);
   return true;
 }
 
@@ -615,77 +558,26 @@ InterpretResult vmExecute(int baseFrame) {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
 
-        char* error = "Can only get property of object, class, or function.";
-
         if (!IS_OBJ(vmPeek(0))) {
-          vmRuntimeError(error);
+          vmRuntimeError("Can only get property of object.");
           return INTERPRET_RUNTIME_ERROR;
         }
+        mapGet(&AS_OBJ(vmPeek(0))->fields, name, &value);
 
-        switch (OBJ_TYPE(vmPeek(0))) {
-          case OBJ_VARIABLE: {
-            if (strcmp(AS_STRING(name)->chars, "name") == 0) {
-              value = OBJ_VAL(AS_VARIABLE(vmPeek(0))->name);
-              vmPop();
-            }
-
-            vmPush(value);
-            break;
-          }
-          case OBJ_NATIVE: {
-            ObjNative* native = AS_NATIVE(vmPeek(0));
-            mapGet(&native->fields, name, &value);
-
-            vmPop();  // native.
-            vmPush(value);
-            break;
-          }
-          case OBJ_CLOSURE: {
-            ObjClosure* closure = AS_CLOSURE(vmPeek(0));
-
-            mapGet(&closure->function->fields, name, &value);
-
-            vmPop();  // closure.
-            vmPush(value);
-            break;
-          }
-          case OBJ_OVERLOAD: {
-            ObjOverload* overload = AS_OVERLOAD(vmPeek(0));
-
-            mapGet(&overload->fields, name, &value);
-
-            vmPop();  // overload.
-            vmPush(value);
-            break;
-          }
-          default:
-            vmRuntimeError(error);
-            return INTERPRET_RUNTIME_ERROR;
-        }
+        vmPop();
+        vmPush(value);
 
         break;
       }
       case OP_SET_PROPERTY: {
         Value name = READ_CONSTANT();
-        ObjMap* fields;
-
-        char* error = "Can only set property of object, class, or function.";
 
         if (!IS_OBJ(vmPeek(1))) {
-          vmRuntimeError(error);
+          vmRuntimeError("Can only set property of object.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        switch (OBJ_TYPE(vmPeek(1))) {
-          case OBJ_CLOSURE:
-            fields = &AS_CLOSURE(vmPeek(1))->function->fields;
-            break;
-          default:
-            vmRuntimeError(error);
-            return INTERPRET_RUNTIME_ERROR;
-        }
-
-        mapSet(fields, name, vmPeek(0));
+        mapSet(&AS_OBJ(vmPeek(1))->fields, name, vmPeek(0));
         vmPop();
         break;
       }
@@ -787,9 +679,9 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_THROW: {
         Value value = vmPop();
 
-        ObjMap* map = AS_MAP(value);
         Value msg;
-        if (!IS_MAP(value) || !mapGet(map, INTERN("message"), &msg) ||
+        if (!IS_MAP(value) ||
+            !mapGet(&AS_MAP(value)->obj.fields, INTERN("message"), &msg) ||
             !IS_STRING(msg))
           vmRuntimeError("Error must define a 'message' string.");
 
@@ -822,12 +714,10 @@ InterpretResult vmExecute(int baseFrame) {
             break;
           }
           default: {
-            vmRuntimeError(
-                "Only objects, sequences, classes, and instances with a '%s' "
-                "method "
-                "support access by subscript.",
-                S_SUBSCRIPT_GET);
-            return INTERPRET_RUNTIME_ERROR;
+            Value value = NIL_VAL;
+            mapGet(&AS_OBJ(obj)->fields, key, &value);
+            vmPush(value);
+            break;
           }
         }
         break;
@@ -870,38 +760,11 @@ InterpretResult vmExecute(int baseFrame) {
             break;
           }
           default: {
-            vmRuntimeError(
-                "Only objects, sequences, and instances with a '%s' method "
-                "support assignment by subscript.",
-                S_SUBSCRIPT_SET);
-            return INTERPRET_RUNTIME_ERROR;
+            mapSet(&AS_OBJ(vmPeek(2))->fields, vmPeek(1), vmPeek(0));
+            vmPop();  // val.
+            vmPop();  // key.
+            break;
           }
-        }
-
-        break;
-      }
-      case OP_SET_TYPE_LOCAL: {
-        uint8_t slot = READ_SHORT();
-        Value local = frame->slots[slot];
-
-        if (IS_OBJ(local)) {
-          Obj* obj = AS_OBJ(local);
-          writeValueArray(&obj->annotations, vmPeek(0));
-        }
-
-        break;
-      }
-      case OP_SET_TYPE_GLOBAL: {
-        Value name = READ_CONSTANT();
-        Value global;
-        if (!mapGet(&vm.globals, name, &global)) {
-          vmRuntimeError("Undefined variable '%s'.", AS_STRING(name)->chars);
-          return INTERPRET_RUNTIME_ERROR;
-        }
-
-        if (IS_OBJ(global)) {
-          Obj* obj = AS_OBJ(global);
-          writeValueArray(&obj->annotations, vmPeek(0));
         }
         break;
       }

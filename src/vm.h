@@ -73,10 +73,10 @@ typedef struct {
   Obj* objects;
   AstNode* astRoot;
   ObjUpvalue* openUpvalues;
-  ObjMap strings;
-  ObjMap globals;
-  ObjMap prefixes;
-  ObjMap infixes;
+  Map strings;
+  Map globals;
+  Map prefixes;
+  Map infixes;
 
   // core defs.
   Core core;
@@ -120,8 +120,6 @@ AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
                                    Token path);
 ObjModule* vmCompileModule(char* enclosingDir, Token path);
 ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
-bool vmImport(ObjModule* module, ObjMap* target);
-bool vmImportAsInstance(ObjModule* module);
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();

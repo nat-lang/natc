@@ -44,9 +44,9 @@ typedef enum {
   OBJ_CLOSURE,
   OBJ_FUNCTION,
   OBJ_OVERLOAD,
-  OBJ_MAP,
   OBJ_NATIVE,
   OBJ_SEQUENCE,
+  OBJ_MAP,
   OBJ_STRING,
   OBJ_UPVALUE,
   OBJ_SPREAD,
@@ -56,30 +56,29 @@ typedef enum {
 
 typedef struct ObjModule ObjModule;
 
-struct Obj {
-  ObjType oType;
-  bool isMarked;
-  uint32_t hash;
-  struct Obj* next;
-  ValueArray annotations;
-};
-
 typedef struct {
   Value key;
   Value value;
 } MapEntry;
 
 typedef struct {
-  Obj obj;
-  AstNode* node;
-} ObjAst;
-
-typedef struct {
-  Obj obj;
   int count;
   int capacity;
   MapEntry* entries;
-} ObjMap;
+} Map;
+
+struct Obj {
+  ObjType oType;
+  bool isMarked;
+  uint32_t hash;
+  struct Obj* next;
+  Map fields;
+};
+
+typedef struct {
+  Obj obj;
+  AstNode* node;
+} ObjAst;
 
 struct ObjString {
   Obj obj;
@@ -106,13 +105,8 @@ struct ObjFunction {
   Local locals[UINT8_COUNT];
   int localCount;
 
-  ObjMap fields;
   ObjString* name;
   ObjModule* module;
-
-  // cache from values to constant indices
-  // in the function's chunk.constants.
-  ObjMap constants;
 };
 
 typedef bool (*NativeFn)(int argCount, Value* args);
@@ -123,7 +117,6 @@ typedef struct {
   bool variadic;
   ObjString* name;
   NativeFn function;
-  ObjMap fields;
 } ObjNative;
 
 typedef struct ObjUpvalue {
@@ -131,10 +124,6 @@ typedef struct ObjUpvalue {
   Value* location;
   Value closed;
   struct ObjUpvalue* next;
-  // the address of the local that's closed over.
-  // we stash this only to reconstruct the ast.
-  uint8_t slot;
-  ObjString* name;
 } ObjUpvalue;
 
 typedef struct {
@@ -148,7 +137,6 @@ typedef struct {
   Obj obj;
   int cases;
   ObjClosure** closures;
-  ObjMap fields;
 } ObjOverload;
 
 struct ObjModule {
@@ -161,8 +149,16 @@ struct ObjModule {
 
 typedef struct {
   Obj obj;
+} ObjSet;
+
+typedef struct {
+  Obj obj;
   ValueArray values;
 } ObjSequence;
+
+typedef struct {
+  Obj obj;
+} ObjMap;
 
 typedef struct {
   Obj obj;
@@ -178,8 +174,8 @@ ObjModule* newModule(ObjString* dirName, ObjString* baseName,
                      ObjString* source);
 ObjNative* newNative(int arity, bool variadic, ObjString* name,
                      NativeFn function);
-ObjMap* newMap();
 ObjSequence* newSequence();
+ObjMap* newMap();
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
 ObjString* concatenateStrings(ObjString* a, ObjString* b);
@@ -193,21 +189,21 @@ static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->oType == type;
 }
 
-void initMap(ObjMap* map);
-void freeMap(ObjMap* map);
-bool mapHas(ObjMap* map, Value key);
-bool mapHasHash(ObjMap* map, Value key, uint32_t hash);
-bool mapGet(ObjMap* map, Value key, Value* value);
-bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash);
-bool mapSet(ObjMap* map, Value key, Value value);
-bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash);
-bool mapDelete(ObjMap* map, Value key);
-void mapAddAll(ObjMap* from, ObjMap* to);
+void initMap(Map* map);
+void freeMap(Map* map);
+bool mapHas(Map* map, Value key);
+bool mapHasHash(Map* map, Value key, uint32_t hash);
+bool mapGet(Map* map, Value key, Value* value);
+bool mapGetHash(Map* map, Value key, Value* value, uint32_t hash);
+bool mapSet(Map* map, Value key, Value value);
+bool mapSetHash(Map* map, Value key, Value value, uint32_t hash);
+bool mapDelete(Map* map, Value key);
+void mapAddAll(Map* from, Map* to);
 void setStringChar(ObjString* string, ObjString* character, int idx);
-ObjString* mapFindString(ObjMap* map, const char* chars, int length,
+ObjString* mapFindString(Map* map, const char* chars, int length,
                          uint32_t hash);
-void mapRemoveWhite(ObjMap* map);
-void markMap(ObjMap* map);
+void mapRemoveWhite(Map* map);
+void markMap(Map* map);
 
 ObjString* tokenString(Token token);
 #endif
