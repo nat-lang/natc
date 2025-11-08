@@ -713,6 +713,13 @@ InterpretResult vmExecute(int baseFrame) {
             vmPush(OBJ_VAL(character));
             break;
           }
+          case OBJ_SET: {
+            ObjSet* set = AS_SET(obj);
+            Value value = BOOL_VAL(false);
+            mapGet(&set->elements, key, &value);
+            vmPush(value);
+            break;
+          }
           default: {
             Value value = NIL_VAL;
             mapGet(&AS_OBJ(obj)->fields, key, &value);

@@ -102,6 +102,12 @@ ObjMap* newMap() {
   return map;
 }
 
+ObjSet* newSet() {
+  ObjSet* set = ALLOCATE_OBJ(ObjSet, OBJ_SET);
+  initMap(&set->elements);
+  return set;
+}
+
 ObjSequence* newSequence() {
   ObjSequence* sequence = ALLOCATE_OBJ(ObjSequence, OBJ_SEQUENCE);
   initValueArray(&sequence->values);
@@ -362,8 +368,6 @@ void markMap(Map* map) {
   }
 }
 
-static void printMap(ObjMap* map) { printf("<map>"); }
-
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_AST: {
@@ -385,7 +389,10 @@ void printObject(Value value) {
       printf("<var %s>", AS_VARIABLE(value)->name->chars);
       break;
     case OBJ_MAP:
-      printMap(AS_MAP(value));
+      printf("<map>");
+      break;
+    case OBJ_SET:
+      printf("<set>");
       break;
     case OBJ_MODULE:
       printf("<module %s>", AS_MODULE(value)->closure->function->name->chars);

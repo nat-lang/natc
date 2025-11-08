@@ -124,6 +124,11 @@ static void blackenObject(Obj* object) {
     }
     case OBJ_MAP:
       break;
+    case OBJ_SET: {
+      ObjSet* set = (ObjSet*)object;
+      markMap(&set->elements);
+      break;
+    }
     case OBJ_NATIVE:
       break;
     case OBJ_STRING:
@@ -198,6 +203,12 @@ static void freeObject(Obj* object) {
     }
     case OBJ_MAP: {
       FREE(ObjMap, object);
+      break;
+    }
+    case OBJ_SET: {
+      ObjSet* set = (ObjSet*)object;
+      freeMap(&set->elements);
+      FREE(ObjSet, object);
       break;
     }
     case OBJ_SPREAD: {
