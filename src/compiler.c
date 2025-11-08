@@ -484,14 +484,14 @@ static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
   }
 }
 
-static AstNode* parseComprehensionConditions(NodeCompiler* cmp,
-                                             AstNode* comprehension,
-                                             TokenType closingToken) {
+static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
+                                   ComprehensionType type,
+                                   TokenType closingToken) {
+  AstNode* comprehension = newComprehensionNode(NULL, type);
   int scopesOpened = 0;
+  bool sawClause = false;
 
-  // Parse conditions until closing token
   while (!check(closingToken) && !check(TOKEN_EOF)) {
-    // Check if this is an iteration condition: var in iterable
     if (checkVariable() && peek(TOKEN_IN)) {
       beginScope(cmp);
       scopesOpened++;
@@ -515,15 +515,31 @@ static AstNode* parseComprehensionConditions(NodeCompiler* cmp,
       pushAstVec(&comprehension->as.comprehension.conditions, predCond);
     }
 
-    if (!check(closingToken)) {
-      if (!match(cmp, TOKEN_COMMA)) {
-        errorAtCurrent(cmp,
-                       "Expect ',' or closing token after comprehension "
-                       "condition.");
-        break;
-      }
+    sawClause = true;
+
+    if (check(closingToken)) {
+      break;
+    }
+
+    if (!match(cmp, TOKEN_COMMA)) {
+      errorAtCurrent(cmp,
+                     "Expect ',' or closing token after comprehension "
+                     "condition.");
+      break;
     }
   }
+
+  if (!sawClause) {
+    error(cmp, "Comprehension requires at least one clause.");
+  }
+
+  Parser afterConditions = saveParser();
+
+  gotoParser(bodyCheckpoint);
+  AstNode* body = expression(cmp);
+  comprehension->as.comprehension.body = body;
+
+  gotoParser(afterConditions);
 
   for (int i = 0; i < scopesOpened; i++) {
     endScope(cmp);
@@ -538,15 +554,15 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
     return newObjectNode();
   }
 
-  Parser checkpoint = saveParser();
+  Parser bodyCheckpoint = saveParser();
   bool isComprehension = advanceTo(cmp, TOKEN_PIPE, TOKEN_RIGHT_BRACE, 1);
-  gotoParser(checkpoint);
+  gotoParser(bodyCheckpoint);
 
   if (isComprehension) {
-    AstNode* body = expression(cmp);
+    advanceTo(cmp, TOKEN_PIPE, TOKEN_RIGHT_BRACE, 1);
     consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
-    AstNode* comprehension = newComprehensionNode(body, COMPREHENSION_SET);
-    parseComprehensionConditions(cmp, comprehension, TOKEN_RIGHT_BRACE);
+    AstNode* comprehension = parseComprehension(
+        cmp, bodyCheckpoint, COMPREHENSION_SET, TOKEN_RIGHT_BRACE);
     consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after comprehension.");
     return comprehension;
   }
@@ -588,16 +604,21 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
   gotoParser(checkpoint);
   if (isFunction) return function(cmp, parser.ppenult);
 
-  // sequence or comprehension.
-  AstNode* node = expression(cmp);
+  Parser bodyCheckpoint = saveParser();
+  bool isComprehension = advanceTo(cmp, TOKEN_PIPE, TOKEN_PAREN_RIGHT, 1);
+  gotoParser(bodyCheckpoint);
 
-  if (check(TOKEN_PIPE)) {
-    advance(cmp);  // consume pipe
-    AstNode* comprehension = newComprehensionNode(node, COMPREHENSION_SEQUENCE);
-    parseComprehensionConditions(cmp, comprehension, TOKEN_PAREN_RIGHT);
+  if (isComprehension) {
+    advanceTo(cmp, TOKEN_PIPE, TOKEN_PAREN_RIGHT, 1);
+    consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
+    AstNode* comprehension = parseComprehension(
+        cmp, bodyCheckpoint, COMPREHENSION_SEQUENCE, TOKEN_PAREN_RIGHT);
     consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after comprehension.");
     return comprehension;
   }
+
+  // sequence or parenthesized expression.
+  AstNode* node = expression(cmp);
 
   if (check(TOKEN_COMMA)) {
     AstNode* seq = newSequenceNode();
