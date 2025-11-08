@@ -25,6 +25,7 @@ typedef enum {
   AST_PARAM,
   AST_RETURN,
   AST_SEQUENCE,
+  AST_SET,
   AST_SIGNATURE,
   AST_THROW,
   AST_UNKNOWN,
@@ -155,6 +156,9 @@ struct AstNode {
       AstVec values;
     } sequence;
     struct {
+      AstVec values;
+    } set;
+    struct {
       AstVec entries;
     } object;
     struct {
@@ -214,6 +218,7 @@ AstNode* newObjectEntryNode(AstNode* key, AstNode* value);
 AstNode* newParamNode(AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
+AstNode* newSetNode();
 AstNode* newThrowNode(AstNode* expr);
 AstNode* newSignatureNode();
 AstNode* newUnknownNode();

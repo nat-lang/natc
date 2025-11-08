@@ -102,6 +102,7 @@ bool initVM() {
 
   vm.core.sSeq = intern("seq");
   vm.core.sObj = intern("obj");
+  vm.core.sSet = intern("set");
 
   defineNatives();
 

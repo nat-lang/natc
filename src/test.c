@@ -1886,6 +1886,144 @@ bool testSequenceInCall() {
   return assertNodesEqual(node, fn);
 }
 
+/* ============================================================
+ * Set Tests
+ * ============================================================ */
+
+bool testSetOneElement() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({1})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* set = newSetNode();
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
+  AstNode* exprStmt = newExprStmtNode(set);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSetTwoElements() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({1, 2})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* set = newSetNode();
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(2)));
+  AstNode* exprStmt = newExprStmtNode(set);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSetVariables() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({x, y})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* set = newSetNode();
+  AstNode* xVar = newVarGlobalNode();
+  xVar->as.global.name = intern("x");
+  AstNode* yVar = newVarGlobalNode();
+  yVar->as.global.name = intern("y");
+  pushAstVec(&set->as.set.values, xVar);
+  pushAstVec(&set->as.set.values, yVar);
+  AstNode* exprStmt = newExprStmtNode(set);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSetComplexExpression() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({1 + 2, f(3), x})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* set = newSetNode();
+
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
+  AstNode* lhs = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* rhs = newLiteralValueNode(NUMBER_VAL(2));
+  AstNode* infix = newCallInfixNode(plusOp, lhs, rhs);
+  pushAstVec(&set->as.set.values, infix);
+
+  AstNode* f = newVarGlobalNode();
+  f->as.global.name = intern("f");
+  AstNode* call = newCallNode(f);
+  pushAstVec(&call->as.call.args, newLiteralValueNode(NUMBER_VAL(3)));
+  pushAstVec(&set->as.set.values, call);
+
+  AstNode* xVar = newVarGlobalNode();
+  xVar->as.global.name = intern("x");
+  pushAstVec(&set->as.set.values, xVar);
+
+  AstNode* exprStmt = newExprStmtNode(set);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSetNested() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "({{1}, {2}})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* outer = newSetNode();
+
+  AstNode* inner1 = newSetNode();
+  pushAstVec(&inner1->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&outer->as.set.values, inner1);
+
+  AstNode* inner2 = newSetNode();
+  pushAstVec(&inner2->as.set.values, newLiteralValueNode(NUMBER_VAL(2)));
+  pushAstVec(&outer->as.set.values, inner2);
+
+  AstNode* exprStmt = newExprStmtNode(outer);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSetInCall() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "f({1, 2})");
+
+  AstNode* fn = mkFunction(name);
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
+  AstNode* call = newCallNode(callee);
+
+  AstNode* set = newSetNode();
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(2)));
+  pushAstVec(&call->as.call.args, set);
+
+  AstNode* exprStmt = newExprStmtNode(call);
+  pushFnStmt(fn, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
 bool testSequenceComprehensionParse() {
   Token name = syntheticToken("test");
   AstNode* actual = compile(name, "(x | x in (1,2), x != 2)");
@@ -2802,6 +2940,105 @@ bool testBytecodeSequenceInCall() {
   return true;
 }
 
+/* Bytecode tests for Set */
+
+bool testBytecodeSetEmpty() {
+  AstNode* set = newSetNode();
+  Chunk c;
+  if (!buildChunkForExpr(set, &c)) return false;
+
+  if (c.count != 5) return false;
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  if (c.code[3] != OP_CALL || c.code[4] != 0) return false;
+
+  if (c.constants.count != 1) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("set")))) return false;
+
+  return true;
+}
+
+bool testBytecodeSetTwoElements() {
+  AstNode* set = newSetNode();
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(2)));
+  Chunk c;
+  if (!buildChunkForExpr(set, &c)) return false;
+
+  if (c.count != 11) return false;
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
+    return false;
+  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
+    return false;
+  if (c.code[9] != OP_CALL || c.code[10] != 2) return false;
+
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("set")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+
+  return true;
+}
+
+bool testBytecodeSetThreeElements() {
+  AstNode* set = newSetNode();
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(2)));
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(3)));
+  Chunk c;
+  if (!buildChunkForExpr(set, &c)) return false;
+
+  if (c.count != 14) return false;
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (c.code[3] != OP_CONSTANT || read_u16(c.code[4], c.code[5]) != 1)
+    return false;
+  if (c.code[6] != OP_CONSTANT || read_u16(c.code[7], c.code[8]) != 2)
+    return false;
+  if (c.code[9] != OP_CONSTANT || read_u16(c.code[10], c.code[11]) != 3)
+    return false;
+  if (c.code[12] != OP_CALL || c.code[13] != 3) return false;
+
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("set")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+  if (!valuesEqual(c.constants.values[3], NUMBER_VAL(3))) return false;
+
+  return true;
+}
+
+bool testBytecodeSetInCall() {
+  // f({1, 2})
+  AstNode* callee = newVarGlobalNode();
+  callee->as.global.name = intern("f");
+  AstNode* call = newCallNode(callee);
+
+  AstNode* set = newSetNode();
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(2)));
+  pushAstVec(&call->as.call.args, set);
+
+  Chunk c;
+  if (!buildChunkForExpr(call, &c)) return false;
+
+  if (c.count != 16) return false;
+
+  if (c.code[0] != OP_GET_GLOBAL || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  if (c.code[3] != OP_GET_GLOBAL) return false;
+  if (c.code[14] != OP_CALL || c.code[15] != 1) return false;
+
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("f")))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(intern("set")))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[3], NUMBER_VAL(2))) return false;
+
+  return true;
+}
+
 /* Bytecode tests for Assignment */
 
 bool testBytecodeAssignmentGlobal() {
@@ -3145,6 +3382,12 @@ int testMain(void) {
   fmt("    ", testSequenceComplexExpression(), "Sequence complex expression");
   fmt("    ", testSequenceNested(), "Sequence nested");
   fmt("    ", testSequenceInCall(), "Sequence in call");
+  fmt("    ", testSetOneElement(), "Set one element");
+  fmt("    ", testSetTwoElements(), "Set two elements");
+  fmt("    ", testSetVariables(), "Set variables");
+  fmt("    ", testSetComplexExpression(), "Set complex expression");
+  fmt("    ", testSetNested(), "Set nested");
+  fmt("    ", testSetInCall(), "Set in call");
   fmt("    ", testSequenceComprehensionParse(), "Sequence comprehension parse");
   fmt("    ", testSequenceComprehensionComplexBody(),
       "Sequence comprehension complex body");
@@ -3221,6 +3464,10 @@ int testMain(void) {
   fmt("    ", testBytecodeSequenceNestedCallee(), "Sequence nested callee");
   fmt("    ", testBytecodeSequenceNested(), "Sequence nested");
   fmt("    ", testBytecodeSequenceInCall(), "Sequence in call");
+  fmt("    ", testBytecodeSetEmpty(), "Set empty");
+  fmt("    ", testBytecodeSetTwoElements(), "Set two elements");
+  fmt("    ", testBytecodeSetThreeElements(), "Set three elements");
+  fmt("    ", testBytecodeSetInCall(), "Set in call");
   fmt("    ", testBytecodeObjectEmpty(), "Object empty");
   fmt("    ", testBytecodeObjectOneProperty(), "Object one property");
   fmt("    ", testBytecodeObjectMultipleProperties(),

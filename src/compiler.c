@@ -463,27 +463,6 @@ static bool peekFunction(NodeCompiler* cmp) {
   return true;
 }
 
-static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
-  advance(cmp);
-  switch (parser.previous.type) {
-    case TOKEN_NIL:
-      return newLiteralValueNode(NIL_VAL);
-    case TOKEN_TRUE:
-      return boolean(cmp, canAssign);
-    case TOKEN_FALSE:
-      return boolean(cmp, canAssign);
-    case TOKEN_IDENTIFIER:
-    case TOKEN_TYPE_VARIABLE:
-      return identifier(cmp, canAssign);
-    case TOKEN_STRING:
-      return string(cmp, canAssign);
-    case TOKEN_NUMBER:
-      return number(cmp, canAssign);
-    default:
-      return newUnknownNode();
-  }
-}
-
 static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
                                    ComprehensionType type,
                                    TokenType closingToken) {
@@ -548,6 +527,17 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
   return comprehension;
 }
 
+static bool isValidObjectKey(AstNode* key) {
+  return key->type == AST_LITERAL ||
+         (key->type == AST_VAR_GLOBAL && key->as.global.name != NULL);
+}
+
+static void ensureObjectKey(NodeCompiler* cmp, AstNode* key) {
+  if (!isValidObjectKey(key)) {
+    error(cmp, "Expect identifier or literal for object key.");
+  }
+}
+
 static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
   if (check(TOKEN_RIGHT_BRACE)) {
     advance(cmp);
@@ -567,28 +557,48 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
     return comprehension;
   }
 
-  AstNode* obj = newObjectNode();
-  do {
-    AstNode* key = literal(cmp, false);
-    if (key->type == AST_UNKNOWN) {
-      errorAtCurrent(cmp, "Expect identifier or literal for object key.");
-    }
+  AstNode* first = expression(cmp);
+
+  if (check(TOKEN_COLON)) {
+    AstNode* obj = newObjectNode();
+    ensureObjectKey(cmp, first);
 
     consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
-
     AstNode* value = expression(cmp);
-    AstNode* entry = newObjectEntryNode(key, value);
-    pushAstVec(&obj->as.object.entries, entry);
+    pushAstVec(&obj->as.object.entries, newObjectEntryNode(first, value));
 
-    if (check(TOKEN_RIGHT_BRACE)) break;
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+      if (!match(cmp, TOKEN_COMMA)) {
+        errorAtCurrent(cmp, "Expect ',' or '}' after object value.");
+        break;
+      }
+      if (check(TOKEN_RIGHT_BRACE)) break;
+
+      AstNode* key = expression(cmp);
+      ensureObjectKey(cmp, key);
+      consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
+      AstNode* val = expression(cmp);
+      pushAstVec(&obj->as.object.entries, newObjectEntryNode(key, val));
+    }
+
+    consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after object literal.");
+    return obj;
+  }
+
+  AstNode* set = newSetNode();
+  pushAstVec(&set->as.set.values, first);
+
+  while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
     if (!match(cmp, TOKEN_COMMA)) {
-      errorAtCurrent(cmp, "Expect ',' or '}' after object value.");
+      errorAtCurrent(cmp, "Expect ',' or '}' after set element.");
       break;
     }
-  } while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF));
+    if (check(TOKEN_RIGHT_BRACE)) break;
+    pushAstVec(&set->as.set.values, expression(cmp));
+  }
 
-  consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after object literal.");
-  return obj;
+  consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after set literal.");
+  return set;
 }
 
 static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {

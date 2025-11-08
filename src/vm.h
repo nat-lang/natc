@@ -58,6 +58,7 @@ typedef struct {
   ObjString* sOut;
   ObjString* sSeq;
   ObjString* sObj;
+  ObjString* sSet;
 
 } Core;
 
