@@ -222,6 +222,12 @@ AstNode* newSequenceNode() {
   return n;
 }
 
+AstNode* newSetNode() {
+  AstNode* n = allocNode(AST_SET);
+  initAstVec(&n->as.set.values);
+  return n;
+}
+
 AstNode* newObjectNode() {
   AstNode* n = allocNode(AST_OBJECT);
   initAstVec(&n->as.object.entries);
@@ -412,6 +418,10 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Sequence\n", depth);
       printNodeVecAt(&node->as.sequence.values, depth + 1);
       break;
+    case AST_SET:
+      printStrAt("Set\n", depth);
+      printNodeVecAt(&node->as.set.values, depth + 1);
+      break;
     case AST_OBJECT:
       printStrAt("Object\n", depth);
       printNodeVecAt(&node->as.object.entries, depth + 1);
@@ -529,6 +539,9 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_SEQUENCE:
       return a->as.sequence.values.count == b->as.sequence.values.count &&
              astVecsEqual(&a->as.sequence.values, &b->as.sequence.values);
+    case AST_SET:
+      return a->as.set.values.count == b->as.set.values.count &&
+             astVecsEqual(&a->as.set.values, &b->as.set.values);
     case AST_OBJECT:
       return a->as.object.entries.count == b->as.object.entries.count &&
              astVecsEqual(&a->as.object.entries, &b->as.object.entries);
@@ -800,6 +813,16 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, (uint8_t)node->as.sequence.values.count);
       break;
     }
+    case AST_SET: {
+      emitByte(chunk, node, OP_GET_GLOBAL);
+      uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sSet));
+      emitConstant(chunk, node, constant);
+      if (!toChunkVec(&node->as.set.values, chunk)) return false;
+
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)node->as.set.values.count);
+      break;
+    }
     case AST_OBJECT: {
       emitByte(chunk, node, OP_GET_GLOBAL);
       uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sObj));
@@ -967,6 +990,10 @@ void markAstNode(AstNode* n) {
       for (int i = 0; i < n->as.sequence.values.count; i++)
         markAstNode((AstNode*)n->as.sequence.values.items[i]);
       break;
+    case AST_SET:
+      for (int i = 0; i < n->as.set.values.count; i++)
+        markAstNode((AstNode*)n->as.set.values.items[i]);
+      break;
     case AST_OBJECT:
       for (int i = 0; i < n->as.object.entries.count; i++)
         markAstNode((AstNode*)n->as.object.entries.items[i]);
@@ -1055,6 +1082,9 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_SEQUENCE:
       freeAstVec(&n->as.sequence.values);
+      break;
+    case AST_SET:
+      freeAstVec(&n->as.set.values);
       break;
     case AST_OBJECT:
       freeAstVec(&n->as.object.entries);
