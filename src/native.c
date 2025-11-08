@@ -99,6 +99,21 @@ bool __seq__(int argCount, Value* args) {
   return true;
 }
 
+bool __set__(int argCount, Value* args) {
+  ObjMap* set = newMap();
+  vm.stackTop[-argCount - 1] = OBJ_VAL(set);
+
+  int i = argCount;
+  while (i-- > 0) {
+    Value element = vmPeek(i);
+    mapSet(&set->obj.fields, element, BOOL_VAL(true));
+  }
+
+  while (++i < argCount) vmPop();
+
+  return true;
+}
+
 bool __obj__(int argCount, Value* args) {
   ObjMap* map = newMap();
   vm.stackTop[-argCount - 1] = OBJ_VAL(map);
@@ -387,6 +402,7 @@ void defineNatives() {
   defineNativeFnGlobal("assert", 1, __assert__);
   defineNativeFnGlobal("len", 1, __length__);
   defineNativeFn("seq", 0, true, __seq__, &vm.globals);
+  defineNativeFn("set", 0, true, __set__, &vm.globals);
   defineNativeFn("obj", 0, true, __obj__, &vm.globals);
 
   defineNativeInfixGlobal("==", __eq__, PREC_COMPARISON);
