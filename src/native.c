@@ -9,7 +9,7 @@
 #include "vm.h"
 
 void defineNativeFn(char* name, int arity, bool variadic, NativeFn function,
-                    ObjMap* dest) {
+                    Map* dest) {
   // keep the values on the stack so they're
   // not gc'd if/when the [dest] map is recapacitated.
   ObjString* objName = intern(name);
@@ -27,7 +27,7 @@ static void defineNativeFnGlobal(char* name, int arity, NativeFn function) {
 }
 
 static void defineNativeAffixGlobal(char* name, int arity, NativeFn function,
-                                    Precedence prec, ObjMap* affixMap) {
+                                    Precedence prec, Map* affixMap) {
   defineNativeFn(name, arity, false, function, &vm.globals);
 
   Value fn;
@@ -106,7 +106,7 @@ bool __obj__(int argCount, Value* args) {
   for (int i = argCount - 1; i >= 1; i -= 2) {
     Value key = vmPeek(i);
     Value value = vmPeek(i - 1);
-    mapSet(map, key, value);
+    mapSet(&map->obj.fields, key, value);
   }
 
   int i = argCount;
@@ -173,7 +173,7 @@ bool __str__(int argCount, Value* args) {
 
 bool __valuesEqual__(Value a, Value b);
 
-bool __subMap__(ObjMap* a, ObjMap* b) {
+bool __subMap__(Map* a, Map* b) {
   for (int i = 0; i < a->count; i++) {
     MapEntry* entry = &a->entries[i];
     if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
@@ -218,7 +218,8 @@ bool __valuesEqual__(Value a, Value b) {
         case OBJ_MAP: {
           ObjMap* aMap = AS_MAP(a);
           ObjMap* bMap = AS_MAP(b);
-          return __subMap__(aMap, bMap) && __subMap__(bMap, aMap);
+          return __subMap__(&aMap->obj.fields, &bMap->obj.fields) &&
+                 __subMap__(&bMap->obj.fields, &aMap->obj.fields);
         }
         default:
           return false;
@@ -321,23 +322,6 @@ bool __stackTrace__(int argCount, Value* args) {
   return true;
 }
 
-bool __annotations__(int argCount, Value* args) {
-  Value value = vmPop();
-  vmPop();  // fn.
-
-  if (!IS_OBJ(value)) {
-    vmRuntimeError("Only objects have annotations.");
-    return false;
-  }
-
-  Obj* obj = AS_OBJ(value);
-  for (int i = 0; i < obj->annotations.count; i++)
-    vmPush(obj->annotations.values[i]);
-  vmTuplify(obj->annotations.count, true);
-
-  return true;
-}
-
 bool __length__(int argCount, Value* args) {
   Value obj = vmPop();
   vmPop();  // native fn.
@@ -429,5 +413,4 @@ void defineNatives() {
   defineNativeFnGlobal("resolveUpvalue", 1, __resolveUpvalue__);
   defineNativeFnGlobal("stackTrace", 0, __stackTrace__);
   defineNativeFnGlobal("address", 1, __address__);
-  defineNativeFnGlobal("annotations", 1, __annotations__);
 }
