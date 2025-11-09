@@ -1,0 +1,12 @@
+(y | y in (1,2))
+
+let x = (() => {y = 1} | y in (1,2))
+
+assert(x[0]() == 1)
+assert(x[1]() == 1)
+
+let f = x => x
+let x = (z | y in (1,2), z in f(y))
+
+assert(x[0] == 1)
+assert(x[1] == 2)

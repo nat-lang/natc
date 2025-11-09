@@ -1,0 +1,37 @@
+use ../utils
+
+let conclude = begin();
+
+use affix
+use assignment
+use annotation
+use block
+use class
+use symbol
+use closure
+use ast
+use equality
+use functional
+use hash
+use iteration
+use length
+use logic
+use math
+use map
+use membership
+use native
+use negation
+use object
+use module/index
+use recursion
+use sequential
+use set
+use string
+use tree
+use type/index
+use overload
+use quantification
+use composition/index
+use json
+
+conclude("integration");
