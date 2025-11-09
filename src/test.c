@@ -721,7 +721,6 @@ bool testForIterSimple() {
   AstNode* body = newExprStmtNode(bodyVar);
 
   AstNode* iterNode = newIterNode(var, iterable, body);
-  iterNode->as.iter.varLocal = 1;
   iterNode->as.iter.iterLocal = 2;
   pushFnStmt(fn, iterNode);
 
@@ -1808,7 +1807,6 @@ bool testBytecodeIterSimple() {
   AstNode* body = newExprStmtNode(bodyVar);
 
   AstNode* iterNode = newIterNode(var, iterable, body);
-  iterNode->as.iter.varLocal = 1;
   iterNode->as.iter.iterLocal = 2;
 
   Chunk c;

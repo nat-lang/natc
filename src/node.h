@@ -128,7 +128,6 @@ struct AstNode {
       AstNode* var;
       AstNode* iterable;
       AstNode* body;
-      uint8_t varLocal;
       uint8_t iterLocal;
     } iter;
 
@@ -218,12 +217,12 @@ struct AstNode {
       AstNode* body;
       AstVec conditions;
       ComprehensionType type;
+      AstNode* compLocal;
     } comprehension;
 
     struct {
       AstNode* var;
       AstNode* iterable;
-      uint8_t varLocal;
       uint8_t iterLocal;
     } comprehensionIter;
 

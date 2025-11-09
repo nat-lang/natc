@@ -101,8 +101,10 @@ bool initVM() {
   vm.core.sOut = intern("out");
 
   vm.core.sSeq = intern("seq");
+  vm.core.sSeqPush = intern("seqPush");
   vm.core.sObj = intern("obj");
   vm.core.sSet = intern("set");
+  vm.core.sSetAdd = intern("setAdd");
 
   vm.core.sLen = intern("len");
   vm.core.sLt = intern("<");

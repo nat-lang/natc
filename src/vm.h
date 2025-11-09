@@ -64,9 +64,10 @@ typedef struct {
   ObjString* sExecMain;
   ObjString* sOut;
   ObjString* sSeq;
+  ObjString* sSeqPush;
   ObjString* sObj;
   ObjString* sSet;
-
+  ObjString* sSetAdd;
 } Core;
 
 typedef struct {

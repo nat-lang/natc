@@ -111,7 +111,6 @@ AstNode* newComprehensionIterNode(AstNode* var, AstNode* iterable) {
   AstNode* n = allocNode(AST_COMPREHENSION_ITER);
   n->as.comprehensionIter.var = var;
   n->as.comprehensionIter.iterable = iterable;
-  n->as.comprehensionIter.varLocal = 0;
   n->as.comprehensionIter.iterLocal = 0;
   return n;
 }
@@ -178,7 +177,6 @@ AstNode* newIterNode(AstNode* var, AstNode* iterable, AstNode* body) {
   n->as.iter.var = var;
   n->as.iter.iterable = iterable;
   n->as.iter.body = body;
-  n->as.iter.varLocal = 0;
   n->as.iter.iterLocal = 0;
   return n;
 }
@@ -436,14 +434,9 @@ void printNodeAt(AstNode* node, int depth) {
     }
     case AST_ITER: {
       printStrAt("Iter\n", depth);
-      printStrAt("Var\n", depth + 1);
-      printNodeAt(node->as.iter.var, depth + 2);
-      printf("%*sVarLocal: %u\n", depth + 1, "", node->as.iter.varLocal);
-      printStrAt("Iterable\n", depth + 1);
-      printNodeAt(node->as.iter.iterable, depth + 2);
-      printf("%*sIterLocal: %u\n", depth + 1, "", node->as.iter.iterLocal);
-      printStrAt("Body\n", depth + 1);
-      printNodeAt(node->as.iter.body, depth + 2);
+      printNodeAt(node->as.iter.var, depth + 1);
+      printNodeAt(node->as.iter.iterable, depth + 1);
+      printNodeAt(node->as.iter.body, depth + 1);
       break;
     }
     case AST_IMPORT: {
@@ -614,7 +607,6 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.iter.var, b->as.iter.var) &&
              nodesEqual(a->as.iter.iterable, b->as.iter.iterable) &&
              nodesEqual(a->as.iter.body, b->as.iter.body) &&
-             a->as.iter.varLocal == b->as.iter.varLocal &&
              a->as.iter.iterLocal == b->as.iter.iterLocal;
 
     case AST_IMPORT:
@@ -703,6 +695,12 @@ static void emitBytes(Chunk* chunk, AstNode* node, uint8_t byte1,
 
 static void emitConstant(Chunk* chunk, AstNode* node, uint16_t constant) {
   emitBytes(chunk, node, constant >> 8, constant & 0xff);
+}
+
+static void emitGlobal(Chunk* chunk, AstNode* node, ObjString* name) {
+  emitByte(chunk, node, OP_GET_GLOBAL);
+  uint16_t constant = addConstant(chunk, OBJ_VAL(name));
+  emitConstant(chunk, node, constant);
 }
 
 void closeUpvalues(Chunk* chunk, AstNode* node) {
@@ -813,15 +811,67 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_COMPREHENSION: {
-      error(node, "Not implemented.");
-      return false;
+      AstNode* addNode = newVarGlobalNode();
+
+      // initialize an empty collection on top of the stack
+      // and stash the addition operation.
+
+      switch (node->as.comprehension.type) {
+        case COMPREHENSION_SEQ: {
+          emitGlobal(chunk, node, vm.core.sSeq);
+          addNode->as.global.name = vm.core.sSeqPush;
+          break;
+        }
+        case COMPREHENSION_SET: {
+          emitGlobal(chunk, node, vm.core.sSet);
+          addNode->as.global.name = vm.core.sSetAdd;
+          break;
+        }
+      }
+
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)0);
+
+      // now we'll translate the comprehension ast to simpler nodes,
+      // from the inside out.
+
+      // the innermost expression calls the addition operation with
+      // the comprehension instance and the body of the comprehension.
+      AstNode* comp = newCallNode(addNode);
+      pushAstVec(&comp->as.call.args, node->as.comprehension.compLocal);
+      pushAstVec(&comp->as.call.args, node->as.comprehension.body);
+      comp = newExprStmtNode(comp);
+
+      // then we wrap it in the restrictions.
+      for (int i = node->as.comprehension.conditions.count - 1; i >= 0; i--) {
+        AstNode* cond = node->as.comprehension.conditions.items[i];
+        switch (cond->type) {
+          case AST_COMPREHENSION_ITER: {
+            comp = newIterNode(cond->as.comprehensionIter.var,
+                               cond->as.comprehensionIter.iterable, comp);
+            comp->as.iter.var = cond->as.comprehensionIter.var;
+            comp->as.iter.iterLocal = cond->as.comprehensionIter.iterLocal;
+            break;
+          }
+          case AST_COMPREHENSION_PRED: {
+            comp = newIfNode(cond->as.comprehensionPred.predicate, comp, NULL);
+            break;
+          }
+          default:
+            error(node, "Invalid comprehension condition.");
+            return false;
+        }
+      }
+
+      if (!toChunk(comp, chunk)) return false;
+      break;
     }
     case AST_COMPREHENSION_ITER: {
-      error(node, "Not implemented.");
+      error(node, "Comprehension iterator must be translated to iterator.");
       return false;
     }
     case AST_COMPREHENSION_PRED:
-      error(node, "Not implemented.");
+      error(node, "Comprehension predicate must be translated to conditional.");
       return false;
     case AST_EXPR_STMT: {
       if (!toChunk(node->as.exprStmt.expr, chunk)) return false;
@@ -905,7 +955,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_ITER: {
-      uint8_t varIndex = node->as.iter.varLocal;
+      uint8_t varIndex = node->as.iter.var->as.local.index;
       uint8_t iterIndex = node->as.iter.iterLocal;
 
       uint16_t iter = addConstant(chunk, OBJ_VAL(vm.core.sIter));
@@ -915,7 +965,6 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       // set up the var at local 0 and the iterator at local 1.
       emitByte(chunk, node, OP_NIL);
       emitByte(chunk, node, OP_GET_GLOBAL);
-
       emitConstant(chunk, node, iter);
       if (!toChunk(node->as.iter.iterable, chunk)) return false;
       emitByte(chunk, node, OP_CALL);

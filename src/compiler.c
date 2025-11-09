@@ -506,6 +506,13 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
                                    ComprehensionType type,
                                    TokenType closingToken) {
   AstNode* comprehension = newComprehensionNode(NULL, type);
+  Token compToken = syntheticToken("__comp");
+  uint8_t compIndex = addLocal(cmp, compToken);
+  AstNode* compVar = newVarLocalNode(compIndex);
+  compVar->as.local.name = tokenString(compToken);
+  comprehension->as.comprehension.compLocal = compVar;
+  markInitialized(cmp);
+
   int scopesOpened = 0;
   bool sawClause = false;
 
@@ -525,7 +532,11 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
       consume(cmp, TOKEN_IN, "Expect 'in' after variable name.");
       AstNode* iterable = expression(cmp);
 
+      uint8_t iterIndex = addLocal(cmp, syntheticToken("__iter"));
+      markInitialized(cmp);
+
       AstNode* iterCond = newComprehensionIterNode(var, iterable);
+      iterCond->as.comprehensionIter.iterLocal = iterIndex;
       pushAstVec(&comprehension->as.comprehension.conditions, iterCond);
     } else {
       AstNode* predicate = expression(cmp);
@@ -862,10 +873,7 @@ static AstNode* forStatement(NodeCompiler* cmp) {
 
       AstNode* iterable = expression(cmp);
 
-      Token iterToken = syntheticToken("__iter");
-      iterToken.type = TOKEN_IDENTIFIER;
-      iterToken.line = varToken.line;
-      uint8_t iterIndex = addLocal(cmp, iterToken);
+      uint8_t iterIndex = addLocal(cmp, syntheticToken("__iter"));
       markInitialized(cmp);
 
       consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after for clause.");
@@ -874,7 +882,6 @@ static AstNode* forStatement(NodeCompiler* cmp) {
 
       AstNode* iterNode = newIterNode(varNode, iterable, body);
       iterNode->line = varToken.line;
-      iterNode->as.iter.varLocal = varIndex;
       iterNode->as.iter.iterLocal = iterIndex;
 
       endScope(cmp);
