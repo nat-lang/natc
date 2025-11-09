@@ -652,7 +652,7 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
     advanceTo(cmp, TOKEN_PIPE, TOKEN_PAREN_RIGHT, 1);
     consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
     AstNode* comprehension = parseComprehension(
-        cmp, bodyCheckpoint, COMPREHENSION_SEQUENCE, TOKEN_PAREN_RIGHT);
+        cmp, bodyCheckpoint, COMPREHENSION_SEQ, TOKEN_PAREN_RIGHT);
     consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after comprehension.");
     return comprehension;
   }
@@ -808,6 +808,43 @@ static AstNode* whileStatement(NodeCompiler* cmp) {
   return newWhileNode(cond, body);
 }
 
+static AstNode* forStatement(NodeCompiler* cmp) {
+  beginScope(cmp);
+
+  consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'for'.");
+
+  AstNode* initializer = NULL;
+  if (!match(cmp, TOKEN_SEMICOLON)) {
+    if (match(cmp, TOKEN_LET)) {
+      initializer = letDeclaration(cmp);
+      consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop initializer.");
+    } else {
+      AstNode* initExpr = expression(cmp);
+      initializer = newExprStmtNode(initExpr);
+      consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop initializer.");
+    }
+  }
+
+  AstNode* condition = NULL;
+  if (!check(TOKEN_SEMICOLON)) {
+    condition = expression(cmp);
+  }
+  consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+  AstNode* increment = NULL;
+  if (!check(TOKEN_PAREN_RIGHT)) {
+    AstNode* incrementExpr = expression(cmp);
+    increment = newExprStmtNode(incrementExpr);
+  }
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after for clauses.");
+
+  AstNode* body = statement(cmp);
+
+  endScope(cmp);
+
+  return newForNode(initializer, condition, increment, body);
+}
+
 static void rescanCurrentAsPathIdentifier(NodeCompiler* cmp) {
   rewindScanner(parser.current);
   parser.current = scanPathIdentifier();
@@ -848,6 +885,8 @@ static AstNode* statement(NodeCompiler* cmp) {
   AstNode* node;
   if (match(cmp, TOKEN_IF)) {
     node = ifStatement(cmp);
+  } else if (match(cmp, TOKEN_FOR)) {
+    node = forStatement(cmp);
   } else if (match(cmp, TOKEN_WHILE)) {
     node = whileStatement(cmp);
   } else if (match(cmp, TOKEN_USE)) {

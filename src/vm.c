@@ -104,6 +104,10 @@ bool initVM() {
   vm.core.sObj = intern("obj");
   vm.core.sSet = intern("set");
 
+  vm.core.sLen = intern("len");
+  vm.core.sLt = intern("<");
+  vm.core.sAdd = intern("+");
+
   defineNatives();
 
   return true;

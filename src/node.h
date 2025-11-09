@@ -16,7 +16,9 @@ typedef enum {
   AST_EXPR_STMT,
   AST_FUNCTION,
   AST_IF,
+  AST_FOR,
   AST_IMPORT,
+  AST_ITER,
   AST_LET,
   AST_LITERAL,
   AST_MODULE,
@@ -39,7 +41,7 @@ typedef enum {
 } AstType;
 
 typedef enum {
-  COMPREHENSION_SEQUENCE,
+  COMPREHENSION_SEQ,
   COMPREHENSION_SET,
 } ComprehensionType;
 
@@ -101,6 +103,12 @@ struct AstNode {
       AstNode* then;
       AstNode* elseBranch;
     } ifStmt;
+    struct {
+      AstNode* initializer;
+      AstNode* condition;
+      AstNode* increment;
+      AstNode* body;
+    } forStmt;
 
     struct {
       AstNode* expr;
@@ -110,6 +118,12 @@ struct AstNode {
       AstNode* module;
       ObjString* alias;  // can be NULL
     } use;
+
+    struct {
+      AstNode* var;
+      AstNode* iterable;
+      AstNode* body;
+    } iter;
 
     struct {
       ObjString* name;
@@ -219,6 +233,8 @@ AstNode* newComprehensionPredNode(AstNode* predicate);
 AstNode* newExprStmtNode(AstNode* expr);
 AstNode* newFunctionNode(AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
+AstNode* newForNode(AstNode* initializer, AstNode* condition,
+                    AstNode* increment, AstNode* body);
 AstNode* newLetNode(AstNode* value);
 AstNode* newLiteralValueNode(Value value);
 AstNode* newLiteralNode();
