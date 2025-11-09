@@ -111,6 +111,8 @@ AstNode* newComprehensionIterNode(AstNode* var, AstNode* iterable) {
   AstNode* n = allocNode(AST_COMPREHENSION_ITER);
   n->as.comprehensionIter.var = var;
   n->as.comprehensionIter.iterable = iterable;
+  n->as.comprehensionIter.varLocal = 0;
+  n->as.comprehensionIter.iterLocal = 0;
   return n;
 }
 

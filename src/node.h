@@ -223,6 +223,8 @@ struct AstNode {
     struct {
       AstNode* var;
       AstNode* iterable;
+      uint8_t varLocal;
+      uint8_t iterLocal;
     } comprehensionIter;
 
     struct {
