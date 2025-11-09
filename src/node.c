@@ -457,7 +457,7 @@ void printNodeAt(AstNode* node, int depth) {
       break;
     }
     case AST_DECL_LET: {
-      printStrAt("Let ", depth);
+      printStrAt("Let\n", depth);
       printNodeAt(node->as.declLet.local, depth + 1);
       printNodeAt(node->as.declLet.value, depth + 1);
       break;
@@ -1034,6 +1034,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       if (!toChunk(node->as.declLet.value, chunk)) return false;
       emitByte(chunk, node, OP_SET_LOCAL);
       emitConstant(chunk, node, node->as.declLet.local->as.local.index);
+      emitByte(chunk, node, OP_POP);
       break;
     }
     case AST_DECL_GLOBAL: {

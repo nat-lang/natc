@@ -389,10 +389,10 @@ void printObject(Value value) {
       printf("<var %s>", AS_VARIABLE(value)->name->chars);
       break;
     case OBJ_MAP:
-      printf("<map>");
+      printf("<map at %p>", AS_MAP(value));
       break;
     case OBJ_SET:
-      printf("<set>");
+      printf("<set at %p>", AS_SET(value));
       break;
     case OBJ_MODULE:
       printf("<module %s>", AS_MODULE(value)->closure->function->name->chars);

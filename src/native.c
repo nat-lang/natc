@@ -262,6 +262,12 @@ bool __valuesEqual__(Value a, Value b) {
           return __subMap__(&aMap->obj.fields, &bMap->obj.fields) &&
                  __subMap__(&bMap->obj.fields, &aMap->obj.fields);
         }
+        case OBJ_SET: {
+          ObjSet* aSet = AS_SET(a);
+          ObjSet* bSet = AS_SET(b);
+          return __subMap__(&aSet->elements, &bSet->elements) &&
+                 __subMap__(&bSet->elements, &aSet->elements);
+        }
         default:
           return false;
       }

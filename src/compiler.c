@@ -505,16 +505,19 @@ static bool peekFunction(NodeCompiler* cmp) {
 static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
                                    ComprehensionType type,
                                    TokenType closingToken) {
+  int scopesOpened = 0;
+  bool sawClause = false;
+
   AstNode* comprehension = newComprehensionNode(NULL, type);
+
+  // local for the comprehension to occupy while it's
+  // under construction.
   Token compToken = syntheticToken("__comp");
   uint8_t compIndex = addLocal(cmp, compToken);
   AstNode* compVar = newVarLocalNode(compIndex);
   compVar->as.local.name = tokenString(compToken);
   comprehension->as.comprehension.compLocal = compVar;
   markInitialized(cmp);
-
-  int scopesOpened = 0;
-  bool sawClause = false;
 
   while (!check(closingToken) && !check(TOKEN_EOF)) {
     if (checkVariable() && peek(TOKEN_IN)) {
@@ -558,9 +561,7 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
     }
   }
 
-  if (!sawClause) {
-    error(cmp, "Comprehension requires at least one clause.");
-  }
+  if (!sawClause) error(cmp, "Comprehension requires at least one clause.");
 
   Parser afterConditions = saveParser();
 
@@ -570,11 +571,27 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
 
   gotoParser(afterConditions);
 
-  for (int i = 0; i < scopesOpened; i++) {
-    endScope(cmp);
-  }
+  for (int i = 0; i < scopesOpened; i++) endScope(cmp);
 
   return comprehension;
+}
+
+static AstNode* comprehensionClosure(NodeCompiler* enclosing,
+                                     Parser bodyCheckpoint,
+                                     ComprehensionType type,
+                                     TokenType closingToken) {
+  NodeCompiler cmp;
+  AstNode* node = newFunctionNode(enclosing->fn->as.function.module);
+  node->as.function.name = tokenString(syntheticToken("__comp_builder"));
+  node->as.function.signature = newSignatureNode();
+  initNodeCompiler(&cmp, enclosing, node);
+
+  beginScope(&cmp);
+  node->as.function.body = newReturnNode(
+      parseComprehension(&cmp, bodyCheckpoint, type, closingToken));
+  endScope(&cmp);
+
+  return newCallNode(node);
 }
 
 static bool isValidObjectKey(AstNode* key) {
@@ -601,10 +618,11 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
   if (isComprehension) {
     advanceTo(cmp, TOKEN_PIPE, TOKEN_RIGHT_BRACE, 1);
     consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
-    AstNode* comprehension = parseComprehension(
-        cmp, bodyCheckpoint, COMPREHENSION_SET, TOKEN_RIGHT_BRACE);
+
+    AstNode* comp = comprehensionClosure(cmp, bodyCheckpoint, COMPREHENSION_SET,
+                                         TOKEN_RIGHT_BRACE);
     consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after comprehension.");
-    return comprehension;
+    return comp;
   }
 
   AstNode* first = expression(cmp);
@@ -671,10 +689,11 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
   if (isComprehension) {
     advanceTo(cmp, TOKEN_PIPE, TOKEN_PAREN_RIGHT, 1);
     consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
-    AstNode* comprehension = parseComprehension(
-        cmp, bodyCheckpoint, COMPREHENSION_SEQ, TOKEN_PAREN_RIGHT);
+
+    AstNode* comp = comprehensionClosure(cmp, bodyCheckpoint, COMPREHENSION_SEQ,
+                                         TOKEN_PAREN_RIGHT);
     consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after comprehension.");
-    return comprehension;
+    return comp;
   }
 
   // sequence or parenthesized expression.
