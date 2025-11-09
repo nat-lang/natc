@@ -265,6 +265,10 @@ static void markRoots() {
   markObject((Obj*)vm.core.sObj);
   markObject((Obj*)vm.core.sSet);
 
+  markObject((Obj*)vm.core.sLen);
+  markObject((Obj*)vm.core.sLt);
+  markObject((Obj*)vm.core.sAdd);
+
   markAstNodes(vm.astRoot);
 }
 

@@ -53,6 +53,10 @@ typedef struct {
   ObjString* sQuote;
   ObjString* sBackslash;
 
+  ObjString* sLen;
+  ObjString* sLt;
+  ObjString* sAdd;
+
   ObjString* sMain;
   ObjString* sExecMain;
   ObjString* sOut;

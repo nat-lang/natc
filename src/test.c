@@ -474,6 +474,233 @@ bool testWhileNested() {
   return assertNodesEqual(node, fn);
 }
 
+bool testForSimple() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "for (let i = 0; i < 10; i = i + 1) i");
+
+  ObjString* iName = intern("i");
+
+  AstNode* fn = mkFunction(name);
+
+  AstNode* initValue = newLiteralValueNode(NUMBER_VAL(0));
+  AstNode* initializer = newLetNode(initValue);
+  initializer->as.let.name = iName;
+
+  AstNode* less = newVarGlobalNode();
+  less->as.global.name = intern("<");
+  AstNode* condLeft = newVarLocalNode(1);
+  condLeft->as.local.name = iName;
+  AstNode* condRight = newLiteralValueNode(NUMBER_VAL(10));
+  AstNode* condition = newCallInfixNode(less, condLeft, condRight);
+
+  AstNode* plus = newVarGlobalNode();
+  plus->as.global.name = intern("+");
+  AstNode* incTarget = newVarLocalNode(1);
+  incTarget->as.local.name = iName;
+  AstNode* incLeft = newVarLocalNode(1);
+  incLeft->as.local.name = iName;
+  AstNode* incRight = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* incValue = newCallInfixNode(plus, incLeft, incRight);
+  AstNode* incrementAssignment = newAssignmentNode(incTarget, incValue);
+  AstNode* increment = newExprStmtNode(incrementAssignment);
+
+  AstNode* bodyExpr = newVarLocalNode(1);
+  bodyExpr->as.local.name = iName;
+  AstNode* body = newExprStmtNode(bodyExpr);
+
+  AstNode* forNode = newForNode(initializer, condition, increment, body);
+  pushFnStmt(fn, forNode);
+
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testForComplexExpressions() {
+  Token name = syntheticToken("test");
+  AstNode* node =
+      compile(name, "for (let i = f(1 + 2); g(h()); i = i + k(3)) i");
+
+  ObjString* iName = intern("i");
+
+  AstNode* fn = mkFunction(name);
+
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
+  AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* two = newLiteralValueNode(NUMBER_VAL(2));
+  AstNode* sum = newCallInfixNode(plusOp, one, two);
+
+  AstNode* fVar = newVarGlobalNode();
+  fVar->as.global.name = intern("f");
+  AstNode* fCall = newCallNode(fVar);
+  pushAstVec(&fCall->as.call.args, sum);
+
+  AstNode* initializer = newLetNode(fCall);
+  initializer->as.let.name = iName;
+
+  AstNode* hVar = newVarGlobalNode();
+  hVar->as.global.name = intern("h");
+  AstNode* hCall = newCallNode(hVar);
+
+  AstNode* gVar = newVarGlobalNode();
+  gVar->as.global.name = intern("g");
+  AstNode* condition = newCallNode(gVar);
+  pushAstVec(&condition->as.call.args, hCall);
+
+  AstNode* incrementTarget = newVarLocalNode(1);
+  incrementTarget->as.local.name = iName;
+  AstNode* incLeft = newVarLocalNode(1);
+  incLeft->as.local.name = iName;
+
+  AstNode* kVar = newVarGlobalNode();
+  kVar->as.global.name = intern("k");
+  AstNode* kCall = newCallNode(kVar);
+  AstNode* three = newLiteralValueNode(NUMBER_VAL(3));
+  pushAstVec(&kCall->as.call.args, three);
+
+  AstNode* plusInc = newVarGlobalNode();
+  plusInc->as.global.name = intern("+");
+  AstNode* incValue = newCallInfixNode(plusInc, incLeft, kCall);
+  AstNode* incrementExpr = newAssignmentNode(incrementTarget, incValue);
+  AstNode* increment = newExprStmtNode(incrementExpr);
+
+  AstNode* bodyExpr = newVarLocalNode(1);
+  bodyExpr->as.local.name = iName;
+  AstNode* body = newExprStmtNode(bodyExpr);
+
+  AstNode* forNode = newForNode(initializer, condition, increment, body);
+  pushFnStmt(fn, forNode);
+
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testForNoInitializer() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "for (; x < 5; x = x + 1) x");
+
+  AstNode* fn = mkFunction(name);
+
+  ObjString* xName = intern("x");
+
+  AstNode* less = newVarGlobalNode();
+  less->as.global.name = intern("<");
+  AstNode* xCond = newVarGlobalNode();
+  xCond->as.global.name = xName;
+  AstNode* five = newLiteralValueNode(NUMBER_VAL(5));
+  AstNode* condition = newCallInfixNode(less, xCond, five);
+
+  AstNode* plus = newVarGlobalNode();
+  plus->as.global.name = intern("+");
+  AstNode* incLeft = newVarGlobalNode();
+  incLeft->as.global.name = xName;
+  AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* incValue = newCallInfixNode(plus, incLeft, one);
+  AstNode* incTarget = newVarGlobalNode();
+  incTarget->as.global.name = xName;
+  AstNode* incrementExpr = newAssignmentNode(incTarget, incValue);
+  AstNode* increment = newExprStmtNode(incrementExpr);
+
+  AstNode* bodyExpr = newVarGlobalNode();
+  bodyExpr->as.global.name = xName;
+  AstNode* body = newExprStmtNode(bodyExpr);
+
+  AstNode* forNode = newForNode(NULL, condition, increment, body);
+  pushFnStmt(fn, forNode);
+
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testForNoIncrement() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "for (let i = 0; i < 5;) i");
+
+  ObjString* iName = intern("i");
+
+  AstNode* fn = mkFunction(name);
+
+  AstNode* initializer = newLetNode(newLiteralValueNode(NUMBER_VAL(0)));
+  initializer->as.let.name = iName;
+
+  AstNode* less = newVarGlobalNode();
+  less->as.global.name = intern("<");
+  AstNode* condLeft = newVarLocalNode(1);
+  condLeft->as.local.name = iName;
+  AstNode* condRight = newLiteralValueNode(NUMBER_VAL(5));
+  AstNode* condition = newCallInfixNode(less, condLeft, condRight);
+
+  AstNode* bodyExpr = newVarLocalNode(1);
+  bodyExpr->as.local.name = iName;
+  AstNode* body = newExprStmtNode(bodyExpr);
+
+  AstNode* forNode = newForNode(initializer, condition, NULL, body);
+  pushFnStmt(fn, forNode);
+
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testForBlockBody() {
+  Token name = syntheticToken("test");
+  AstNode* node =
+      compile(name, "for (let i = 0; i < 1; i = i + 1) { let y = i }");
+
+  ObjString* iName = intern("i");
+  ObjString* yName = intern("y");
+
+  AstNode* fn = mkFunction(name);
+
+  AstNode* initializer = newLetNode(newLiteralValueNode(NUMBER_VAL(0)));
+  initializer->as.let.name = iName;
+
+  AstNode* less = newVarGlobalNode();
+  less->as.global.name = intern("<");
+  AstNode* condLeft = newVarLocalNode(1);
+  condLeft->as.local.name = iName;
+  AstNode* condRight = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* condition = newCallInfixNode(less, condLeft, condRight);
+
+  AstNode* plus = newVarGlobalNode();
+  plus->as.global.name = intern("+");
+  AstNode* incLeft = newVarLocalNode(1);
+  incLeft->as.local.name = iName;
+  AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* incValue = newCallInfixNode(plus, incLeft, one);
+  AstNode* incTarget = newVarLocalNode(1);
+  incTarget->as.local.name = iName;
+  AstNode* incrementExpr = newAssignmentNode(incTarget, incValue);
+  AstNode* increment = newExprStmtNode(incrementExpr);
+
+  AstNode* block = newBlockNode();
+  AstNode* yValue = newVarLocalNode(1);
+  yValue->as.local.name = iName;
+  AstNode* letY = newLetNode(yValue);
+  letY->as.let.name = yName;
+  pushAstVec(&block->as.block.stmts, letY);
+
+  AstNode* forNode = newForNode(initializer, condition, increment, block);
+  pushFnStmt(fn, forNode);
+
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
 /* ============================================================
  * Throw Statement Tests
  * ============================================================ */
@@ -1535,6 +1762,57 @@ bool testBytecodeWhileComplexBody() {
   return true;
 }
 
+bool testBytecodeForSimple() {
+  AstNode* initializer = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(0)));
+  AstNode* condition = newLiteralValueNode(BOOL_VAL(true));
+  AstNode* increment = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(1)));
+  AstNode* body = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(2)));
+
+  AstNode* forNode = newForNode(initializer, condition, increment, body);
+
+  Chunk c;
+  if (!buildChunkForExpr(forNode, &c)) return false;
+
+  if (c.count < 1) return false;
+
+  if (c.code[0] != OP_CONSTANT || read_u16(c.code[1], c.code[2]) != 0)
+    return false;
+  if (c.code[3] != OP_POP) return false;
+
+  if (c.code[4] != OP_CONSTANT || read_u16(c.code[5], c.code[6]) != 1)
+    return false;
+  if (c.code[7] != OP_JUMP_IF_FALSE) return false;
+
+  if (c.code[10] != OP_POP) return false;
+
+  if (c.code[11] != OP_CONSTANT || read_u16(c.code[12], c.code[13]) != 2)
+    return false;
+  if (c.code[14] != OP_POP) return false;
+
+  if (c.code[15] != OP_CONSTANT || read_u16(c.code[16], c.code[17]) != 3)
+    return false;
+  if (c.code[18] != OP_POP) return false;
+
+  bool loopFound = false;
+  for (int i = 0; i < c.count; i++) {
+    if (c.code[i] == OP_LOOP) {
+      loopFound = true;
+      break;
+    }
+  }
+  if (!loopFound) return false;
+
+  if (c.code[c.count - 1] != OP_POP) return false;
+
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], NUMBER_VAL(0))) return false;
+  if (!valuesEqual(c.constants.values[1], BOOL_VAL(true))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+  if (!valuesEqual(c.constants.values[3], NUMBER_VAL(1))) return false;
+
+  return true;
+}
+
 /* ============================================================
  * Import Bytecode Tests
  * ============================================================ */
@@ -2101,7 +2379,7 @@ bool testSequenceComprehension() {
 
   AstNode* body = newVarLocalNode(1);
   body->as.local.name = intern("x");
-  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQUENCE);
+  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQ);
 
   AstNode* iterable = newSequenceNode();
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
@@ -2313,7 +2591,7 @@ bool testSequenceComprehensionComplexBody() {
   bodyLeft->as.local.name = intern("x");
   AstNode* bodyRight = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* bodyExpr = newCallInfixNode(plusOp, bodyLeft, bodyRight);
-  AstNode* comp = newComprehensionNode(bodyExpr, COMPREHENSION_SEQUENCE);
+  AstNode* comp = newComprehensionNode(bodyExpr, COMPREHENSION_SEQ);
 
   AstNode* iterable = newSequenceNode();
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
@@ -2340,7 +2618,7 @@ bool testSequenceComprehensionNestedBody() {
 
   AstNode* innerBody = newVarLocalNode(2);
   innerBody->as.local.name = intern("y");
-  AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQUENCE);
+  AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQ);
   AstNode* innerIterable = newSequenceNode();
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(1)));
@@ -2351,7 +2629,7 @@ bool testSequenceComprehensionNestedBody() {
   AstNode* innerIter = newComprehensionIterNode(innerVar, innerIterable);
   pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
 
-  AstNode* outerComp = newComprehensionNode(innerComp, COMPREHENSION_SEQUENCE);
+  AstNode* outerComp = newComprehensionNode(innerComp, COMPREHENSION_SEQ);
 
   AstNode* outerIterable = newSequenceNode();
   pushAstVec(&outerIterable->as.sequence.values,
@@ -2380,11 +2658,11 @@ bool testSequenceComprehensionNestedCondition() {
 
   AstNode* body = newVarLocalNode(1);
   body->as.local.name = intern("x");
-  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQUENCE);
+  AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQ);
 
   AstNode* innerBody = newVarLocalNode(2);
   innerBody->as.local.name = intern("y");
-  AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQUENCE);
+  AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQ);
   AstNode* innerIterable = newSequenceNode();
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(1)));
@@ -3479,6 +3757,11 @@ int testMain(void) {
   fmt("    ", testWhileBlock(), "While block");
   fmt("    ", testWhileComplexCondition(), "While complex condition");
   fmt("    ", testWhileNested(), "While nested");
+  fmt("    ", testForSimple(), "For simple");
+  fmt("    ", testForComplexExpressions(), "For complex expressions");
+  fmt("    ", testForNoInitializer(), "For no initializer");
+  fmt("    ", testForNoIncrement(), "For no increment");
+  fmt("    ", testForBlockBody(), "For block body");
   fmt("    ", testThrowGlobal(), "Throw global");
   fmt("    ", testThrowCall(), "Throw call");
   fmt("    ", testThrowInfix(), "Throw infix");
@@ -3562,6 +3845,7 @@ int testMain(void) {
   fmt("    ", testBytecodeWhileEmptyBody(), "While empty body");
   fmt("    ", testBytecodeWhileNested(), "While nested");
   fmt("    ", testBytecodeWhileComplexBody(), "While complex body");
+  fmt("    ", testBytecodeForSimple(), "For simple");
   fmt("    ", testBytecodeImportSimple(), "Import simple");
   fmt("    ", testBytecodeImportWithAlias(), "Import with alias");
   fmt("    ", testBytecodeImportLongPath(), "Import long path");

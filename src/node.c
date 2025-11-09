@@ -161,6 +161,16 @@ AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch) {
   return n;
 }
 
+AstNode* newForNode(AstNode* initializer, AstNode* condition,
+                    AstNode* increment, AstNode* body) {
+  AstNode* n = allocNode(AST_FOR);
+  n->as.forStmt.initializer = initializer;
+  n->as.forStmt.condition = condition;
+  n->as.forStmt.increment = increment;
+  n->as.forStmt.body = body;
+  return n;
+}
+
 AstNode* newUseNode(AstNode* module) {
   AstNode* n = allocNode(AST_IMPORT);
   n->as.use.module = module;
@@ -344,7 +354,7 @@ void printNodeAt(AstNode* node, int depth) {
     }
     case AST_COMPREHENSION: {
       printStrAt("Comprehension ", depth);
-      printf("(%s)\n", node->as.comprehension.type == COMPREHENSION_SEQUENCE
+      printf("(%s)\n", node->as.comprehension.type == COMPREHENSION_SEQ
                            ? "Sequence"
                            : "Set");
       printNodeAt(node->as.comprehension.body, depth + 1);
@@ -379,6 +389,40 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.ifStmt.cond, depth + 1);
       printNodeAt(node->as.ifStmt.then, depth + 1);
       printNodeAt(node->as.ifStmt.elseBranch, depth + 1);
+      break;
+    }
+    case AST_FOR: {
+      printStrAt("For\n", depth);
+      printStrAt("Initializer\n", depth + 1);
+      if (node->as.forStmt.initializer != NULL) {
+        printNodeAt(node->as.forStmt.initializer, depth + 2);
+      } else {
+        printStrAt("None\n", depth + 2);
+      }
+      printStrAt("Condition\n", depth + 1);
+      if (node->as.forStmt.condition != NULL) {
+        printNodeAt(node->as.forStmt.condition, depth + 2);
+      } else {
+        printStrAt("None\n", depth + 2);
+      }
+      printStrAt("Increment\n", depth + 1);
+      if (node->as.forStmt.increment != NULL) {
+        printNodeAt(node->as.forStmt.increment, depth + 2);
+      } else {
+        printStrAt("None\n", depth + 2);
+      }
+      printStrAt("Body\n", depth + 1);
+      printNodeAt(node->as.forStmt.body, depth + 2);
+      break;
+    }
+    case AST_ITER: {
+      printStrAt("Iter\n", depth);
+      printStrAt("Var\n", depth + 1);
+      printNodeAt(node->as.iter.var, depth + 2);
+      printStrAt("Iterable\n", depth + 1);
+      printNodeAt(node->as.iter.iterable, depth + 2);
+      printStrAt("Body\n", depth + 1);
+      printNodeAt(node->as.iter.body, depth + 2);
       break;
     }
     case AST_IMPORT: {
@@ -534,6 +578,15 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.ifStmt.cond, b->as.ifStmt.cond) &&
              nodesEqual(a->as.ifStmt.then, b->as.ifStmt.then) &&
              nodesEqual(a->as.ifStmt.elseBranch, b->as.ifStmt.elseBranch);
+    case AST_FOR:
+      return nodesEqual(a->as.forStmt.initializer, b->as.forStmt.initializer) &&
+             nodesEqual(a->as.forStmt.condition, b->as.forStmt.condition) &&
+             nodesEqual(a->as.forStmt.increment, b->as.forStmt.increment) &&
+             nodesEqual(a->as.forStmt.body, b->as.forStmt.body);
+    case AST_ITER:
+      return nodesEqual(a->as.iter.var, b->as.iter.var) &&
+             nodesEqual(a->as.iter.iterable, b->as.iter.iterable) &&
+             nodesEqual(a->as.iter.body, b->as.iter.body);
 
     case AST_IMPORT:
       return nodesEqual(a->as.use.module, b->as.use.module) &&
@@ -727,12 +780,14 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, (uint8_t)2);
       break;
     }
-    case AST_COMPREHENSION:
-      error(node, "Comprehension compilation not yet implemented.");
-      return false;
-    case AST_COMPREHENSION_ITER:
+    case AST_COMPREHENSION: {
       error(node, "Not implemented.");
       return false;
+    }
+    case AST_COMPREHENSION_ITER: {
+      error(node, "Not implemented.");
+      return false;
+    }
     case AST_COMPREHENSION_PRED:
       error(node, "Not implemented.");
       return false;
@@ -783,6 +838,37 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       patchJump(chunk, node, elseJump);
       break;
     }
+    case AST_FOR: {
+      if (node->as.forStmt.initializer != NULL) {
+        if (!toChunk(node->as.forStmt.initializer, chunk)) return false;
+      }
+
+      int loopStart = chunk->count;
+      int exitJump = -1;
+
+      if (node->as.forStmt.condition != NULL) {
+        if (!toChunk(node->as.forStmt.condition, chunk)) return false;
+        exitJump = emitJump(chunk, node, OP_JUMP_IF_FALSE);
+        emitByte(chunk, node, OP_POP);
+      }
+
+      if (!toChunk(node->as.forStmt.body, chunk)) return false;
+
+      if (node->as.forStmt.increment != NULL) {
+        if (!toChunk(node->as.forStmt.increment, chunk)) return false;
+      }
+
+      emitLoop(chunk, node, loopStart);
+
+      if (exitJump != -1) {
+        patchJump(chunk, node, exitJump);
+        emitByte(chunk, node, OP_POP);
+      }
+      break;
+    }
+    case AST_ITER:
+      error(node, "Not implemented.");
+      return false;
     case AST_WHILE: {
       int loopStart = chunk->count;
 
@@ -992,6 +1078,17 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.ifStmt.elseBranch);
       break;
     }
+    case AST_FOR:
+      markAstNode(n->as.forStmt.initializer);
+      markAstNode(n->as.forStmt.condition);
+      markAstNode(n->as.forStmt.increment);
+      markAstNode(n->as.forStmt.body);
+      break;
+    case AST_ITER:
+      markAstNode(n->as.iter.var);
+      markAstNode(n->as.iter.iterable);
+      markAstNode(n->as.iter.body);
+      break;
     case AST_IMPORT:
       markAstNode(n->as.use.module);
       if (n->as.use.alias != NULL) {
@@ -1120,6 +1217,10 @@ void freeAstNode(AstNode* n) {
     case AST_FUNCTION:
       break;
     case AST_IF:
+      break;
+    case AST_FOR:
+      break;
+    case AST_ITER:
       break;
     case AST_WHILE:
       break;
