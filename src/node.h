@@ -121,9 +121,15 @@ struct AstNode {
     } use;
 
     struct {
+      AstVec bits;
+    } interpolation;
+
+    struct {
       AstNode* var;
       AstNode* iterable;
       AstNode* body;
+      uint8_t varLocal;
+      uint8_t iterLocal;
     } iter;
 
     struct {
@@ -236,10 +242,12 @@ AstNode* newComprehensionNode(AstNode* body, ComprehensionType type);
 AstNode* newComprehensionIterNode(AstNode* var, AstNode* iterable);
 AstNode* newComprehensionPredNode(AstNode* predicate);
 AstNode* newExprStmtNode(AstNode* expr);
-AstNode* newFunctionNode(AstNode* module);
-AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
 AstNode* newForNode(AstNode* initializer, AstNode* condition,
                     AstNode* increment, AstNode* body);
+AstNode* newFunctionNode(AstNode* module);
+AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
+AstNode* newInterpolationNode();
+AstNode* newIterNode(AstNode* var, AstNode* iterable, AstNode* body);
 AstNode* newDeclLetNode(AstNode* value);
 AstNode* newDeclGlobalNode(AstNode* value);
 AstNode* newLiteralValueNode(Value value);

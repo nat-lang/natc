@@ -108,6 +108,8 @@ bool initVM() {
   vm.core.sLt = intern("<");
   vm.core.sAdd = intern("+");
   vm.core.sIter = intern("iter");
+  vm.core.sMore = intern("more");
+  vm.core.sNext = intern("next");
 
   defineNatives();
 
@@ -492,6 +494,29 @@ static bool validateSeqIdx(ObjSequence* seq, Value idx) {
   return true;
 }
 
+bool vmExecuteProperty(char* name, int argCount) {
+  printf("executing property: %s for obj\n", name);
+  printValue(vmPeek(argCount));
+  printf("\n");
+  Value obj = vmPeek(argCount);
+  Value prop = NIL_VAL;
+  if (!mapGet(&AS_OBJ(obj)->fields, INTERN(name), &prop) ||
+      !(IS_CLOSURE(prop) || IS_NATIVE(prop))) {
+    printf("not a function or native\n");
+    printValue(prop);
+    return false;
+  }
+  printf("prop: ");
+  printValue(prop);
+  printf("\n");
+  vm.stackTop[-argCount - 1] = prop;
+  if (!vmCallValue(prop, argCount)) return false;
+
+  int frames = IS_NATIVE(prop) ? 0 : 1;
+
+  return (vmExecute(vm.frameCount - frames) == INTERPRET_OK);
+}
+
 // Loop until we're back to [baseFrame] frames. Typically this
 // is just 0, but if we want to execute a single function in the
 // middle of execution we can let [baseFrame] = the current frame.
@@ -827,9 +852,6 @@ InterpretResult vmExecute(int baseFrame) {
 ObjClosure* vmCompileAST(char* source, AstNode* module) {
   AstNode* node =
       compileFunctionNode(module->as.module.baseName, source, module);
-  printf("node: ");
-  printNode(node);
-  printf("\n");
 
   ObjFunction* fn = toFunction(node);
 
