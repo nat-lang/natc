@@ -200,9 +200,9 @@ AstNode* newWhileNode(AstNode* cond, AstNode* body) {
   return n;
 }
 
-AstNode* newDeclLetNode(AstNode* value) {
+AstNode* newDeclLetNode(AstNode* local, AstNode* value) {
   AstNode* n = allocNode(AST_DECL_LET);
-  n->as.declLet.name = NULL;
+  n->as.declLet.local = local;
   n->as.declLet.value = value;
   return n;
 }
@@ -458,7 +458,7 @@ void printNodeAt(AstNode* node, int depth) {
     }
     case AST_DECL_LET: {
       printStrAt("Let ", depth);
-      printf("\"%s\"\n", node->as.declLet.name->chars);
+      printNodeAt(node->as.declLet.local, depth + 1);
       printNodeAt(node->as.declLet.value, depth + 1);
       break;
     }
@@ -618,7 +618,7 @@ bool nodesEqual(AstNode* a, AstNode* b) {
              nodesEqual(a->as.whileStmt.body, b->as.whileStmt.body);
 
     case AST_DECL_LET:
-      return a->as.declLet.name == b->as.declLet.name &&
+      return nodesEqual(a->as.declLet.local, b->as.declLet.local) &&
              nodesEqual(a->as.declLet.value, b->as.declLet.value);
     case AST_DECL_GLOBAL:
       return a->as.declGlobal.name == b->as.declGlobal.name &&
@@ -1029,9 +1029,13 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       if (!toChunk(node->as.use.module, chunk)) return false;
       break;
     }
-    case AST_DECL_LET:
+    case AST_DECL_LET: {
+      emitByte(chunk, node, OP_UNDEFINED);
       if (!toChunk(node->as.declLet.value, chunk)) return false;
+      emitByte(chunk, node, OP_SET_LOCAL);
+      emitConstant(chunk, node, node->as.declLet.local->as.local.index);
       break;
+    }
     case AST_DECL_GLOBAL: {
       if (!toChunk(node->as.declGlobal.value, chunk)) return false;
       emitByte(chunk, node, OP_DEFINE_GLOBAL);
@@ -1241,7 +1245,7 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.whileStmt.body);
       break;
     case AST_DECL_LET:
-      markObject((Obj*)n->as.declLet.name);
+      markAstNode(n->as.declLet.local);
       markAstNode(n->as.declLet.value);
       break;
     case AST_DECL_GLOBAL:

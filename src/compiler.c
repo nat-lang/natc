@@ -813,21 +813,20 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
   consumeIdentifier(cmp, "Expect variable name.");
   Token nameToken = parser.previous;
 
-  addLocal(cmp, nameToken);
-
-  AstNode* node = newUnknownNode();
-  if (match(cmp, TOKEN_EQUAL)) {
-    node = expression(cmp);
-  } else {
-    node = newLiteralValueNode(UNDEF_VAL);
-    node->line = parser.previous.line;
-  }
-
+  uint8_t localIndex = addLocal(cmp, nameToken);
   markInitialized(cmp);
 
-  node = newDeclLetNode(node);
-  node->as.declLet.name = tokenString(nameToken);
-  return node;
+  AstNode* value = newUnknownNode();
+  if (match(cmp, TOKEN_EQUAL)) {
+    value = expression(cmp);
+  } else {
+    value = newLiteralValueNode(UNDEF_VAL);
+    value->line = parser.previous.line;
+  }
+
+  AstNode* local = newVarLocalNode(localIndex);
+  local->as.local.name = tokenString(nameToken);
+  return newDeclLetNode(local, value);
 }
 
 static AstNode* ifStatement(NodeCompiler* cmp) {
