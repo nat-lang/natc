@@ -535,6 +535,12 @@ InterpretResult vmExecute(int baseFrame) {
         frame->slots[slot] = vmPeek(0);
         break;
       }
+      case OP_DEFINE_GLOBAL: {
+        Value name = READ_CONSTANT();
+        mapSet(&vm.globals, name, vmPeek(0));
+        vmPop();
+        break;
+      }
       case OP_GET_GLOBAL: {
         ObjString* name = READ_STRING();
 

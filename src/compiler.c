@@ -771,6 +771,23 @@ static AstNode* expression(NodeCompiler* cmp) {
   return parsePrecedence(cmp, PREC_ASSIGNMENT);
 }
 
+static AstNode* globalDeclaration(NodeCompiler* cmp) {
+  consumeIdentifier(cmp, "Expect variable name.");
+  Token nameToken = parser.previous;
+
+  AstNode* node = newUnknownNode();
+  if (match(cmp, TOKEN_EQUAL)) {
+    node = expression(cmp);
+  } else {
+    node = newLiteralValueNode(UNDEF_VAL);
+    node->line = parser.previous.line;
+  }
+
+  node = newDeclGlobalNode(node);
+  node->as.declGlobal.name = tokenString(nameToken);
+  return node;
+}
+
 static AstNode* letDeclaration(NodeCompiler* cmp) {
   consumeIdentifier(cmp, "Expect variable name.");
   Token nameToken = parser.previous;
@@ -787,8 +804,8 @@ static AstNode* letDeclaration(NodeCompiler* cmp) {
 
   markInitialized(cmp);
 
-  node = newLetNode(node);
-  node->as.let.name = tokenString(nameToken);
+  node = newDeclLetNode(node);
+  node->as.declLet.name = tokenString(nameToken);
   return node;
 }
 
@@ -902,6 +919,8 @@ static AstNode* statement(NodeCompiler* cmp) {
     node = throwStatement(cmp);
   } else if (match(cmp, TOKEN_LET)) {
     node = letDeclaration(cmp);
+  } else if (match(cmp, TOKEN_GLOBAL)) {
+    node = globalDeclaration(cmp);
   } else if (match(cmp, TOKEN_LEFT_BRACE)) {
     node = block(cmp);
   } else {
