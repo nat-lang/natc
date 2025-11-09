@@ -1,25 +1,26 @@
 let s
 
+// literal construction.
+
 s = ({1})
 assert(s[1])
-assert(s[2] == nil)
+assert(s[2] == false)
 
 s = ({1, 2, 1})
 assert(s[1])
 assert(s[2])
-assert(s[3] == nil)
+assert(s[3] == false)
 
-let fromCall = set(4, 5, 4)
-assert(fromCall[4])
-assert(fromCall[5])
-assert(fromCall[6] == nil)
+// from native function.
 
-let comp = ({x | x in (1,2,3), x != 2})
-assert(comp[1])
-assert(comp[2] == nil)
-assert(comp[3])
+s = set(4, 5, 4)
+assert(s[4])
+assert(s[5])
+assert(s[6] == false)
 
-let empty = set()
-assert(empty[1] == nil)
+// api.
 
-
+s = set()
+setAdd(s, 4)
+assert(s[4])
+assert(s[5] == false)

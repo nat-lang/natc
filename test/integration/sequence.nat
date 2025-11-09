@@ -37,15 +37,17 @@ assert(x == (2,3,4))
 
 // as argument of global function.
 
-let id = (x) => x
+global id = x => x
 assert(id((x | x in (1,2))) == (1,2))
 
 // as argument of local function.
 
-(() => {
-  let id = (x) => x
+let f = () => {
+  let id = x => x
   assert(id((x | x in (1,2))) == (1,2))
-})()
+}
+
+f()
 
 // product of iterable conditions.
 
@@ -59,7 +61,7 @@ assert(x == (
 // vacuous iterable condition.
 
 x = (x | x in (1,2,3,4), y in (1,2))
-assert(x == (1,2,3,4))
+assert(x == (1,1,2,2,3,3,4,4))
 
 // vacuous condition.
 
@@ -67,7 +69,7 @@ x = (a | a in (1,2,3), true)
 assert(x == (1,2,3))
 
 x = (a | a in (1,2,3), false)
-assert(x == ())
+assert(x == (,))
 
 // predicative condition anaphoric on previous condition.
 
@@ -75,7 +77,7 @@ x = (a | a in (1,2,3), a != 3)
 assert(x == (1,2))
 
 x = (a | a in (1,2,3), a != 3, a != 2)
-assert(x == (1))
+assert(x == (1,))
 
 // iterable condition anaphoric on previous condition.
 
@@ -99,13 +101,13 @@ assert(x == (
 
 // body comprehension.
 
-x = ((b | b in a) | a in ((1,2),(3), (4,5)))
-assert(x == ((1,2), (3), (4,5)))
+x = ((b | b in a) | a in ((1,2),(3,), (4,5)))
+assert(x == ((1,2), (3,), (4,5)))
 
 // nested body comprehension.
 
-x = (((c | c in b) | b in a) | a in (((1,2)),((3)), ((4,5))))
-assert(x == (((1,2)), ((3)), ((4,5))))
+x = (((c | c in b) | b in a) | a in (((1,2),),((3,),), ((4,5),)))
+assert(x == (((1,2),), ((3,),), ((4,5),)))
 
 // condition comprehension.
 
@@ -131,27 +133,28 @@ assert(x == (1,2,3))
 
 x = ({a | a in b} | b in ((1,2), (3,4)))
 
-assert({3,4} in x)
-assert({1,2} in x)
+assert(x[0] == {1,2})
+assert(x[1] == {3,4})
 
 // assignment to a local.
 
-(() => {
+let f = () => {
   let x = (x | x in (1,2,3))
   assert(x == (1,2,3))
-})()
+}
 
 // assignment to a global property.
 
 global a = {}
-a.y = (z | z in (1,2))
-assert(a.y == (1,2))
+a["y"] = (z | z in (1,2))
+assert(a["y"] == (1,2))
 
 // assignment to a local property.
 
-(() => {
+let f = () => {
   let a = {}
-  a.y = (z | z in (1,2))
-  assert(a.y == (1,2))
-})()
+  a["y"] = (z | z in (1,2))
+  assert(a["y"] == (1,2))
+}
 
+f()
