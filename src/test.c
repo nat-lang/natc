@@ -1814,53 +1814,60 @@ bool testBytecodeIterSimple() {
   Chunk c;
   if (!buildChunkForExpr(iterNode, &c)) return false;
 
-  if (c.count != 42) return false;
+  if (c.count != 51) return false;
 
   if (c.code[0] != OP_NIL) return false;
-  if (c.code[1] != OP_SET_LOCAL) return false;
-  if (read_u16(c.code[2], c.code[3]) != 1) return false;
-  if (c.code[4] != OP_POP) return false;
+  if (c.code[1] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[2], c.code[3]) != 0) return false;
 
-  if (c.code[5] != OP_GET_GLOBAL) return false;
-  if (read_u16(c.code[6], c.code[7]) != 0) return false;
+  if (c.code[4] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[5], c.code[6]) != 3) return false;
 
-  if (c.code[8] != OP_GET_GLOBAL) return false;
-  if (read_u16(c.code[9], c.code[10]) != 1) return false;
-
-  if (c.code[11] != OP_CONSTANT || read_u16(c.code[12], c.code[13]) != 2)
+  if (c.code[7] != OP_CONSTANT || read_u16(c.code[8], c.code[9]) != 4)
     return false;
-  if (c.code[14] != OP_CONSTANT || read_u16(c.code[15], c.code[16]) != 3)
+  if (c.code[10] != OP_CONSTANT || read_u16(c.code[11], c.code[12]) != 5)
     return false;
 
-  if (c.code[17] != OP_CALL || c.code[18] != 2) return false;
-  if (c.code[19] != OP_CALL || c.code[20] != 1) return false;
+  if (c.code[13] != OP_CALL || c.code[14] != 2) return false;
+  if (c.code[15] != OP_CALL || c.code[16] != 1) return false;
 
-  if (c.code[21] != OP_SET_LOCAL || read_u16(c.code[22], c.code[23]) != 2)
+  if (c.code[17] != OP_GET_LOCAL || read_u16(c.code[18], c.code[19]) != 2)
     return false;
-  if (c.code[24] != OP_POP) return false;
+  if (c.code[20] != OP_GET_PROPERTY) return false;
+  if (read_u16(c.code[21], c.code[22]) != 1) return false;
+  if (c.code[23] != OP_CALL || c.code[24] != 0) return false;
 
-  if (c.code[25] != OP_GET_LOCAL || read_u16(c.code[26], c.code[27]) != 2)
+  if (c.code[25] != OP_JUMP_IF_FALSE) return false;
+  if (read_u16(c.code[26], c.code[27]) != 20) return false;
+  if (c.code[28] != OP_POP) return false;
+
+  if (c.code[29] != OP_GET_LOCAL || read_u16(c.code[30], c.code[31]) != 2)
     return false;
-
-  if (read_u16(c.code[29], c.code[30]) != 10) return false;
-  if (read_u16(c.code[31], c.code[32]) != 1) return false;
-
-  if (c.code[33] != OP_POP) return false;
-
-  if (c.code[34] != OP_GET_LOCAL || read_u16(c.code[35], c.code[36]) != 1)
+  if (c.code[32] != OP_GET_PROPERTY) return false;
+  if (read_u16(c.code[33], c.code[34]) != 2) return false;
+  if (c.code[35] != OP_CALL || c.code[36] != 0) return false;
+  if (c.code[37] != OP_SET_LOCAL || read_u16(c.code[38], c.code[39]) != 1)
     return false;
-  if (c.code[37] != OP_POP) return false;
+  if (c.code[40] != OP_POP) return false;
 
-  if (c.code[38] != OP_LOOP) return false;
-  if (read_u16(c.code[39], c.code[40]) != 16) return false;
+  if (c.code[41] != OP_GET_LOCAL || read_u16(c.code[42], c.code[43]) != 1)
+    return false;
+  if (c.code[44] != OP_POP) return false;
 
-  if (c.code[41] != OP_POP) return false;
+  if (c.code[45] != OP_LOOP) return false;
+  if (read_u16(c.code[46], c.code[47]) != 31) return false;
 
-  if (c.constants.count != 4) return false;
+  if (c.code[48] != OP_POP) return false;
+  if (c.code[49] != OP_POP) return false;
+  if (c.code[50] != OP_POP) return false;
+
+  if (c.constants.count != 6) return false;
   if (!valuesEqual(c.constants.values[0], OBJ_VAL(vm.core.sIter))) return false;
-  if (!valuesEqual(c.constants.values[1], OBJ_VAL(vm.core.sSeq))) return false;
-  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(1))) return false;
-  if (!valuesEqual(c.constants.values[3], NUMBER_VAL(2))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(vm.core.sMore))) return false;
+  if (!valuesEqual(c.constants.values[2], OBJ_VAL(vm.core.sNext))) return false;
+  if (!valuesEqual(c.constants.values[3], OBJ_VAL(vm.core.sSeq))) return false;
+  if (!valuesEqual(c.constants.values[4], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[5], NUMBER_VAL(2))) return false;
 
   return true;
 }
