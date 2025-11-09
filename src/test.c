@@ -204,9 +204,10 @@ bool testFunctionNode() {
   f->as.function.signature = newSignatureNode();
   f->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
 
-  AstNode* let = newDeclLetNode(f);
   ObjString* objLetName = intern("f");
-  let->as.declLet.name = objLetName;
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, f);
 
   AstNode* fn = mkFunction(name);
   pushFnStmt(fn, let);
@@ -301,8 +302,11 @@ bool testIfBlock() {
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("x");
   AstNode* block = newBlockNode();
-  AstNode* let = newDeclLetNode(newLiteralValueNode(NUMBER_VAL(1)));
-  let->as.declLet.name = intern("y");
+  ObjString* yName = intern("y");
+  AstNode* yLocal = newVarLocalNode(1);
+  yLocal->as.local.name = yName;
+  AstNode* letValue = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* let = newDeclLetNode(yLocal, letValue);
   pushAstVec(&block->as.block.stmts, let);
   AstNode* ifNode = newIfNode(cond, block, NULL);
   pushFnStmt(fn, ifNode);
@@ -422,8 +426,11 @@ bool testWhileBlock() {
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("x");
   AstNode* block = newBlockNode();
-  AstNode* let = newDeclLetNode(newLiteralValueNode(NUMBER_VAL(1)));
-  let->as.declLet.name = intern("y");
+  ObjString* yName = intern("y");
+  AstNode* yLocal = newVarLocalNode(1);
+  yLocal->as.local.name = yName;
+  AstNode* letValue = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* let = newDeclLetNode(yLocal, letValue);
   pushAstVec(&block->as.block.stmts, let);
   AstNode* whileNode = newWhileNode(cond, block);
   pushFnStmt(fn, whileNode);
@@ -483,8 +490,9 @@ bool testForSimple() {
   AstNode* fn = mkFunction(name);
 
   AstNode* initValue = newLiteralValueNode(NUMBER_VAL(0));
-  AstNode* initializer = newDeclLetNode(initValue);
-  initializer->as.declLet.name = iName;
+  AstNode* initLocal = newVarLocalNode(1);
+  initLocal->as.local.name = iName;
+  AstNode* initializer = newDeclLetNode(initLocal, initValue);
 
   AstNode* less = newVarGlobalNode();
   less->as.global.name = intern("<");
@@ -538,8 +546,9 @@ bool testForComplexExpressions() {
   AstNode* fCall = newCallNode(fVar);
   pushAstVec(&fCall->as.call.args, sum);
 
-  AstNode* initializer = newDeclLetNode(fCall);
-  initializer->as.declLet.name = iName;
+  AstNode* initLocal = newVarLocalNode(1);
+  initLocal->as.local.name = iName;
+  AstNode* initializer = newDeclLetNode(initLocal, fCall);
 
   AstNode* hVar = newVarGlobalNode();
   hVar->as.global.name = intern("h");
@@ -629,8 +638,10 @@ bool testForNoIncrement() {
 
   AstNode* fn = mkFunction(name);
 
-  AstNode* initializer = newDeclLetNode(newLiteralValueNode(NUMBER_VAL(0)));
-  initializer->as.declLet.name = iName;
+  AstNode* initLocal = newVarLocalNode(1);
+  initLocal->as.local.name = iName;
+  AstNode* initializer =
+      newDeclLetNode(initLocal, newLiteralValueNode(NUMBER_VAL(0)));
 
   AstNode* less = newVarGlobalNode();
   less->as.global.name = intern("<");
@@ -663,8 +674,10 @@ bool testForBlockBody() {
 
   AstNode* fn = mkFunction(name);
 
-  AstNode* initializer = newDeclLetNode(newLiteralValueNode(NUMBER_VAL(0)));
-  initializer->as.declLet.name = iName;
+  AstNode* initLocal = newVarLocalNode(1);
+  initLocal->as.local.name = iName;
+  AstNode* initializer =
+      newDeclLetNode(initLocal, newLiteralValueNode(NUMBER_VAL(0)));
 
   AstNode* less = newVarGlobalNode();
   less->as.global.name = intern("<");
@@ -687,8 +700,9 @@ bool testForBlockBody() {
   AstNode* block = newBlockNode();
   AstNode* yValue = newVarLocalNode(1);
   yValue->as.local.name = iName;
-  AstNode* letY = newDeclLetNode(yValue);
-  letY->as.declLet.name = yName;
+  AstNode* yLocal = newVarLocalNode(2);
+  yLocal->as.local.name = yName;
+  AstNode* letY = newDeclLetNode(yLocal, yValue);
   pushAstVec(&block->as.block.stmts, letY);
 
   AstNode* forNode = newForNode(initializer, condition, increment, block);
@@ -853,12 +867,14 @@ bool testAssignmentLocal() {
   AstNode* node = compile(name, "let x \n x = 1");
 
   AstNode* fn = mkFunction(name);
-  AstNode* let = newDeclLetNode(newLiteralValueNode(UNDEF_VAL));
-  let->as.declLet.name = intern("x");
+  ObjString* xName = intern("x");
+  AstNode* xLocal = newVarLocalNode(1);
+  xLocal->as.local.name = xName;
+  AstNode* let = newDeclLetNode(xLocal, newLiteralValueNode(UNDEF_VAL));
   pushFnStmt(fn, let);
 
   AstNode* var = newVarLocalNode(1);
-  var->as.local.name = intern("x");
+  var->as.local.name = xName;
   AstNode* literal = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* assignment = newAssignmentNode(var, literal);
   AstNode* exprStmt = newExprStmtNode(assignment);
