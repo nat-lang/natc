@@ -139,6 +139,7 @@ typedef enum {
   TOKEN_USE,
   TOKEN_USER_PREFIX,
   TOKEN_USER_INFIX,
+  TOKEN_SYNTHETIC
 } TokenType;
 
 typedef struct {

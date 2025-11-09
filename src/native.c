@@ -99,6 +99,20 @@ bool __seq__(int argCount, Value* args) {
   return true;
 }
 
+bool __seqPush__(int argCount, Value* args) {
+  if (!IS_SEQUENCE(vmPeek(1))) {
+    vmRuntimeError("Expecting sequence.");
+    return false;
+  }
+  ObjSequence* seq = AS_SEQUENCE(vmPeek(1));
+  writeValueArray(&seq->values, vmPeek(0));
+  vmPop();  // value.
+  vmPop();  // sequence.
+  vmPop();  // native fn.
+  vmPush(NIL_VAL);
+  return true;
+}
+
 bool __set__(int argCount, Value* args) {
   ObjSet* set = newSet();
   vm.stackTop[-argCount - 1] = OBJ_VAL(set);
@@ -111,6 +125,21 @@ bool __set__(int argCount, Value* args) {
 
   while (++i < argCount) vmPop();
 
+  return true;
+}
+
+bool __setAdd__(int argCount, Value* args) {
+  if (!IS_SET(vmPeek(1))) {
+    vmRuntimeError("Expecting set.");
+    return false;
+  }
+
+  ObjSet* set = AS_SET(vmPeek(1));
+  mapSet(&set->elements, vmPeek(0), BOOL_VAL(true));
+  vmPop();  // value.
+  vmPop();  // set.
+  vmPop();  // native fn.
+  vmPush(NIL_VAL);
   return true;
 }
 
@@ -398,8 +427,12 @@ void defineNatives() {
 
   defineNativeFnGlobal("assert", 1, __assert__);
   defineNativeFnGlobal("len", 1, __length__);
+
   defineNativeFn("seq", 0, true, __seq__, &vm.globals);
+  defineNativeFn("seqPush", 2, false, __seqPush__, &vm.globals);
   defineNativeFn("set", 0, true, __set__, &vm.globals);
+  defineNativeFn("setAdd", 2, false, __setAdd__, &vm.globals);
+
   defineNativeFn("obj", 0, true, __obj__, &vm.globals);
   defineNativeFnGlobal("str", 1, __str__);
 

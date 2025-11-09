@@ -24,6 +24,7 @@ Token syntheticToken(const char *start) {
   Token token;
   token.start = start;
   token.length = (int)strlen(start);
+  token.type = TOKEN_SYNTHETIC;
   return token;
 }
 

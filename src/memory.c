@@ -262,8 +262,10 @@ static void markRoots() {
   markObject((Obj*)vm.core.sOut);
 
   markObject((Obj*)vm.core.sSeq);
+  markObject((Obj*)vm.core.sSeqPush);
   markObject((Obj*)vm.core.sObj);
   markObject((Obj*)vm.core.sSet);
+  markObject((Obj*)vm.core.sSetAdd);
 
   markObject((Obj*)vm.core.sLen);
   markObject((Obj*)vm.core.sLt);
