@@ -676,6 +676,12 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
   return node;
 }
 
+static AstNode* returnStatement(NodeCompiler* cmp, bool canAssign) {
+  AstNode* value = NULL;
+  value = expression(cmp);
+  return newReturnNode(value);
+}
+
 static ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
@@ -693,6 +699,7 @@ static ParseRule rules[] = {
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_USER_INFIX] = {NULL, userInfix, PREC_NONE, PREC_NONE},
+    [TOKEN_RETURN] = {returnStatement, NULL, PREC_NONE, PREC_NONE},
 };
 
 #define PREC_STEP 1
