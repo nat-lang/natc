@@ -56,6 +56,7 @@ typedef struct {
   ObjString* sLen;
   ObjString* sLt;
   ObjString* sAdd;
+  ObjString* sIter;
 
   ObjString* sMain;
   ObjString* sExecMain;

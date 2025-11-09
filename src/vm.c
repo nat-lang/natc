@@ -107,10 +107,11 @@ bool initVM() {
   vm.core.sLen = intern("len");
   vm.core.sLt = intern("<");
   vm.core.sAdd = intern("+");
+  vm.core.sIter = intern("iter");
 
   defineNatives();
 
-  return true;
+  return vmInterpretEntrypoint(NAT_CORE_LOC) == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -958,7 +959,7 @@ InterpretResult vmInterpretEntrypoint(char* path) {
   return vmExecuteModule(module);
 }
 
-// wasm api.
+// Wasm api.
 
 void vmInit_wasm() {
   if (!initVM()) exit(2);

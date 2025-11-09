@@ -20,10 +20,6 @@ install:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=release SOURCE_DIR=src
 
-new-ast:
-	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=new-ast SOURCE_DIR=src
-
 # Compile and symlink to local bin.
 dev:
 	@ $(MAKE) configure
@@ -60,20 +56,11 @@ debug-log-gc:
 
 unit:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=test MODE=unit SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=test MODE=debug-stress-gc SOURCE_DIR=src
 	@ $(BUILD_DIR)/test
-
-new-integration:
-	@ $(BUILD_DIR)/nat test/ast/index
 
 integration:
 	@ $(BUILD_DIR)/nat test/integration/index
-
-regression:
-	@ $(BUILD_DIR)/nat test/regression/index
-
-trip:
-	@ $(BUILD_DIR)/nat test/trip/index
 
 tests:
 	@ $(MAKE) integration
