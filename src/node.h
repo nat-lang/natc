@@ -132,7 +132,7 @@ struct AstNode {
     } iter;
 
     struct {
-      ObjString* name;
+      AstNode* local;
       AstNode* value;
     } declLet;
     struct {
@@ -249,7 +249,7 @@ AstNode* newFunctionNode(AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
 AstNode* newInterpolationNode();
 AstNode* newIterNode(AstNode* var, AstNode* iterable, AstNode* body);
-AstNode* newDeclLetNode(AstNode* value);
+AstNode* newDeclLetNode(AstNode* local, AstNode* value);
 AstNode* newDeclGlobalNode(AstNode* value);
 AstNode* newLiteralValueNode(Value value);
 AstNode* newLiteralNode();

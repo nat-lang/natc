@@ -855,6 +855,7 @@ ObjClosure* vmCompileAST(char* source, AstNode* module) {
   AstNode* node =
       compileFunctionNode(module->as.module.baseName, source, module);
 
+  printNode(node);
   ObjFunction* fn = toFunction(node);
 
   vmPush(OBJ_VAL(fn));
