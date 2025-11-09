@@ -179,6 +179,8 @@ static TokenType identifierType() {
         }
       }
       break;
+    case 'g':
+      return checkpointKeyword(1, 5, "lobal", TOKEN_GLOBAL);
     case 'i':
       if (CURRENT - START > 1) {
         switch (START[1]) {

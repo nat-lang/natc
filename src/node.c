@@ -190,10 +190,17 @@ AstNode* newWhileNode(AstNode* cond, AstNode* body) {
   return n;
 }
 
-AstNode* newLetNode(AstNode* value) {
-  AstNode* n = allocNode(AST_LET);
-  n->as.let.name = NULL;
-  n->as.let.value = value;
+AstNode* newDeclLetNode(AstNode* value) {
+  AstNode* n = allocNode(AST_DECL_LET);
+  n->as.declLet.name = NULL;
+  n->as.declLet.value = value;
+  return n;
+}
+
+AstNode* newDeclGlobalNode(AstNode* value) {
+  AstNode* n = allocNode(AST_DECL_GLOBAL);
+  n->as.declGlobal.name = NULL;
+  n->as.declGlobal.value = value;
   return n;
 }
 
@@ -442,10 +449,16 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.whileStmt.body, depth + 1);
       break;
     }
-    case AST_LET: {
+    case AST_DECL_LET: {
       printStrAt("Let ", depth);
-      printf("\"%s\"\n", node->as.let.name->chars);
-      printNodeAt(node->as.let.value, depth + 1);
+      printf("\"%s\"\n", node->as.declLet.name->chars);
+      printNodeAt(node->as.declLet.value, depth + 1);
+      break;
+    }
+    case AST_DECL_GLOBAL: {
+      printStrAt("Global ", depth);
+      printf("\"%s\"\n", node->as.declGlobal.name->chars);
+      printNodeAt(node->as.declGlobal.value, depth + 1);
       break;
     }
     case AST_LITERAL: {
@@ -596,9 +609,12 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.whileStmt.cond, b->as.whileStmt.cond) &&
              nodesEqual(a->as.whileStmt.body, b->as.whileStmt.body);
 
-    case AST_LET:
-      return a->as.let.name == b->as.let.name &&
-             nodesEqual(a->as.let.value, b->as.let.value);
+    case AST_DECL_LET:
+      return a->as.declLet.name == b->as.declLet.name &&
+             nodesEqual(a->as.declLet.value, b->as.declLet.value);
+    case AST_DECL_GLOBAL:
+      return a->as.declGlobal.name == b->as.declGlobal.name &&
+             nodesEqual(a->as.declGlobal.value, b->as.declGlobal.value);
 
     case AST_LITERAL:
       return valuesEqual(a->as.literal.value, b->as.literal.value);
@@ -796,6 +812,34 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, OP_POP);
       break;
     }
+    case AST_FOR: {
+      if (node->as.forStmt.initializer != NULL) {
+        if (!toChunk(node->as.forStmt.initializer, chunk)) return false;
+      }
+
+      int loopStart = chunk->count;
+      int exitJump = -1;
+
+      if (node->as.forStmt.condition != NULL) {
+        if (!toChunk(node->as.forStmt.condition, chunk)) return false;
+        exitJump = emitJump(chunk, node, OP_JUMP_IF_FALSE);
+        emitByte(chunk, node, OP_POP);
+      }
+
+      if (!toChunk(node->as.forStmt.body, chunk)) return false;
+
+      if (node->as.forStmt.increment != NULL) {
+        if (!toChunk(node->as.forStmt.increment, chunk)) return false;
+      }
+
+      emitLoop(chunk, node, loopStart);
+
+      if (exitJump != -1) {
+        patchJump(chunk, node, exitJump);
+        emitByte(chunk, node, OP_POP);
+      }
+      break;
+    }
     case AST_FUNCTION: {
       ObjFunction* fn = toFunction(node);
 
@@ -838,34 +882,6 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       patchJump(chunk, node, elseJump);
       break;
     }
-    case AST_FOR: {
-      if (node->as.forStmt.initializer != NULL) {
-        if (!toChunk(node->as.forStmt.initializer, chunk)) return false;
-      }
-
-      int loopStart = chunk->count;
-      int exitJump = -1;
-
-      if (node->as.forStmt.condition != NULL) {
-        if (!toChunk(node->as.forStmt.condition, chunk)) return false;
-        exitJump = emitJump(chunk, node, OP_JUMP_IF_FALSE);
-        emitByte(chunk, node, OP_POP);
-      }
-
-      if (!toChunk(node->as.forStmt.body, chunk)) return false;
-
-      if (node->as.forStmt.increment != NULL) {
-        if (!toChunk(node->as.forStmt.increment, chunk)) return false;
-      }
-
-      emitLoop(chunk, node, loopStart);
-
-      if (exitJump != -1) {
-        patchJump(chunk, node, exitJump);
-        emitByte(chunk, node, OP_POP);
-      }
-      break;
-    }
     case AST_ITER:
       error(node, "Not implemented.");
       return false;
@@ -894,10 +910,16 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       if (!toChunk(node->as.use.module, chunk)) return false;
       break;
     }
-    case AST_LET:
-      if (!toChunk(node->as.let.value, chunk)) return false;
+    case AST_DECL_LET:
+      if (!toChunk(node->as.declLet.value, chunk)) return false;
       break;
-
+    case AST_DECL_GLOBAL: {
+      if (!toChunk(node->as.declGlobal.value, chunk)) return false;
+      emitByte(chunk, node, OP_DEFINE_GLOBAL);
+      uint16_t constant = addConstant(chunk, OBJ_VAL(node->as.declGlobal.name));
+      emitConstant(chunk, node, constant);
+      break;
+    }
     case AST_LITERAL: {
       uint16_t constant = addConstant(chunk, node->as.literal.value);
       emitByte(chunk, node, OP_CONSTANT);
@@ -1099,9 +1121,13 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.whileStmt.cond);
       markAstNode(n->as.whileStmt.body);
       break;
-    case AST_LET:
-      markObject((Obj*)n->as.let.name);
-      markAstNode(n->as.let.value);
+    case AST_DECL_LET:
+      markObject((Obj*)n->as.declLet.name);
+      markAstNode(n->as.declLet.value);
+      break;
+    case AST_DECL_GLOBAL:
+      markObject((Obj*)n->as.declGlobal.name);
+      markAstNode(n->as.declGlobal.value);
       break;
     case AST_LITERAL:
       /* Value may reference Obj* (e.g., strings); mark via markValue */
@@ -1224,7 +1250,9 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_WHILE:
       break;
-    case AST_LET:
+    case AST_DECL_LET:
+      break;
+    case AST_DECL_GLOBAL:
       break;
     case AST_MODULE:
       freeAstVec(&n->as.module.stmts);

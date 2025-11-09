@@ -19,7 +19,8 @@ typedef enum {
   AST_FOR,
   AST_IMPORT,
   AST_ITER,
-  AST_LET,
+  AST_DECL_LET,
+  AST_DECL_GLOBAL,
   AST_LITERAL,
   AST_MODULE,
   AST_OBJECT,
@@ -128,7 +129,11 @@ struct AstNode {
     struct {
       ObjString* name;
       AstNode* value;
-    } let;
+    } declLet;
+    struct {
+      ObjString* name;
+      AstNode* value;
+    } declGlobal;
 
     struct {
       Value value;
@@ -235,7 +240,8 @@ AstNode* newFunctionNode(AstNode* module);
 AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
 AstNode* newForNode(AstNode* initializer, AstNode* condition,
                     AstNode* increment, AstNode* body);
-AstNode* newLetNode(AstNode* value);
+AstNode* newDeclLetNode(AstNode* value);
+AstNode* newDeclGlobalNode(AstNode* value);
 AstNode* newLiteralValueNode(Value value);
 AstNode* newLiteralNode();
 AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
