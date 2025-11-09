@@ -13,7 +13,23 @@ let last
 for (let i = 0; i < 3; i = i + 1) last = i
 assert(last == 2)
 
+// nested for loop.
+
+let sum = 0
+for (let i = 0; i < 3; i = i + 1) {
+  for (let j = 0; j < 3; j = j + 1) {
+    sum = sum + i + j
+  }
+}
+assert(sum == 18)
+
 // for in loop.
+
+for (y in (,)) assert(false)
+
+for (y in (,)) {
+  assert(false)
+}
 
 let sum = 0
 for (x in (1,2,3)) {
@@ -21,7 +37,27 @@ for (x in (1,2,3)) {
 }
 assert(sum == 6)
 
-// for in loop, expression body.
+// for in loop, nested.
+
 let last = nil
 for (y in (4,5)) last = y
 assert(last == 5)
+
+// nested for in loop.
+let sum = 0
+for (x in (1,2,3)) {
+  for (y in (4,5)) {
+    sum = sum + x + y
+  }
+}
+assert(sum == 39)
+
+// for in loop, nested iterable.
+
+let sum = 0
+for (x in ((1,2), (3,4))) {
+  for (a in x) {
+    sum = sum + a
+  }
+}
+assert(sum == 10)
