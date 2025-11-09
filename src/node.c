@@ -126,6 +126,16 @@ AstNode* newExprStmtNode(AstNode* expr) {
   return n;
 }
 
+AstNode* newForNode(AstNode* initializer, AstNode* condition,
+                    AstNode* increment, AstNode* body) {
+  AstNode* n = allocNode(AST_FOR);
+  n->as.forStmt.initializer = initializer;
+  n->as.forStmt.condition = condition;
+  n->as.forStmt.increment = increment;
+  n->as.forStmt.body = body;
+  return n;
+}
+
 AstNode* newFunctionNode(AstNode* module) {
   AstNode* n = allocNode(AST_FUNCTION);
   n->as.function.name = NULL;
@@ -161,13 +171,13 @@ AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch) {
   return n;
 }
 
-AstNode* newForNode(AstNode* initializer, AstNode* condition,
-                    AstNode* increment, AstNode* body) {
-  AstNode* n = allocNode(AST_FOR);
-  n->as.forStmt.initializer = initializer;
-  n->as.forStmt.condition = condition;
-  n->as.forStmt.increment = increment;
-  n->as.forStmt.body = body;
+AstNode* newIterNode(AstNode* var, AstNode* iterable, AstNode* body) {
+  AstNode* n = allocNode(AST_ITER);
+  n->as.iter.var = var;
+  n->as.iter.iterable = iterable;
+  n->as.iter.body = body;
+  n->as.iter.varLocal = 0;
+  n->as.iter.iterLocal = 0;
   return n;
 }
 
@@ -426,8 +436,10 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Iter\n", depth);
       printStrAt("Var\n", depth + 1);
       printNodeAt(node->as.iter.var, depth + 2);
+      printf("%*sVarLocal: %u\n", depth + 1, "", node->as.iter.varLocal);
       printStrAt("Iterable\n", depth + 1);
       printNodeAt(node->as.iter.iterable, depth + 2);
+      printf("%*sIterLocal: %u\n", depth + 1, "", node->as.iter.iterLocal);
       printStrAt("Body\n", depth + 1);
       printNodeAt(node->as.iter.body, depth + 2);
       break;
@@ -599,7 +611,9 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_ITER:
       return nodesEqual(a->as.iter.var, b->as.iter.var) &&
              nodesEqual(a->as.iter.iterable, b->as.iter.iterable) &&
-             nodesEqual(a->as.iter.body, b->as.iter.body);
+             nodesEqual(a->as.iter.body, b->as.iter.body) &&
+             a->as.iter.varLocal == b->as.iter.varLocal &&
+             a->as.iter.iterLocal == b->as.iter.iterLocal;
 
     case AST_IMPORT:
       return nodesEqual(a->as.use.module, b->as.use.module) &&
@@ -838,6 +852,12 @@ bool toChunk(AstNode* node, Chunk* chunk) {
         patchJump(chunk, node, exitJump);
         emitByte(chunk, node, OP_POP);
       }
+
+      // pop the initialized variable if it's a let declaration.
+      if (node->as.forStmt.initializer != NULL &&
+          node->as.forStmt.initializer->type == AST_DECL_LET) {
+        emitByte(chunk, node, OP_POP);
+      }
       break;
     }
     case AST_FUNCTION: {
@@ -845,7 +865,6 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       vmPush(OBJ_VAL(fn));
       uint16_t fnConst = addConstant(chunk, OBJ_VAL(fn));
-      vmPop();
 
       emitByte(chunk, node, OP_CLOSURE);
       emitConstant(chunk, node, fnConst);
@@ -853,6 +872,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
         emitByte(chunk, node, node->as.function.upvalues[i].isLocal ? 1 : 0);
         emitByte(chunk, node, node->as.function.upvalues[i].index);
       }
+      vmPop();  // fn.
       break;
     }
     case AST_IF: {
@@ -882,9 +902,57 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       patchJump(chunk, node, elseJump);
       break;
     }
-    case AST_ITER:
-      error(node, "Not implemented.");
-      return false;
+    case AST_ITER: {
+      uint8_t varIndex = node->as.iter.varLocal;
+      uint8_t iterIndex = node->as.iter.iterLocal;
+
+      uint16_t iter = addConstant(chunk, OBJ_VAL(vm.core.sIter));
+      uint16_t more = addConstant(chunk, OBJ_VAL(vm.core.sMore));
+      uint16_t next = addConstant(chunk, OBJ_VAL(vm.core.sNext));
+
+      // set up the var at local 0 and the iterator at local 1.
+      emitByte(chunk, node, OP_NIL);
+      emitByte(chunk, node, OP_GET_GLOBAL);
+
+      emitConstant(chunk, node, iter);
+      if (!toChunk(node->as.iter.iterable, chunk)) return false;
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)1);
+
+      int loopStart = chunk->count;
+
+      // more()?
+      emitByte(chunk, node, OP_GET_LOCAL);
+      emitConstant(chunk, node, iterIndex);
+      emitByte(chunk, node, OP_GET_PROPERTY);
+      emitConstant(chunk, node, more);
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)0);
+
+      int exitJump = emitJump(chunk, node, OP_JUMP_IF_FALSE);
+      emitByte(chunk, node, OP_POP);
+
+      // next().
+      emitByte(chunk, node, OP_GET_LOCAL);
+      emitConstant(chunk, node, iterIndex);
+      emitByte(chunk, node, OP_GET_PROPERTY);
+      emitConstant(chunk, node, next);
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)0);
+      emitByte(chunk, node, OP_SET_LOCAL);
+      emitConstant(chunk, node, varIndex);
+      emitByte(chunk, node, OP_POP);
+
+      if (!toChunk(node->as.iter.body, chunk)) return false;
+
+      emitLoop(chunk, node, loopStart);
+      patchJump(chunk, node, exitJump);
+
+      emitByte(chunk, node, OP_POP);  // pop the jump condition.
+      emitByte(chunk, node, OP_POP);  // pop the iterator.
+      emitByte(chunk, node, OP_POP);  // pop the value.
+      break;
+    }
     case AST_WHILE: {
       int loopStart = chunk->count;
 

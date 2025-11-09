@@ -701,6 +701,37 @@ bool testForBlockBody() {
   return assertNodesEqual(node, fn);
 }
 
+bool testForIterSimple() {
+  Token name = syntheticToken("test");
+  AstNode* node = compile(name, "for (x in (1, 2)) x");
+
+  ObjString* xName = intern("x");
+
+  AstNode* fn = mkFunction(name);
+
+  AstNode* var = newVarLocalNode(1);
+  var->as.local.name = xName;
+
+  AstNode* iterable = newSequenceNode();
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
+
+  AstNode* bodyVar = newVarLocalNode(1);
+  bodyVar->as.local.name = xName;
+  AstNode* body = newExprStmtNode(bodyVar);
+
+  AstNode* iterNode = newIterNode(var, iterable, body);
+  iterNode->as.iter.varLocal = 1;
+  iterNode->as.iter.iterLocal = 2;
+  pushFnStmt(fn, iterNode);
+
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
 /* ============================================================
  * Throw Statement Tests
  * ============================================================ */
@@ -1175,9 +1206,11 @@ bool testBytecodeFunctionExpr() {
   // OP_CONSTANT (1 byte) + CONSTANT (2 bytes) = 3
   if (c1.count != 3) return false;
   if (c1.code[0] != OP_CONSTANT) return false;
+
   if (read_u16(c1.code[1], c1.code[2]) != 0) return false;
   if (c1.constants.count != 1) return false;
   if (!valuesEqual(c1.constants.values[0], NUMBER_VAL(42))) return false;
+
   return true;
 }
 
@@ -1758,6 +1791,77 @@ bool testBytecodeWhileComplexBody() {
   if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("x")))) return false;
   if (!valuesEqual(c.constants.values[1], NUMBER_VAL(1))) return false;
   if (!valuesEqual(c.constants.values[2], NUMBER_VAL(2))) return false;
+
+  return true;
+}
+
+bool testBytecodeIterSimple() {
+  AstNode* var = newVarLocalNode(1);
+  var->as.local.name = intern("x");
+
+  AstNode* iterable = newSequenceNode();
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
+
+  AstNode* bodyVar = newVarLocalNode(1);
+  bodyVar->as.local.name = intern("x");
+  AstNode* body = newExprStmtNode(bodyVar);
+
+  AstNode* iterNode = newIterNode(var, iterable, body);
+  iterNode->as.iter.varLocal = 1;
+  iterNode->as.iter.iterLocal = 2;
+
+  Chunk c;
+  if (!buildChunkForExpr(iterNode, &c)) return false;
+
+  if (c.count != 42) return false;
+
+  if (c.code[0] != OP_NIL) return false;
+  if (c.code[1] != OP_SET_LOCAL) return false;
+  if (read_u16(c.code[2], c.code[3]) != 1) return false;
+  if (c.code[4] != OP_POP) return false;
+
+  if (c.code[5] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[6], c.code[7]) != 0) return false;
+
+  if (c.code[8] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[9], c.code[10]) != 1) return false;
+
+  if (c.code[11] != OP_CONSTANT || read_u16(c.code[12], c.code[13]) != 2)
+    return false;
+  if (c.code[14] != OP_CONSTANT || read_u16(c.code[15], c.code[16]) != 3)
+    return false;
+
+  if (c.code[17] != OP_CALL || c.code[18] != 2) return false;
+  if (c.code[19] != OP_CALL || c.code[20] != 1) return false;
+
+  if (c.code[21] != OP_SET_LOCAL || read_u16(c.code[22], c.code[23]) != 2)
+    return false;
+  if (c.code[24] != OP_POP) return false;
+
+  if (c.code[25] != OP_GET_LOCAL || read_u16(c.code[26], c.code[27]) != 2)
+    return false;
+
+  if (c.code[28] != OP_ITER) return false;
+  if (read_u16(c.code[29], c.code[30]) != 10) return false;
+  if (read_u16(c.code[31], c.code[32]) != 1) return false;
+
+  if (c.code[33] != OP_POP) return false;
+
+  if (c.code[34] != OP_GET_LOCAL || read_u16(c.code[35], c.code[36]) != 1)
+    return false;
+  if (c.code[37] != OP_POP) return false;
+
+  if (c.code[38] != OP_LOOP) return false;
+  if (read_u16(c.code[39], c.code[40]) != 16) return false;
+
+  if (c.code[41] != OP_POP) return false;
+
+  if (c.constants.count != 4) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(vm.core.sIter))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(vm.core.sSeq))) return false;
+  if (!valuesEqual(c.constants.values[2], NUMBER_VAL(1))) return false;
+  if (!valuesEqual(c.constants.values[3], NUMBER_VAL(2))) return false;
 
   return true;
 }
@@ -3762,6 +3866,7 @@ int testMain(void) {
   fmt("    ", testForNoInitializer(), "For no initializer");
   fmt("    ", testForNoIncrement(), "For no increment");
   fmt("    ", testForBlockBody(), "For block body");
+  fmt("    ", testForIterSimple(), "For iter simple");
   fmt("    ", testThrowGlobal(), "Throw global");
   fmt("    ", testThrowCall(), "Throw call");
   fmt("    ", testThrowInfix(), "Throw infix");
@@ -3845,6 +3950,7 @@ int testMain(void) {
   fmt("    ", testBytecodeWhileEmptyBody(), "While empty body");
   fmt("    ", testBytecodeWhileNested(), "While nested");
   fmt("    ", testBytecodeWhileComplexBody(), "While complex body");
+  fmt("    ", testBytecodeIterSimple(), "For-in simple");
   fmt("    ", testBytecodeForSimple(), "For simple");
   fmt("    ", testBytecodeImportSimple(), "Import simple");
   fmt("    ", testBytecodeImportWithAlias(), "Import with alias");

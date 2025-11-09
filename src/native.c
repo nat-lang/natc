@@ -174,9 +174,6 @@ bool __str__(int argCount, Value* args) {
       }
       break;
     }
-    default:
-      vmRuntimeError("Can't turn value into a string.");
-      return false;
   }
 
   vmPop();
@@ -404,6 +401,7 @@ void defineNatives() {
   defineNativeFn("seq", 0, true, __seq__, &vm.globals);
   defineNativeFn("set", 0, true, __set__, &vm.globals);
   defineNativeFn("obj", 0, true, __obj__, &vm.globals);
+  defineNativeFnGlobal("str", 1, __str__);
 
   defineNativeInfixGlobal("==", __eq__, PREC_COMPARISON);
   defineNativeInfixGlobal("!=", __neq__, PREC_COMPARISON);
@@ -416,11 +414,10 @@ void defineNatives() {
   defineNativeInfixGlobal("/", __div__, PREC_FACTOR);
   defineNativeInfixGlobal("*", __mul__, PREC_FACTOR);
 
-  defineNativePrefixGlobal("__print__", __print__);
+  defineNativePrefixGlobal("print", __print__);
 
   //
 
-  defineNativeFnGlobal("str", 1, __str__);
   defineNativeFnGlobal("ord", 1, __ord__);
   defineNativeFnGlobal("hash", 1, __hash__);
   defineNativeFnGlobal("vmHashable", 1, __vmHashable__);

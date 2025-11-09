@@ -407,6 +407,15 @@ static AstNode* string(NodeCompiler* cmp, bool canAssign) {
   node->line = parser.previous.line;
   return node;
 }
+static AstNode* stringInterpolation(NodeCompiler* cmp, bool canAssign);
+static AstNode* interpolation(NodeCompiler* cmp, bool canAssign,
+                              int startOffset, int lengthOffset) {
+  return NULL;
+}
+
+static AstNode* stringInterpolation(NodeCompiler* cmp, bool canAssign) {
+  return interpolation(cmp, canAssign, 1, 3);
+}
 
 static void argumentList(NodeCompiler* cmp, AstVec* vec) {
   uint8_t argCount = 0;
@@ -684,6 +693,7 @@ static AstNode* returnStatement(NodeCompiler* cmp, bool canAssign) {
 
 static ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {identifier, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_INTERPOLATION] = {stringInterpolation, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
@@ -836,6 +846,43 @@ static AstNode* forStatement(NodeCompiler* cmp) {
   beginScope(cmp);
 
   consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'for'.");
+
+  Parser checkpoint = saveParser();
+  match(cmp, TOKEN_LET);
+  if (checkVariable()) {
+    advance(cmp);
+    Token varToken = parser.previous;
+
+    if (match(cmp, TOKEN_IN)) {
+      uint8_t varIndex = addLocal(cmp, varToken);
+      AstNode* varNode = newVarLocalNode(varIndex);
+      varNode->as.local.name = tokenString(varToken);
+      varNode->line = varToken.line;
+      markInitialized(cmp);
+
+      AstNode* iterable = expression(cmp);
+
+      Token iterToken = syntheticToken("__iter");
+      iterToken.type = TOKEN_IDENTIFIER;
+      iterToken.line = varToken.line;
+      uint8_t iterIndex = addLocal(cmp, iterToken);
+      markInitialized(cmp);
+
+      consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after for clause.");
+
+      AstNode* body = statement(cmp);
+
+      AstNode* iterNode = newIterNode(varNode, iterable, body);
+      iterNode->line = varToken.line;
+      iterNode->as.iter.varLocal = varIndex;
+      iterNode->as.iter.iterLocal = iterIndex;
+
+      endScope(cmp);
+      return iterNode;
+    }
+  }
+
+  gotoParser(checkpoint);
 
   AstNode* initializer = NULL;
   if (!match(cmp, TOKEN_SEMICOLON)) {
