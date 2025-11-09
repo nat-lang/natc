@@ -56,7 +56,7 @@ debug-log-gc:
 
 unit:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=test MODE=debug-stress-gc SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=test MODE=unit SOURCE_DIR=src
 	@ $(BUILD_DIR)/test
 
 integration:

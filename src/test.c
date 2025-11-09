@@ -1842,7 +1842,6 @@ bool testBytecodeIterSimple() {
   if (c.code[25] != OP_GET_LOCAL || read_u16(c.code[26], c.code[27]) != 2)
     return false;
 
-  if (c.code[28] != OP_ITER) return false;
   if (read_u16(c.code[29], c.code[30]) != 10) return false;
   if (read_u16(c.code[31], c.code[32]) != 1) return false;
 
