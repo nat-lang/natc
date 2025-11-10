@@ -19,7 +19,6 @@ static Obj* allocateObject(size_t size, ObjType type) {
   object->oType = type;
   object->isMarked = false;
   object->next = vm.objects;
-  object->hash = 0;
   initMap(&object->fields);
   vm.objects = object;
 
@@ -118,7 +117,7 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;
-  string->obj.hash = hash;
+  string->hash = hash;
 
   vmPush(OBJ_VAL(string));
   mapSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
@@ -172,7 +171,7 @@ void setStringChar(ObjString* string, ObjString* character, int idx) {
 
   uint32_t hash = hashString(string->chars, string->length);
 
-  string->obj.hash = hash;
+  string->hash = hash;
 }
 
 ObjString* intern(const char* chars) {
@@ -340,7 +339,7 @@ ObjString* mapFindString(Map* map, const char* chars, int length,
       if (IS_NIL(entry->value)) return NULL;
     } else if (IS_STRING(entry->key) &&
                AS_STRING(entry->key)->length == length &&
-               AS_STRING(entry->key)->obj.hash == hash &&
+               AS_STRING(entry->key)->hash == hash &&
                memcmp(AS_STRING(entry->key)->chars, chars, length) == 0) {
       // We found it.
       return AS_STRING(entry->key);
@@ -391,9 +390,10 @@ void printObject(Value value) {
     case OBJ_MAP:
       printf("<map at %p>", AS_MAP(value));
       break;
-    case OBJ_SET:
+    case OBJ_SET: {
       printf("<set at %p>", AS_SET(value));
       break;
+    }
     case OBJ_MODULE:
       printf("<module %s>", AS_MODULE(value)->closure->function->name->chars);
       break;

@@ -145,6 +145,8 @@ bool vmHashValue(Value value, uint32_t* hash) {
   if (vHashable(value)) {
     *hash = hashValue(value);
     return true;
+  } else {
+    vmRuntimeError("Not a hashable type.");
   }
 
   return false;
@@ -854,7 +856,8 @@ InterpretResult vmExecute(int baseFrame) {
 ObjClosure* vmCompileAST(char* source, AstNode* module) {
   AstNode* node =
       compileFunctionNode(module->as.module.baseName, source, module);
-
+  printNode(node);
+  printf("\n");
   ObjFunction* fn = toFunction(node);
 
   vmPush(OBJ_VAL(fn));
