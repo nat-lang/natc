@@ -2495,34 +2495,51 @@ bool testSubscriptNested() {
   return assertNodesEqual(actual, expected);
 }
 
+static AstNode* comprehensionLocal(uint8_t index, const char* name) {
+  AstNode* local = newVarLocalNode(index);
+  local->as.local.name = intern(name);
+  return local;
+}
+
+static AstNode* wrapComprehensionInClosure(AstNode* comp) {
+  AstNode* compLocal = comprehensionLocal(1, "__comp");
+  comp->as.comprehension.compLocal = compLocal;
+
+  AstNode* builder = newFunctionNode(NULL);
+  builder->as.function.name = intern("__comp_builder");
+  builder->as.function.signature = newSignatureNode();
+  builder->as.function.body = newReturnNode(comp);
+
+  return newCallNode(builder);
+}
+
 bool testSequenceComprehension() {
   Token name = syntheticToken("test");
   AstNode* actual = compile(name, "(x | x in (1,2), x != 2)");
 
   AstNode* expected = mkFunction(name);
 
-  AstNode* body = newVarLocalNode(1);
-  body->as.local.name = intern("x");
+  AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQ);
 
   AstNode* iterable = newSequenceNode();
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* iterVar = newVarLocalNode(1);
-  iterVar->as.local.name = intern("x");
+  AstNode* iterVar = comprehensionLocal(2, "x");
   AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  iterCond->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&comp->as.comprehension.conditions, iterCond);
 
   AstNode* neqOp = newVarGlobalNode();
   neqOp->as.global.name = intern("!=");
-  AstNode* predVar = newVarLocalNode(1);
-  predVar->as.local.name = intern("x");
+  AstNode* predVar = comprehensionLocal(2, "x");
   AstNode* predExpr =
       newCallInfixNode(neqOp, predVar, newLiteralValueNode(NUMBER_VAL(2)));
   AstNode* predCond = newComprehensionPredNode(predExpr);
   pushAstVec(&comp->as.comprehension.conditions, predCond);
 
-  AstNode* exprStmt = newExprStmtNode(comp);
+  AstNode* call = wrapComprehensionInClosure(comp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2537,28 +2554,27 @@ bool testSetComprehensionParse() {
 
   AstNode* expected = mkFunction(name);
 
-  AstNode* body = newVarLocalNode(1);
-  body->as.local.name = intern("x");
+  AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SET);
 
   AstNode* iterable = newSequenceNode();
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* iterVar = newVarLocalNode(1);
-  iterVar->as.local.name = intern("x");
+  AstNode* iterVar = comprehensionLocal(2, "x");
   AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  iterCond->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&comp->as.comprehension.conditions, iterCond);
 
   AstNode* neqOp = newVarGlobalNode();
   neqOp->as.global.name = intern("!=");
-  AstNode* predVar = newVarLocalNode(1);
-  predVar->as.local.name = intern("x");
+  AstNode* predVar = comprehensionLocal(2, "x");
   AstNode* predExpr =
       newCallInfixNode(neqOp, predVar, newLiteralValueNode(NUMBER_VAL(2)));
   AstNode* predCond = newComprehensionPredNode(predExpr);
   pushAstVec(&comp->as.comprehension.conditions, predCond);
 
-  AstNode* exprStmt = newExprStmtNode(comp);
+  AstNode* call = wrapComprehensionInClosure(comp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2575,8 +2591,7 @@ bool testSetComprehensionComplexBody() {
 
   AstNode* plusOp = newVarGlobalNode();
   plusOp->as.global.name = intern("+");
-  AstNode* bodyLeft = newVarLocalNode(1);
-  bodyLeft->as.local.name = intern("x");
+  AstNode* bodyLeft = comprehensionLocal(2, "x");
   AstNode* bodyRight = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* bodyExpr = newCallInfixNode(plusOp, bodyLeft, bodyRight);
   AstNode* comp = newComprehensionNode(bodyExpr, COMPREHENSION_SET);
@@ -2584,12 +2599,13 @@ bool testSetComprehensionComplexBody() {
   AstNode* iterable = newSequenceNode();
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* iterVar = newVarLocalNode(1);
-  iterVar->as.local.name = intern("x");
+  AstNode* iterVar = comprehensionLocal(2, "x");
   AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  iterCond->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&comp->as.comprehension.conditions, iterCond);
 
-  AstNode* exprStmt = newExprStmtNode(comp);
+  AstNode* call = wrapComprehensionInClosure(comp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2606,20 +2622,20 @@ bool testSetComprehensionNestedBody() {
 
   AstNode* innerPlus = newVarGlobalNode();
   innerPlus->as.global.name = intern("+");
-  AstNode* innerX = newVarLocalNode(2);
-  innerX->as.local.name = intern("x");
+  AstNode* innerX = comprehensionLocal(2, "x");
   AstNode* innerOne = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* innerBodyExpr = newCallInfixNode(innerPlus, innerX, innerOne);
   AstNode* innerComp = newComprehensionNode(innerBodyExpr, COMPREHENSION_SET);
 
-  AstNode* innerIterVar = newVarLocalNode(2);
-  innerIterVar->as.local.name = intern("x");
-  AstNode* iterableY = newVarLocalNode(1);
-  iterableY->as.local.name = intern("y");
+  AstNode* innerIterVar = comprehensionLocal(2, "x");
+  AstNode* iterableY = newVarUpvalueNode(0);
+  iterableY->as.upvalue.name = intern("y");
   AstNode* innerIter = newComprehensionIterNode(innerIterVar, iterableY);
+  innerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
 
-  AstNode* outerComp = newComprehensionNode(innerComp, COMPREHENSION_SET);
+  AstNode* innerCall = wrapComprehensionInClosure(innerComp);
+  AstNode* outerComp = newComprehensionNode(innerCall, COMPREHENSION_SET);
 
   AstNode* outerIterable = newSequenceNode();
   pushAstVec(&outerIterable->as.sequence.values,
@@ -2628,12 +2644,13 @@ bool testSetComprehensionNestedBody() {
              newLiteralValueNode(NUMBER_VAL(2)));
   pushAstVec(&outerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(3)));
-  AstNode* outerIterVar = newVarLocalNode(1);
-  outerIterVar->as.local.name = intern("y");
+  AstNode* outerIterVar = comprehensionLocal(2, "y");
   AstNode* outerIter = newComprehensionIterNode(outerIterVar, outerIterable);
+  outerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&outerComp->as.comprehension.conditions, outerIter);
 
-  AstNode* exprStmt = newExprStmtNode(outerComp);
+  AstNode* call = wrapComprehensionInClosure(outerComp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2647,29 +2664,29 @@ bool testSetComprehensionNestedCondition() {
   AstNode* actual = compile(name, "({x | x in {y | y in (1,2)}})");
   AstNode* expected = mkFunction(name);
 
-  AstNode* body = newVarLocalNode(1);
-  body->as.local.name = intern("x");
+  AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SET);
 
-  AstNode* innerBody = newVarLocalNode(2);
-  innerBody->as.local.name = intern("y");
+  AstNode* innerBody = comprehensionLocal(2, "y");
   AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SET);
   AstNode* innerIterable = newSequenceNode();
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* innerIterVar = newVarLocalNode(2);
-  innerIterVar->as.local.name = intern("y");
+  AstNode* innerIterVar = comprehensionLocal(2, "y");
   AstNode* innerIter = newComprehensionIterNode(innerIterVar, innerIterable);
+  innerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
 
-  AstNode* outerIterVar = newVarLocalNode(1);
-  outerIterVar->as.local.name = intern("x");
-  AstNode* outerIter = newComprehensionIterNode(outerIterVar, innerComp);
+  AstNode* innerCall = wrapComprehensionInClosure(innerComp);
+  AstNode* outerIterVar = comprehensionLocal(2, "x");
+  AstNode* outerIter = newComprehensionIterNode(outerIterVar, innerCall);
+  outerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&comp->as.comprehension.conditions, outerIter);
 
-  AstNode* exprStmt = newExprStmtNode(comp);
+  AstNode* call = wrapComprehensionInClosure(comp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2694,7 +2711,8 @@ bool testSetComprehensionFunctionBody() {
   AstNode* predCond = newComprehensionPredNode(predicate);
   pushAstVec(&comp->as.comprehension.conditions, predCond);
 
-  AstNode* exprStmt = newExprStmtNode(comp);
+  AstNode* call = wrapComprehensionInClosure(comp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2711,8 +2729,7 @@ bool testSequenceComprehensionComplexBody() {
 
   AstNode* plusOp = newVarGlobalNode();
   plusOp->as.global.name = intern("+");
-  AstNode* bodyLeft = newVarLocalNode(1);
-  bodyLeft->as.local.name = intern("x");
+  AstNode* bodyLeft = comprehensionLocal(2, "x");
   AstNode* bodyRight = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* bodyExpr = newCallInfixNode(plusOp, bodyLeft, bodyRight);
   AstNode* comp = newComprehensionNode(bodyExpr, COMPREHENSION_SEQ);
@@ -2720,12 +2737,13 @@ bool testSequenceComprehensionComplexBody() {
   AstNode* iterable = newSequenceNode();
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&iterable->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* iterVar = newVarLocalNode(1);
-  iterVar->as.local.name = intern("x");
+  AstNode* iterVar = comprehensionLocal(2, "x");
   AstNode* iterCond = newComprehensionIterNode(iterVar, iterable);
+  iterCond->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&comp->as.comprehension.conditions, iterCond);
 
-  AstNode* exprStmt = newExprStmtNode(comp);
+  AstNode* call = wrapComprehensionInClosure(comp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2740,32 +2758,33 @@ bool testSequenceComprehensionNestedBody() {
 
   AstNode* expected = mkFunction(name);
 
-  AstNode* innerBody = newVarLocalNode(2);
-  innerBody->as.local.name = intern("y");
+  AstNode* innerBody = comprehensionLocal(2, "y");
   AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQ);
   AstNode* innerIterable = newSequenceNode();
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* innerVar = newVarLocalNode(2);
-  innerVar->as.local.name = intern("y");
+  AstNode* innerVar = comprehensionLocal(2, "y");
   AstNode* innerIter = newComprehensionIterNode(innerVar, innerIterable);
+  innerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
 
-  AstNode* outerComp = newComprehensionNode(innerComp, COMPREHENSION_SEQ);
+  AstNode* innerCall = wrapComprehensionInClosure(innerComp);
+  AstNode* outerComp = newComprehensionNode(innerCall, COMPREHENSION_SEQ);
 
   AstNode* outerIterable = newSequenceNode();
   pushAstVec(&outerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&outerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* outerVar = newVarLocalNode(1);
-  outerVar->as.local.name = intern("x");
+  AstNode* outerVar = comprehensionLocal(2, "x");
   AstNode* outerIter = newComprehensionIterNode(outerVar, outerIterable);
+  outerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&outerComp->as.comprehension.conditions, outerIter);
 
-  AstNode* exprStmt = newExprStmtNode(outerComp);
+  AstNode* call = wrapComprehensionInClosure(outerComp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -2780,29 +2799,29 @@ bool testSequenceComprehensionNestedCondition() {
 
   AstNode* expected = mkFunction(name);
 
-  AstNode* body = newVarLocalNode(1);
-  body->as.local.name = intern("x");
+  AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQ);
 
-  AstNode* innerBody = newVarLocalNode(2);
-  innerBody->as.local.name = intern("y");
+  AstNode* innerBody = comprehensionLocal(2, "y");
   AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQ);
   AstNode* innerIterable = newSequenceNode();
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&innerIterable->as.sequence.values,
              newLiteralValueNode(NUMBER_VAL(2)));
-  AstNode* innerVar = newVarLocalNode(2);
-  innerVar->as.local.name = intern("y");
+  AstNode* innerVar = comprehensionLocal(2, "y");
   AstNode* innerIter = newComprehensionIterNode(innerVar, innerIterable);
+  innerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&innerComp->as.comprehension.conditions, innerIter);
 
-  AstNode* outerVar = newVarLocalNode(1);
-  outerVar->as.local.name = intern("x");
-  AstNode* outerIter = newComprehensionIterNode(outerVar, innerComp);
+  AstNode* innerCall = wrapComprehensionInClosure(innerComp);
+  AstNode* outerVar = comprehensionLocal(2, "x");
+  AstNode* outerIter = newComprehensionIterNode(outerVar, innerCall);
+  outerIter->as.comprehensionIter.iterLocal = 3;
   pushAstVec(&comp->as.comprehension.conditions, outerIter);
 
-  AstNode* exprStmt = newExprStmtNode(comp);
+  AstNode* call = wrapComprehensionInClosure(comp);
+  AstNode* exprStmt = newExprStmtNode(call);
   pushFnStmt(expected, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
