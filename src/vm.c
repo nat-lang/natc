@@ -105,6 +105,7 @@ bool initVM() {
   vm.core.sObj = intern("obj");
   vm.core.sSet = intern("set");
   vm.core.sSetAdd = intern("setAdd");
+  vm.core.sTree = intern("tree");
 
   vm.core.sLen = intern("len");
   vm.core.sLt = intern("<");
@@ -758,6 +759,20 @@ InterpretResult vmExecute(int baseFrame) {
             Value value = BOOL_VAL(false);
             mapGet(&set->elements, key, &value);
             vmPush(value);
+            break;
+          }
+          case OBJ_TREE: {
+            ObjTree* tree = AS_TREE(obj);
+            if (!IS_NUMBER(key)) {
+              vmRuntimeError("Tree index must be a number.");
+              return INTERPRET_RUNTIME_ERROR;
+            }
+            int idx = (int)AS_NUMBER(key);
+            if (idx < 0 || idx >= tree->children.count) {
+              vmRuntimeError("Tree index out of bounds.");
+              return INTERPRET_RUNTIME_ERROR;
+            }
+            vmPush(tree->children.values[idx]);
             break;
           }
           default: {

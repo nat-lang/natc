@@ -183,6 +183,76 @@ bool __setAdd__(int argCount, Value* args) {
   return true;
 }
 
+// Helper function to recursively convert sequences to trees
+static Value convertSeqToTree(Value value) {
+  if (!IS_SEQUENCE(value)) {
+    return value;
+  }
+
+  ObjSequence* seq = AS_SEQUENCE(value);
+  if (seq->values.count == 0) {
+    // Empty sequence becomes tree with nil data and no children
+    ObjTree* tree = newTree(NIL_VAL);
+    return OBJ_VAL(tree);
+  }
+
+  // First element is the data
+  Value data = seq->values.values[0];
+
+  // Create tree with that data
+  ObjTree* tree = newTree(data);
+
+  // Remaining elements are children - recursively convert them
+  for (int i = 1; i < seq->values.count; i++) {
+    Value childValue = convertSeqToTree(seq->values.values[i]);
+    writeValueArray(&tree->children, childValue);
+  }
+
+  return OBJ_VAL(tree);
+}
+
+bool __tree__(int argCount, Value* args) {
+  // First argument is the interior node data
+  // Remaining arguments are children
+
+  if (argCount == 0) {
+    vmRuntimeError("tree() requires at least one argument (data).");
+    return false;
+  }
+
+  Value data = vmPeek(argCount - 1);
+
+  // Check if this is a single-argument call with a sequence
+  // If so, treat it as nested sequence conversion
+  if (argCount == 1 && IS_SEQUENCE(data)) {
+    Value result = convertSeqToTree(data);
+    vm.stackTop[-argCount - 1] = result;
+    for (int i = 0; i < argCount; i++) vmPop();
+    return true;
+  }
+
+  // Otherwise, create tree directly from arguments
+  ObjTree* tree = newTree(data);
+  vm.stackTop[-argCount - 1] = OBJ_VAL(tree);
+
+  // Add remaining arguments as children, converting sequences recursively
+  for (int i = argCount - 2; i >= 0; i--) {
+    Value childValue = vmPeek(i);
+
+    // If child is a sequence, convert it recursively
+    if (IS_SEQUENCE(childValue)) {
+      childValue = convertSeqToTree(childValue);
+    }
+
+    writeValueArray(&tree->children, childValue);
+  }
+
+  // Pop all arguments
+  for (int i = 0; i < argCount; i++) vmPop();
+
+  return true;
+}
+
 bool __obj__(int argCount, Value* args) {
   ObjMap* map = newMap();
   vm.stackTop[-argCount - 1] = OBJ_VAL(map);
@@ -415,6 +485,7 @@ void defineNatives() {
   defineNativeFn("keys", 1, false, __keys__, &vm.globals);
   defineNativeFn("set", 0, true, __set__, &vm.globals);
   defineNativeFn("setAdd", 2, false, __setAdd__, &vm.globals);
+  defineNativeFn("tree", 0, true, __tree__, &vm.globals);
 
   defineNativeFn("obj", 0, true, __obj__, &vm.globals);
   defineNativeFnGlobal("str", 1, __str__);

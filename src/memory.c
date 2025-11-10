@@ -143,6 +143,12 @@ static void blackenObject(Obj* object) {
       markValue(spread->value);
       break;
     }
+    case OBJ_TREE: {
+      ObjTree* tree = (ObjTree*)object;
+      markValue(tree->data);
+      markArray(&tree->children);
+      break;
+    }
     case OBJ_MODULE: {
       ObjModule* module = (ObjModule*)object;
       markObject((Obj*)module->source);
@@ -213,6 +219,12 @@ static void freeObject(Obj* object) {
     }
     case OBJ_SPREAD: {
       FREE(ObjSpread, object);
+      break;
+    }
+    case OBJ_TREE: {
+      ObjTree* tree = (ObjTree*)object;
+      freeValueArray(&tree->children);
+      FREE(ObjTree, object);
       break;
     }
     case OBJ_UPVALUE:
