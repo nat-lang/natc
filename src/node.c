@@ -255,6 +255,13 @@ AstNode* newSetNode() {
   return n;
 }
 
+AstNode* newTreeNode() {
+  AstNode* n = allocNode(AST_TREE);
+  n->as.tree.interiorNode = NULL;
+  initAstVec(&n->as.tree.values);
+  return n;
+}
+
 AstNode* newSubscriptGetNode(AstNode* object, AstNode* index) {
   AstNode* n = allocNode(AST_SUBSCRIPT_GET);
   n->as.subscript.object = object;
@@ -501,6 +508,15 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Set\n", depth);
       printNodeVecAt(&node->as.set.values, depth + 1);
       break;
+    case AST_TREE:
+      printStrAt("Tree\n", depth);
+      if (node->as.tree.interiorNode != NULL) {
+        printStrAt("Interior:\n", depth + 1);
+        printNodeAt(node->as.tree.interiorNode, depth + 2);
+      }
+      printStrAt("Children:\n", depth + 1);
+      printNodeVecAt(&node->as.tree.values, depth + 2);
+      break;
     case AST_SUBSCRIPT_GET:
       printStrAt("SubscriptGet\n", depth);
       printNodeAt(node->as.subscript.object, depth + 1);
@@ -645,6 +661,10 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_SET:
       return a->as.set.values.count == b->as.set.values.count &&
              astVecsEqual(&a->as.set.values, &b->as.set.values);
+    case AST_TREE:
+      return nodesEqual(a->as.tree.interiorNode, b->as.tree.interiorNode) &&
+             a->as.tree.values.count == b->as.tree.values.count &&
+             astVecsEqual(&a->as.tree.values, &b->as.tree.values);
     case AST_SUBSCRIPT_GET:
       return nodesEqual(a->as.subscript.object, b->as.subscript.object) &&
              nodesEqual(a->as.subscript.index, b->as.subscript.index);
@@ -916,9 +936,12 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       ObjFunction* fn = toFunction(node);
 
       vmPush(OBJ_VAL(fn));
-      fn->module = newModule(node->as.function.module->as.module.dirName,
-                             node->as.function.module->as.module.baseName,
-                             node->as.function.module->as.module.source);
+      if (node->as.function.module != NULL) {
+        fn->module = newModule(node->as.function.module->as.module.dirName,
+                               node->as.function.module->as.module.baseName,
+                               node->as.function.module->as.module.source);
+      }
+
       uint16_t fnConst = addConstant(chunk, OBJ_VAL(fn));
 
       emitByte(chunk, node, OP_CLOSURE);
@@ -1086,6 +1109,26 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       emitByte(chunk, node, OP_CALL);
       emitByte(chunk, node, (uint8_t)node->as.set.values.count);
+      break;
+    }
+    case AST_TREE: {
+      emitByte(chunk, node, OP_GET_GLOBAL);
+      uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sTree));
+      emitConstant(chunk, node, constant);
+
+      // Emit interior node data (or nil if not specified)
+      if (node->as.tree.interiorNode != NULL) {
+        if (!toChunk(node->as.tree.interiorNode, chunk)) return false;
+      } else {
+        emitByte(chunk, node, OP_NIL);
+      }
+
+      // Emit children
+      if (!toChunkVec(&node->as.tree.values, chunk)) return false;
+
+      // Call tree() with interior data + children count
+      emitByte(chunk, node, OP_CALL);
+      emitByte(chunk, node, (uint8_t)(1 + node->as.tree.values.count));
       break;
     }
     case AST_SUBSCRIPT_GET: {
@@ -1288,6 +1331,11 @@ void markAstNode(AstNode* n) {
       for (int i = 0; i < n->as.set.values.count; i++)
         markAstNode((AstNode*)n->as.set.values.items[i]);
       break;
+    case AST_TREE:
+      markAstNode(n->as.tree.interiorNode);
+      for (int i = 0; i < n->as.tree.values.count; i++)
+        markAstNode((AstNode*)n->as.tree.values.items[i]);
+      break;
     case AST_SUBSCRIPT_GET:
       markAstNode(n->as.subscript.object);
       markAstNode(n->as.subscript.index);
@@ -1394,6 +1442,9 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_SET:
       freeAstVec(&n->as.set.values);
+      break;
+    case AST_TREE:
+      freeAstVec(&n->as.tree.values);
       break;
     case AST_SUBSCRIPT_GET:
     case AST_SUBSCRIPT_SET:

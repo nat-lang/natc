@@ -4,6 +4,7 @@ use expression
 use function
 use native
 use set
-// use sequence
+use sequence
 use string
+use tree
 use while_

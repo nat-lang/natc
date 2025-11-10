@@ -113,6 +113,13 @@ ObjSequence* newSequence() {
   return sequence;
 }
 
+ObjTree* newTree(Value data) {
+  ObjTree* tree = ALLOCATE_OBJ(ObjTree, OBJ_TREE);
+  tree->data = data;
+  initValueArray(&tree->children);
+  return tree;
+}
+
 static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
@@ -412,6 +419,18 @@ void printObject(Value value) {
     case OBJ_STRING:
       printf("%s", AS_CSTRING(value));
       break;
+    case OBJ_TREE: {
+      ObjTree* tree = AS_TREE(value);
+      printf("Tree(");
+      printValue(tree->data);
+      printf(", [");
+      for (int i = 0; i < tree->children.count; i++) {
+        if (i > 0) printf(", ");
+        printValue(tree->children.values[i]);
+      }
+      printf("])");
+      break;
+    }
     case OBJ_UPVALUE:
       printf("<upvalue at %p>", AS_UPVALUE(value));
       break;

@@ -68,6 +68,7 @@ typedef struct {
   ObjString* sObj;
   ObjString* sSet;
   ObjString* sSetAdd;
+  ObjString* sTree;
 } Core;
 
 typedef struct {

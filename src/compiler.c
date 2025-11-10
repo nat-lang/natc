@@ -756,6 +756,40 @@ static AstNode* returnStatement(NodeCompiler* cmp, bool canAssign) {
   return setNodeFromToken(node, parser.previous);
 }
 
+static AstNode* leftBracket(NodeCompiler* cmp, bool canAssign) {
+  Token openToken = parser.previous;
+
+  // Empty tree []
+  if (check(TOKEN_RIGHT_BRACKET)) {
+    advance(cmp);
+    return setNodeFromToken(newTreeNode(), openToken);
+  }
+
+  AstNode* tree = setNodeFromToken(newTreeNode(), openToken);
+
+  // Check for interior node with dot prefix
+  if (match(cmp, TOKEN_DOT)) {
+    tree->as.tree.interiorNode = parsePrecedence(cmp, PREC_PRIMARY);
+  }
+
+  // Parse space-separated children (no commas)
+  // Use PREC_PRIMARY to avoid subscript operations being parsed
+  while (!check(TOKEN_RIGHT_BRACKET) && !check(TOKEN_EOF)) {
+    AstNode* child = parsePrecedence(cmp, PREC_PRIMARY);
+    pushAstVec(&tree->as.tree.values, child);
+
+    // Trees use space separation, not comma separation
+    // If we see a comma, it's an error
+    if (check(TOKEN_COMMA)) {
+      errorAtCurrent(cmp, "Trees use space-separated values, not commas.");
+      break;
+    }
+  }
+
+  consume(cmp, TOKEN_RIGHT_BRACKET, "Expect ']' after tree literal.");
+  return tree;
+}
+
 static ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {identifier, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_INTERPOLATION] = {stringInterpolation, NULL, PREC_NONE, PREC_NONE},
@@ -768,7 +802,7 @@ static ParseRule rules[] = {
     [TOKEN_UNDEFINED] = {literalUndefined, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {leftBrace, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_LEFT_BRACKET] = {NULL, subscript, PREC_CALL, PREC_NONE},
+    [TOKEN_LEFT_BRACKET] = {leftBracket, subscript, PREC_CALL, PREC_NONE},
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_PAREN_LEFT] = {parenLeft, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},

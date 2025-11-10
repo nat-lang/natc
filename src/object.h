@@ -21,6 +21,7 @@
 #define IS_SPREAD(value) isObjType(value, OBJ_SPREAD)
 #define IS_UPVALUE(value) isObjType(value, OBJ_UPVALUE)
 #define IS_MODULE(value) isObjType(value, OBJ_MODULE)
+#define IS_TREE(value) isObjType(value, OBJ_TREE)
 
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
@@ -36,6 +37,7 @@
 #define AS_SPREAD(value) (((ObjSpread*)AS_OBJ(value)))
 #define AS_UPVALUE(value) (((ObjUpvalue*)AS_OBJ(value)))
 #define AS_MODULE(value) (((ObjModule*)AS_OBJ(value)))
+#define AS_TREE(value) ((ObjTree*)AS_OBJ(value))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 
@@ -55,6 +57,7 @@ typedef enum {
   OBJ_SPREAD,
   OBJ_VARIABLE,
   OBJ_MODULE,
+  OBJ_TREE,
 } ObjType;
 
 typedef struct {
@@ -167,6 +170,12 @@ typedef struct {
   Value value;
 } ObjSpread;
 
+typedef struct {
+  Obj obj;
+  Value data;
+  ValueArray children;
+} ObjTree;
+
 ObjAst* newObjAst(AstNode* root);
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
@@ -179,6 +188,7 @@ ObjNative* newNative(int arity, bool variadic, ObjString* name,
 ObjSequence* newSequence();
 ObjMap* newMap();
 ObjSet* newSet();
+ObjTree* newTree(Value data);
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
 ObjString* concatenateStrings(ObjString* a, ObjString* b);

@@ -33,6 +33,7 @@ typedef enum {
   AST_SUBSCRIPT_SET,
   AST_SIGNATURE,
   AST_THROW,
+  AST_TREE,
   AST_UNKNOWN,
   AST_VAR_GLOBAL,
   AST_VAR_LOCAL,
@@ -185,6 +186,10 @@ struct AstNode {
       AstVec values;
     } set;
     struct {
+      AstNode* interiorNode;
+      AstVec values;
+    } tree;
+    struct {
       AstNode* object;
       AstNode* index;
     } subscript;
@@ -261,6 +266,7 @@ AstNode* newParamNode(AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();
 AstNode* newSetNode();
+AstNode* newTreeNode();
 AstNode* newSubscriptGetNode(AstNode* object, AstNode* index);
 AstNode* newSubscriptSetNode(AstNode* object, AstNode* index, AstNode* value);
 AstNode* newThrowNode(AstNode* expr);
