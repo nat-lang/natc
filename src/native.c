@@ -367,8 +367,7 @@ bool __length__(int argCount, Value* args) {
       return true;
     }
     default: {
-      vmRuntimeError(
-          "Only sequences and objects with a '%s' method have length.", S_LEN);
+      vmRuntimeError("Only objects have length.");
       return false;
     }
   }

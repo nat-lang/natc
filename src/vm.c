@@ -853,9 +853,12 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
-ObjClosure* vmCompileAST(char* source, AstNode* module) {
+ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
+  AstNode* moduleNode =
+      newModuleNode(module->dirName, module->baseName, module->source);
   AstNode* node =
-      compileFunctionNode(module->as.module.baseName, source, module);
+      compileFunctionNode(moduleNode->as.module.baseName, source, moduleNode);
+
   printNode(node);
   printf("\n");
   ObjFunction* fn = toFunction(node);
@@ -864,13 +867,6 @@ ObjClosure* vmCompileAST(char* source, AstNode* module) {
   ObjClosure* closure = newClosure(fn);
   vmPop();  // function.
 
-  return closure;
-}
-
-ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
-  AstNode* moduleNode =
-      newModuleNode(module->dirName, module->baseName, module->source);
-  ObjClosure* closure = vmCompileAST(source, moduleNode);
   closure->function->module = module;
   return closure;
 }
@@ -897,7 +893,11 @@ bool vmPathBits(char* enclosingDir, Token path) {
   vmPush(OBJ_VAL(objBaseName));
   ObjString* objAbsPath = intern(absPath);
   vmPush(OBJ_VAL(objAbsPath));
+  char* source = readFile(objAbsPath->chars);
+  ObjString* objSource = intern(source);
+  vmPush(OBJ_VAL(objSource));
 
+  free(source);
   free(c1);
   free(c2);
   return true;
@@ -907,13 +907,9 @@ AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
                                    Token path) {
   if (!vmPathBits(enclosingDir, path)) return NULL;
 
-  ObjString* objDirName = AS_STRING(vmPeek(2));
-  ObjString* objBaseName = AS_STRING(vmPeek(1));
-  ObjString* objAbsPath = AS_STRING(vmPeek(0));
-  char* source = readFile(objAbsPath->chars);
-  ObjString* objSource = intern(source);
-  vmPush(OBJ_VAL(objSource));
-  free(source);
+  ObjString* objDirName = AS_STRING(vmPeek(3));
+  ObjString* objBaseName = AS_STRING(vmPeek(2));
+  ObjString* objSource = AS_STRING(vmPeek(0));
 
   AstNode* module = newModuleNode(objDirName, objBaseName, objSource);
   compileModuleImportBody(cmp, module);
@@ -929,14 +925,10 @@ AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
 ObjModule* vmCompileModule(char* enclosingDir, Token path) {
   if (!vmPathBits(enclosingDir, path)) return NULL;
 
-  ObjString* objDirName = AS_STRING(vmPeek(2));
-  ObjString* objBaseName = AS_STRING(vmPeek(1));
-  ObjString* objAbsPath = AS_STRING(vmPeek(0));
-
-  char* source = readFile(objAbsPath->chars);
-  ObjString* objSource = intern(source);
-  vmPush(OBJ_VAL(objSource));
-  free(source);
+  ObjString* objDirName = AS_STRING(vmPeek(3));
+  ObjString* objBaseName = AS_STRING(vmPeek(2));
+  ObjString* objAbsPath = AS_STRING(vmPeek(1));
+  ObjString* objSource = AS_STRING(vmPeek(0));
 
   ObjModule* module = newModule(objDirName, objBaseName, objSource);
   vmPush(OBJ_VAL(module));

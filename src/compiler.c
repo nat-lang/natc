@@ -533,7 +533,7 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
 
   // local for the comprehension to occupy while it's
   // under construction.
-  Token compToken = syntheticToken("__comp");
+  Token compToken = syntheticToken("#comprehension");
   uint8_t compIndex = addLocal(cmp, compToken);
   AstNode* compVar =
       setNodeFromToken(newVarLocalNode(compIndex), parser.previous);
@@ -608,7 +608,7 @@ static AstNode* comprehensionClosure(NodeCompiler* enclosing,
   NodeCompiler cmp;
   AstNode* node = setNodeFromToken(
       newFunctionNode(enclosing->fn->as.function.module), parser.previous);
-  node->as.function.name = tokenString(syntheticToken("__comp_builder"));
+  node->as.function.name = tokenString(syntheticToken("#comprehension"));
   node->as.function.signature = setNodeFromNode(newSignatureNode(), node);
   initNodeCompiler(&cmp, enclosing, node);
 
