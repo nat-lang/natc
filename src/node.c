@@ -257,7 +257,7 @@ AstNode* newSetNode() {
 
 AstNode* newTreeNode() {
   AstNode* n = allocNode(AST_TREE);
-  n->as.tree.interiorNode = NULL;
+  n->as.tree.value = NULL;
   initAstVec(&n->as.tree.values);
   return n;
 }
@@ -510,9 +510,9 @@ void printNodeAt(AstNode* node, int depth) {
       break;
     case AST_TREE:
       printStrAt("Tree\n", depth);
-      if (node->as.tree.interiorNode != NULL) {
+      if (node->as.tree.value != NULL) {
         printStrAt("Interior:\n", depth + 1);
-        printNodeAt(node->as.tree.interiorNode, depth + 2);
+        printNodeAt(node->as.tree.value, depth + 2);
       }
       printStrAt("Children:\n", depth + 1);
       printNodeVecAt(&node->as.tree.values, depth + 2);
@@ -662,7 +662,7 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return a->as.set.values.count == b->as.set.values.count &&
              astVecsEqual(&a->as.set.values, &b->as.set.values);
     case AST_TREE:
-      return nodesEqual(a->as.tree.interiorNode, b->as.tree.interiorNode) &&
+      return nodesEqual(a->as.tree.value, b->as.tree.value) &&
              a->as.tree.values.count == b->as.tree.values.count &&
              astVecsEqual(&a->as.tree.values, &b->as.tree.values);
     case AST_SUBSCRIPT_GET:
@@ -1117,8 +1117,8 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitConstant(chunk, node, constant);
 
       // Emit interior node data (or nil if not specified)
-      if (node->as.tree.interiorNode != NULL) {
-        if (!toChunk(node->as.tree.interiorNode, chunk)) return false;
+      if (node->as.tree.value != NULL) {
+        if (!toChunk(node->as.tree.value, chunk)) return false;
       } else {
         emitByte(chunk, node, OP_NIL);
       }
@@ -1332,7 +1332,7 @@ void markAstNode(AstNode* n) {
         markAstNode((AstNode*)n->as.set.values.items[i]);
       break;
     case AST_TREE:
-      markAstNode(n->as.tree.interiorNode);
+      markAstNode(n->as.tree.value);
       for (int i = 0; i < n->as.tree.values.count; i++)
         markAstNode((AstNode*)n->as.tree.values.items[i]);
       break;

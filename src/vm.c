@@ -763,16 +763,20 @@ InterpretResult vmExecute(int baseFrame) {
           }
           case OBJ_TREE: {
             ObjTree* tree = AS_TREE(obj);
-            if (!IS_NUMBER(key)) {
-              vmRuntimeError("Tree index must be a number.");
-              return INTERPRET_RUNTIME_ERROR;
+            // Try numeric index first (children)
+            if (IS_NUMBER(key)) {
+              int idx = (int)AS_NUMBER(key);
+              if (idx < 0 || idx >= tree->children.count) {
+                vmRuntimeError("Tree index out of bounds.");
+                return INTERPRET_RUNTIME_ERROR;
+              }
+              vmPush(tree->children.values[idx]);
+            } else {
+              // Try fields map (e.g., "value")
+              Value value = NIL_VAL;
+              mapGet(&tree->obj.fields, key, &value);
+              vmPush(value);
             }
-            int idx = (int)AS_NUMBER(key);
-            if (idx < 0 || idx >= tree->children.count) {
-              vmRuntimeError("Tree index out of bounds.");
-              return INTERPRET_RUNTIME_ERROR;
-            }
-            vmPush(tree->children.values[idx]);
             break;
           }
           default: {

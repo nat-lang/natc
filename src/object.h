@@ -172,7 +172,6 @@ typedef struct {
 
 typedef struct {
   Obj obj;
-  Value data;
   ValueArray children;
 } ObjTree;
 
@@ -188,7 +187,7 @@ ObjNative* newNative(int arity, bool variadic, ObjString* name,
 ObjSequence* newSequence();
 ObjMap* newMap();
 ObjSet* newSet();
-ObjTree* newTree(Value data);
+ObjTree* newTree();
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
 ObjString* concatenateStrings(ObjString* a, ObjString* b);

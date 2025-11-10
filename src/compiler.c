@@ -767,23 +767,28 @@ static AstNode* leftBracket(NodeCompiler* cmp, bool canAssign) {
 
   AstNode* tree = setNodeFromToken(newTreeNode(), openToken);
 
-  // Check for interior node with dot prefix
-  if (match(cmp, TOKEN_DOT)) {
-    tree->as.tree.interiorNode = parsePrecedence(cmp, PREC_PRIMARY);
-  }
+  // Parse first element
+  AstNode* first = parsePrecedence(cmp, PREC_PRIMARY);
 
-  // Parse space-separated children (no commas)
-  // Use PREC_PRIMARY to avoid subscript operations being parsed
-  while (!check(TOKEN_RIGHT_BRACKET) && !check(TOKEN_EOF)) {
-    AstNode* child = parsePrecedence(cmp, PREC_PRIMARY);
-    pushAstVec(&tree->as.tree.values, child);
+  // If there are more elements, first is the value, rest are children
+  if (!check(TOKEN_RIGHT_BRACKET)) {
+    // First element is the node value
+    tree->as.tree.value = first;
 
-    // Trees use space separation, not comma separation
-    // If we see a comma, it's an error
-    if (check(TOKEN_COMMA)) {
-      errorAtCurrent(cmp, "Trees use space-separated values, not commas.");
-      break;
+    // Parse remaining space-separated children
+    while (!check(TOKEN_RIGHT_BRACKET) && !check(TOKEN_EOF)) {
+      AstNode* child = parsePrecedence(cmp, PREC_PRIMARY);
+      pushAstVec(&tree->as.tree.values, child);
+
+      // Trees use space separation, not comma separation
+      if (check(TOKEN_COMMA)) {
+        errorAtCurrent(cmp, "Trees use space-separated values, not commas.");
+        break;
+      }
     }
+  } else {
+    // Single element - it's a child, no value specified
+    pushAstVec(&tree->as.tree.values, first);
   }
 
   consume(cmp, TOKEN_RIGHT_BRACKET, "Expect ']' after tree literal.");
