@@ -763,20 +763,16 @@ InterpretResult vmExecute(int baseFrame) {
           }
           case OBJ_TREE: {
             ObjTree* tree = AS_TREE(obj);
-            // Try numeric index first (children)
-            if (IS_NUMBER(key)) {
-              int idx = (int)AS_NUMBER(key);
-              if (idx < 0 || idx >= tree->children.count) {
-                vmRuntimeError("Tree index out of bounds.");
-                return INTERPRET_RUNTIME_ERROR;
-              }
-              vmPush(tree->children.values[idx]);
-            } else {
-              // Try fields map (e.g., "value")
-              Value value = NIL_VAL;
-              mapGet(&tree->obj.fields, key, &value);
-              vmPush(value);
+            if (!IS_NUMBER(key)) {
+              vmRuntimeError("Tree subscript must be a number.");
+              return INTERPRET_RUNTIME_ERROR;
             }
+            int idx = (int)AS_NUMBER(key);
+            if (idx < 0 || idx >= tree->children.count) {
+              vmRuntimeError("Tree index out of bounds.");
+              return INTERPRET_RUNTIME_ERROR;
+            }
+            vmPush(tree->children.values[idx]);
             break;
           }
           default: {
@@ -786,6 +782,34 @@ InterpretResult vmExecute(int baseFrame) {
             break;
           }
         }
+        break;
+      }
+      case OP_PROPERTY_GET: {
+        ObjString* property = READ_STRING();
+        Value obj = vmPop();
+
+        if (!IS_OBJ(obj)) {
+          vmRuntimeError("Only objects have properties.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        Value value = NIL_VAL;
+        mapGet(&AS_OBJ(obj)->fields, OBJ_VAL(property), &value);
+        vmPush(value);
+        break;
+      }
+      case OP_PROPERTY_SET: {
+        ObjString* property = READ_STRING();
+        Value value = vmPop();
+        Value obj = vmPop();
+
+        if (!IS_OBJ(obj)) {
+          vmRuntimeError("Only objects have properties.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        mapSet(&AS_OBJ(obj)->fields, OBJ_VAL(property), value);
+        vmPush(obj);
         break;
       }
       case OP_SUBSCRIPT_SET: {
@@ -877,9 +901,6 @@ ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
       newModuleNode(module->dirName, module->baseName, module->source);
   AstNode* node =
       compileFunctionNode(moduleNode->as.module.baseName, source, moduleNode);
-
-  printNode(node);
-  printf("\n");
   ObjFunction* fn = toFunction(node);
 
   vmPush(OBJ_VAL(fn));
