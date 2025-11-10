@@ -145,7 +145,6 @@ static void blackenObject(Obj* object) {
     }
     case OBJ_TREE: {
       ObjTree* tree = (ObjTree*)object;
-      markValue(tree->data);
       markArray(&tree->children);
       break;
     }

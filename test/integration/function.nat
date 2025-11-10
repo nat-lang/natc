@@ -6,3 +6,4 @@ let f = x => x + 1
 // naked function calls.
 
 f(1) 
+

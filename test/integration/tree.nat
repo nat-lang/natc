@@ -2,91 +2,95 @@ let t
 
 // empty tree
 t = []
+print(t)
 
-
-// simple leaf trees
+// simple leaf tree - single element is a child
 t = [1]
-
+print(t)
 assert(t[0] == 1)
 
+// tree with value and children - first is value, rest are children
 t = [1 2 3]
-
-assert(t[0] == 1)
-assert(t[1] == 2)
-assert(t[2] == 3)
+print(t)
+assert(t["value"] == 1)
+assert(t[0] == 2)
+assert(t[1] == 3)
 
 // nested tree literals
 t = [[1] [2] [3]]
-
-assert(t[0][0] == 1)
-assert(t[1][0] == 2)
-assert(t[2][0] == 3)
-
-// deeper nesting
-t = [[1 2] [3 4 5] [6]]
-
-assert(t[0][0] == 1)
-assert(t[0][1] == 2)
+print(t)
+// First element [1] is the value, [2] and [3] are children
+assert(t["value"][0] == 1)
+assert(t[0][0] == 2)
 assert(t[1][0] == 3)
-assert(t[1][1] == 4)
-assert(t[1][2] == 5)
-assert(t[2][0] == 6)
 
-// interior nodes with dot syntax
-t = [.1 2 3]
+// deeper nesting with values
+t = [[1 2] [3 4 5] [6]]
+print(t)
+assert(t["value"]["value"] == 1)
+assert(t["value"][0] == 2)
+assert(t[0]["value"] == 3)
+assert(t[0][0] == 4)
+assert(t[0][1] == 5)
+assert(t[1][0] == 6)
 
-
-// interior node with expression
-t = [.(1 + 1) 2 3]
-
-
-// nested interior nodes
-t = [.1 [.2 3 4] [.5 6 7]]
-
+// tree with value and nested children
+t = [1 [2 3 4] [5 6 7]]
+print(t)
+assert(t["value"] == 1)
+assert(t[0]["value"] == 2)
+assert(t[0][0] == 3)
+assert(t[0][1] == 4)
+assert(t[1]["value"] == 5)
+assert(t[1][0] == 6)
+assert(t[1][1] == 7)
 
 // tree native function with direct arguments
 t = tree(1, 2, 3, 4)
-
+print(t)
+assert(t["value"] == 1)
 assert(t[0] == 2)
 assert(t[1] == 3)
 assert(t[2] == 4)
 
 // tree native function with sequence conversion
 t = tree((1, 2, 3))
-
+print(t)
+assert(t["value"] == 1)
 assert(t[0] == 2)
 assert(t[1] == 3)
 
 // nested sequence conversion
 t = tree((1, (2, (,)), (3, (,))))
-
-print(t[0])
-print(t[0][0])
-// The nested empty sequences create empty trees
-// t[0] is Tree(2, [Tree(nil, [])])
-// t[0][0] is Tree(nil, [])
+print(t)
+assert(t["value"] == 1)
+assert(t[0]["value"] == 2)
+assert(t[1]["value"] == 3)
 
 // more complex sequence conversion
 t = tree((1, (2, 3, 4), (5, 6, 7)))
-
+print(t)
+assert(t["value"] == 1)
+assert(t[0]["value"] == 2)
 assert(t[0][0] == 3)
 assert(t[0][1] == 4)
+assert(t[1]["value"] == 5)
 assert(t[1][0] == 6)
 assert(t[1][1] == 7)
 
 // tree with different data types
 t = [true false nil]
-
-assert(t[0] == true)
-assert(t[1] == false)
-assert(t[2] == nil)
+print(t)
+assert(t["value"] == true)
+assert(t[0] == false)
+assert(t[1] == nil)
 
 // tree with strings
 t = ["a" "b" "c"]
-
-assert(t[0] == "a")
-assert(t[1] == "b")
-assert(t[2] == "c")
+print(t)
+assert(t["value"] == "a")
+assert(t[0] == "b")
+assert(t[1] == "c")
 
 // tree equality (should work via default equality)
 let t1 = tree(1, 2, 3)
@@ -96,22 +100,23 @@ print(t2)
 
 // expression trees
 t = [(1 + 1) (2 + 2) (3 + 3)]
-
-assert(t[0] == 2)
-assert(t[1] == 4)
-assert(t[2] == 6)
+print(t)
+assert(t["value"] == 2)
+assert(t[0] == 4)
+assert(t[1] == 6)
 
 // trees with function results
 global double = x => x * 2
 t = [(double(1)) (double(2)) (double(3))]
-
-assert(t[0] == 2)
-assert(t[1] == 4)
-assert(t[2] == 6)
+print(t)
+assert(t["value"] == 2)
+assert(t[0] == 4)
+assert(t[1] == 6)
 
 // empty children sequence conversion
 t = tree((5, (,), (,)))
-
-// Tree with data 5 and two empty child trees with no children
-// Just verify the tree was created successfully
-
+print(t)
+assert(t["value"] == 5)
+// Two children with nil values
+assert(t[0]["value"] == nil)
+assert(t[1]["value"] == nil)

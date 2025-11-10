@@ -113,9 +113,8 @@ ObjSequence* newSequence() {
   return sequence;
 }
 
-ObjTree* newTree(Value data) {
+ObjTree* newTree() {
   ObjTree* tree = ALLOCATE_OBJ(ObjTree, OBJ_TREE);
-  tree->data = data;
   initValueArray(&tree->children);
   return tree;
 }
@@ -422,7 +421,13 @@ void printObject(Value value) {
     case OBJ_TREE: {
       ObjTree* tree = AS_TREE(value);
       printf("Tree(");
-      printValue(tree->data);
+      // Print value from fields map
+      Value treeValue;
+      if (mapGet(&tree->obj.fields, INTERN("value"), &treeValue)) {
+        printValue(treeValue);
+      } else {
+        printf("nil");
+      }
       printf(", [");
       for (int i = 0; i < tree->children.count; i++) {
         if (i > 0) printf(", ");

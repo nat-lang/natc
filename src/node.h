@@ -186,7 +186,7 @@ struct AstNode {
       AstVec values;
     } set;
     struct {
-      AstNode* interiorNode;
+      AstNode* value;
       AstVec values;
     } tree;
     struct {

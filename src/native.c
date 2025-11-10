@@ -190,17 +190,17 @@ static Value convertSeqToTree(Value value) {
   }
 
   ObjSequence* seq = AS_SEQUENCE(value);
+  ObjTree* tree = newTree();
+
   if (seq->values.count == 0) {
-    // Empty sequence becomes tree with nil data and no children
-    ObjTree* tree = newTree(NIL_VAL);
+    // Empty sequence becomes tree with nil value and no children
+    mapSet(&tree->obj.fields, INTERN("value"), NIL_VAL);
     return OBJ_VAL(tree);
   }
 
-  // First element is the data
-  Value data = seq->values.values[0];
-
-  // Create tree with that data
-  ObjTree* tree = newTree(data);
+  // First element is the value
+  Value treeValue = seq->values.values[0];
+  mapSet(&tree->obj.fields, INTERN("value"), treeValue);
 
   // Remaining elements are children - recursively convert them
   for (int i = 1; i < seq->values.count; i++) {
@@ -212,27 +212,28 @@ static Value convertSeqToTree(Value value) {
 }
 
 bool __tree__(int argCount, Value* args) {
-  // First argument is the interior node data
+  // First argument is the node value
   // Remaining arguments are children
 
   if (argCount == 0) {
-    vmRuntimeError("tree() requires at least one argument (data).");
+    vmRuntimeError("tree() requires at least one argument (value).");
     return false;
   }
 
-  Value data = vmPeek(argCount - 1);
+  Value nodeValue = vmPeek(argCount - 1);
 
   // Check if this is a single-argument call with a sequence
   // If so, treat it as nested sequence conversion
-  if (argCount == 1 && IS_SEQUENCE(data)) {
-    Value result = convertSeqToTree(data);
+  if (argCount == 1 && IS_SEQUENCE(nodeValue)) {
+    Value result = convertSeqToTree(nodeValue);
     vm.stackTop[-argCount - 1] = result;
     for (int i = 0; i < argCount; i++) vmPop();
     return true;
   }
 
   // Otherwise, create tree directly from arguments
-  ObjTree* tree = newTree(data);
+  ObjTree* tree = newTree();
+  mapSet(&tree->obj.fields, INTERN("value"), nodeValue);
   vm.stackTop[-argCount - 1] = OBJ_VAL(tree);
 
   // Add remaining arguments as children, converting sequences recursively
