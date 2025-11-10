@@ -179,5 +179,6 @@ typedef enum {
 typedef struct AstNode AstNode;
 typedef struct ObjString ObjString;
 typedef struct ObjFunction ObjFunction;
+typedef struct ObjModule ObjModule;
 
 #endif

@@ -57,8 +57,6 @@ typedef enum {
   OBJ_MODULE,
 } ObjType;
 
-typedef struct ObjModule ObjModule;
-
 typedef struct {
   Value key;
   Value value;

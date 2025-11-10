@@ -66,7 +66,6 @@ static AstNode* allocNode(AstType kind) {
   memset(n, 0, sizeof(AstNode));
   n->type = kind;
   n->line = -1;
-  n->col = -1;
   n->next = vm.astRoot;
   vm.astRoot = n;
   return n;
@@ -917,6 +916,9 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       ObjFunction* fn = toFunction(node);
 
       vmPush(OBJ_VAL(fn));
+      fn->module = newModule(node->as.function.module->as.module.dirName,
+                             node->as.function.module->as.module.baseName,
+                             node->as.function.module->as.module.source);
       uint16_t fnConst = addConstant(chunk, OBJ_VAL(fn));
 
       emitByte(chunk, node, OP_CLOSURE);
@@ -1148,6 +1150,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 ObjFunction* toFunction(AstNode* node) {
   ObjFunction* fn = newFunction();
   vmPush(OBJ_VAL(fn));
+
   fn->name = node->as.function.name;
   fn->arity = node->as.function.signature->as.signature.params.count;
   fn->node = node;
