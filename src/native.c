@@ -113,9 +113,17 @@ bool __seqPush__(int argCount, Value* args) {
   return true;
 }
 
-bool __toSeq__(int argCount, Value* args) {
+bool __keys__(int argCount, Value* args) {
   Value v = vmPeek(0);
   ObjSequence* seq = newSequence();
+
+  if (!IS_OBJ(v)) {
+    vmRuntimeError("Only objects and sets have keys.");
+    vmPop();  // set.
+    vmPop();  // native fn.
+    return false;
+  }
+
   switch (OBJ_TYPE(v)) {
     case OBJ_SET: {
       ObjSet* set = AS_SET(v);
@@ -129,10 +137,13 @@ bool __toSeq__(int argCount, Value* args) {
       break;
     }
     default: {
-      vmRuntimeError("Can only convert sets to sequences.");
-      vmPop();  // set.
-      vmPop();  // native fn.
-      return false;
+      Obj* obj = AS_OBJ(v);
+      for (int i = 0; i < obj->fields.capacity; i++) {
+        MapEntry* entry = &obj->fields.entries[i];
+        if (!IS_UNDEF(entry->key) && !IS_UNDEF(entry->value))
+          writeValueArray(&seq->values, entry->key);
+      }
+      break;
     }
   }
 
@@ -402,7 +413,7 @@ void defineNatives() {
 
   defineNativeFn("seq", 0, true, __seq__, &vm.globals);
   defineNativeFn("seqPush", 2, false, __seqPush__, &vm.globals);
-  defineNativeFn("toSeq", 1, false, __toSeq__, &vm.globals);
+  defineNativeFn("keys", 1, false, __keys__, &vm.globals);
   defineNativeFn("set", 0, true, __set__, &vm.globals);
   defineNativeFn("setAdd", 2, false, __setAdd__, &vm.globals);
 

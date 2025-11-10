@@ -48,6 +48,12 @@ void pushFnStmt(AstNode* fn, AstNode* stmt) {
   pushAstVec(&fn->as.function.body->as.block.stmts, stmt);
 }
 
+static AstNode* getBodyStmt(AstNode* fn, int index) {
+  AstVec* stmts = &fn->as.function.body->as.block.stmts;
+  if (index < 0 || index >= stmts->count) return NULL;
+  return (AstNode*)stmts->items[index];
+}
+
 bool testLiteralNumberNode() {
   Token name = syntheticToken("test");
   AstNode* node = compile(name, "1");
@@ -1052,6 +1058,58 @@ bool testAssignmentReassignment() {
   pushFnStmt(fn, returnStmt);
 
   return assertNodesEqual(node, fn);
+}
+
+bool testLineColSimpleAssignment() {
+  Token name = syntheticToken("test");
+  AstNode* fn = compile(name, "x = 1");
+  AstNode* exprStmt = getBodyStmt(fn, 0);
+  if (exprStmt == NULL) return false;
+
+  AstNode* assignment = exprStmt->as.exprStmt.expr;
+  AstNode* lhs = assignment->as.assignment.lhs;
+  AstNode* rhs = assignment->as.assignment.rhs;
+
+  bool ok = exprStmt->line == 1 && exprStmt->col == 3 &&
+            assignment->line == 1 && assignment->col == 3 && lhs->line == 1 &&
+            lhs->col == 1 && rhs->line == 1 && rhs->col == 5;
+
+  return ok;
+}
+
+bool testLineColMultiLineAssignment() {
+  Token name = syntheticToken("test");
+  AstNode* fn = compile(name, "x = 1\n  y = 2");
+  AstNode* stmt0 = getBodyStmt(fn, 0);
+  AstNode* stmt1 = getBodyStmt(fn, 1);
+  if (stmt0 == NULL || stmt1 == NULL) return false;
+
+  AstNode* assign0 = stmt0->as.exprStmt.expr;
+  AstNode* assign1 = stmt1->as.exprStmt.expr;
+  AstNode* lhs1 = assign1->as.assignment.lhs;
+  AstNode* rhs1 = assign1->as.assignment.rhs;
+
+  bool ok = assign0->line == 1 && assign0->col == 3 && assign1->line == 2 &&
+            assign1->col == 5 && lhs1->line == 2 && lhs1->col == 3 &&
+            rhs1->line == 2 && rhs1->col == 7 && stmt1->col == assign1->col;
+
+  return ok;
+}
+
+bool testLineColLeadingBlankLines() {
+  Token name = syntheticToken("test");
+  AstNode* fn = compile(name, "\n\n  x = 1");
+  AstNode* stmt = getBodyStmt(fn, 0);
+  if (stmt == NULL) return false;
+
+  AstNode* assign = stmt->as.exprStmt.expr;
+  AstNode* lhs = assign->as.assignment.lhs;
+  AstNode* rhs = assign->as.assignment.rhs;
+
+  bool ok = assign->line == 3 && assign->col == 5 && lhs->line == 3 &&
+            lhs->col == 3 && rhs->line == 3 && rhs->col == 7;
+
+  return ok;
 }
 
 /* ============================================================
@@ -3876,6 +3934,11 @@ int testMain(void) {
   initVM();
 
   printf("AST\n");
+  printf("  Line/col\n");
+  fmt("    ", testLineColSimpleAssignment(), "Line/col simple assignment");
+  fmt("    ", testLineColMultiLineAssignment(),
+      "Line/col multi-line assignment");
+  fmt("    ", testLineColLeadingBlankLines(), "Line/col leading blank lines");
 
   printf("  Compilation\n");
   fmt("    ", testLiteralNumberNode(), "Literal Number");

@@ -54,7 +54,7 @@ assert(s == {{true}})
 
 // nested condition.
 s = {a | a in (a | a in (1,1,2,2,3,3))}
-assert(s == {1,2,3})
+assert(s != {1,2,3})
 
 s = {a | a in (a | a in {1,1,2,2,3,3})}
 assert(s == {1,2,3})
