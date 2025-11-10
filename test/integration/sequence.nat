@@ -84,7 +84,7 @@ assert(x == (1,))
 x = (b | a in ((1,2),(3,4),(5,6)), b in a)
 assert(x == (1,2,3,4,5,6))
 
-x = (b + c | a in ((1,2)), b in (3,4), c in a)
+x = (b + c | a in ((1,2),), b in (3,4), c in a)
 assert(x == (4,5,5,6))
 
 x = ((b, c) | a in ((1,2),(3,4)), b in a, c in a)
