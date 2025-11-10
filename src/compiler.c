@@ -482,6 +482,29 @@ static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
   return setNodeFromNode(node, lhs);
 }
 
+static AstNode* property(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
+                         Precedence prec) {
+  consumeIdentifier(cmp, "Expect identifier after '.'.");
+  Token id = parser.previous;
+
+  AstNode* node;
+  if (match(cmp, TOKEN_EQUAL)) {
+    AstNode* value = expression(cmp);
+    if (!canAssign) {
+      error(cmp, "Invalid assignment target.");
+      vmPop();
+      return lhs;
+    }
+    node = newPropertySetNode(lhs, value);
+    node->as.propertySet.property = tokenString(id);
+  } else {
+    node = newPropertyGetNode(lhs);
+    node->as.propertyGet.property = tokenString(id);
+  }
+
+  return setNodeFromNode(node, lhs);
+}
+
 // Find a [token] that isn't nested within braces, brackets,
 // or parentheses, for some initial [depth],
 static bool advanceTo(NodeCompiler* cmp, TokenType token, TokenType closing,
@@ -809,6 +832,7 @@ static ParseRule rules[] = {
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_LEFT_BRACKET] = {leftBracket, subscript, PREC_CALL, PREC_NONE},
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_DOT] = {NULL, property, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_LEFT] = {parenLeft, call, PREC_CALL, PREC_NONE},
     [TOKEN_PAREN_RIGHT] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
@@ -1118,6 +1142,11 @@ AstNode* compileFunctionNode(ObjString* name, char* source, AstNode* module) {
   AstNode* defaultReturn = newReturnNode(nilLiteral);
   setNodeFromToken(defaultReturn, synthetic);
   pushAstVec(&node->as.function.body->as.block.stmts, defaultReturn);
+
+#ifdef DEBUG_TRACE_AST
+  printf("Compiling function: %s\n", module->as.module.baseName->chars);
+  printNode(node);
+#endif
   return node;
 }
 

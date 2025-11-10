@@ -277,6 +277,21 @@ AstNode* newSubscriptSetNode(AstNode* object, AstNode* index, AstNode* value) {
   return n;
 }
 
+AstNode* newPropertyGetNode(AstNode* object) {
+  AstNode* n = allocNode(AST_PROPERTY_GET);
+  n->as.propertyGet.object = object;
+  n->as.propertyGet.property = NULL;
+  return n;
+}
+
+AstNode* newPropertySetNode(AstNode* object, AstNode* value) {
+  AstNode* n = allocNode(AST_PROPERTY_SET);
+  n->as.propertySet.object = object;
+  n->as.propertySet.property = NULL;
+  n->as.propertySet.value = value;
+  return n;
+}
+
 AstNode* newObjectNode() {
   AstNode* n = allocNode(AST_OBJECT);
   initAstVec(&n->as.object.entries);
@@ -528,6 +543,17 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.subscriptSet.index, depth + 1);
       printNodeAt(node->as.subscriptSet.value, depth + 1);
       break;
+    case AST_PROPERTY_GET:
+      printStrAt("PropertyGet ", depth);
+      printf("\"%s\"\n", node->as.propertyGet.property->chars);
+      printNodeAt(node->as.propertyGet.object, depth + 1);
+      break;
+    case AST_PROPERTY_SET:
+      printStrAt("PropertySet ", depth);
+      printf("\"%s\"\n", node->as.propertySet.property->chars);
+      printNodeAt(node->as.propertySet.object, depth + 1);
+      printNodeAt(node->as.propertySet.value, depth + 1);
+      break;
     case AST_OBJECT:
       printStrAt("Object\n", depth);
       printNodeVecAt(&node->as.object.entries, depth + 1);
@@ -672,6 +698,13 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.subscriptSet.object, b->as.subscriptSet.object) &&
              nodesEqual(a->as.subscriptSet.index, b->as.subscriptSet.index) &&
              nodesEqual(a->as.subscriptSet.value, b->as.subscriptSet.value);
+    case AST_PROPERTY_GET:
+      return nodesEqual(a->as.propertyGet.object, b->as.propertyGet.object) &&
+             a->as.propertyGet.property == b->as.propertyGet.property;
+    case AST_PROPERTY_SET:
+      return nodesEqual(a->as.propertySet.object, b->as.propertySet.object) &&
+             a->as.propertySet.property == b->as.propertySet.property &&
+             nodesEqual(a->as.propertySet.value, b->as.propertySet.value);
     case AST_OBJECT:
       return a->as.object.entries.count == b->as.object.entries.count &&
              astVecsEqual(&a->as.object.entries, &b->as.object.entries);
@@ -1144,6 +1177,23 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitByte(chunk, node, OP_SUBSCRIPT_SET);
       break;
     }
+    case AST_PROPERTY_GET: {
+      if (!toChunk(node->as.propertyGet.object, chunk)) return false;
+      emitByte(chunk, node, OP_PROPERTY_GET);
+      uint16_t constant =
+          addConstant(chunk, OBJ_VAL(node->as.propertyGet.property));
+      emitConstant(chunk, node, constant);
+      break;
+    }
+    case AST_PROPERTY_SET: {
+      if (!toChunk(node->as.propertySet.object, chunk)) return false;
+      if (!toChunk(node->as.propertySet.value, chunk)) return false;
+      emitByte(chunk, node, OP_PROPERTY_SET);
+      uint16_t constant =
+          addConstant(chunk, OBJ_VAL(node->as.propertySet.property));
+      emitConstant(chunk, node, constant);
+      break;
+    }
     case AST_OBJECT: {
       emitByte(chunk, node, OP_GET_GLOBAL);
       uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sObj));
@@ -1345,6 +1395,15 @@ void markAstNode(AstNode* n) {
       markAstNode(n->as.subscriptSet.index);
       markAstNode(n->as.subscriptSet.value);
       break;
+    case AST_PROPERTY_GET:
+      markAstNode(n->as.propertyGet.object);
+      markObject((Obj*)n->as.propertyGet.property);
+      break;
+    case AST_PROPERTY_SET:
+      markAstNode(n->as.propertySet.object);
+      markObject((Obj*)n->as.propertySet.property);
+      markAstNode(n->as.propertySet.value);
+      break;
     case AST_OBJECT:
       for (int i = 0; i < n->as.object.entries.count; i++)
         markAstNode((AstNode*)n->as.object.entries.items[i]);
@@ -1448,6 +1507,10 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_SUBSCRIPT_GET:
     case AST_SUBSCRIPT_SET:
+      break;
+    case AST_PROPERTY_GET:
+      break;
+    case AST_PROPERTY_SET:
       break;
     case AST_OBJECT:
       freeAstVec(&n->as.object.entries);

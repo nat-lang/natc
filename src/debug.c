@@ -155,6 +155,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_SUBSCRIPT_GET", offset);
     case OP_SUBSCRIPT_SET:
       return simpleInstruction("OP_SUBSCRIPT_SET", offset);
+    case OP_PROPERTY_GET:
+      return constantInstruction("OP_PROPERTY_GET", chunk, offset);
+    case OP_PROPERTY_SET:
+      return constantInstruction("OP_PROPERTY_SET", chunk, offset);
     case OP_SPREAD:
       return simpleInstruction("OP_SPREAD", offset);
     case OP_QUANTIFY:

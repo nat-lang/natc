@@ -2553,6 +2553,84 @@ bool testSubscriptNested() {
   return assertNodesEqual(actual, expected);
 }
 
+bool testPropertyGet() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "obj.foo");
+
+  AstNode* expected = mkFunction(name);
+  AstNode* obj = newVarGlobalNode();
+  obj->as.global.name = intern("obj");
+  AstNode* prop = newPropertyGetNode(obj);
+  prop->as.propertyGet.property = intern("foo");
+  AstNode* exprStmt = newExprStmtNode(prop);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testPropertySet() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "obj.foo = 42");
+
+  AstNode* expected = mkFunction(name);
+  AstNode* obj = newVarGlobalNode();
+  obj->as.global.name = intern("obj");
+  AstNode* value = newLiteralValueNode(NUMBER_VAL(42));
+  AstNode* set = newPropertySetNode(obj, value);
+  set->as.propertySet.property = intern("foo");
+  AstNode* exprStmt = newExprStmtNode(set);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testPropertyNested() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "obj.foo.bar");
+
+  AstNode* expected = mkFunction(name);
+  AstNode* obj = newVarGlobalNode();
+  obj->as.global.name = intern("obj");
+  AstNode* first = newPropertyGetNode(obj);
+  first->as.propertyGet.property = intern("foo");
+  AstNode* second = newPropertyGetNode(first);
+  second->as.propertyGet.property = intern("bar");
+  AstNode* exprStmt = newExprStmtNode(second);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
+bool testPropertyNestedAssignment() {
+  Token name = syntheticToken("test");
+  AstNode* actual = compile(name, "obj.foo.bar = 99");
+
+  AstNode* expected = mkFunction(name);
+  AstNode* obj = newVarGlobalNode();
+  obj->as.global.name = intern("obj");
+  AstNode* first = newPropertyGetNode(obj);
+  first->as.propertyGet.property = intern("foo");
+  AstNode* value = newLiteralValueNode(NUMBER_VAL(99));
+  AstNode* second = newPropertySetNode(first, value);
+  second->as.propertySet.property = intern("bar");
+  AstNode* exprStmt = newExprStmtNode(second);
+  pushFnStmt(expected, exprStmt);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
+
+  return assertNodesEqual(actual, expected);
+}
+
 static AstNode* comprehensionLocal(uint8_t index, const char* name) {
   AstNode* local = newVarLocalNode(index);
   local->as.local.name = intern(name);
@@ -3637,6 +3715,71 @@ bool testBytecodeSubscriptSet() {
   return true;
 }
 
+/* Bytecode tests for Property Access */
+
+bool testBytecodePropertyGet() {
+  AstNode* obj = newVarGlobalNode();
+  obj->as.global.name = intern("obj");
+  ObjString* propName = intern("foo");
+  AstNode* prop = newPropertyGetNode(obj);
+  prop->as.propertyGet.property = propName;
+  Chunk c;
+  if (!buildChunkForExpr(prop, &c)) return false;
+
+  // Layout: OP_GET_GLOBAL (3) + OP_PROPERTY_GET (3) = 6 bytes
+  if (c.count != 6) return false;
+
+  // Check OP_GET_GLOBAL for "obj"
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+
+  // Check OP_PROPERTY_GET with property name constant
+  if (c.code[3] != OP_PROPERTY_GET) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;
+
+  // Check constants: obj name and property name
+  if (c.constants.count != 2) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("obj")))) return false;
+  if (!valuesEqual(c.constants.values[1], OBJ_VAL(propName))) return false;
+
+  return true;
+}
+
+bool testBytecodePropertySet() {
+  AstNode* obj = newVarGlobalNode();
+  obj->as.global.name = intern("obj");
+  ObjString* propName = intern("bar");
+  AstNode* value = newLiteralValueNode(NUMBER_VAL(99));
+  AstNode* set = newPropertySetNode(obj, value);
+  set->as.propertySet.property = propName;
+  Chunk c;
+  if (!buildChunkForExpr(set, &c)) return false;
+
+  // Layout: OP_GET_GLOBAL (3) + CONSTANT(99) (3) + OP_PROPERTY_SET (3) = 9
+  // bytes
+  if (c.count != 9) return false;
+
+  // Check OP_GET_GLOBAL for "obj"
+  if (c.code[0] != OP_GET_GLOBAL) return false;
+  if (read_u16(c.code[1], c.code[2]) != 0) return false;
+
+  // Check CONSTANT for value (99)
+  if (c.code[3] != OP_CONSTANT) return false;
+  if (read_u16(c.code[4], c.code[5]) != 1) return false;
+
+  // Check OP_PROPERTY_SET with property name constant
+  if (c.code[6] != OP_PROPERTY_SET) return false;
+  if (read_u16(c.code[7], c.code[8]) != 2) return false;
+
+  // Check constants: obj name, value (99), property name
+  if (c.constants.count != 3) return false;
+  if (!valuesEqual(c.constants.values[0], OBJ_VAL(intern("obj")))) return false;
+  if (!valuesEqual(c.constants.values[1], NUMBER_VAL(99))) return false;
+  if (!valuesEqual(c.constants.values[2], OBJ_VAL(propName))) return false;
+
+  return true;
+}
+
 /* Bytecode tests for Assignment */
 
 bool testBytecodeAssignmentGlobal() {
@@ -4000,6 +4143,10 @@ int testMain(void) {
   fmt("    ", testSubscriptGet(), "Subscript get");
   fmt("    ", testSubscriptSet(), "Subscript set");
   fmt("    ", testSubscriptNested(), "Subscript nested");
+  fmt("    ", testPropertyGet(), "Property get");
+  fmt("    ", testPropertySet(), "Property set");
+  fmt("    ", testPropertyNested(), "Property nested");
+  fmt("    ", testPropertyNestedAssignment(), "Property nested assignment");
   fmt("    ", testSequenceComprehension(), "Sequence comprehension");
   fmt("    ", testSequenceComprehensionComplexBody(),
       "Sequence comprehension complex body");
@@ -4084,6 +4231,8 @@ int testMain(void) {
   fmt("    ", testBytecodeSetInCall(), "Set in call");
   fmt("    ", testBytecodeSubscriptGet(), "Subscript get bytecode");
   fmt("    ", testBytecodeSubscriptSet(), "Subscript set bytecode");
+  fmt("    ", testBytecodePropertyGet(), "Property get bytecode");
+  fmt("    ", testBytecodePropertySet(), "Property set bytecode");
   fmt("    ", testBytecodeObjectEmpty(), "Object empty");
   fmt("    ", testBytecodeObjectOneProperty(), "Object one property");
   fmt("    ", testBytecodeObjectMultipleProperties(),

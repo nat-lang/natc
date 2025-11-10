@@ -31,6 +31,8 @@ typedef enum {
   AST_SET,
   AST_SUBSCRIPT_GET,
   AST_SUBSCRIPT_SET,
+  AST_PROPERTY_GET,
+  AST_PROPERTY_SET,
   AST_SIGNATURE,
   AST_THROW,
   AST_TREE,
@@ -199,6 +201,15 @@ struct AstNode {
       AstNode* value;
     } subscriptSet;
     struct {
+      AstNode* object;
+      ObjString* property;
+    } propertyGet;
+    struct {
+      AstNode* object;
+      ObjString* property;
+      AstNode* value;
+    } propertySet;
+    struct {
       AstVec entries;
     } object;
     struct {
@@ -269,6 +280,8 @@ AstNode* newSetNode();
 AstNode* newTreeNode();
 AstNode* newSubscriptGetNode(AstNode* object, AstNode* index);
 AstNode* newSubscriptSetNode(AstNode* object, AstNode* index, AstNode* value);
+AstNode* newPropertyGetNode(AstNode* object);
+AstNode* newPropertySetNode(AstNode* object, AstNode* value);
 AstNode* newThrowNode(AstNode* expr);
 AstNode* newSignatureNode();
 AstNode* newUnknownNode();

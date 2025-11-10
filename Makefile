@@ -32,17 +32,21 @@ debug:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 
 # Compile the interpreter with instruction and stack tracing enabled.
-debug-stack:
+trace-stack:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stack SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace-stack SOURCE_DIR=src
 
-debug-chunk:
+trace-chunk:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-chunk SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace-chunk SOURCE_DIR=src
 
-debug-trace:
+trace-ast:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-trace SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace-ast SOURCE_DIR=src
+
+trace:
+	@ $(MAKE) configure
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace SOURCE_DIR=src
 
 # Compile the interpreter with an eager garbage collector.
 debug-stress-gc:
