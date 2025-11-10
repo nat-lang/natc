@@ -113,10 +113,12 @@ bool initVM() {
   vm.core.sIter = intern("iter");
   vm.core.sMore = intern("more");
   vm.core.sNext = intern("next");
+  vm.core.sValue = intern("value");
 
   defineNatives();
 
-  return vmInterpretEntrypoint(NAT_CORE_LOC) == INTERPRET_OK;
+  // return vmInterpretEntrypoint(NAT_CORE_LOC) == INTERPRET_OK;
+  return true;
 }
 
 void freeVM() {
