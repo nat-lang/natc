@@ -9,6 +9,7 @@ Scanner initScanner(const char *source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
+  scanner.lineStart = source;
 
   return scanner;
 }
@@ -18,6 +19,7 @@ void initToken(Token *token) {
   token->start = NULL;
   token->length = -1;
   token->line = -1;
+  token->column = -1;
 }
 
 Token syntheticToken(const char *start) {
@@ -25,6 +27,8 @@ Token syntheticToken(const char *start) {
   token.start = start;
   token.length = (int)strlen(start);
   token.type = TOKEN_SYNTHETIC;
+  token.line = 0;
+  token.column = -1;
   return token;
 }
 
@@ -42,6 +46,11 @@ void gotoScanner(Scanner checkpoint) { scanner = checkpoint; }
 void rewindScanner(Token token) {
   scanner.line = token.line;
   scanner.current = scanner.start = token.start;
+  if (token.column > 0) {
+    scanner.lineStart = token.start - (token.column - 1);
+  } else {
+    scanner.lineStart = token.start;
+  }
 }
 
 static bool isAlpha(char c) {
@@ -92,6 +101,7 @@ static Token makeToken(TokenType type) {
   token.start = scanner.start;
   token.length = (int)(scanner.current - scanner.start);
   token.line = scanner.line;
+  token.column = (int)(scanner.start - scanner.lineStart) + 1;
   return token;
 }
 
@@ -101,6 +111,7 @@ static Token errorToken(const char *message) {
   token.start = message;
   token.length = (int)strlen(message);
   token.line = scanner.line;
+  token.column = (int)(scanner.start - scanner.lineStart) + 1;
   return token;
 }
 
@@ -116,8 +127,9 @@ void skipWhitespace() {
         advance();
         break;
       case '\n':
-        scanner.line++;
         advance();
+        scanner.line++;
+        scanner.lineStart = scanner.current;
         break;
       case '/':
         if (peekNext() == '/') {
@@ -332,10 +344,16 @@ static Token string(TokenType type, TokenType interpolationType) {
     if (peek() == '#' && peekNext() == '{') {
       advance();
       advance();
+      scanner.start = scanner.current - 2;
       return makeToken(interpolationType);
     }
 
-    if (peek() == '\n') scanner.line++;
+    if (peek() == '\n') {
+      advance();
+      scanner.line++;
+      scanner.lineStart = scanner.current;
+      continue;
+    }
     advance();
   }
 

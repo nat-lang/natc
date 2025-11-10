@@ -59,7 +59,7 @@ void freeAstVec(AstVec* v);
 struct AstNode {
   AstType type;
   int line;
-  int chr;
+  int col;
 
   AstNode* next;
 

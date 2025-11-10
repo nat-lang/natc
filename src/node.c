@@ -66,6 +66,7 @@ static AstNode* allocNode(AstType kind) {
   memset(n, 0, sizeof(AstNode));
   n->type = kind;
   n->line = -1;
+  n->col = -1;
   n->next = vm.astRoot;
   vm.astRoot = n;
   return n;
