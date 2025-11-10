@@ -1150,10 +1150,10 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitConstant(chunk, node, constant);
 
       // Emit interior node data (or nil if not specified)
-      if (node->as.tree.value != NULL) {
-        if (!toChunk(node->as.tree.value, chunk)) return false;
-      } else {
+      if (node->as.tree.value == NULL) {
         emitByte(chunk, node, OP_NIL);
+      } else {
+        if (!toChunk(node->as.tree.value, chunk)) return false;
       }
 
       // Emit children

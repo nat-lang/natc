@@ -184,31 +184,23 @@ bool __setAdd__(int argCount, Value* args) {
 }
 
 // Helper function to recursively convert sequences to trees
-static Value convertSeqToTree(Value value) {
-  if (!IS_SEQUENCE(value)) {
-    return value;
-  }
-
-  ObjSequence* seq = AS_SEQUENCE(value);
-  ObjTree* tree = newTree();
-
-  if (seq->values.count == 0) {
-    // Empty sequence becomes tree with nil value and no children
-    mapSet(&tree->obj.fields, INTERN("value"), NIL_VAL);
-    return OBJ_VAL(tree);
-  }
-
-  // First element is the value
-  Value treeValue = seq->values.values[0];
-  mapSet(&tree->obj.fields, INTERN("value"), treeValue);
+static void seqToTree(ObjSequence* seq, ObjTree* tree) {
+  Value el0 = seq->values.count == 0 ? NIL_VAL : seq->values.values[0];
+  mapSet(&tree->obj.fields, OBJ_VAL(vm.core.sValue), el0);
 
   // Remaining elements are children - recursively convert them
   for (int i = 1; i < seq->values.count; i++) {
-    Value childValue = convertSeqToTree(seq->values.values[i]);
-    writeValueArray(&tree->children, childValue);
+    if (IS_SEQUENCE(seq->values.values[i])) {
+      ObjTree* child = newTree();
+      vmPush(OBJ_VAL(child));
+      seqToTree(AS_SEQUENCE(seq->values.values[i]), child);
+      writeValueArray(&tree->children, OBJ_VAL(child));
+      vmPop();
+    } else {
+      Value childValue = seq->values.values[i];
+      writeValueArray(&tree->children, childValue);
+    }
   }
-
-  return OBJ_VAL(tree);
 }
 
 bool __tree__(int argCount, Value* args) {
@@ -220,32 +212,36 @@ bool __tree__(int argCount, Value* args) {
     return false;
   }
 
-  Value nodeValue = vmPeek(argCount - 1);
+  ObjTree* tree = newTree();
+  vm.stackTop[-argCount - 1] = OBJ_VAL(tree);
+
+  Value arg0 = vmPeek(argCount - 1);
 
   // Check if this is a single-argument call with a sequence
   // If so, treat it as nested sequence conversion
-  if (argCount == 1 && IS_SEQUENCE(nodeValue)) {
-    Value result = convertSeqToTree(nodeValue);
-    vm.stackTop[-argCount - 1] = result;
+  if (argCount == 1 && IS_SEQUENCE(arg0)) {
+    seqToTree(AS_SEQUENCE(arg0), tree);
     for (int i = 0; i < argCount; i++) vmPop();
     return true;
   }
 
   // Otherwise, create tree directly from arguments
-  ObjTree* tree = newTree();
-  mapSet(&tree->obj.fields, INTERN("value"), nodeValue);
-  vm.stackTop[-argCount - 1] = OBJ_VAL(tree);
+  mapSet(&tree->obj.fields, OBJ_VAL(vm.core.sValue), arg0);
 
   // Add remaining arguments as children, converting sequences recursively
-  for (int i = argCount - 2; i >= 0; i--) {
-    Value childValue = vmPeek(i);
+  for (int n = argCount - 2; n >= 0; n--) {
+    Value argn = vmPeek(n);
 
     // If child is a sequence, convert it recursively
-    if (IS_SEQUENCE(childValue)) {
-      childValue = convertSeqToTree(childValue);
+    if (IS_SEQUENCE(argn)) {
+      ObjTree* child = newTree();
+      vmPush(OBJ_VAL(child));
+      seqToTree(AS_SEQUENCE(argn), child);
+      writeValueArray(&tree->children, OBJ_VAL(child));
+      vmPop();
+    } else {
+      writeValueArray(&tree->children, argn);
     }
-
-    writeValueArray(&tree->children, childValue);
   }
 
   // Pop all arguments
