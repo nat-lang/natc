@@ -113,6 +113,35 @@ bool __seqPush__(int argCount, Value* args) {
   return true;
 }
 
+bool __toSeq__(int argCount, Value* args) {
+  Value v = vmPeek(0);
+  ObjSequence* seq = newSequence();
+  switch (OBJ_TYPE(v)) {
+    case OBJ_SET: {
+      ObjSet* set = AS_SET(v);
+
+      for (int i = 0; i < set->elements.capacity; i++) {
+        MapEntry* entry = &set->elements.entries[i];
+        if (!IS_UNDEF(entry->key) && !IS_UNDEF(entry->value) &&
+            IS_BOOL(entry->value) && AS_BOOL(entry->value))
+          writeValueArray(&seq->values, entry->key);
+      }
+      break;
+    }
+    default: {
+      vmRuntimeError("Can only convert sets to sequences.");
+      vmPop();  // set.
+      vmPop();  // native fn.
+      return false;
+    }
+  }
+
+  vmPop();  // set.
+  vmPop();  // native fn.
+  vmPush(OBJ_VAL(seq));
+  return true;
+}
+
 bool __set__(int argCount, Value* args) {
   ObjSet* set = newSet();
   vm.stackTop[-argCount - 1] = OBJ_VAL(set);
@@ -212,75 +241,12 @@ bool __str__(int argCount, Value* args) {
   return true;
 }
 
-bool __valuesEqual__(Value a, Value b);
-
-bool __subMap__(Map* a, Map* b) {
-  for (int i = 0; i < a->count; i++) {
-    MapEntry* entry = &a->entries[i];
-    if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
-    Value bValue;
-    if (!mapGet(b, entry->key, &bValue)) return false;
-    if (!__valuesEqual__(entry->value, bValue)) return false;
-  }
-  return true;
-}
-
-bool __valuesEqual__(Value a, Value b) {
-  if (a.vmType != b.vmType) return false;
-
-  switch (a.vmType) {
-    case VAL_UNDEF:
-    case VAL_UNIT:
-    case VAL_NIL:
-      return true;
-    case VAL_BOOL:
-      return AS_BOOL(a) == AS_BOOL(b);
-      break;
-    case VAL_NUMBER:
-      return AS_NUMBER(a) == AS_NUMBER(b);
-    case VAL_OBJ: {
-      Obj* aObj = AS_OBJ(a);
-      Obj* bObj = AS_OBJ(b);
-
-      if (aObj->oType != bObj->oType) return false;
-
-      switch (aObj->oType) {
-        case OBJ_SEQUENCE: {
-          ObjSequence* aSeq = AS_SEQUENCE(a);
-          ObjSequence* bSeq = AS_SEQUENCE(b);
-          if (aSeq->values.count != bSeq->values.count) return false;
-          for (int i = 0; i < aSeq->values.count; i++) {
-            if (!__valuesEqual__(aSeq->values.values[i],
-                                 bSeq->values.values[i]))
-              return false;
-          }
-          return true;
-        }
-        case OBJ_MAP: {
-          ObjMap* aMap = AS_MAP(a);
-          ObjMap* bMap = AS_MAP(b);
-          return __subMap__(&aMap->obj.fields, &bMap->obj.fields) &&
-                 __subMap__(&bMap->obj.fields, &aMap->obj.fields);
-        }
-        case OBJ_SET: {
-          ObjSet* aSet = AS_SET(a);
-          ObjSet* bSet = AS_SET(b);
-          return __subMap__(&aSet->elements, &bSet->elements) &&
-                 __subMap__(&bSet->elements, &aSet->elements);
-        }
-        default:
-          return false;
-      }
-    }
-  }
-}
-
 bool __eq__(int argCount, Value* args) {
   Value a = vmPop();
   Value b = vmPop();
   vmPop();  // native fn.
 
-  vmPush(BOOL_VAL(__valuesEqual__(a, b)));
+  vmPush(BOOL_VAL(valuesEqual(a, b)));
   return true;
 }
 
@@ -289,7 +255,7 @@ bool __neq__(int argCount, Value* args) {
   Value b = vmPop();
   vmPop();  // native fn.
 
-  vmPush(BOOL_VAL(!__valuesEqual__(a, b)));
+  vmPush(BOOL_VAL(!valuesEqual(a, b)));
   return true;
 }
 
@@ -436,6 +402,7 @@ void defineNatives() {
 
   defineNativeFn("seq", 0, true, __seq__, &vm.globals);
   defineNativeFn("seqPush", 2, false, __seqPush__, &vm.globals);
+  defineNativeFn("toSeq", 1, false, __toSeq__, &vm.globals);
   defineNativeFn("set", 0, true, __set__, &vm.globals);
   defineNativeFn("setAdd", 2, false, __setAdd__, &vm.globals);
 

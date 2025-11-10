@@ -9,10 +9,8 @@ global iter = x => {
     return x[idx - 1]
   }
 
-  let o = {
+  return {
     "more": more,
     "next": next
   }
-  // print(o["more"])
-  return o
 }

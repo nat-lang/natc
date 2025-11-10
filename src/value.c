@@ -73,6 +73,19 @@ void printValueArray(ValueArray* array) {
   printf(")");
 }
 
+bool valuesEqual(Value a, Value b);
+
+bool subMap(Map* a, Map* b) {
+  for (int i = 0; i < a->count; i++) {
+    MapEntry* entry = &a->entries[i];
+    if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value)) continue;
+    Value bValue;
+    if (!mapGet(b, entry->key, &bValue)) return false;
+    if (!valuesEqual(entry->value, bValue)) return false;
+  }
+  return true;
+}
+
 bool valuesEqual(Value a, Value b) {
   if (a.vmType != b.vmType) return false;
 
@@ -89,13 +102,41 @@ bool valuesEqual(Value a, Value b) {
       Obj* aObj = AS_OBJ(a);
       Obj* bObj = AS_OBJ(b);
 
-      if (aObj->hash != 0 && bObj->hash != 0) return aObj->hash == bObj->hash;
+      if (aObj->oType != bObj->oType) return false;
 
-      // do they point to the same place on the heap?
-      return aObj == bObj;
+      switch (OBJ_TYPE(a)) {
+        case OBJ_SEQUENCE: {
+          ObjSequence* aSeq = AS_SEQUENCE(a);
+          ObjSequence* bSeq = AS_SEQUENCE(b);
+          if (aSeq->values.count != bSeq->values.count) return false;
+          for (int i = 0; i < aSeq->values.count; i++) {
+            if (!valuesEqual(aSeq->values.values[i], bSeq->values.values[i]))
+              return false;
+          }
+          return true;
+        }
+        case OBJ_MAP: {
+          ObjMap* aMap = AS_MAP(a);
+          ObjMap* bMap = AS_MAP(b);
+          return subMap(&aMap->obj.fields, &bMap->obj.fields) &&
+                 subMap(&bMap->obj.fields, &aMap->obj.fields);
+        }
+        case OBJ_SET: {
+          ObjSet* aSet = AS_SET(a);
+          ObjSet* bSet = AS_SET(b);
+          return subMap(&aSet->elements, &bSet->elements) &&
+                 subMap(&bSet->elements, &aSet->elements);
+        }
+        case OBJ_STRING: {
+          ObjString* aString = AS_STRING(a);
+          ObjString* bString = AS_STRING(b);
+          return aString->hash == bString->hash;
+        }
+        default:
+          // do they point to the same place on the heap?
+          return aObj == bObj;
+      }
     }
-    default:
-      return false;  // Unreachable.
   }
 }
 
@@ -132,7 +173,8 @@ static inline uint32_t hashNumber(double num) {
 
 bool vHashable(Value value) {
   return (IS_BOOL(value) || IS_NIL(value) || IS_UNDEF(value) ||
-          IS_UNIT(value) || IS_NUMBER(value) || IS_STRING(value));
+          IS_UNIT(value) || IS_NUMBER(value) || IS_STRING(value) ||
+          IS_SET(value));
 }
 
 // Generates a hash code for [value], which must be one of
@@ -150,8 +192,28 @@ uint32_t hashValue(Value value) {
     case VAL_NUMBER:
       return hashNumber(AS_NUMBER(value));
     case VAL_OBJ: {
-      Obj* object = AS_OBJ(value);
-      return object->hash;
+      switch (OBJ_TYPE(value)) {
+        case OBJ_SET: {
+          Map* elements = &AS_SET(value)->elements;
+          uint32_t hash = 0;
+          for (int i = 0; i < elements->capacity; i++) {
+            MapEntry* entry = &elements->entries[i];
+            if (IS_UNDEF(entry->key) || IS_UNDEF(entry->value) ||
+                !IS_BOOL(entry->value) || !AS_BOOL(entry->value))
+              continue;
+            hash = hash + hashValue(entry->key);
+          }
+
+          return hash;
+        }
+        case OBJ_STRING: {
+          ObjString* string = AS_STRING(value);
+          return string->hash;
+        }
+        default: {
+          return 0;
+        }
+      }
     }
   }
 
