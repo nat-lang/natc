@@ -1,2 +1,3 @@
 use iteration
 
+print(iter)

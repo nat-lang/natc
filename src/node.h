@@ -151,7 +151,7 @@ struct AstNode {
       ObjString* dirName;
       ObjString* baseName;
       ObjString* source;
-      AstVec stmts;
+      AstNode* fn;
     } module;
 
     struct {
@@ -300,6 +300,7 @@ void printNode(AstNode* node);
 
 bool toChunk(AstNode* node, Chunk* chunk);
 ObjFunction* toFunction(AstNode* node);
+ObjModule* toModule(AstNode* node);
 
 /* memory */
 

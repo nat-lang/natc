@@ -1062,9 +1062,11 @@ static AstNode* importStatement(NodeCompiler* cmp) {
     return setNodeFromToken(newUnknownNode(), useToken);
   }
 
-  AstNode* module = vmCompileModuleImportBody(
-      cmp, cmp->fn->as.function.module->as.module.dirName->chars,
-      parser.previous);
+  vmPush(OBJ_VAL(tokenString(parser.previous)));
+  AstNode* module =
+      vmCompileModuleNode(cmp->fn->as.function.module->as.module.dirName->chars,
+                          AS_STRING(vmPeek(0))->chars);
+  vmPop();  // path.
   gotoParser(checkpoint);
 
   AstNode* node = setNodeFromToken(newUseNode(module), useToken);
@@ -1119,19 +1121,13 @@ static void statements(NodeCompiler* cmp, AstVec* target) {
   }
 }
 
-void compileModuleImportBody(NodeCompiler* cmp, AstNode* module) {
+AstNode* compileFunctionNode(AstNode* module) {
   Scanner sc = initScanner(module->as.module.source->chars);
-  initParser(sc);
-  statements(cmp, &module->as.module.stmts);
-}
-
-AstNode* compileFunctionNode(ObjString* name, char* source, AstNode* module) {
-  Scanner sc = initScanner(source);
   initParser(sc);
   NodeCompiler cmp;
   Token synthetic = {.line = 0, .column = -1};
   AstNode* node = setNodeFromToken(newFunctionNode(module), synthetic);
-  node->as.function.name = name;
+  node->as.function.name = module->as.module.baseName;
   node->as.function.signature = setNodeFromToken(newSignatureNode(), synthetic);
   node->as.function.body = setNodeFromToken(newBlockNode(), synthetic);
   initNodeCompiler(&cmp, NULL, node);
@@ -1143,8 +1139,15 @@ AstNode* compileFunctionNode(ObjString* name, char* source, AstNode* module) {
   setNodeFromToken(defaultReturn, synthetic);
   pushAstVec(&node->as.function.body->as.block.stmts, defaultReturn);
 
+  return node;
+}
+
+AstNode* compileModuleNode(ObjString* dirName, ObjString* baseName,
+                           ObjString* source) {
+  AstNode* node = newModuleNode(dirName, baseName, source);
+  node->as.module.fn = compileFunctionNode(node);
 #ifdef DEBUG_TRACE_AST
-  printf("Compiling function: %s\n", module->as.module.baseName->chars);
+  printf("Compiling module: %s\n", node->as.module.baseName->chars);
   printNode(node);
 #endif
   return node;

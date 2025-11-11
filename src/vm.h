@@ -118,7 +118,6 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
-InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretEntrypoint(char* path);
 
 char* vmInterpretEntrypoint_wasm(char* path);
@@ -126,10 +125,8 @@ char* vmGenerate_wasm(char* path);
 void vmInit_wasm();
 void vmFree_wasm();
 
-AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
-                                   Token path);
-ObjModule* vmCompileModule(char* enclosingDir, Token path);
-ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
+AstNode* vmCompileModuleNode(char* enclosingDir, char* path);
+
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();

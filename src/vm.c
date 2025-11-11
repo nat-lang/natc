@@ -117,8 +117,7 @@ bool initVM() {
 
   defineNatives();
 
-  // return vmInterpretEntrypoint(NAT_CORE_LOC) == INTERPRET_OK;
-  return true;
+  return vmInterpretEntrypoint(NAT_CORE_LOC) == INTERPRET_OK;
 }
 
 void freeVM() {
@@ -899,28 +898,11 @@ InterpretResult vmExecute(int baseFrame) {
 
 // Compilation routines that use the stack.
 
-ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module) {
-  AstNode* moduleNode =
-      newModuleNode(module->dirName, module->baseName, module->source);
-  AstNode* node =
-      compileFunctionNode(moduleNode->as.module.baseName, source, moduleNode);
-  ObjFunction* fn = toFunction(node);
-
-  vmPush(OBJ_VAL(fn));
-  ObjClosure* closure = newClosure(fn);
-  vmPop();  // function.
-
-  closure->function->module = module;
-  return closure;
-}
-
-bool vmPathBits(char* enclosingDir, Token path) {
+bool vmPathBits(char* enclosingDir, char* path) {
   // path can be of the form a/b/c, in which case we need to
   // separate a/b from c.
-  ObjString* objPath = copyString(path.start, path.length);
-  vmPush(OBJ_VAL(objPath));
 
-  char* absPath = pathToUri(enclosingDir, objPath->chars);
+  char* absPath = pathToUri(enclosingDir, path);
   char *c1 = malloc(strlen(absPath) + 1), *c2 = malloc(strlen(absPath) + 1);
   if (c1 == 0 || c2 == 0) return false;
   strcpy(c1, absPath);
@@ -928,15 +910,11 @@ bool vmPathBits(char* enclosingDir, Token path) {
   char* dir = dirname(c1);
   char* base = basename(c2);
 
-  vmPop();
-
   ObjString* objDirName = intern(dir);
   vmPush(OBJ_VAL(objDirName));
   ObjString* objBaseName = intern(base);
   vmPush(OBJ_VAL(objBaseName));
-  ObjString* objAbsPath = intern(absPath);
-  vmPush(OBJ_VAL(objAbsPath));
-  char* source = readFile(objAbsPath->chars);
+  char* source = readFile(absPath);
   ObjString* objSource = intern(source);
   vmPush(OBJ_VAL(objSource));
 
@@ -946,79 +924,39 @@ bool vmPathBits(char* enclosingDir, Token path) {
   return true;
 }
 
-AstNode* vmCompileModuleImportBody(NodeCompiler* cmp, char* enclosingDir,
-                                   Token path) {
+AstNode* vmCompileModuleNode(char* enclosingDir, char* path) {
   if (!vmPathBits(enclosingDir, path)) return NULL;
 
-  ObjString* objDirName = AS_STRING(vmPeek(3));
-  ObjString* objBaseName = AS_STRING(vmPeek(2));
+  ObjString* objDirName = AS_STRING(vmPeek(2));
+  ObjString* objBaseName = AS_STRING(vmPeek(1));
   ObjString* objSource = AS_STRING(vmPeek(0));
 
-  AstNode* module = newModuleNode(objDirName, objBaseName, objSource);
-  compileModuleImportBody(cmp, module);
+  AstNode* moduleNode = compileModuleNode(objDirName, objBaseName, objSource);
 
   vmPop();  // objSource.
-  vmPop();  // objAbsPath.
   vmPop();  // objBaseName.
   vmPop();  // objDirName.
 
-  return module;
+  return moduleNode;
 }
 
-ObjModule* vmCompileModule(char* enclosingDir, Token path) {
-  if (!vmPathBits(enclosingDir, path)) return NULL;
-
-  ObjString* objDirName = AS_STRING(vmPeek(3));
-  ObjString* objBaseName = AS_STRING(vmPeek(2));
-  ObjString* objAbsPath = AS_STRING(vmPeek(1));
-  ObjString* objSource = AS_STRING(vmPeek(0));
-
-  ObjModule* module = newModule(objDirName, objBaseName, objSource);
-  vmPush(OBJ_VAL(module));
-
-  ObjClosure* closure = vmCompileClosure(syntheticToken(objAbsPath->chars),
-                                         objSource->chars, module);
-  if (closure == NULL) return NULL;
-
-  module->closure = closure;
-
-  vmPop();  // module.
-  vmPop();  // objAbsPath.
-  vmPop();  // objSource.
-  vmPop();  // objBaseName.
-  vmPop();  // objDirName.
-
-  return module;
+ObjModule* vmCompileModule(char* enclosingDir, char* path) {
+  AstNode* moduleNode = vmCompileModuleNode(enclosingDir, path);
+  return toModule(moduleNode);
 }
 
 // Entrypoints.
 
-InterpretResult vmInterpretExpr(char* path, char* expr) {
-  Token tokPath = syntheticToken(path);
-  ObjClosure* closure = vmCompileClosure(tokPath, expr, NULL);
-
-  if (closure == NULL) return INTERPRET_COMPILE_ERROR;
-
-  vmPush(OBJ_VAL(closure));
-  if (!callClosure(closure, 0)) return INTERPRET_RUNTIME_ERROR;
-
-  return vmExecute(vm.frameCount - 1);
-}
-
-InterpretResult vmExecuteModule(ObjModule* module) {
-  if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
-
-  return vmExecute(vm.frameCount - 1);
-}
-
 InterpretResult vmInterpretEntrypoint(char* path) {
-  ObjModule* module = vmCompileModule(NULL, syntheticToken(path));
+  ObjModule* module = vmCompileModule(NULL, path);
 
   if (module == NULL) return INTERPRET_COMPILE_ERROR;
 
   vmPush(OBJ_VAL(module));
   vm.module = module;
-  return vmExecuteModule(module);
+  if (!callModule(module)) return INTERPRET_RUNTIME_ERROR;
+
+  return vmExecute(vm.frameCount - 1);
 }
 
 // Wasm api.

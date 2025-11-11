@@ -15,11 +15,12 @@
  * Node compilation.
  * ============================================================ */
 
-AstNode* compile(Token name, char* source) {
-  ObjString* objName = tokenString(name);
-  vmPush(OBJ_VAL(objName));
-  AstNode* node = compileFunctionNode(objName, source, NULL);
-  vmPop();
+AstNode* compile(char* source) {
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  module->as.module.source = intern(source);
+  module->as.module.dirName = intern("unit");
+  module->as.module.baseName = intern("test");
+  AstNode* node = compileFunctionNode(module);
   return node;
 }
 
@@ -36,9 +37,9 @@ bool assertNodesEqual(AstNode* a, AstNode* b) {
   return true;
 }
 
-AstNode* mkFunction(Token name) {
+AstNode* mkFunction() {
   AstNode* fn = newFunctionNode(NULL);
-  fn->as.function.name = tokenString(name);
+  fn->as.function.name = intern("f");
   fn->as.function.signature = newSignatureNode();
   fn->as.function.body = newBlockNode();
   return fn;
@@ -55,10 +56,9 @@ static AstNode* getBodyStmt(AstNode* fn, int index) {
 }
 
 bool testLiteralNumberNode() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "1");
+  AstNode* node = compile("1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* literal = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* exprStmt = newExprStmtNode(literal);
   pushFnStmt(fn, exprStmt);
@@ -70,10 +70,9 @@ bool testLiteralNumberNode() {
 }
 
 bool testLiteralBooleanTrue() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "true");
+  AstNode* node = compile("true");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* literal = newLiteralValueNode(BOOL_VAL(true));
   AstNode* exprStmt = newExprStmtNode(literal);
   pushFnStmt(fn, exprStmt);
@@ -85,10 +84,9 @@ bool testLiteralBooleanTrue() {
 }
 
 bool testLiteralBooleanFalse() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "false");
+  AstNode* node = compile("false");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* literal = newLiteralValueNode(BOOL_VAL(false));
   AstNode* exprStmt = newExprStmtNode(literal);
   pushFnStmt(fn, exprStmt);
@@ -100,14 +98,13 @@ bool testLiteralBooleanFalse() {
 }
 
 bool testCallNode0Args() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "f()");
+  AstNode* node = compile("f()");
 
   AstNode* var = newVarGlobalNode();
   var->as.global.name = intern("f");
   AstNode* call = newCallNode(var);
   AstNode* exprStmt = newExprStmtNode(call);
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -117,14 +114,13 @@ bool testCallNode0Args() {
 }
 
 bool testCallNode1Args() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "f(1)");
+  AstNode* node = compile("f(1)");
 
   AstNode* f = newVarGlobalNode();
   f->as.global.name = intern("f");
   AstNode* call = newCallNode(f);
   AstNode* exprStmt = newExprStmtNode(call);
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   pushAstVec(&call->as.call.args, newLiteralValueNode(NUMBER_VAL(1)));
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
@@ -135,8 +131,7 @@ bool testCallNode1Args() {
 }
 
 bool testCallInfixNode() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "1 + 2");
+  AstNode* node = compile("1 + 2");
 
   AstNode* inf = newVarGlobalNode();
   inf->as.global.name = intern("+");
@@ -144,7 +139,7 @@ bool testCallInfixNode() {
   AstNode* rhs = newLiteralValueNode(NUMBER_VAL(2));
   AstNode* call = newCallInfixNode(inf, lhs, rhs);
   AstNode* exprStmt = newExprStmtNode(call);
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -154,8 +149,7 @@ bool testCallInfixNode() {
 }
 
 bool testCallInfixNodeLeftNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "1 + 2 + 3");
+  AstNode* node = compile("1 + 2 + 3");
 
   AstNode* plusOp1 = newVarGlobalNode();
   plusOp1->as.global.name = intern("+");
@@ -168,7 +162,7 @@ bool testCallInfixNodeLeftNested() {
   AstNode* call =
       newCallInfixNode(plusOp2, callLeft, newLiteralValueNode(NUMBER_VAL(3)));
   AstNode* exprStmt = newExprStmtNode(call);
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -178,8 +172,7 @@ bool testCallInfixNodeLeftNested() {
 }
 
 bool testCallInfixNodeRightNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "1 + (2 + 3)");
+  AstNode* node = compile("1 + (2 + 3)");
 
   AstNode* plusOp1 = newVarGlobalNode();
   plusOp1->as.global.name = intern("+");
@@ -192,7 +185,7 @@ bool testCallInfixNodeRightNested() {
   AstNode* call =
       newCallInfixNode(plusOp2, newLiteralValueNode(NUMBER_VAL(1)), callRight);
   AstNode* exprStmt = newExprStmtNode(call);
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -202,8 +195,7 @@ bool testCallInfixNodeRightNested() {
 }
 
 bool testFunctionNode() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "let f = () => 1");
+  AstNode* node = compile("let f = () => 1");
 
   AstNode* f = newFunctionNode(NULL);
   f->as.function.name = intern("f");
@@ -215,7 +207,7 @@ bool testFunctionNode() {
   fLocal->as.local.name = objLetName;
   AstNode* let = newDeclLetNode(fLocal, f);
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   pushFnStmt(fn, let);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
   AstNode* returnStmt = newReturnNode(nil);
@@ -229,10 +221,9 @@ bool testFunctionNode() {
  * ============================================================ */
 
 bool testStringLiteral() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "\"hello\"");
+  AstNode* node = compile("\"hello\"");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* literal = newLiteralNode();
   ObjString* str = intern("hello");
   literal->as.literal.value = OBJ_VAL(str);
@@ -246,10 +237,9 @@ bool testStringLiteral() {
 }
 
 bool testStringEmpty() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "\"\"");
+  AstNode* node = compile("\"\"");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* literal = newLiteralNode();
   ObjString* str = intern("");
   literal->as.literal.value = OBJ_VAL(str);
@@ -267,10 +257,9 @@ bool testStringEmpty() {
  * ============================================================ */
 
 bool testIfSimple() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (true) 1");
+  AstNode* node = compile("if (true) 1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newLiteralValueNode(BOOL_VAL(true));
   AstNode* then = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(1)));
   AstNode* ifNode = newIfNode(cond, then, NULL);
@@ -283,10 +272,9 @@ bool testIfSimple() {
 }
 
 bool testIfElse() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (x) 1 else 2");
+  AstNode* node = compile("if (x) 1 else 2");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("x");
   AstNode* then = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(1)));
@@ -301,10 +289,9 @@ bool testIfElse() {
 }
 
 bool testIfBlock() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (x) { let y = 1 }");
+  AstNode* node = compile("if (x) { let y = 1 }");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("x");
   AstNode* block = newBlockNode();
@@ -324,10 +311,9 @@ bool testIfBlock() {
 }
 
 bool testIfElseBlock() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (x) { 1 } else { 2 }");
+  AstNode* node = compile("if (x) { 1 } else { 2 }");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("x");
   AstNode* thenBlock = newBlockNode();
@@ -346,10 +332,9 @@ bool testIfElseBlock() {
 }
 
 bool testIfNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (a) if (b) 1 else 2");
+  AstNode* node = compile("if (a) if (b) 1 else 2");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* outerCond = newVarGlobalNode();
   outerCond->as.global.name = intern("a");
   AstNode* innerCond = newVarGlobalNode();
@@ -367,10 +352,9 @@ bool testIfNested() {
 }
 
 bool testIfElseIf() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (a) 1 else if (b) 2 else 3");
+  AstNode* node = compile("if (a) 1 else if (b) 2 else 3");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("a");
   AstNode* then = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(1)));
@@ -389,10 +373,9 @@ bool testIfElseIf() {
 }
 
 bool testIfComplexCondition() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (1 + 2) 1");
+  AstNode* node = compile("if (1 + 2) 1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* op = newVarGlobalNode();
   op->as.global.name = intern("+");
   AstNode* lhs = newLiteralValueNode(NUMBER_VAL(1));
@@ -409,10 +392,9 @@ bool testIfComplexCondition() {
 }
 
 bool testWhileSimple() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "while (true) 1");
+  AstNode* node = compile("while (true) 1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newLiteralValueNode(BOOL_VAL(true));
   AstNode* body = newExprStmtNode(newLiteralValueNode(NUMBER_VAL(1)));
   AstNode* whileNode = newWhileNode(cond, body);
@@ -425,10 +407,9 @@ bool testWhileSimple() {
 }
 
 bool testWhileBlock() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "while (x) { let y = 1 }");
+  AstNode* node = compile("while (x) { let y = 1 }");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("x");
   AstNode* block = newBlockNode();
@@ -448,10 +429,9 @@ bool testWhileBlock() {
 }
 
 bool testWhileComplexCondition() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "while (1 + 2) 1");
+  AstNode* node = compile("while (1 + 2) 1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* op = newVarGlobalNode();
   op->as.global.name = intern("+");
   AstNode* lhs = newLiteralValueNode(NUMBER_VAL(1));
@@ -468,10 +448,9 @@ bool testWhileComplexCondition() {
 }
 
 bool testWhileNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "while (a) while (b) 1");
+  AstNode* node = compile("while (a) while (b) 1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* outerCond = newVarGlobalNode();
   outerCond->as.global.name = intern("a");
   AstNode* innerCond = newVarGlobalNode();
@@ -488,12 +467,11 @@ bool testWhileNested() {
 }
 
 bool testForSimple() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "for (let i = 0; i < 10; i = i + 1) i");
+  AstNode* node = compile("for (let i = 0; i < 10; i = i + 1) i");
 
   ObjString* iName = intern("i");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   AstNode* initValue = newLiteralValueNode(NUMBER_VAL(0));
   AstNode* initLocal = newVarLocalNode(1);
@@ -533,13 +511,11 @@ bool testForSimple() {
 }
 
 bool testForComplexExpressions() {
-  Token name = syntheticToken("test");
-  AstNode* node =
-      compile(name, "for (let i = f(1 + 2); g(h()); i = i + k(3)) i");
+  AstNode* node = compile("for (let i = f(1 + 2); g(h()); i = i + k(3)) i");
 
   ObjString* iName = intern("i");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   AstNode* plusOp = newVarGlobalNode();
   plusOp->as.global.name = intern("+");
@@ -597,10 +573,9 @@ bool testForComplexExpressions() {
 }
 
 bool testForNoInitializer() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "for (; x < 5; x = x + 1) x");
+  AstNode* node = compile("for (; x < 5; x = x + 1) x");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   ObjString* xName = intern("x");
 
@@ -637,12 +612,11 @@ bool testForNoInitializer() {
 }
 
 bool testForNoIncrement() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "for (let i = 0; i < 5;) i");
+  AstNode* node = compile("for (let i = 0; i < 5;) i");
 
   ObjString* iName = intern("i");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   AstNode* initLocal = newVarLocalNode(1);
   initLocal->as.local.name = iName;
@@ -671,14 +645,12 @@ bool testForNoIncrement() {
 }
 
 bool testForBlockBody() {
-  Token name = syntheticToken("test");
-  AstNode* node =
-      compile(name, "for (let i = 0; i < 1; i = i + 1) { let y = i }");
+  AstNode* node = compile("for (let i = 0; i < 1; i = i + 1) { let y = i }");
 
   ObjString* iName = intern("i");
   ObjString* yName = intern("y");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   AstNode* initLocal = newVarLocalNode(1);
   initLocal->as.local.name = iName;
@@ -722,12 +694,11 @@ bool testForBlockBody() {
 }
 
 bool testForIterSimple() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "for (x in (1, 2)) x");
+  AstNode* node = compile("for (x in (1, 2)) x");
 
   ObjString* xName = intern("x");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   AstNode* var = newVarLocalNode(1);
   var->as.local.name = xName;
@@ -756,10 +727,9 @@ bool testForIterSimple() {
  * ============================================================ */
 
 bool testThrowGlobal() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "throw error");
+  AstNode* node = compile("throw error");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* errorVar = newVarGlobalNode();
   errorVar->as.global.name = intern("error");
   AstNode* throwNode = newThrowNode(errorVar);
@@ -772,10 +742,9 @@ bool testThrowGlobal() {
 }
 
 bool testThrowCall() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "throw Error(1)");
+  AstNode* node = compile("throw Error(1)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* errorVar = newVarGlobalNode();
   errorVar->as.global.name = intern("Error");
   AstNode* call = newCallNode(errorVar);
@@ -791,10 +760,9 @@ bool testThrowCall() {
 }
 
 bool testThrowInfix() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "throw 1 + 2");
+  AstNode* node = compile("throw 1 + 2");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* op = newVarGlobalNode();
   op->as.global.name = intern("+");
   AstNode* lhs = newLiteralValueNode(NUMBER_VAL(1));
@@ -810,10 +778,9 @@ bool testThrowInfix() {
 }
 
 bool testThrowInBlock() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "{ throw error }");
+  AstNode* node = compile("{ throw error }");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* block = newBlockNode();
   AstNode* errorVar = newVarGlobalNode();
   errorVar->as.global.name = intern("error");
@@ -828,10 +795,9 @@ bool testThrowInBlock() {
 }
 
 bool testThrowInConditional() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "if (x) throw error");
+  AstNode* node = compile("if (x) throw error");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* cond = newVarGlobalNode();
   cond->as.global.name = intern("x");
   AstNode* errorVar = newVarGlobalNode();
@@ -851,10 +817,9 @@ bool testThrowInConditional() {
  * ============================================================ */
 
 bool testAssignmentGlobal() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "x = 1");
+  AstNode* node = compile("x = 1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* var = newVarGlobalNode();
   var->as.global.name = intern("x");
   AstNode* literal = newLiteralValueNode(NUMBER_VAL(1));
@@ -869,10 +834,9 @@ bool testAssignmentGlobal() {
 }
 
 bool testAssignmentLocal() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "let x \n x = 1");
+  AstNode* node = compile("let x \n x = 1");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   ObjString* xName = intern("x");
   AstNode* xLocal = newVarLocalNode(1);
   xLocal->as.local.name = xName;
@@ -893,10 +857,9 @@ bool testAssignmentLocal() {
 }
 
 bool testAssignmentWithExpression() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "x = 1 + 2");
+  AstNode* node = compile("x = 1 + 2");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* var = newVarGlobalNode();
   var->as.global.name = intern("x");
   AstNode* op = newVarGlobalNode();
@@ -915,10 +878,9 @@ bool testAssignmentWithExpression() {
 }
 
 bool testAssignmentWithCall() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "x = f()");
+  AstNode* node = compile("x = f()");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* var = newVarGlobalNode();
   var->as.global.name = intern("x");
   AstNode* callee = newVarGlobalNode();
@@ -935,10 +897,9 @@ bool testAssignmentWithCall() {
 }
 
 bool testAssignmentNestedExpression() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "x = (1 + 2) + 3");
+  AstNode* node = compile("x = (1 + 2) + 3");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* var = newVarGlobalNode();
   var->as.global.name = intern("x");
 
@@ -965,10 +926,9 @@ bool testAssignmentNestedExpression() {
 }
 
 bool testAssignmentBooleanValue() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "x = true");
+  AstNode* node = compile("x = true");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* var = newVarGlobalNode();
   var->as.global.name = intern("x");
   AstNode* literal = newLiteralValueNode(BOOL_VAL(true));
@@ -983,10 +943,9 @@ bool testAssignmentBooleanValue() {
 }
 
 bool testAssignmentInBlock() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "{ x = 1 }");
+  AstNode* node = compile("{ x = 1 }");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* block = newBlockNode();
   AstNode* var = newVarGlobalNode();
   var->as.global.name = intern("x");
@@ -1003,10 +962,9 @@ bool testAssignmentInBlock() {
 }
 
 bool testMultipleAssignments() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "x = 1 \n y = 2");
+  AstNode* node = compile("x = 1 \n y = 2");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   // x = 1
   AstNode* var1 = newVarGlobalNode();
@@ -1032,10 +990,9 @@ bool testMultipleAssignments() {
 }
 
 bool testAssignmentReassignment() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "x = 1 \n x = 2");
+  AstNode* node = compile("x = 1 \n x = 2");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   // x = 1
   AstNode* var1 = newVarGlobalNode();
@@ -1061,8 +1018,7 @@ bool testAssignmentReassignment() {
 }
 
 bool testLineColSimpleAssignment() {
-  Token name = syntheticToken("test");
-  AstNode* fn = compile(name, "x = 1");
+  AstNode* fn = compile("x = 1");
   AstNode* exprStmt = getBodyStmt(fn, 0);
   if (exprStmt == NULL) return false;
 
@@ -1078,8 +1034,7 @@ bool testLineColSimpleAssignment() {
 }
 
 bool testLineColMultiLineAssignment() {
-  Token name = syntheticToken("test");
-  AstNode* fn = compile(name, "x = 1\n  y = 2");
+  AstNode* fn = compile("x = 1\n  y = 2");
   AstNode* stmt0 = getBodyStmt(fn, 0);
   AstNode* stmt1 = getBodyStmt(fn, 1);
   if (stmt0 == NULL || stmt1 == NULL) return false;
@@ -1097,8 +1052,7 @@ bool testLineColMultiLineAssignment() {
 }
 
 bool testLineColLeadingBlankLines() {
-  Token name = syntheticToken("test");
-  AstNode* fn = compile(name, "\n\n  x = 1");
+  AstNode* fn = compile("\n\n  x = 1");
   AstNode* stmt = getBodyStmt(fn, 0);
   if (stmt == NULL) return false;
 
@@ -2162,10 +2116,9 @@ bool testBytecodeThrowInConditional() {
  * ============================================================ */
 
 bool testSequenceEmpty() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "(,)");
+  AstNode* node = compile("(,)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* seq = newSequenceNode();
   AstNode* exprStmt = newExprStmtNode(seq);
   pushFnStmt(fn, exprStmt);
@@ -2177,10 +2130,9 @@ bool testSequenceEmpty() {
 }
 
 bool testSequenceOneElement() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "(1,)");
+  AstNode* node = compile("(1,)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* seq = newSequenceNode();
   pushAstVec(&seq->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
   AstNode* exprStmt = newExprStmtNode(seq);
@@ -2193,10 +2145,9 @@ bool testSequenceOneElement() {
 }
 
 bool testSequenceTwoElements() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "(1, 2)");
+  AstNode* node = compile("(1, 2)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* seq = newSequenceNode();
   pushAstVec(&seq->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&seq->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
@@ -2210,10 +2161,9 @@ bool testSequenceTwoElements() {
 }
 
 bool testSequenceThreeElements() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "(1, 2, 3)");
+  AstNode* node = compile("(1, 2, 3)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* seq = newSequenceNode();
   pushAstVec(&seq->as.sequence.values, newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&seq->as.sequence.values, newLiteralValueNode(NUMBER_VAL(2)));
@@ -2228,10 +2178,9 @@ bool testSequenceThreeElements() {
 }
 
 bool testSequenceVariables() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "(x, y)");
+  AstNode* node = compile("(x, y)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* seq = newSequenceNode();
   AstNode* xVar = newVarGlobalNode();
   xVar->as.global.name = intern("x");
@@ -2249,10 +2198,9 @@ bool testSequenceVariables() {
 }
 
 bool testSequenceComplexExpression() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "(1 + 2, f(3), x)");
+  AstNode* node = compile("(1 + 2, f(3), x)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* seq = newSequenceNode();
 
   // 1 + 2
@@ -2285,10 +2233,9 @@ bool testSequenceComplexExpression() {
 }
 
 bool testSequenceNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "((1, 2), 3)");
+  AstNode* node = compile("((1, 2), 3)");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   // inner sequence (1, 2)
   AstNode* innerSeq = newSequenceNode();
@@ -2310,10 +2257,9 @@ bool testSequenceNested() {
 }
 
 bool testSequenceInCall() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "f((1, 2))");
+  AstNode* node = compile("f((1, 2))");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* callee = newVarGlobalNode();
   callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
@@ -2337,10 +2283,9 @@ bool testSequenceInCall() {
  * ============================================================ */
 
 bool testSetOneElement() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({1})");
+  AstNode* node = compile("({1})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* set = newSetNode();
   pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
   AstNode* exprStmt = newExprStmtNode(set);
@@ -2353,10 +2298,9 @@ bool testSetOneElement() {
 }
 
 bool testSetTwoElements() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({1, 2})");
+  AstNode* node = compile("({1, 2})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* set = newSetNode();
   pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(1)));
   pushAstVec(&set->as.set.values, newLiteralValueNode(NUMBER_VAL(2)));
@@ -2370,10 +2314,9 @@ bool testSetTwoElements() {
 }
 
 bool testSetVariables() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({x, y})");
+  AstNode* node = compile("({x, y})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* set = newSetNode();
   AstNode* xVar = newVarGlobalNode();
   xVar->as.global.name = intern("x");
@@ -2391,10 +2334,9 @@ bool testSetVariables() {
 }
 
 bool testSetComplexExpression() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({1 + 2, f(3), x})");
+  AstNode* node = compile("({1 + 2, f(3), x})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* set = newSetNode();
 
   AstNode* plusOp = newVarGlobalNode();
@@ -2424,10 +2366,9 @@ bool testSetComplexExpression() {
 }
 
 bool testSetNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({{1}, {2}})");
+  AstNode* node = compile("({{1}, {2}})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* outer = newSetNode();
 
   AstNode* inner1 = newSetNode();
@@ -2448,10 +2389,9 @@ bool testSetNested() {
 }
 
 bool testSetInCall() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "f({1, 2})");
+  AstNode* node = compile("f({1, 2})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* callee = newVarGlobalNode();
   callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
@@ -2471,10 +2411,9 @@ bool testSetInCall() {
 }
 
 bool testSubscriptGet() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "arr[1]");
+  AstNode* actual = compile("arr[1]");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
   AstNode* arr = newVarGlobalNode();
   arr->as.global.name = intern("arr");
   AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
@@ -2489,10 +2428,9 @@ bool testSubscriptGet() {
 }
 
 bool testSubscriptSet() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "arr[foo[0]] = seq[1]");
+  AstNode* actual = compile("arr[foo[0]] = seq[1]");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* arr = newVarGlobalNode();
   arr->as.global.name = intern("arr");
@@ -2518,10 +2456,9 @@ bool testSubscriptSet() {
 }
 
 bool testSubscriptNested() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "meta[0][1]");
+  AstNode* actual = compile("meta[0][1]");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* meta = newVarGlobalNode();
   meta->as.global.name = intern("meta");
@@ -2540,10 +2477,9 @@ bool testSubscriptNested() {
 }
 
 bool testPropertyGet() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "obj.foo");
+  AstNode* actual = compile("obj.foo");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
   AstNode* obj = newVarGlobalNode();
   obj->as.global.name = intern("obj");
   AstNode* prop = newPropertyGetNode(obj);
@@ -2558,10 +2494,9 @@ bool testPropertyGet() {
 }
 
 bool testPropertySet() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "obj.foo = 42");
+  AstNode* actual = compile("obj.foo = 42");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
   AstNode* obj = newVarGlobalNode();
   obj->as.global.name = intern("obj");
   AstNode* value = newLiteralValueNode(NUMBER_VAL(42));
@@ -2577,10 +2512,9 @@ bool testPropertySet() {
 }
 
 bool testPropertyNested() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "obj.foo.bar");
+  AstNode* actual = compile("obj.foo.bar");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
   AstNode* obj = newVarGlobalNode();
   obj->as.global.name = intern("obj");
   AstNode* first = newPropertyGetNode(obj);
@@ -2597,10 +2531,9 @@ bool testPropertyNested() {
 }
 
 bool testPropertyNestedAssignment() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "obj.foo.bar = 99");
+  AstNode* actual = compile("obj.foo.bar = 99");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
   AstNode* obj = newVarGlobalNode();
   obj->as.global.name = intern("obj");
   AstNode* first = newPropertyGetNode(obj);
@@ -2636,10 +2569,9 @@ static AstNode* wrapComprehensionInClosure(AstNode* comp) {
 }
 
 bool testSequenceComprehension() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "(x | x in (1,2), x != 2)");
+  AstNode* actual = compile("(x | x in (1,2), x != 2)");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQ);
@@ -2671,10 +2603,9 @@ bool testSequenceComprehension() {
 }
 
 bool testSetComprehensionParse() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "({x | x in (1,2), x != 2})");
+  AstNode* actual = compile("({x | x in (1,2), x != 2})");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SET);
@@ -2706,10 +2637,9 @@ bool testSetComprehensionParse() {
 }
 
 bool testSetComprehensionComplexBody() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "({x + 1 | x in (1,2)})");
+  AstNode* actual = compile("({x + 1 | x in (1,2)})");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* plusOp = newVarGlobalNode();
   plusOp->as.global.name = intern("+");
@@ -2737,10 +2667,9 @@ bool testSetComprehensionComplexBody() {
 }
 
 bool testSetComprehensionNestedBody() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "({{x + 1 | x in y} | y in (1,2,3)})");
+  AstNode* actual = compile("({{x + 1 | x in y} | y in (1,2,3)})");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* innerPlus = newVarGlobalNode();
   innerPlus->as.global.name = intern("+");
@@ -2782,9 +2711,8 @@ bool testSetComprehensionNestedBody() {
 }
 
 bool testSetComprehensionNestedCondition() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "({x | x in {y | y in (1,2)}})");
-  AstNode* expected = mkFunction(name);
+  AstNode* actual = compile("({x | x in {y | y in (1,2)}})");
+  AstNode* expected = mkFunction();
 
   AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SET);
@@ -2818,10 +2746,9 @@ bool testSetComprehensionNestedCondition() {
 }
 
 bool testSetComprehensionFunctionBody() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "({() => 1 | true})");
+  AstNode* actual = compile("({() => 1 | true})");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* fnExpr = newFunctionNode(NULL);
   fnExpr->as.function.signature = newSignatureNode();
@@ -2844,10 +2771,9 @@ bool testSetComprehensionFunctionBody() {
 }
 
 bool testSequenceComprehensionComplexBody() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "(x + 1 | x in (1,2))");
+  AstNode* actual = compile("(x + 1 | x in (1,2))");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* plusOp = newVarGlobalNode();
   plusOp->as.global.name = intern("+");
@@ -2875,10 +2801,9 @@ bool testSequenceComprehensionComplexBody() {
 }
 
 bool testSequenceComprehensionNestedBody() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "((y | y in (1,2)) | x in (1,2))");
+  AstNode* actual = compile("((y | y in (1,2)) | x in (1,2))");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* innerBody = comprehensionLocal(2, "y");
   AstNode* innerComp = newComprehensionNode(innerBody, COMPREHENSION_SEQ);
@@ -2916,10 +2841,9 @@ bool testSequenceComprehensionNestedBody() {
 }
 
 bool testSequenceComprehensionNestedCondition() {
-  Token name = syntheticToken("test");
-  AstNode* actual = compile(name, "(x | x in (y | y in (1,2)))");
+  AstNode* actual = compile("(x | x in (y | y in (1,2)))");
 
-  AstNode* expected = mkFunction(name);
+  AstNode* expected = mkFunction();
 
   AstNode* body = comprehensionLocal(2, "x");
   AstNode* comp = newComprehensionNode(body, COMPREHENSION_SEQ);
@@ -2957,10 +2881,9 @@ bool testSequenceComprehensionNestedCondition() {
  * ============================================================ */
 
 bool testObjectEmpty() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({})");
+  AstNode* node = compile("({})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* obj = newObjectNode();
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
@@ -2972,10 +2895,9 @@ bool testObjectEmpty() {
 }
 
 bool testObjectOneProperty() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({\"x\": 1})");
+  AstNode* node = compile("({\"x\": 1})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* obj = newObjectNode();
   AstNode* keyLiteral = newLiteralNode();
   ObjString* keyX = intern("x");
@@ -2993,10 +2915,9 @@ bool testObjectOneProperty() {
 }
 
 bool testObjectMultipleProperties() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({\"x\": 1, \"y\": 2, \"z\": 3})");
+  AstNode* node = compile("({\"x\": 1, \"y\": 2, \"z\": 3})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* obj = newObjectNode();
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));
@@ -3020,10 +2941,9 @@ bool testObjectMultipleProperties() {
 }
 
 bool testObjectIdentifierKey() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({key: value})");
+  AstNode* node = compile("({key: value})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* obj = newObjectNode();
   AstNode* key = newVarGlobalNode();
   key->as.global.name = intern("key");
@@ -3040,10 +2960,9 @@ bool testObjectIdentifierKey() {
 }
 
 bool testObjectComplexValues() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({\"x\": 1 + 2, \"y\": f()})");
+  AstNode* node = compile("({\"x\": 1 + 2, \"y\": f()})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* obj = newObjectNode();
 
   AstNode* plusOp = newVarGlobalNode();
@@ -3072,10 +2991,9 @@ bool testObjectComplexValues() {
 }
 
 bool testObjectNested() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({\"outer\": {\"inner\": 1}})");
+  AstNode* node = compile("({\"outer\": {\"inner\": 1}})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
 
   AstNode* innerObj = newObjectNode();
   AstNode* keyInner = newLiteralNode();
@@ -3099,10 +3017,9 @@ bool testObjectNested() {
 }
 
 bool testObjectInExpression() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "f({\"x\": 1})");
+  AstNode* node = compile("f({\"x\": 1})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* callee = newVarGlobalNode();
   callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
@@ -3124,10 +3041,9 @@ bool testObjectInExpression() {
 }
 
 bool testObjectTrailingComma() {
-  Token name = syntheticToken("test");
-  AstNode* node = compile(name, "({\"x\": 1,})");
+  AstNode* node = compile("({\"x\": 1,})");
 
-  AstNode* fn = mkFunction(name);
+  AstNode* fn = mkFunction();
   AstNode* obj = newObjectNode();
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));

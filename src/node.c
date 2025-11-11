@@ -232,7 +232,7 @@ AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
   n->as.module.dirName = dirName;
   n->as.module.baseName = baseName;
   n->as.module.source = source;
-  initAstVec(&n->as.module.stmts);
+  n->as.module.fn = NULL;
   return n;
 }
 
@@ -498,7 +498,7 @@ void printNodeAt(AstNode* node, int depth) {
     }
     case AST_MODULE:
       printStrAt("Module\n", depth);
-      printNodeVecAt(&node->as.module.stmts, depth + 1);
+      printNodeAt(node->as.module.fn, depth + 1);
       break;
 
     case AST_PARAM:
@@ -672,7 +672,7 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_MODULE:
       return a->as.module.dirName == b->as.module.dirName &&
              a->as.module.baseName == b->as.module.baseName &&
-             astVecsEqual(&a->as.module.stmts, &b->as.module.stmts);
+             nodesEqual(a->as.module.fn, b->as.module.fn);
 
     case AST_PARAM:
       return a->as.param.name == b->as.param.name;
@@ -1110,7 +1110,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_MODULE:
-      if (!toChunkVec(&node->as.module.stmts, chunk)) return false;
+      if (!toChunk(node->as.module.fn, chunk)) return false;
       break;
     case AST_PARAM:
       break;
@@ -1259,6 +1259,21 @@ ObjFunction* toFunction(AstNode* node) {
   return fn;
 }
 
+ObjModule* toModule(AstNode* node) {
+  ObjModule* module =
+      newModule(node->as.module.dirName, node->as.module.baseName,
+                node->as.module.source);
+  vmPush(OBJ_VAL(module));
+  ObjFunction* fn = toFunction(node->as.module.fn);
+  vmPush(OBJ_VAL(fn));
+  ObjClosure* closure = newClosure(fn);
+  fn->module = module;
+  module->closure = closure;
+  vmPop();  // function.
+  vmPop();  // module.
+  return module;
+}
+
 // memory.
 // ============================================================
 
@@ -1358,9 +1373,7 @@ void markAstNode(AstNode* n) {
       markObject((Obj*)n->as.module.dirName);
       markObject((Obj*)n->as.module.baseName);
       markObject((Obj*)n->as.module.source);
-      for (int i = 0; i < n->as.module.stmts.count; i++) {
-        markAstNode((AstNode*)n->as.module.stmts.items[i]);
-      }
+      markAstNode(n->as.module.fn);
       break;
     }
     case AST_PARAM:
@@ -1490,7 +1503,6 @@ void freeAstNode(AstNode* n) {
     case AST_DECL_GLOBAL:
       break;
     case AST_MODULE:
-      freeAstVec(&n->as.module.stmts);
       break;
     case AST_PARAM:
       break;
