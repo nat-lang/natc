@@ -1116,20 +1116,6 @@ bool testLineColLeadingBlankLines() {
  * Node GC.
  * ============================================================ */
 
-bool testAstGC() {
-  Value litVal = NUMBER_VAL(42);
-  AstNode* lit = newLiteralValueNode(litVal);
-  AstNode* ret = newReturnNode(lit);
-  ObjAst* wrapper = newObjAst(ret);
-  Value rootVal = OBJ_VAL(wrapper);
-
-  vmPush(rootVal);
-  collectGarbage();
-  vmPop();
-
-  return wrapper->node == ret;
-}
-
 /* ============================================================
  * Bytecode (AST -> Chunk) helpers and tests.
  * ============================================================ */
@@ -4173,7 +4159,6 @@ int testMain(void) {
   fmt("    ", testObjectTrailingComma(), "Object trailing comma");
 
   printf("  Memory\n");
-  fmt("    ", testAstGC(), "Literal Number - Marked on stack");
 
   printf("  Bytecode\n");
   fmt("    ", testBytecodeCall0Args(), "Call (0 args) callee+OP_CALL");

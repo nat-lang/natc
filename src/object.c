@@ -29,12 +29,6 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
-ObjAst* newObjAst(AstNode* node) {
-  ObjAst* obj = (ObjAst*)allocateObject(sizeof(ObjAst), OBJ_AST);
-  obj->node = node;
-  return obj;
-}
-
 ObjClosure* newClosure(ObjFunction* function) {
   ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
   for (int i = 0; i < function->upvalueCount; i++) upvalues[i] = NULL;
@@ -375,14 +369,11 @@ void markMap(Map* map) {
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
-    case OBJ_AST: {
-      printf("<ast>");
+    case OBJ_CLOSURE: {
+      ObjClosure* closure = AS_CLOSURE(value);
+      printf("<closure %s at %p>", closure->function->name->chars, closure);
       break;
     }
-    case OBJ_CLOSURE:
-      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
-             AS_CLOSURE(value));
-      break;
     case OBJ_FUNCTION:
       printf("<function %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
@@ -401,7 +392,8 @@ void printObject(Value value) {
       break;
     }
     case OBJ_MODULE:
-      printf("<module %s>", AS_MODULE(value)->closure->function->name->chars);
+      printf("<module %s/%s>", AS_MODULE(value)->dirName->chars,
+             AS_MODULE(value)->baseName->chars);
       break;
     case OBJ_NATIVE:
       printf("<native %s>", AS_NATIVE(value)->name->chars);
