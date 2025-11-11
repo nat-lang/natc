@@ -13,7 +13,9 @@ typedef struct NodeCompiler {
 } NodeCompiler;
 
 void compileModuleImportBody(NodeCompiler* cmp, AstNode* module);
-AstNode* compileFunctionNode(ObjString* name, char* source, AstNode* module);
+AstNode* compileFunctionNode(AstNode* module);
+AstNode* compileModuleNode(ObjString* dirName, ObjString* baseName,
+                           ObjString* source);
 
 void markNodeCompilerRoots(NodeCompiler* cmp);
 
