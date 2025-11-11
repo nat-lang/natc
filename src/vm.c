@@ -787,31 +787,32 @@ InterpretResult vmExecute(int baseFrame) {
         break;
       }
       case OP_PROPERTY_GET: {
-        ObjString* property = READ_STRING();
-        Value obj = vmPop();
+        ObjString* prop = READ_STRING();
+        Value obj = vmPeek(0);
 
         if (!IS_OBJ(obj)) {
           vmRuntimeError("Only objects have properties.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        Value value = NIL_VAL;
-        mapGet(&AS_OBJ(obj)->fields, OBJ_VAL(property), &value);
-        vmPush(value);
+        Value val = NIL_VAL;
+        mapGet(&AS_OBJ(obj)->fields, OBJ_VAL(prop), &val);
+        vmPop();
+        vmPush(val);
         break;
       }
       case OP_PROPERTY_SET: {
-        ObjString* property = READ_STRING();
-        Value value = vmPop();
-        Value obj = vmPop();
+        ObjString* prop = READ_STRING();
+        Value val = vmPeek(0);
+        Value obj = vmPeek(1);
 
         if (!IS_OBJ(obj)) {
           vmRuntimeError("Only objects have properties.");
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        mapSet(&AS_OBJ(obj)->fields, OBJ_VAL(property), value);
-        vmPush(obj);
+        mapSet(&AS_OBJ(obj)->fields, OBJ_VAL(prop), val);
+        vmPop();
         break;
       }
       case OP_SUBSCRIPT_SET: {

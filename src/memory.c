@@ -73,11 +73,6 @@ static void markArray(ValueArray* array) {
   }
 }
 
-static void markObjAST(ObjAst* ast) {
-  if (!ast) return;
-  markAstNode(ast->node);
-}
-
 static void blackenObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
   printf("%p blacken ", (void*)object);
@@ -88,10 +83,6 @@ static void blackenObject(Obj* object) {
   markMap(&object->fields);
 
   switch (object->oType) {
-    case OBJ_AST:
-      markObjAST((ObjAst*)object);
-      break;
-
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
@@ -161,14 +152,12 @@ static void blackenObject(Obj* object) {
 
 static void freeObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
-  printf("%p free type %d\n", (void*)object, object->type);
+  printf("%p free type %d\n", (void*)object, object->oType);
 #endif
 
   freeMap(&object->fields);
 
   switch (object->oType) {
-    case OBJ_AST:
-      break;
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);

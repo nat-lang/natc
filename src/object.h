@@ -44,7 +44,6 @@
 #define INTERN(value) ((OBJ_VAL(intern(value))))
 
 typedef enum {
-  OBJ_AST,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
   OBJ_OVERLOAD,
@@ -77,11 +76,6 @@ struct Obj {
   struct Obj* next;
   Map fields;
 };
-
-typedef struct {
-  Obj obj;
-  AstNode* node;
-} ObjAst;
 
 struct ObjString {
   Obj obj;
@@ -175,7 +169,6 @@ typedef struct {
   ValueArray children;
 } ObjTree;
 
-ObjAst* newObjAst(AstNode* root);
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
 ObjOverload* newOverload(int cases);
