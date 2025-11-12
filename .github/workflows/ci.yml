@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches:
-      - '**'
+      - "**"
 
 jobs:
   matrix:
@@ -17,14 +17,12 @@ jobs:
       - name: Set base dir
         run: |
           echo "NAT_BASE_DIR=${{ github.workspace }}/" >> $GITHUB_ENV
+      - name: Run unit tests
+        run: make unit
       - name: Build
         run: make install
       - name: Run integration tests
         run: make integration
-      - name: Run regression tests
-        run: make regression
-      - name: Run trip tests
-        run: make trip
       - name: Run integration tests against valgrind
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -36,8 +34,8 @@ jobs:
       - name: Stress the garbage collector
         run: |
           sudo make clean
-          make debug-stress-gc
-          make tests
+          make stress-gc
+          make integration
   wasm:
     runs-on: ubuntu-latest
     steps:

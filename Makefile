@@ -49,12 +49,12 @@ trace:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace SOURCE_DIR=src
 
 # Compile the interpreter with an eager garbage collector.
-debug-stress-gc:
+stress-gc:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stress-gc SOURCE_DIR=src
 
 # Compile the interpreter with a verbose garbage collector.
-debug-log-gc:
+log-gc:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
 
