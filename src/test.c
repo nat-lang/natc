@@ -1936,53 +1936,6 @@ bool testBytecodeForSimple() {
 }
 
 /* ============================================================
- * Import Bytecode Tests
- * ============================================================ */
-
-bool testBytecodeImportSimple() {
-  AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module);
-  Chunk c;
-  if (!buildChunkForExpr(importNode, &c)) return false;
-
-  // Import statement compiles the module node, which for an empty module
-  // results in no bytecode (empty statements vector)
-  if (c.count != 0) return false;
-  if (c.constants.count != 0) return false;
-  return true;
-}
-
-bool testBytecodeImportWithAlias() {
-  AstNode* module = newModuleNode(NULL, NULL, NULL);
-  AstNode* importNode = newUseNode(module);
-  importNode->as.use.alias = intern("m");
-  Chunk c;
-  if (!buildChunkForExpr(importNode, &c)) return false;
-
-  // Import statement compiles the module node, which for an empty module
-  // results in no bytecode (empty statements vector)
-  // The alias is stored in the AST but not emitted in bytecode yet
-  if (c.count != 0) return false;
-  if (c.constants.count != 0) return false;
-  return true;
-}
-
-bool testBytecodeImportLongPath() {
-  AstNode* module = newModuleNode(NULL, NULL, NULL);
-  module->as.module.dirName =
-      intern("very/long/path/to/a/module/that/has/many/segments");
-  AstNode* importNode = newUseNode(module);
-  Chunk c;
-  if (!buildChunkForExpr(importNode, &c)) return false;
-
-  // Import statement compiles the module node, which for an empty module
-  // results in no bytecode (empty statements vector)
-  if (c.count != 0) return false;
-  if (c.constants.count != 0) return false;
-  return true;
-}
-
-/* ============================================================
  * Throw Bytecode Tests
  * ============================================================ */
 
@@ -3057,6 +3010,139 @@ bool testObjectTrailingComma() {
   return assertNodesEqual(node, fn);
 }
 
+/* Import parsing test */
+
+AstNode* compileWithImportDir(char* source, char* dirName) {
+  AstNode* module = newModuleNode(NULL, NULL, NULL);
+  module->as.module.source = intern(source);
+  module->as.module.dirName = intern(dirName);
+  module->as.module.baseName = intern("test");
+  AstNode* node = compileFunctionNode(module);
+  return node;
+}
+
+bool testImportParsing() {
+  // Compile the import statement with the correct directory
+  AstNode* node = compileWithImportDir("use export", "test/integration/import");
+
+  // The import should desugar to a block containing:
+  // 1. let __import = call(exportModuleFunction)
+  // 2. let x = __import["x"]
+  // 3. let f = __import["f"]
+
+  // The compiled node is a function node; get its body
+  if (node->type != AST_FUNCTION) {
+    printf("Expected compiled node to be AST_FUNCTION, got type %d\n",
+           node->type);
+    return false;
+  }
+
+  AstNode* body = node->as.function.body;
+  if (body->type != AST_BLOCK) {
+    printf("Expected function body to be AST_BLOCK, got type %d\n", body->type);
+    return false;
+  }
+
+  // The function body should have 2 statements: the import block and the return
+  AstVec* bodyStmts = &body->as.block.stmts;
+  if (bodyStmts->count < 1) {
+    printf("Expected at least 1 statement in function body, got %d\n",
+           bodyStmts->count);
+    return false;
+  }
+
+  // Extract the first statement which should be the import block
+  AstNode* actualFirstStmt = bodyStmts->items[0];
+  if (actualFirstStmt->type != AST_BLOCK) {
+    printf(
+        "Expected first statement to be a block (import desugaring), got type "
+        "%d\n",
+        actualFirstStmt->type);
+    return false;
+  }
+
+  AstVec* blockStmts = &actualFirstStmt->as.block.stmts;
+
+  // Check we have 3 statements in the block:
+  // let __import = ...
+  // let x = ...
+  // let f = ...
+  if (blockStmts->count != 3) {
+    printf("Expected 3 statements in import block, got %d\n",
+           blockStmts->count);
+    return false;
+  }
+
+  // Check first statement: let __import = call(exportModuleFunction)
+  AstNode* importDecl = blockStmts->items[0];
+  if (importDecl->type != AST_DECL_LET) {
+    printf("Expected first statement to be AST_DECL_LET, got type %d\n",
+           importDecl->type);
+    return false;
+  }
+  if (importDecl->as.declLet.local->type != AST_VAR_LOCAL) {
+    printf("Expected import decl local to be AST_VAR_LOCAL\n");
+    return false;
+  }
+  ObjString* importName = importDecl->as.declLet.local->as.local.name;
+  if (strcmp(importName->chars, "__import") != 0) {
+    printf("Expected import local name to be '__import', got '%s'\n",
+           importName->chars);
+    return false;
+  }
+  if (importDecl->as.declLet.value->type != AST_CALL) {
+    printf("Expected import value to be AST_CALL, got type %d\n",
+           importDecl->as.declLet.value->type);
+    return false;
+  }
+
+  // Check second statement: let x = __import["x"]
+  AstNode* xDecl = blockStmts->items[1];
+  if (xDecl->type != AST_DECL_LET) {
+    printf("Expected second statement to be AST_DECL_LET for x, got type %d\n",
+           xDecl->type);
+    return false;
+  }
+  if (xDecl->as.declLet.local->type != AST_VAR_LOCAL) {
+    printf("Expected x decl local to be AST_VAR_LOCAL\n");
+    return false;
+  }
+  ObjString* xName = xDecl->as.declLet.local->as.local.name;
+  if (strcmp(xName->chars, "x") != 0) {
+    printf("Expected second local name to be 'x', got '%s'\n", xName->chars);
+    return false;
+  }
+  if (xDecl->as.declLet.value->type != AST_SUBSCRIPT_GET) {
+    printf("Expected x value to be AST_SUBSCRIPT_GET, got type %d\n",
+           xDecl->as.declLet.value->type);
+    return false;
+  }
+
+  // Check third statement: let f = __import["f"]
+  AstNode* fDecl = blockStmts->items[2];
+  if (fDecl->type != AST_DECL_LET) {
+    printf("Expected third statement to be AST_DECL_LET for f, got type %d\n",
+           fDecl->type);
+    return false;
+  }
+  if (fDecl->as.declLet.local->type != AST_VAR_LOCAL) {
+    printf("Expected f decl local to be AST_VAR_LOCAL\n");
+    return false;
+  }
+  ObjString* fName = fDecl->as.declLet.local->as.local.name;
+  if (strcmp(fName->chars, "f") != 0) {
+    printf("Expected third local name to be 'f', got '%s'\n", fName->chars);
+    return false;
+  }
+  if (fDecl->as.declLet.value->type != AST_SUBSCRIPT_GET) {
+    printf("Expected f value to be AST_SUBSCRIPT_GET, got type %d\n",
+           fDecl->as.declLet.value->type);
+    return false;
+  }
+
+  return true;
+}
+
 /* Bytecode tests for Object */
 
 bool testBytecodeObjectEmpty() {
@@ -4070,6 +4156,7 @@ int testMain(void) {
   fmt("    ", testObjectNested(), "Object nested");
   fmt("    ", testObjectInExpression(), "Object in expression");
   fmt("    ", testObjectTrailingComma(), "Object trailing comma");
+  fmt("    ", testImportParsing(), "Import simple");
 
   printf("  Memory\n");
 
@@ -4099,9 +4186,6 @@ int testMain(void) {
   fmt("    ", testBytecodeWhileComplexBody(), "While complex body");
   fmt("    ", testBytecodeIterSimple(), "For-in simple");
   fmt("    ", testBytecodeForSimple(), "For simple");
-  fmt("    ", testBytecodeImportSimple(), "Import simple");
-  fmt("    ", testBytecodeImportWithAlias(), "Import with alias");
-  fmt("    ", testBytecodeImportLongPath(), "Import long path");
   fmt("    ", testBytecodeThrowSimple(), "Throw simple");
   fmt("    ", testBytecodeThrowLiteral(), "Throw literal");
   fmt("    ", testBytecodeThrowInfix(), "Throw infix");
