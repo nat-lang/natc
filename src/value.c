@@ -5,6 +5,7 @@
 
 #include "memory.h"
 #include "object.h"
+#include "vm.h"
 
 void initValueArray(ValueArray* array) {
   array->values = NULL;
@@ -126,6 +127,24 @@ bool valuesEqual(Value a, Value b) {
           ObjSet* bSet = AS_SET(b);
           return subMap(&aSet->elements, &bSet->elements) &&
                  subMap(&bSet->elements, &aSet->elements);
+        }
+        case OBJ_TREE: {
+          ObjTree* aTree = AS_TREE(a);
+          ObjTree* bTree = AS_TREE(b);
+          Value aVal, bVal;
+          if (!mapGet(&aTree->obj.fields, OBJ_VAL(vm.core.sValue), &aVal))
+            return false;
+          if (!mapGet(&bTree->obj.fields, OBJ_VAL(vm.core.sValue), &bVal))
+            return false;
+          if (!valuesEqual(aVal, bVal)) return false;
+          if (aTree->children.count != bTree->children.count) return false;
+          for (int i = 0; i < aTree->children.count; i++) {
+            if (!valuesEqual(aTree->children.values[i],
+                             bTree->children.values[i])) {
+              return false;
+            }
+          }
+          return true;
         }
         case OBJ_STRING: {
           ObjString* aString = AS_STRING(a);

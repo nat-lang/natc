@@ -61,8 +61,8 @@ void errorAt(NodeCompiler* cmp, Token* token, const char* message) {
   else
     parser.panicMode = true;
 
-  fprintf(stderr, "Error in %s:%d", cmp->fn->as.function.name->chars,
-          token->line);
+  fprintf(stderr, "Error at %s:%d:%d", cmp->fn->as.function.name->chars,
+          token->line, token->column);
 
   if (token->type == TOKEN_EOF) {
     fprintf(stderr, " at end.");
@@ -660,7 +660,7 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
   Token openToken = parser.previous;
   if (check(TOKEN_RIGHT_BRACE)) {
     advance(cmp);
-    return setNodeFromToken(newObjectNode(), openToken);
+    return setNodeFromToken(newMapNode(), openToken);
   }
 
   Parser bodyCheckpoint = saveParser();
@@ -680,14 +680,14 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
   AstNode* first = expression(cmp);
 
   if (check(TOKEN_COLON)) {
-    AstNode* obj = setNodeFromToken(newObjectNode(), openToken);
+    AstNode* obj = setNodeFromToken(newMapNode(), openToken);
     ensureObjectKey(cmp, first);
 
     consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
     AstNode* value = expression(cmp);
-    AstNode* entry = newObjectEntryNode(first, value);
+    AstNode* entry = newMapEntryNode(first, value);
     setNodeFromNode(entry, first);
-    pushAstVec(&obj->as.object.entries, entry);
+    pushAstVec(&obj->as.map.entries, entry);
 
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
       if (!match(cmp, TOKEN_COMMA)) {
@@ -700,9 +700,9 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
       ensureObjectKey(cmp, key);
       consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
       AstNode* val = expression(cmp);
-      AstNode* kv = newObjectEntryNode(key, val);
+      AstNode* kv = newMapEntryNode(key, val);
       setNodeFromNode(kv, key);
-      pushAstVec(&obj->as.object.entries, kv);
+      pushAstVec(&obj->as.map.entries, kv);
     }
 
     consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after object literal.");
@@ -1070,13 +1070,48 @@ static AstNode* importStatement(NodeCompiler* cmp) {
   gotoParser(checkpoint);
 
   AstNode* node = setNodeFromToken(newUseNode(module), useToken);
+  AstNode* importBlock = newBlockNode();
 
-  if (match(cmp, TOKEN_AS)) {
-    consume(cmp, TOKEN_IDENTIFIER, "Expect identifier for alias.");
-    node->as.use.alias = tokenString(parser.previous);
+  // translate the import to a call to the module's function,
+  // and return a map of the local variables.
+  AstNode* fn = node->as.use.module->as.module.fn;
+  AstVec* stmts = &fn->as.function.body->as.block.stmts;
+  AstNode* ret = stmts->items[stmts->count - 1];
+  ret->as.xReturn.value = newMapNode();
+  for (int i = 0; i < stmts->count; i++) {
+    AstNode* stmt = stmts->items[i];
+    if (stmt->type == AST_DECL_LET) {
+      AstNode* key = newLiteralNode();
+      key->as.literal.value = OBJ_VAL(stmt->as.declLet.local->as.local.name);
+      AstNode* entry = newMapEntryNode(key, stmt->as.declLet.local);
+      pushAstVec(&ret->as.xReturn.value->as.map.entries, entry);
+    }
   }
+  // then build let declarations for each of the local variables,
+  // pulled from the map, and add them to the function's statements.
+  uint8_t importLocal = addLocal(cmp, syntheticToken("__import"));
+  AstNode* importVar = newVarLocalNode(importLocal);
+  importVar->as.local.name = intern("__import");
+  AstNode* importCall = setNodeFromToken(newCallNode(fn), useToken);
+  AstNode* import = newDeclLetNode(importVar, importCall);
+  pushAstVec(&importBlock->as.block.stmts, import);
+  markInitialized(cmp);
 
-  return node;
+  AstVec* entries = &ret->as.xReturn.value->as.map.entries;
+  for (int i = 0; i < entries->count; i++) {
+    AstNode* entry = entries->items[i];
+    ObjString* name = AS_STRING(entry->as.mapEntry.key->as.literal.value);
+    uint8_t declLocal = addLocal(cmp, syntheticToken(name->chars));
+    AstNode* nodeLocal = newVarLocalNode(declLocal);
+    nodeLocal->as.local.name = name;
+    AstNode* key = newLiteralNode();
+    key->as.literal.value = OBJ_VAL(name);
+    AstNode* decl =
+        newDeclLetNode(nodeLocal, newSubscriptGetNode(importVar, key));
+    pushAstVec(&importBlock->as.block.stmts, decl);
+    markInitialized(cmp);
+  }
+  return importBlock;
 }
 
 static AstNode* throwStatement(NodeCompiler* cmp) {

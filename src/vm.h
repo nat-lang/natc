@@ -100,9 +100,6 @@ typedef struct {
 
   // currently executing module.
   ObjModule* module;
-
-  int comprehensionDepth;
-  Obj* comprehensions[COMPREHENSION_DEPTH_MAX];
 } VM;
 
 typedef enum {

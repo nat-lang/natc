@@ -23,8 +23,8 @@ typedef enum {
   AST_DECL_GLOBAL,
   AST_LITERAL,
   AST_MODULE,
-  AST_OBJECT,
-  AST_OBJECT_ENTRY,
+  AST_MAP,
+  AST_MAP_ENTRY,
   AST_PARAM,
   AST_RETURN,
   AST_SEQUENCE,
@@ -211,11 +211,11 @@ struct AstNode {
     } propertySet;
     struct {
       AstVec entries;
-    } object;
+    } map;
     struct {
       AstNode* key;
       AstNode* value;
-    } objectEntry;
+    } mapEntry;
     struct {
       AstVec params;
       int varargs;
@@ -271,8 +271,8 @@ AstNode* newLiteralValueNode(Value value);
 AstNode* newLiteralNode();
 AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
                        ObjString* source);
-AstNode* newObjectNode();
-AstNode* newObjectEntryNode(AstNode* key, AstNode* value);
+AstNode* newMapNode();
+AstNode* newMapEntryNode(AstNode* key, AstNode* value);
 AstNode* newParamNode(AstNode* annotation);
 AstNode* newReturnNode(AstNode* value);
 AstNode* newSequenceNode();

@@ -115,7 +115,6 @@ bool __seqPush__(int argCount, Value* args) {
 
 bool __keys__(int argCount, Value* args) {
   Value v = vmPeek(0);
-  ObjSequence* seq = newSequence();
 
   if (!IS_OBJ(v)) {
     vmRuntimeError("Only objects and sets have keys.");
@@ -123,6 +122,9 @@ bool __keys__(int argCount, Value* args) {
     vmPop();  // native fn.
     return false;
   }
+
+  ObjSequence* seq = newSequence();
+  vmPush(OBJ_VAL(seq));
 
   switch (OBJ_TYPE(v)) {
     case OBJ_SET: {
@@ -147,6 +149,7 @@ bool __keys__(int argCount, Value* args) {
     }
   }
 
+  vmPop();  // seq.
   vmPop();  // set.
   vmPop();  // native fn.
   vmPush(OBJ_VAL(seq));

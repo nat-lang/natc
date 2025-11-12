@@ -217,6 +217,8 @@ AstNode* newDeclGlobalNode(AstNode* value) {
 AstNode* newLiteralValueNode(Value value) {
   if (IS_OBJ(value)) {
     vmRuntimeError("Can't create literal node with object value.");
+    printValue(value);
+    printf("\n");
     exit(1);
   }
   AstNode* n = allocNode(AST_LITERAL);
@@ -292,16 +294,16 @@ AstNode* newPropertySetNode(AstNode* object, AstNode* value) {
   return n;
 }
 
-AstNode* newObjectNode() {
-  AstNode* n = allocNode(AST_OBJECT);
-  initAstVec(&n->as.object.entries);
+AstNode* newMapNode() {
+  AstNode* n = allocNode(AST_MAP);
+  initAstVec(&n->as.map.entries);
   return n;
 }
 
-AstNode* newObjectEntryNode(AstNode* key, AstNode* value) {
-  AstNode* n = allocNode(AST_OBJECT_ENTRY);
-  n->as.objectEntry.key = key;
-  n->as.objectEntry.value = value;
+AstNode* newMapEntryNode(AstNode* key, AstNode* value) {
+  AstNode* n = allocNode(AST_MAP_ENTRY);
+  n->as.mapEntry.key = key;
+  n->as.mapEntry.value = value;
   return n;
 }
 
@@ -554,14 +556,14 @@ void printNodeAt(AstNode* node, int depth) {
       printNodeAt(node->as.propertySet.object, depth + 1);
       printNodeAt(node->as.propertySet.value, depth + 1);
       break;
-    case AST_OBJECT:
+    case AST_MAP:
       printStrAt("Object\n", depth);
-      printNodeVecAt(&node->as.object.entries, depth + 1);
+      printNodeVecAt(&node->as.map.entries, depth + 1);
       break;
-    case AST_OBJECT_ENTRY:
+    case AST_MAP_ENTRY:
       printStrAt("Entry\n", depth);
-      printNodeAt(node->as.objectEntry.key, depth + 1);
-      printNodeAt(node->as.objectEntry.value, depth + 1);
+      printNodeAt(node->as.mapEntry.key, depth + 1);
+      printNodeAt(node->as.mapEntry.value, depth + 1);
       break;
     case AST_SIGNATURE:
       printStrAt("Signature\n", depth);
@@ -705,12 +707,12 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return nodesEqual(a->as.propertySet.object, b->as.propertySet.object) &&
              a->as.propertySet.property == b->as.propertySet.property &&
              nodesEqual(a->as.propertySet.value, b->as.propertySet.value);
-    case AST_OBJECT:
-      return a->as.object.entries.count == b->as.object.entries.count &&
-             astVecsEqual(&a->as.object.entries, &b->as.object.entries);
-    case AST_OBJECT_ENTRY:
-      return nodesEqual(a->as.objectEntry.key, b->as.objectEntry.key) &&
-             nodesEqual(a->as.objectEntry.value, b->as.objectEntry.value);
+    case AST_MAP:
+      return a->as.map.entries.count == b->as.map.entries.count &&
+             astVecsEqual(&a->as.map.entries, &b->as.map.entries);
+    case AST_MAP_ENTRY:
+      return nodesEqual(a->as.mapEntry.key, b->as.mapEntry.key) &&
+             nodesEqual(a->as.mapEntry.value, b->as.mapEntry.value);
     case AST_SIGNATURE:
       return a->as.signature.varargs == b->as.signature.varargs &&
              astVecsEqual(&a->as.signature.params, &b->as.signature.params);
@@ -1085,7 +1087,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_IMPORT: {
-      if (!toChunk(node->as.use.module, chunk)) return false;
+      error(node, "Import must be translated to let declarations.");
       break;
     }
     case AST_DECL_LET: {
@@ -1194,20 +1196,20 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitConstant(chunk, node, constant);
       break;
     }
-    case AST_OBJECT: {
+    case AST_MAP: {
       emitByte(chunk, node, OP_GET_GLOBAL);
       uint16_t constant = addConstant(chunk, OBJ_VAL(vm.core.sObj));
       emitConstant(chunk, node, constant);
 
-      if (!toChunkVec(&node->as.object.entries, chunk)) return false;
+      if (!toChunkVec(&node->as.map.entries, chunk)) return false;
 
       emitByte(chunk, node, OP_CALL);
-      emitByte(chunk, node, (uint8_t)(node->as.object.entries.count * 2));
+      emitByte(chunk, node, (uint8_t)(node->as.map.entries.count * 2));
       break;
     }
-    case AST_OBJECT_ENTRY: {
-      if (!toChunk(node->as.objectEntry.key, chunk)) return false;
-      if (!toChunk(node->as.objectEntry.value, chunk)) return false;
+    case AST_MAP_ENTRY: {
+      if (!toChunk(node->as.mapEntry.key, chunk)) return false;
+      if (!toChunk(node->as.mapEntry.value, chunk)) return false;
       break;
     }
     case AST_SIGNATURE: {
@@ -1373,7 +1375,6 @@ void markAstNode(AstNode* n) {
       markObject((Obj*)n->as.module.dirName);
       markObject((Obj*)n->as.module.baseName);
       markObject((Obj*)n->as.module.source);
-      markAstNode(n->as.module.fn);
       break;
     }
     case AST_PARAM:
@@ -1417,13 +1418,13 @@ void markAstNode(AstNode* n) {
       markObject((Obj*)n->as.propertySet.property);
       markAstNode(n->as.propertySet.value);
       break;
-    case AST_OBJECT:
-      for (int i = 0; i < n->as.object.entries.count; i++)
-        markAstNode((AstNode*)n->as.object.entries.items[i]);
+    case AST_MAP:
+      for (int i = 0; i < n->as.map.entries.count; i++)
+        markAstNode((AstNode*)n->as.map.entries.items[i]);
       break;
-    case AST_OBJECT_ENTRY:
-      markAstNode(n->as.objectEntry.key);
-      markAstNode(n->as.objectEntry.value);
+    case AST_MAP_ENTRY:
+      markAstNode(n->as.mapEntry.key);
+      markAstNode(n->as.mapEntry.value);
       break;
     case AST_SIGNATURE:
       for (int i = 0; i < n->as.signature.params.count; i++)
@@ -1524,10 +1525,10 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_PROPERTY_SET:
       break;
-    case AST_OBJECT:
-      freeAstVec(&n->as.object.entries);
+    case AST_MAP:
+      freeAstVec(&n->as.map.entries);
       break;
-    case AST_OBJECT_ENTRY:
+    case AST_MAP_ENTRY:
       break;
   }
 
