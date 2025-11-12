@@ -2884,7 +2884,7 @@ bool testObjectEmpty() {
   AstNode* node = compile("({})");
 
   AstNode* fn = mkFunction();
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
@@ -2898,13 +2898,13 @@ bool testObjectOneProperty() {
   AstNode* node = compile("({\"x\": 1})");
 
   AstNode* fn = mkFunction();
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* keyLiteral = newLiteralNode();
   ObjString* keyX = intern("x");
   keyLiteral->as.literal.value = OBJ_VAL(keyX);
   AstNode* entry =
-      newObjectEntryNode(keyLiteral, newLiteralValueNode(NUMBER_VAL(1)));
-  pushAstVec(&obj->as.object.entries, entry);
+      newMapEntryNode(keyLiteral, newLiteralValueNode(NUMBER_VAL(1)));
+  pushAstVec(&obj->as.map.entries, entry);
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
@@ -2918,19 +2918,19 @@ bool testObjectMultipleProperties() {
   AstNode* node = compile("({\"x\": 1, \"y\": 2, \"z\": 3})");
 
   AstNode* fn = mkFunction();
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
   AstNode* keyY = newLiteralNode();
   keyY->as.literal.value = OBJ_VAL(intern("y"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyY, newLiteralValueNode(NUMBER_VAL(2))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyY, newLiteralValueNode(NUMBER_VAL(2))));
   AstNode* keyZ = newLiteralNode();
   keyZ->as.literal.value = OBJ_VAL(intern("z"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyZ, newLiteralValueNode(NUMBER_VAL(3))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyZ, newLiteralValueNode(NUMBER_VAL(3))));
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
@@ -2944,12 +2944,12 @@ bool testObjectIdentifierKey() {
   AstNode* node = compile("({key: value})");
 
   AstNode* fn = mkFunction();
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* key = newVarGlobalNode();
   key->as.global.name = intern("key");
-  AstNode* entry = newObjectEntryNode(key, newVarGlobalNode());
-  entry->as.objectEntry.value->as.global.name = intern("value");
-  pushAstVec(&obj->as.object.entries, entry);
+  AstNode* entry = newMapEntryNode(key, newVarGlobalNode());
+  entry->as.mapEntry.value->as.global.name = intern("value");
+  pushAstVec(&obj->as.map.entries, entry);
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
@@ -2963,7 +2963,7 @@ bool testObjectComplexValues() {
   AstNode* node = compile("({\"x\": 1 + 2, \"y\": f()})");
 
   AstNode* fn = mkFunction();
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
 
   AstNode* plusOp = newVarGlobalNode();
   plusOp->as.global.name = intern("+");
@@ -2972,14 +2972,14 @@ bool testObjectComplexValues() {
   AstNode* infix = newCallInfixNode(plusOp, lhs, rhs);
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));
-  pushAstVec(&obj->as.object.entries, newObjectEntryNode(keyX, infix));
+  pushAstVec(&obj->as.map.entries, newMapEntryNode(keyX, infix));
 
   AstNode* f = newVarGlobalNode();
   f->as.global.name = intern("f");
   AstNode* call = newCallNode(f);
   AstNode* keyY = newLiteralNode();
   keyY->as.literal.value = OBJ_VAL(intern("y"));
-  pushAstVec(&obj->as.object.entries, newObjectEntryNode(keyY, call));
+  pushAstVec(&obj->as.map.entries, newMapEntryNode(keyY, call));
 
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
@@ -2995,17 +2995,16 @@ bool testObjectNested() {
 
   AstNode* fn = mkFunction();
 
-  AstNode* innerObj = newObjectNode();
+  AstNode* innerObj = newMapNode();
   AstNode* keyInner = newLiteralNode();
   keyInner->as.literal.value = OBJ_VAL(intern("inner"));
-  pushAstVec(&innerObj->as.object.entries,
-             newObjectEntryNode(keyInner, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&innerObj->as.map.entries,
+             newMapEntryNode(keyInner, newLiteralValueNode(NUMBER_VAL(1))));
 
-  AstNode* outerObj = newObjectNode();
+  AstNode* outerObj = newMapNode();
   AstNode* keyOuter = newLiteralNode();
   keyOuter->as.literal.value = OBJ_VAL(intern("outer"));
-  pushAstVec(&outerObj->as.object.entries,
-             newObjectEntryNode(keyOuter, innerObj));
+  pushAstVec(&outerObj->as.map.entries, newMapEntryNode(keyOuter, innerObj));
 
   AstNode* exprStmt = newExprStmtNode(outerObj);
   pushFnStmt(fn, exprStmt);
@@ -3024,11 +3023,11 @@ bool testObjectInExpression() {
   callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
 
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
   pushAstVec(&call->as.call.args, obj);
 
   AstNode* exprStmt = newExprStmtNode(call);
@@ -3044,11 +3043,11 @@ bool testObjectTrailingComma() {
   AstNode* node = compile("({\"x\": 1,})");
 
   AstNode* fn = mkFunction();
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
   AstNode* exprStmt = newExprStmtNode(obj);
   pushFnStmt(fn, exprStmt);
   AstNode* nil = newLiteralValueNode(NIL_VAL);
@@ -3061,7 +3060,7 @@ bool testObjectTrailingComma() {
 /* Bytecode tests for Object */
 
 bool testBytecodeObjectEmpty() {
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   Chunk c;
   if (!buildChunkForExpr(obj, &c)) return false;
 
@@ -3079,11 +3078,11 @@ bool testBytecodeObjectEmpty() {
 }
 
 bool testBytecodeObjectOneProperty() {
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* key = newLiteralNode();
   key->as.literal.value = OBJ_VAL(intern("key"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(key, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(key, newLiteralValueNode(NUMBER_VAL(1))));
   Chunk c;
   if (!buildChunkForExpr(obj, &c)) return false;
 
@@ -3117,19 +3116,19 @@ bool testBytecodeObjectOneProperty() {
 }
 
 bool testBytecodeObjectMultipleProperties() {
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
   AstNode* keyY = newLiteralNode();
   keyY->as.literal.value = OBJ_VAL(intern("y"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyY, newLiteralValueNode(NUMBER_VAL(2))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyY, newLiteralValueNode(NUMBER_VAL(2))));
   AstNode* keyZ = newLiteralNode();
   keyZ->as.literal.value = OBJ_VAL(intern("z"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyZ, newLiteralValueNode(NUMBER_VAL(3))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyZ, newLiteralValueNode(NUMBER_VAL(3))));
   Chunk c;
   if (!buildChunkForExpr(obj, &c)) return false;
 
@@ -3148,17 +3147,16 @@ bool testBytecodeObjectMultipleProperties() {
 }
 
 bool testBytecodeObjectNested() {
-  AstNode* innerObj = newObjectNode();
+  AstNode* innerObj = newMapNode();
   AstNode* keyInner = newLiteralNode();
   keyInner->as.literal.value = OBJ_VAL(intern("inner"));
-  pushAstVec(&innerObj->as.object.entries,
-             newObjectEntryNode(keyInner, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&innerObj->as.map.entries,
+             newMapEntryNode(keyInner, newLiteralValueNode(NUMBER_VAL(1))));
 
-  AstNode* outerObj = newObjectNode();
+  AstNode* outerObj = newMapNode();
   AstNode* keyOuter = newLiteralNode();
   keyOuter->as.literal.value = OBJ_VAL(intern("outer"));
-  pushAstVec(&outerObj->as.object.entries,
-             newObjectEntryNode(keyOuter, innerObj));
+  pushAstVec(&outerObj->as.map.entries, newMapEntryNode(keyOuter, innerObj));
 
   Chunk c;
   if (!buildChunkForExpr(outerObj, &c)) return false;
@@ -3192,13 +3190,12 @@ bool testBytecodeObjectNested() {
 }
 
 bool testBytecodeObjectComplexKeys() {
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* keyLiteral = newLiteralNode();
   ObjString* keyStr = intern("string-key");
   keyLiteral->as.literal.value = OBJ_VAL(keyStr);
-  pushAstVec(
-      &obj->as.object.entries,
-      newObjectEntryNode(keyLiteral, newLiteralValueNode(NUMBER_VAL(42))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyLiteral, newLiteralValueNode(NUMBER_VAL(42))));
   Chunk c;
   if (!buildChunkForExpr(obj, &c)) return false;
 
@@ -3228,11 +3225,11 @@ bool testBytecodeObjectInCall() {
   callee->as.global.name = intern("f");
   AstNode* call = newCallNode(callee);
 
-  AstNode* obj = newObjectNode();
+  AstNode* obj = newMapNode();
   AstNode* keyX = newLiteralNode();
   keyX->as.literal.value = OBJ_VAL(intern("x"));
-  pushAstVec(&obj->as.object.entries,
-             newObjectEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
+  pushAstVec(&obj->as.map.entries,
+             newMapEntryNode(keyX, newLiteralValueNode(NUMBER_VAL(1))));
   pushAstVec(&call->as.call.args, obj);
 
   Chunk c;

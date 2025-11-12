@@ -25,7 +25,6 @@ setAdd(s, 4)
 assert(s[4])
 assert(s[5] == false)
 
-
 // comprehension.
 
 // literal body.
@@ -41,27 +40,26 @@ s = {{true | b in a} | a in ((1,2), (3,), (4,5))}
 assert(s == {{true}})
 
 s = {{b | b in a} | a in ((1,2), (3,), (4,5,5))}
-print((keys(x) | x in keys(s)))
 assert(s == {{1,2}, {3}, {4,5}})
 
 s = {a | a in ({1,2}, {3}, {4,5})}
 assert(s == {{1,2}, {3}, {4,5}})
 
+// these require iteration impl for sets.
 // s = {{b | b in a} | a in ({1,2}, {3}, {4,5,5})}
 // assert(s == {{1,2}, {3}, {4,5}})
 
 // s = {{true | b in a} | a in ({1,2}, {3}, {4,5})}
 // assert(s == {{true}})
 
-// nested condition.
-// s = {a | a in (a | a in (1,1,2,2,3,3))}
-// assert(s == {1,2,3})
-
 // s = {a | a in (a | a in {1,1,2,2,3,3})}
 // assert(s == {1,2,3})
 
-// sequence comprehension in body.
-// s = {(a | a in b) | b in ((1,2), (3,4))}
+// nested condition.
+s = {a | a in (a | a in (1,1,2,2,3,3))}
+assert(s == {1,2,3})
 
-// assert(s[(3,4)])
-// assert(s[(1,2)])
+// sequence comprehension in body.
+s = {(a | a in b) | b in ((1,2), (3,4))}
+assert(s[(3,4)])
+assert(s[(1,2)])

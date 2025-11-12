@@ -77,9 +77,6 @@ bool initVM() {
 
   vm.module = NULL;
 
-  vm.comprehensionDepth = 0;
-  for (int i = 0; i < COMPREHENSION_DEPTH_MAX; i++) vm.comprehensions[i] = NULL;
-
   initMap(&vm.globals);
   initMap(&vm.strings);
   initMap(&vm.prefixes);
