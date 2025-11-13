@@ -34,6 +34,7 @@ typedef enum {
   AST_PROPERTY_GET,
   AST_PROPERTY_SET,
   AST_SIGNATURE,
+  AST_SWITCH,
   AST_THROW,
   AST_TREE,
   AST_UNKNOWN,
@@ -221,6 +222,11 @@ struct AstNode {
       int varargs;
     } signature;
     struct {
+      ObjString* name;
+      AstVec cases;  // Vector of AST_FUNCTION nodes (each case)
+      int arity;     // Validated consistent arity across all cases
+    } switchFunc;
+    struct {
       AstNode* expr;
     } spread;
 
@@ -284,6 +290,7 @@ AstNode* newPropertyGetNode(AstNode* object);
 AstNode* newPropertySetNode(AstNode* object, AstNode* value);
 AstNode* newThrowNode(AstNode* expr);
 AstNode* newSignatureNode();
+AstNode* newSwitchNode(ObjString* name);
 AstNode* newUnknownNode();
 AstNode* newUseNode(AstNode* module);
 AstNode* newVarGlobalNode();

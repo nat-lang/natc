@@ -326,6 +326,14 @@ AstNode* newSignatureNode() {
   return n;
 }
 
+AstNode* newSwitchNode(ObjString* name) {
+  AstNode* n = allocNode(AST_SWITCH);
+  n->as.switchFunc.name = name;
+  initAstVec(&n->as.switchFunc.cases);
+  n->as.switchFunc.arity = 0;
+  return n;
+}
+
 AstNode* newReturnNode(AstNode* value) {
   AstNode* n = allocNode(AST_RETURN);
   n->as.xReturn.value = value;
@@ -561,6 +569,12 @@ void printNodeAt(AstNode* node, int depth) {
       printStrAt("Signature\n", depth);
       printNodeVecAt(&node->as.signature.params, depth + 1);
       break;
+    case AST_SWITCH:
+      printStrAt("Switch ", depth);
+      printf("(%s) arity=%d\n", node->as.switchFunc.name->chars,
+             node->as.switchFunc.arity);
+      printNodeVecAt(&node->as.switchFunc.cases, depth + 1);
+      break;
 
     case AST_VAR_GLOBAL:
       printStrAt("Global ", depth);
@@ -708,6 +722,9 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_SIGNATURE:
       return a->as.signature.varargs == b->as.signature.varargs &&
              astVecsEqual(&a->as.signature.params, &b->as.signature.params);
+    case AST_SWITCH:
+      return a->as.switchFunc.name == b->as.switchFunc.name &&
+             astVecsEqual(&a->as.switchFunc.cases, &b->as.switchFunc.cases);
 
     case AST_VAR_GLOBAL:
       return a->as.global.name == b->as.global.name;
@@ -1209,6 +1226,20 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       if (!toChunkVec(&node->as.signature.params, chunk)) return false;
       break;
     }
+    case AST_SWITCH: {
+      // Emit each function case
+      for (int i = 0; i < node->as.switchFunc.cases.count; i++) {
+        if (!toChunk(&node->as.switchFunc.cases.items[i], chunk)) return false;
+      }
+
+      // Emit OP_SWITCH with case count and name
+      emitByte(chunk, node, OP_SWITCH);
+      emitByte(chunk, node, (uint8_t)node->as.switchFunc.cases.count);
+      uint16_t nameConst =
+          addConstant(chunk, OBJ_VAL(node->as.switchFunc.name));
+      emitConstant(chunk, node, nameConst);
+      break;
+    }
     case AST_VAR_GLOBAL: {
       uint16_t constant = addConstant(chunk, OBJ_VAL(node->as.global.name));
       emitByte(chunk, node, OP_GET_GLOBAL);
@@ -1357,6 +1388,11 @@ void markAstNode(AstNode* n) {
       break;
     case AST_SIGNATURE:
       break;
+    case AST_SWITCH:
+      markObject((Obj*)n->as.switchFunc.name);
+      for (int i = 0; i < n->as.switchFunc.cases.count; i++)
+        markAstNode(&n->as.switchFunc.cases.items[i]);
+      break;
     case AST_VAR_GLOBAL:
       markObject((Obj*)n->as.global.name);
       break;
@@ -1407,6 +1443,9 @@ void freeAstNode(AstNode* n) {
       break;
     case AST_SIGNATURE:
       freeAstVec(&n->as.signature.params);
+      break;
+    case AST_SWITCH:
+      freeAstVec(&n->as.switchFunc.cases);
       break;
     case AST_RETURN:
       break;
