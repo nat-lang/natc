@@ -1538,7 +1538,8 @@ void freeAstNode(AstNode* n) {
 
 void freeAstNodes(AstNode* node) {
   while (node != NULL) {
+    AstNode* next = node->next;
     freeAstNode(node);
-    node = node->next;
+    node = next;
   }
 }
