@@ -1276,91 +1276,50 @@ void markAstNode(AstNode* n) {
 
   switch (n->type) {
     case AST_ASSIGNMENT:
-      markAstNode(n->as.assignment.lhs);
-      markAstNode(n->as.assignment.rhs);
       break;
     case AST_BLOCK:
-      for (int i = 0; i < n->as.block.stmts.count; i++) {
-        markAstNode((AstNode*)&n->as.block.stmts.items[i]);
-      }
       break;
 
-    case AST_CALL: {
-      markAstNode(n->as.call.callee);
-      for (int i = 0; i < n->as.call.args.count; i++) {
-        markAstNode((AstNode*)&n->as.call.args.items[i]);
-      }
+    case AST_CALL:
       break;
-    }
-    case AST_CALL_INFIX: {
-      markAstNode(n->as.callInfix.callee);
-      markAstNode(n->as.callInfix.lhs);
-      markAstNode(n->as.callInfix.rhs);
+
+    case AST_CALL_INFIX:
       break;
-    }
-    case AST_COMPREHENSION: {
-      markAstNode(n->as.comprehension.body);
-      for (int i = 0; i < n->as.comprehension.conditions.count; i++) {
-        markAstNode(&n->as.comprehension.conditions.items[i]);
-      }
+
+    case AST_COMPREHENSION:
       break;
-    }
-    case AST_COMPREHENSION_ITER: {
-      markAstNode(n->as.comprehensionIter.var);
-      markAstNode(n->as.comprehensionIter.iterable);
+
+    case AST_COMPREHENSION_ITER:
       break;
-    }
+
     case AST_COMPREHENSION_PRED:
-      markAstNode(n->as.comprehensionPred.predicate);
+
       break;
     case AST_EXPR_STMT:
-      markAstNode(n->as.exprStmt.expr);
       break;
 
-    case AST_FUNCTION: {
+    case AST_FUNCTION:
       markObject((Obj*)n->as.function.name);
-      markAstNode(n->as.function.module);
-      markAstNode(n->as.function.signature);
-      markAstNode(n->as.function.body);
       break;
-    }
-    case AST_IF: {
-      markAstNode(n->as.ifStmt.cond);
-      markAstNode(n->as.ifStmt.then);
-      markAstNode(n->as.ifStmt.elseBranch);
+
+    case AST_IF:
       break;
-    }
+
     case AST_FOR:
-      markAstNode(n->as.forStmt.initializer);
-      markAstNode(n->as.forStmt.condition);
-      markAstNode(n->as.forStmt.increment);
-      markAstNode(n->as.forStmt.body);
       break;
     case AST_ITER:
-      markAstNode(n->as.iter.var);
-      markAstNode(n->as.iter.iterable);
-      markAstNode(n->as.iter.body);
       break;
     case AST_IMPORT:
-      markAstNode(n->as.use.module);
-      if (n->as.use.alias != NULL) {
-        markObject((Obj*)n->as.use.alias);
-      }
+      if (n->as.use.alias != NULL) markObject((Obj*)n->as.use.alias);
       break;
     case AST_WHILE:
-      markAstNode(n->as.whileStmt.cond);
-      markAstNode(n->as.whileStmt.body);
       break;
     case AST_DECL_LET:
-      markAstNode(n->as.declLet.local);
-      markAstNode(n->as.declLet.value);
       break;
     case AST_DECL_GLOBAL:
       markObject((Obj*)n->as.declGlobal.name);
-      markAstNode(n->as.declGlobal.value);
       break;
     case AST_LITERAL:
-      /* Value may reference Obj* (e.g., strings); mark via markValue */
       markValue(n->as.literal.value);
       break;
     case AST_MODULE: {
@@ -1371,56 +1330,32 @@ void markAstNode(AstNode* n) {
     }
     case AST_PARAM:
       markObject((Obj*)n->as.param.name);
-      markAstNode(n->as.param.annotation);
       break;
     case AST_RETURN:
-      markAstNode(n->as.xReturn.value);
       break;
     case AST_THROW:
-      markAstNode(n->as.throwStmt.expr);
       break;
     case AST_SEQUENCE:
-      for (int i = 0; i < n->as.sequence.values.count; i++)
-        markAstNode(&n->as.sequence.values.items[i]);
       break;
     case AST_SET:
-      for (int i = 0; i < n->as.set.values.count; i++)
-        markAstNode(&n->as.set.values.items[i]);
       break;
     case AST_TREE:
-      markAstNode(n->as.tree.value);
-      for (int i = 0; i < n->as.tree.values.count; i++)
-        markAstNode(&n->as.tree.values.items[i]);
       break;
     case AST_SUBSCRIPT_GET:
-      markAstNode(n->as.subscript.object);
-      markAstNode(n->as.subscript.index);
       break;
     case AST_SUBSCRIPT_SET:
-      markAstNode(n->as.subscriptSet.object);
-      markAstNode(n->as.subscriptSet.index);
-      markAstNode(n->as.subscriptSet.value);
       break;
     case AST_PROPERTY_GET:
-      markAstNode(n->as.propertyGet.object);
       markObject((Obj*)n->as.propertyGet.property);
       break;
     case AST_PROPERTY_SET:
-      markAstNode(n->as.propertySet.object);
       markObject((Obj*)n->as.propertySet.property);
-      markAstNode(n->as.propertySet.value);
       break;
     case AST_MAP:
-      for (int i = 0; i < n->as.map.entries.count; i++)
-        markAstNode(&n->as.map.entries.items[i]);
       break;
     case AST_MAP_ENTRY:
-      markAstNode(n->as.mapEntry.key);
-      markAstNode(n->as.mapEntry.value);
       break;
     case AST_SIGNATURE:
-      for (int i = 0; i < n->as.signature.params.count; i++)
-        markAstNode(&n->as.signature.params.items[i]);
       break;
     case AST_VAR_GLOBAL:
       markObject((Obj*)n->as.global.name);
