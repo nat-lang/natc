@@ -1076,10 +1076,10 @@ static AstNode* importStatement(NodeCompiler* cmp) {
   // and return a map of the local variables.
   AstNode* fn = node->as.use.module->as.module.fn;
   AstVec* stmts = &fn->as.function.body->as.block.stmts;
-  AstNode* ret = stmts->items[stmts->count - 1];
+  AstNode* ret = &stmts->items[stmts->count - 1];
   ret->as.xReturn.value = newMapNode();
   for (int i = 0; i < stmts->count; i++) {
-    AstNode* stmt = stmts->items[i];
+    AstNode* stmt = &stmts->items[i];
     if (stmt->type == AST_DECL_LET) {
       AstNode* key = newLiteralNode();
       key->as.literal.value = OBJ_VAL(stmt->as.declLet.local->as.local.name);
@@ -1099,7 +1099,7 @@ static AstNode* importStatement(NodeCompiler* cmp) {
 
   AstVec* entries = &ret->as.xReturn.value->as.map.entries;
   for (int i = 0; i < entries->count; i++) {
-    AstNode* entry = entries->items[i];
+    AstNode* entry = &entries->items[i];
     ObjString* name = AS_STRING(entry->as.mapEntry.key->as.literal.value);
     uint8_t declLocal = addLocal(cmp, syntheticToken(name->chars));
     AstNode* nodeLocal = newVarLocalNode(declLocal);
