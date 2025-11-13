@@ -37,10 +37,10 @@ assert(mixed1(2,3) == 5)
 
 // Switch functions - boolean and nil patterns
 
-let boolNil = (true) => 1, (false) => 0, (nil) => -1
+let boolNil = (true) => 1, (false) => 0, (nil) => 99
 assert(boolNil(true) == 1)
 assert(boolNil(false) == 0)
-assert(boolNil(nil) == -1)
+assert(boolNil(nil) == 99)
 
 // Switch functions - string patterns
 

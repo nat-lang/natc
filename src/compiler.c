@@ -302,37 +302,51 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 
 // Parse a pattern element in signature context
 static AstNode* patternElement(NodeCompiler* cmp) {
-  // Literal patterns
+  // Literal patterns - allocate local slot for stack alignment
   if (match(cmp, TOKEN_NUMBER)) {
-    double value = strtod(parser.previous.start, NULL);
-    return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)),
-                            parser.previous);
+    Token litToken = parser.previous;
+    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
+    markInitialized(cmp);
+    double value = strtod(litToken.start, NULL);
+    return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)), litToken);
   }
 
   if (match(cmp, TOKEN_STRING)) {
-    ObjString* str =
-        copyString(parser.previous.start + 1, parser.previous.length - 2);
-    AstNode* node = setNodeFromToken(newLiteralNode(), parser.previous);
+    Token litToken = parser.previous;
+    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
+    markInitialized(cmp);
+    ObjString* str = copyString(litToken.start + 1, litToken.length - 2);
+    AstNode* node = setNodeFromToken(newLiteralNode(), litToken);
     node->as.literal.value = OBJ_VAL(str);
     return node;
   }
 
   if (match(cmp, TOKEN_TRUE)) {
-    return setNodeFromToken(newLiteralValueNode(BOOL_VAL(true)),
-                            parser.previous);
+    Token litToken = parser.previous;
+    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
+    markInitialized(cmp);
+    return setNodeFromToken(newLiteralValueNode(BOOL_VAL(true)), litToken);
   }
 
   if (match(cmp, TOKEN_FALSE)) {
-    return setNodeFromToken(newLiteralValueNode(BOOL_VAL(false)),
-                            parser.previous);
+    Token litToken = parser.previous;
+    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
+    markInitialized(cmp);
+    return setNodeFromToken(newLiteralValueNode(BOOL_VAL(false)), litToken);
   }
 
   if (match(cmp, TOKEN_NIL)) {
-    return setNodeFromToken(newLiteralValueNode(NIL_VAL), parser.previous);
+    Token litToken = parser.previous;
+    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
+    markInitialized(cmp);
+    return setNodeFromToken(newLiteralValueNode(NIL_VAL), litToken);
   }
 
   if (match(cmp, TOKEN_UNDEFINED)) {
-    return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), parser.previous);
+    Token litToken = parser.previous;
+    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
+    markInitialized(cmp);
+    return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), litToken);
   }
 
   // Variable pattern - parse as parameter, not as var reference

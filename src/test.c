@@ -217,6 +217,301 @@ bool testFunctionNode() {
 }
 
 /* ============================================================
+ * Switch Function Tests
+ * ============================================================ */
+
+bool testSwitchFunctionTwoCases() {
+  AstNode* node = compile("let f = (1) => 1, (2) => 2");
+
+  // Create first case
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("f");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* literal1 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case1->as.function.signature->as.signature.params, literal1);
+  case1->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+
+  // Create second case
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("f");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* literal2 = newLiteralValueNode(NUMBER_VAL(2));
+  pushAstVec(&case2->as.function.signature->as.signature.params, literal2);
+  case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(2)));
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 1;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSwitchFunctionVariablePatterns() {
+  AstNode* node = compile("let f = (x) => x, (y) => y + 1");
+
+  // Create first case
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("f");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* param1 = newParamNode(NULL);
+  param1->as.param.name = intern("x");
+  pushAstVec(&case1->as.function.signature->as.signature.params, param1);
+  AstNode* var1 = newVarLocalNode(0);
+  var1->as.local.name = intern("x");
+  case1->as.function.body = newReturnNode(var1);
+
+  // Create second case
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("f");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* param2 = newParamNode(NULL);
+  param2->as.param.name = intern("y");
+  pushAstVec(&case2->as.function.signature->as.signature.params, param2);
+  AstNode* var2 = newVarLocalNode(0);
+  var2->as.local.name = intern("y");
+  AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
+  AstNode* plusOp = newVarGlobalNode();
+  plusOp->as.global.name = intern("+");
+  AstNode* plusCall = newCallInfixNode(plusOp, var2, one);
+  case2->as.function.body = newReturnNode(plusCall);
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 1;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSwitchFunctionMixedPatterns() {
+  AstNode* node = compile("let f = (1) => 1, (x) => x");
+
+  // Create first case with literal
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("f");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* literal1 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case1->as.function.signature->as.signature.params, literal1);
+  case1->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+
+  // Create second case with variable
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("f");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* param = newParamNode(NULL);
+  param->as.param.name = intern("x");
+  pushAstVec(&case2->as.function.signature->as.signature.params, param);
+  AstNode* var = newVarLocalNode(0);
+  var->as.local.name = intern("x");
+  case2->as.function.body = newReturnNode(var);
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 1;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSwitchFunctionThreeCases() {
+  AstNode* node = compile("let f = (1) => 1, (2) => 2, (3) => 3");
+
+  // Create switch node with three cases
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 1;
+
+  for (int i = 1; i <= 3; i++) {
+    AstNode* caseNode = newFunctionNode(NULL);
+    caseNode->as.function.name = intern("f");
+    caseNode->as.function.signature = newSignatureNode();
+    AstNode* literal = newLiteralValueNode(NUMBER_VAL(i));
+    pushAstVec(&caseNode->as.function.signature->as.signature.params, literal);
+    caseNode->as.function.body =
+        newReturnNode(newLiteralValueNode(NUMBER_VAL(i)));
+    pushAstVec(&switchNode->as.switchFunc.cases, caseNode);
+  }
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSwitchFunctionMultiParam() {
+  AstNode* node = compile("let f = (1, x) => x, (x, 1) => x");
+
+  // Create first case: (1, x) => x
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("f");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* literal1 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case1->as.function.signature->as.signature.params, literal1);
+  AstNode* param1 = newParamNode(NULL);
+  param1->as.param.name = intern("x");
+  pushAstVec(&case1->as.function.signature->as.signature.params, param1);
+  AstNode* var1 = newVarLocalNode(1);
+  var1->as.local.name = intern("x");
+  case1->as.function.body = newReturnNode(var1);
+
+  // Create second case: (x, 1) => x
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("f");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* param2 = newParamNode(NULL);
+  param2->as.param.name = intern("x");
+  pushAstVec(&case2->as.function.signature->as.signature.params, param2);
+  AstNode* literal2 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case2->as.function.signature->as.signature.params, literal2);
+  AstNode* var2 = newVarLocalNode(0);
+  var2->as.local.name = intern("x");
+  case2->as.function.body = newReturnNode(var2);
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 2;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSwitchFunctionStringPatterns() {
+  AstNode* node = compile("let f = (\"hello\") => 1, (\"world\") => 2");
+
+  // Create first case
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("f");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* str1 = newLiteralNode();
+  str1->as.literal.value = OBJ_VAL(intern("hello"));
+  pushAstVec(&case1->as.function.signature->as.signature.params, str1);
+  case1->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+
+  // Create second case
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("f");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* str2 = newLiteralNode();
+  str2->as.literal.value = OBJ_VAL(intern("world"));
+  pushAstVec(&case2->as.function.signature->as.signature.params, str2);
+  case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(2)));
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 1;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+bool testSwitchFunctionBooleanPatterns() {
+  AstNode* node = compile("let f = (true) => 1, (false) => 0");
+
+  // Create first case
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("f");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* trueLit = newLiteralValueNode(BOOL_VAL(true));
+  pushAstVec(&case1->as.function.signature->as.signature.params, trueLit);
+  case1->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+
+  // Create second case
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("f");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* falseLit = newLiteralValueNode(BOOL_VAL(false));
+  pushAstVec(&case2->as.function.signature->as.signature.params, falseLit);
+  case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(0)));
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 1;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
+/* ============================================================
  * String Tests
  * ============================================================ */
 
@@ -1223,6 +1518,261 @@ bool testBytecodeFunctionExpr() {
   if (read_u16(c1.code[1], c1.code[2]) != 0) return false;
   if (c1.constants.count != 1) return false;
   if (!valuesEqual(c1.constants.values[0], NUMBER_VAL(42))) return false;
+
+  return true;
+}
+
+bool testBytecodeSwitchTwoCases() {
+  // Create first case
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("f");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* literal1 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case1->as.function.signature->as.signature.params, literal1);
+  case1->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+
+  // Create second case
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("f");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* literal2 = newLiteralValueNode(NUMBER_VAL(2));
+  pushAstVec(&case2->as.function.signature->as.signature.params, literal2);
+  case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(2)));
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("f"));
+  switchNode->as.switchFunc.arity = 1;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  Chunk c;
+  if (!buildChunkForExpr(switchNode, &c)) return false;
+
+  // Verify we have at least the minimum expected size
+  // 2 closures (3+ bytes each) + OP_SWITCH (4 bytes) = at least 10 bytes
+  if (c.count < 10) return false;
+
+  // Find OP_SWITCH instruction (should be near the end)
+  int switchPos = -1;
+  for (int i = 0; i < c.count - 3; i++) {
+    if (c.code[i] == OP_SWITCH) {
+      switchPos = i;
+      break;
+    }
+  }
+  if (switchPos == -1) return false;
+
+  // Verify OP_SWITCH bytecode format
+  if (c.code[switchPos] != OP_SWITCH) return false;
+  if (c.code[switchPos + 1] != 2) return false;  // case count
+  uint16_t nameConstIdx =
+      read_u16(c.code[switchPos + 2], c.code[switchPos + 3]);
+
+  // Verify constants: 2 functions + 1 name = 3 constants
+  if (c.constants.count != 3) return false;
+  if (!IS_FUNCTION(c.constants.values[0])) return false;
+  if (!IS_FUNCTION(c.constants.values[1])) return false;
+  if (!IS_STRING(c.constants.values[nameConstIdx])) return false;
+  if (!valuesEqual(c.constants.values[nameConstIdx], OBJ_VAL(intern("f"))))
+    return false;
+
+  // Verify closures are present (should be before OP_SWITCH)
+  int closureCount = 0;
+  for (int i = 0; i < switchPos; i++) {
+    if (c.code[i] == OP_CLOSURE) closureCount++;
+  }
+  if (closureCount != 2) return false;
+
+  return true;
+}
+
+bool testBytecodeSwitchThreeCases() {
+  // Create switch node with three cases
+  AstNode* switchNode = newSwitchNode(intern("g"));
+  switchNode->as.switchFunc.arity = 1;
+
+  for (int i = 0; i < 3; i++) {
+    AstNode* caseNode = newFunctionNode(NULL);
+    caseNode->as.function.name = intern("g");
+    caseNode->as.function.signature = newSignatureNode();
+    AstNode* literal = newLiteralValueNode(NUMBER_VAL(i + 1));
+    pushAstVec(&caseNode->as.function.signature->as.signature.params, literal);
+    caseNode->as.function.body =
+        newReturnNode(newLiteralValueNode(NUMBER_VAL(i + 1)));
+    pushAstVec(&switchNode->as.switchFunc.cases, caseNode);
+  }
+
+  Chunk c;
+  if (!buildChunkForExpr(switchNode, &c)) return false;
+
+  // Find OP_SWITCH instruction
+  int switchPos = -1;
+  for (int i = 0; i < c.count - 3; i++) {
+    if (c.code[i] == OP_SWITCH) {
+      switchPos = i;
+      break;
+    }
+  }
+  if (switchPos == -1) return false;
+
+  // Verify OP_SWITCH bytecode format
+  if (c.code[switchPos] != OP_SWITCH) return false;
+  if (c.code[switchPos + 1] != 3) return false;  // case count
+  uint16_t nameConstIdx =
+      read_u16(c.code[switchPos + 2], c.code[switchPos + 3]);
+
+  // Verify constants: 3 functions + 1 name = 4 constants
+  if (c.constants.count != 4) return false;
+  for (int i = 0; i < 3; i++) {
+    if (!IS_FUNCTION(c.constants.values[i])) return false;
+  }
+  if (!IS_STRING(c.constants.values[nameConstIdx])) return false;
+  if (!valuesEqual(c.constants.values[nameConstIdx], OBJ_VAL(intern("g"))))
+    return false;
+
+  // Verify closures are present (should be before OP_SWITCH)
+  int closureCount = 0;
+  for (int i = 0; i < switchPos; i++) {
+    if (c.code[i] == OP_CLOSURE) closureCount++;
+  }
+  if (closureCount != 3) return false;
+
+  return true;
+}
+
+bool testBytecodeSwitchMultiParam() {
+  // Create first case: (1, x) => x
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("h");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* literal1 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case1->as.function.signature->as.signature.params, literal1);
+  AstNode* param1 = newParamNode(NULL);
+  param1->as.param.name = intern("x");
+  pushAstVec(&case1->as.function.signature->as.signature.params, param1);
+  AstNode* var1 = newVarLocalNode(1);
+  var1->as.local.name = intern("x");
+  case1->as.function.body = newReturnNode(var1);
+
+  // Create second case: (x, 1) => x
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("h");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* param2 = newParamNode(NULL);
+  param2->as.param.name = intern("x");
+  pushAstVec(&case2->as.function.signature->as.signature.params, param2);
+  AstNode* literal2 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case2->as.function.signature->as.signature.params, literal2);
+  AstNode* var2 = newVarLocalNode(0);
+  var2->as.local.name = intern("x");
+  case2->as.function.body = newReturnNode(var2);
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("h"));
+  switchNode->as.switchFunc.arity = 2;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  Chunk c;
+  if (!buildChunkForExpr(switchNode, &c)) return false;
+
+  // Find OP_SWITCH instruction
+  int switchPos = -1;
+  for (int i = 0; i < c.count - 3; i++) {
+    if (c.code[i] == OP_SWITCH) {
+      switchPos = i;
+      break;
+    }
+  }
+  if (switchPos == -1) return false;
+
+  // Verify OP_SWITCH bytecode format
+  if (c.code[switchPos] != OP_SWITCH) return false;
+  if (c.code[switchPos + 1] != 2) return false;  // case count
+  uint16_t nameConstIdx =
+      read_u16(c.code[switchPos + 2], c.code[switchPos + 3]);
+
+  // Verify constants: 2 functions + 1 name = 3 constants
+  if (c.constants.count != 3) return false;
+  if (!IS_FUNCTION(c.constants.values[0])) return false;
+  if (!IS_FUNCTION(c.constants.values[1])) return false;
+  if (!IS_STRING(c.constants.values[nameConstIdx])) return false;
+  if (!valuesEqual(c.constants.values[nameConstIdx], OBJ_VAL(intern("h"))))
+    return false;
+
+  // Verify arity of functions
+  ObjFunction* fn1 = AS_FUNCTION(c.constants.values[0]);
+  ObjFunction* fn2 = AS_FUNCTION(c.constants.values[1]);
+  if (fn1->arity != 2) return false;
+  if (fn2->arity != 2) return false;
+
+  // Verify closures are present (should be before OP_SWITCH)
+  int closureCount = 0;
+  for (int i = 0; i < switchPos; i++) {
+    if (c.code[i] == OP_CLOSURE) closureCount++;
+  }
+  if (closureCount != 2) return false;
+
+  return true;
+}
+
+bool testBytecodeSwitchMixedPatterns() {
+  // Create first case with literal
+  AstNode* case1 = newFunctionNode(NULL);
+  case1->as.function.name = intern("m");
+  case1->as.function.signature = newSignatureNode();
+  AstNode* literal1 = newLiteralValueNode(NUMBER_VAL(1));
+  pushAstVec(&case1->as.function.signature->as.signature.params, literal1);
+  case1->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+
+  // Create second case with variable
+  AstNode* case2 = newFunctionNode(NULL);
+  case2->as.function.name = intern("m");
+  case2->as.function.signature = newSignatureNode();
+  AstNode* param = newParamNode(NULL);
+  param->as.param.name = intern("x");
+  pushAstVec(&case2->as.function.signature->as.signature.params, param);
+  AstNode* var = newVarLocalNode(0);
+  var->as.local.name = intern("x");
+  case2->as.function.body = newReturnNode(var);
+
+  // Create switch node
+  AstNode* switchNode = newSwitchNode(intern("m"));
+  switchNode->as.switchFunc.arity = 1;
+  pushAstVec(&switchNode->as.switchFunc.cases, case1);
+  pushAstVec(&switchNode->as.switchFunc.cases, case2);
+
+  Chunk c;
+  if (!buildChunkForExpr(switchNode, &c)) return false;
+
+  // Find OP_SWITCH instruction
+  int switchPos = -1;
+  for (int i = 0; i < c.count - 3; i++) {
+    if (c.code[i] == OP_SWITCH) {
+      switchPos = i;
+      break;
+    }
+  }
+  if (switchPos == -1) return false;
+
+  // Verify OP_SWITCH bytecode format
+  if (c.code[switchPos] != OP_SWITCH) return false;
+  if (c.code[switchPos + 1] != 2) return false;  // case count
+  uint16_t nameConstIdx =
+      read_u16(c.code[switchPos + 2], c.code[switchPos + 3]);
+
+  // Verify constants
+  if (c.constants.count != 3) return false;
+  if (!IS_FUNCTION(c.constants.values[0])) return false;
+  if (!IS_FUNCTION(c.constants.values[1])) return false;
+  if (!IS_STRING(c.constants.values[nameConstIdx])) return false;
+
+  // Verify closures are present (should be before OP_SWITCH)
+  int closureCount = 0;
+  for (int i = 0; i < switchPos; i++) {
+    if (c.code[i] == OP_CLOSURE) closureCount++;
+  }
+  if (closureCount != 2) return false;
 
   return true;
 }
@@ -2704,6 +3254,7 @@ bool testSetComprehensionFunctionBody() {
   AstNode* expected = mkFunction();
 
   AstNode* fnExpr = newFunctionNode(NULL);
+  fnExpr->as.function.name = intern("(");
   fnExpr->as.function.signature = newSignatureNode();
   fnExpr->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
 
@@ -4078,6 +4629,17 @@ int testMain(void) {
   fmt("    ", testCallInfixNodeLeftNested(), "Call Infix - Left Nested");
   fmt("    ", testCallInfixNodeRightNested(), "Call Infix - Right Nested");
   fmt("    ", testFunctionNode(), "Function - Implicit Return - Literal");
+  fmt("    ", testSwitchFunctionTwoCases(), "Switch function - Two cases");
+  fmt("    ", testSwitchFunctionVariablePatterns(),
+      "Switch function - Variable patterns");
+  fmt("    ", testSwitchFunctionMixedPatterns(),
+      "Switch function - Mixed patterns");
+  fmt("    ", testSwitchFunctionThreeCases(), "Switch function - Three cases");
+  fmt("    ", testSwitchFunctionMultiParam(), "Switch function - Multi-param");
+  fmt("    ", testSwitchFunctionStringPatterns(),
+      "Switch function - String patterns");
+  fmt("    ", testSwitchFunctionBooleanPatterns(),
+      "Switch function - Boolean patterns");
   fmt("    ", testStringLiteral(), "String literal");
   fmt("    ", testStringEmpty(), "String empty");
   fmt("    ", testIfSimple(), "If simple");
@@ -4167,6 +4729,14 @@ int testMain(void) {
   fmt("    ", testBytecodeCallNestedCallee(), "Call with nested callee");
   fmt("    ", testBytecodeFunctionEmpty(), "Function empty body");
   fmt("    ", testBytecodeFunctionExpr(), "Function expression body");
+  fmt("    ", testBytecodeSwitchTwoCases(),
+      "Switch function - Two cases bytecode");
+  fmt("    ", testBytecodeSwitchThreeCases(),
+      "Switch function - Three cases bytecode");
+  fmt("    ", testBytecodeSwitchMultiParam(),
+      "Switch function - Multi-param bytecode");
+  fmt("    ", testBytecodeSwitchMixedPatterns(),
+      "Switch function - Mixed patterns bytecode");
   fmt("    ", testBytecodeGlobal(), "Global variable");
   fmt("    ", testBytecodeGlobalLongName(), "Global variable long name");
   fmt("    ", testBytecodeCallInfix(), "Call infix");
