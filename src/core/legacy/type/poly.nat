@@ -155,7 +155,7 @@ class PolyTypeState extends AdhocTypeState {
       return type;
     }
 
-    if (node is ASTOverload) {
+    if (node is ASTSwitch) {
       let tCases = node.children.map(this.principal);
 
       // push case abstractions to left edge.
@@ -169,9 +169,9 @@ class PolyTypeState extends AdhocTypeState {
       });
 
       if (abstract)
-        return TGeneralization(TOverload(..tCases));
+        return TGeneralization(TSwitch(..tCases));
 
-      return TOverload(..tCases);
+      return TSwitch(..tCases);
     }
 
     if (node is ASTQuantification) {

@@ -306,7 +306,6 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
   // Value scrutinee = vmPeek(0);
 
   for (int i = 0; i < caseCount; i++) {
-    // unification fix me.
     // if (!unify(cases[i], scrutinee)) return false;
     return false;
 
@@ -338,8 +337,8 @@ bool vmCallValue(Value caller, int argCount) {
           return callCases(&closure, 1, argCount);
         return callClosure(AS_CLOSURE(caller), argCount);
       }
-      case OBJ_OVERLOAD: {
-        ObjOverload* overload = AS_OVERLOAD(caller);
+      case OBJ_SWITCH: {
+        ObjSwitch* overload = AS_SWITCH(caller);
         return callCases(overload->closures, overload->cases, argCount);
       }
       case OBJ_NATIVE:
@@ -419,25 +418,25 @@ void vmClosure(CallFrame* frame) {
   vmCaptureUpvalues(closure, frame);
 }
 
-bool vmOverload(CallFrame* frame) {
+bool vmSwitch(CallFrame* frame) {
   int cases = READ_BYTE();
   // READ_CONSTANT();  // name.
   frame->ip += 2;
   int arity = 0;
-  ObjOverload* overload = newOverload(cases);
+  ObjSwitch* overload = newSwitch(cases);
 
   for (int i = cases; i > 0; i--) {
     ObjClosure** closures = overload->closures;
 
     if (!IS_CLOSURE(vmPeek(i - 1))) {
-      vmRuntimeError("Overload operand must be a function.");
+      vmRuntimeError("Switch operand must be a function.");
       return false;
     }
 
     closures[cases - i] = AS_CLOSURE(vmPeek(i - 1));
 
     if (i < cases && closures[cases - i]->function->arity != arity) {
-      vmRuntimeError("Overload operands must have uniform arity.");
+      vmRuntimeError("Switch cases must have uniform arity.");
       return false;
     }
 
@@ -665,8 +664,8 @@ InterpretResult vmExecute(int baseFrame) {
         vmClosure(frame);
         break;
       }
-      case OP_OVERLOAD: {
-        if (!vmOverload(frame)) return INTERPRET_RUNTIME_ERROR;
+      case OP_SWITCH: {
+        if (!vmSwitch(frame)) return INTERPRET_RUNTIME_ERROR;
         break;
       }
       case OP_VARIABLE: {

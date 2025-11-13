@@ -228,7 +228,7 @@ class SimpleTypeSystem {
     // these need to be inferred.
     if (type == OFunction) return nil;
     if (type == OBoundFunction) return nil;
-    if (type == OOverload) return nil;
+    if (type == OSwitch) return nil;
 
     throw TypeError("Don't know the literal type of " + str(value) + ".");
   }

@@ -28,7 +28,7 @@ typedef enum {
   OP_LOOP,
   OP_CALL,
   OP_CLOSURE,
-  OP_OVERLOAD,
+  OP_SWITCH,
   OP_VARIABLE,
   OP_SIGN,
   OP_CLOSE_UPVALUE,

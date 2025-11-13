@@ -15,7 +15,7 @@ class AnnotatedTree extends Tree {
   texData() => {
     if (this.data == nil) return "";
 
-    if (vmType(this.data) in [OFunction, OOverload]) {
+    if (vmType(this.data) in [OFunction, OSwitch]) {
       let ast <- this.data;
       ast = ast.simplify();
       let tex = "$#{this.type.tex()}$ \\ $#{ast.tex()}$";
