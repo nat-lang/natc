@@ -90,8 +90,8 @@ static void blackenObject(Obj* object) {
         markObject((Obj*)closure->upvalues[i]);
       break;
     }
-    case OBJ_OVERLOAD: {
-      ObjOverload* overload = (ObjOverload*)object;
+    case OBJ_SWITCH: {
+      ObjSwitch* overload = (ObjSwitch*)object;
       for (int i = 0; i < overload->cases; i++)
         markObject((Obj*)overload->closures[i]);
       break;
@@ -169,10 +169,10 @@ static void freeObject(Obj* object) {
       FREE(ObjFunction, object);
       break;
     }
-    case OBJ_OVERLOAD: {
-      ObjOverload* overload = (ObjOverload*)object;
-      FREE_ARRAY(ObjOverload*, overload->closures, overload->cases);
-      FREE(ObjOverload, object);
+    case OBJ_SWITCH: {
+      ObjSwitch* overload = (ObjSwitch*)object;
+      FREE_ARRAY(ObjSwitch*, overload->closures, overload->cases);
+      FREE(ObjSwitch, object);
       break;
     }
     case OBJ_MODULE: {

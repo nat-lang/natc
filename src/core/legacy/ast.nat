@@ -366,7 +366,7 @@ class ASTExternalUpvalue extends ASTUpvalue {
   tex() => {
     let value = this.resolve(), type = vmType(value);
 
-    if (type in [OFunction, OOverload]) {
+    if (type in [OFunction, OSwitch]) {
       let ast <- value;
       return ast.tex();
     } else if (type == OInstance && callable(value.tex)) {
@@ -648,7 +648,7 @@ class ASTMethod extends ASTExpr {
   }
 }
 
-class ASTOverload extends ASTExpr {
+class ASTSwitch extends ASTExpr {
   init(overload, count, closures) => {
     this.overload = overload;
     this.count = count;

@@ -46,7 +46,7 @@
 #define S_AST_INTERNAL_UPVALUE "ASTInternalUpvalue"
 #define S_AST_LOCAL "ASTLocal"
 #define S_AST_GLOBAL "ASTGlobal"
-#define S_AST_OVERLOAD "ASTOverload"
+#define S_AST_SWITCH "ASTSwitch"
 #define S_AST_MEMBERSHIP "ASTMembership"
 #define S_AST_BLOCK "ASTBlock"
 #define S_AST_QUANTIFICATION "ASTQuantification"
@@ -63,7 +63,7 @@
 #define S_OTYPE_FUNCTION "OFunction"
 #define S_OTYPE_BOUND_FUNCTION "OBoundFunction"
 #define S_OTYPE_NATIVE "ONative"
-#define S_OTYPE_OVERLOAD "OOverload"
+#define S_OTYPE_SWITCH "OSwitch"
 #define S_OTYPE_SEQUENCE "OSequence"
 
 #define S_GRAMMAR "Grammar"

@@ -1,45 +1,45 @@
-class TOverload extends Type {
+class TSwitch extends Type {
   init(*cases) => {
     if (len(cases) == 0)
-      throw TypeError("TOverload requires at least one case.");
+      throw TypeError("TSwitch requires at least one case.");
 
     this.cases = cases.map(TypeSystem.typify);
   }
 
   unit(type) => {
-    if (type is TOverload)
+    if (type is TSwitch)
       return type;
-    return TOverload(type);
+    return TSwitch(type);
   }
 
   lift(type) => {
     // if a function has a disjunctive domain we can map it
     // into an overload with a case for each disjunct.
     if (type is TFunction and type.domain is TSum)
-      return TOverload(..[x -> type.range | x in type.domain]);
+      return TSwitch(..[x -> type.range | x in type.domain]);
 
     return this.unit(type);
   }
 
-  concat(that) => TOverload(..this.cases.concat(that.cases));
+  concat(that) => TSwitch(..this.cases.concat(that.cases));
 
-  __eq__(that) => that is TOverload && this.cases == that.cases;
+  __eq__(that) => that is TSwitch && this.cases == that.cases;
 
-  str() => "TOverload(#{join([x.str() | x in this.cases], ", ")})";
+  str() => "TSwitch(#{join([x.str() | x in this.cases], ", ")})";
   tex() => join([case.tex() | case in this.cases], " \mid ");
   pp() => { print this.str(); }
   fvs() => union(..[case.fvs() | case in this.cases]);
 
-  substitute(sub) => TOverload(..this.cases.map(x => x.substitute(sub)));
+  substitute(sub) => TSwitch(..this.cases.map(x => x.substitute(sub)));
 }
 
-let infix(7) & = (a, b) => TOverload.unit(a).concat(TOverload.unit(b));
+let infix(7) & = (a, b) => TSwitch.unit(a).concat(TSwitch.unit(b));
 
 class AdhocTypeState extends SubtypeState {
   constrain(node: ASTNode) => {
-    if (node is ASTOverload) {
+    if (node is ASTSwitch) {
       let tCases = node.children.map(this.principal);
-      return TOverload(..tCases);
+      return TSwitch(..tCases);
     }
 
     return super.constrain(node);
@@ -53,9 +53,9 @@ class AdhocTypeState extends SubtypeState {
       if (left is TVar || right is TVar)
         return super._unify(constraint);
 
-      if (left is TOverload || right is TOverload) {
-        let oLeft = TOverload.lift(left);
-        let oRight = TOverload.lift(right);
+      if (left is TSwitch || right is TSwitch) {
+        let oLeft = TSwitch.lift(left);
+        let oRight = TSwitch.lift(right);
 
         let tRange = [];
 
@@ -87,9 +87,9 @@ class AdhocTypeState extends SubtypeState {
     }
 
     // left ~ right iff left <| right & right <| left
-    if (left is TOverload || right is TOverload) {
-      left = TOverload.lift(left);
-      right = TOverload.lift(right);
+    if (left is TSwitch || right is TSwitch) {
+      left = TSwitch.lift(left);
+      right = TSwitch.lift(right);
 
       this.constraints.extend([
         // fixme: remove parens.
@@ -103,7 +103,7 @@ class AdhocTypeState extends SubtypeState {
   }
 
   type(expr) => {
-    if (vmType(expr) == OOverload)
+    if (vmType(expr) == OSwitch)
       return this.infer(expr);
 
     return super.type(expr);

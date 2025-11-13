@@ -52,11 +52,11 @@ ObjModule* newModule(ObjString* dirName, ObjString* baseName,
   return module;
 }
 
-ObjOverload* newOverload(int cases) {
+ObjSwitch* newSwitch(int cases) {
   ObjClosure** closures = ALLOCATE(ObjClosure*, cases);
   for (int i = 0; i < cases; i++) closures[i] = NULL;
 
-  ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
+  ObjSwitch* overload = ALLOCATE_OBJ(ObjSwitch, OBJ_SWITCH);
   overload->closures = closures;
   overload->cases = cases;
   return overload;
@@ -379,8 +379,8 @@ void printObject(Value value) {
       printf("<function %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
-    case OBJ_OVERLOAD:
-      printf("<overload at %p>", AS_OVERLOAD(value));
+    case OBJ_SWITCH:
+      printf("<overload at %p>", AS_SWITCH(value));
       break;
     case OBJ_VARIABLE:
       printf("<var %s>", AS_VARIABLE(value)->name->chars);

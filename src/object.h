@@ -10,7 +10,7 @@
 
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
-#define IS_OVERLOAD(value) isObjType(value, OBJ_OVERLOAD)
+#define IS_SWITCH(value) isObjType(value, OBJ_SWITCH)
 #define IS_VARIABLE(value) isObjType(value, OBJ_VARIABLE)
 #define IS_PATTERN(value) isObjType(value, OBJ_PATTERN)
 #define IS_MAP(value) isObjType(value, OBJ_MAP)
@@ -25,7 +25,7 @@
 
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
-#define AS_OVERLOAD(value) ((ObjOverload*)AS_OBJ(value))
+#define AS_SWITCH(value) ((ObjSwitch*)AS_OBJ(value))
 #define AS_VARIABLE(value) (((ObjVariable*)AS_OBJ(value)))
 #define AS_PATTERN(value) (((ObjPattern*)AS_OBJ(value)))
 #define AS_MAP(value) ((ObjMap*)AS_OBJ(value))
@@ -46,7 +46,7 @@
 typedef enum {
   OBJ_CLOSURE,
   OBJ_FUNCTION,
-  OBJ_OVERLOAD,
+  OBJ_SWITCH,
   OBJ_NATIVE,
   OBJ_SEQUENCE,
   OBJ_SET,
@@ -128,7 +128,7 @@ typedef struct {
   Obj obj;
   int cases;
   ObjClosure** closures;
-} ObjOverload;
+} ObjSwitch;
 
 struct ObjModule {
   Obj obj;
@@ -164,7 +164,7 @@ typedef struct {
 
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
-ObjOverload* newOverload(int cases);
+ObjSwitch* newSwitch(int cases);
 ObjVariable* newVariable(ObjString* name);
 ObjModule* newModule(ObjString* dirName, ObjString* baseName,
                      ObjString* source);

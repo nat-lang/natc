@@ -139,12 +139,12 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_CLOSE_UPVALUE", offset);
     case OP_RETURN:
       return simpleInstruction("OP_RETURN", offset);
-    case OP_OVERLOAD: {
+    case OP_SWITCH: {
       offset += 1;
       uint8_t slot = chunk->code[offset];
       uint16_t constant = readShort(chunk, offset);
       offset += 3;
-      printf("%-16s %4d '", "OP_OVERLOAD", slot);
+      printf("%-16s %4d '", "OP_SWITCH", slot);
       printValue(chunk->constants.values[constant]);
       printf("'\n");
       return offset;

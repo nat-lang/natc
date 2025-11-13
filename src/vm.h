@@ -135,7 +135,7 @@ void vmInitFrame(ObjClosure* closure, int offset);
 bool vmCallValue(Value value, int argCount);
 void vmCloseUpvalues(Value* last);
 void vmClosure(CallFrame* frame);
-bool vmOverload(CallFrame* frame);
+bool vmSwitch(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
 bool vmTuplify(int count, bool replace);
