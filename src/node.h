@@ -290,7 +290,7 @@ AstNode* newPropertyGetNode(AstNode* object);
 AstNode* newPropertySetNode(AstNode* object, AstNode* value);
 AstNode* newThrowNode(AstNode* expr);
 AstNode* newSignatureNode();
-AstNode* newSwitchNode(ObjString* name);
+AstNode* newSwitchNode();
 AstNode* newUnknownNode();
 AstNode* newUseNode(AstNode* module);
 AstNode* newVarGlobalNode();

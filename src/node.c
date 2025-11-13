@@ -326,9 +326,9 @@ AstNode* newSignatureNode() {
   return n;
 }
 
-AstNode* newSwitchNode(ObjString* name) {
+AstNode* newSwitchNode() {
   AstNode* n = allocNode(AST_SWITCH);
-  n->as.switchFunc.name = name;
+  n->as.switchFunc.name = NULL;
   initAstVec(&n->as.switchFunc.cases);
   n->as.switchFunc.arity = 0;
   return n;
@@ -1390,8 +1390,6 @@ void markAstNode(AstNode* n) {
       break;
     case AST_SWITCH:
       markObject((Obj*)n->as.switchFunc.name);
-      for (int i = 0; i < n->as.switchFunc.cases.count; i++)
-        markAstNode(&n->as.switchFunc.cases.items[i]);
       break;
     case AST_VAR_GLOBAL:
       markObject((Obj*)n->as.global.name);
