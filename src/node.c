@@ -19,16 +19,6 @@ bool nodesEqual(AstNode* a, AstNode* b);
 // vector.
 // ============================================================
 
-static void ensureAstVec(AstVec* v, int need) {
-  if (v->capacity >= need) return;
-  int newCap = v->capacity ? v->capacity * 2 : 8;
-  while (newCap < need) newCap *= 2;
-  size_t oldBytes = (size_t)v->capacity * sizeof(void*);
-  size_t newBytes = (size_t)newCap * sizeof(void*);
-  v->items = (AstNode**)reallocate(v->items, oldBytes, newBytes);
-  v->capacity = newCap;
-}
-
 void initAstVec(AstVec* v) {
   v->items = NULL;
   v->count = 0;
@@ -36,24 +26,26 @@ void initAstVec(AstVec* v) {
 }
 
 void pushAstVec(AstVec* v, AstNode* node) {
-  ensureAstVec(v, v->count + 1);
-  v->items[v->count++] = node;
+  if (v->capacity < v->count + 1) {
+    int oldCapacity = v->capacity;
+    v->capacity = GROW_CAPACITY(oldCapacity);
+    v->items = GROW_ARRAY(AstNode, v->items, oldCapacity, v->capacity);
+  }
+
+  v->items[v->count] = *node;
+  v->count++;
 }
 
 void freeAstVec(AstVec* v) {
-  if (!v) return;
-  size_t oldBytes = (size_t)v->capacity * sizeof(void*);
-  (void)reallocate(v->items, oldBytes, 0);
-  v->items = NULL;
-  v->count = 0;
-  v->capacity = 0;
+  FREE_ARRAY(AstNode, v->items, v->capacity);
+  initAstVec(v);
 }
 
 bool astVecsEqual(AstVec* a, AstVec* b) {
   if (a->count != b->count) return false;
 
   for (int i = 0; i < a->count; i++)
-    if (!nodesEqual(a->items[i], b->items[i])) return false;
+    if (!nodesEqual(&a->items[i], &b->items[i])) return false;
 
   return true;
 }
@@ -358,7 +350,7 @@ void printStrAt(char* str, int depth) {
 
 void printNodeVecAt(AstVec* nodes, int depth) {
   for (int i = 0; i < nodes->count; i++) {
-    printNodeAt(nodes->items[i], depth);
+    printNodeAt(&nodes->items[i], depth);
   }
 }
 
@@ -802,7 +794,7 @@ ObjFunction* toFunction(AstNode* node);
 
 bool toChunkVec(AstVec* nodes, Chunk* chunk) {
   for (int i = 0; i < nodes->count; i++) {
-    if (!toChunk(nodes->items[i], chunk)) return false;
+    if (!toChunk(&nodes->items[i], chunk)) return false;
   }
   return true;
 }
@@ -900,7 +892,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       // then we wrap it in the restrictions.
       for (int i = node->as.comprehension.conditions.count - 1; i >= 0; i--) {
-        AstNode* cond = node->as.comprehension.conditions.items[i];
+        AstNode* cond = &node->as.comprehension.conditions.items[i];
         switch (cond->type) {
           case AST_COMPREHENSION_ITER: {
             comp = newIterNode(cond->as.comprehensionIter.var,
@@ -1289,14 +1281,14 @@ void markAstNode(AstNode* n) {
       break;
     case AST_BLOCK:
       for (int i = 0; i < n->as.block.stmts.count; i++) {
-        markAstNode((AstNode*)n->as.block.stmts.items[i]);
+        markAstNode((AstNode*)&n->as.block.stmts.items[i]);
       }
       break;
 
     case AST_CALL: {
       markAstNode(n->as.call.callee);
       for (int i = 0; i < n->as.call.args.count; i++) {
-        markAstNode((AstNode*)n->as.call.args.items[i]);
+        markAstNode((AstNode*)&n->as.call.args.items[i]);
       }
       break;
     }
@@ -1309,7 +1301,7 @@ void markAstNode(AstNode* n) {
     case AST_COMPREHENSION: {
       markAstNode(n->as.comprehension.body);
       for (int i = 0; i < n->as.comprehension.conditions.count; i++) {
-        markAstNode(n->as.comprehension.conditions.items[i]);
+        markAstNode(&n->as.comprehension.conditions.items[i]);
       }
       break;
     }
@@ -1389,16 +1381,16 @@ void markAstNode(AstNode* n) {
       break;
     case AST_SEQUENCE:
       for (int i = 0; i < n->as.sequence.values.count; i++)
-        markAstNode((AstNode*)n->as.sequence.values.items[i]);
+        markAstNode(&n->as.sequence.values.items[i]);
       break;
     case AST_SET:
       for (int i = 0; i < n->as.set.values.count; i++)
-        markAstNode((AstNode*)n->as.set.values.items[i]);
+        markAstNode(&n->as.set.values.items[i]);
       break;
     case AST_TREE:
       markAstNode(n->as.tree.value);
       for (int i = 0; i < n->as.tree.values.count; i++)
-        markAstNode((AstNode*)n->as.tree.values.items[i]);
+        markAstNode(&n->as.tree.values.items[i]);
       break;
     case AST_SUBSCRIPT_GET:
       markAstNode(n->as.subscript.object);
@@ -1420,7 +1412,7 @@ void markAstNode(AstNode* n) {
       break;
     case AST_MAP:
       for (int i = 0; i < n->as.map.entries.count; i++)
-        markAstNode((AstNode*)n->as.map.entries.items[i]);
+        markAstNode(&n->as.map.entries.items[i]);
       break;
     case AST_MAP_ENTRY:
       markAstNode(n->as.mapEntry.key);
@@ -1428,7 +1420,7 @@ void markAstNode(AstNode* n) {
       break;
     case AST_SIGNATURE:
       for (int i = 0; i < n->as.signature.params.count; i++)
-        markObject((Obj*)n->as.signature.params.items[i]);
+        markAstNode(&n->as.signature.params.items[i]);
       break;
     case AST_VAR_GLOBAL:
       markObject((Obj*)n->as.global.name);
@@ -1486,6 +1478,7 @@ void freeAstNode(AstNode* n) {
     case AST_UNKNOWN:
       break;
     case AST_BLOCK:
+      freeAstVec(&n->as.block.stmts);
       break;
     case AST_EXPR_STMT:
       break;

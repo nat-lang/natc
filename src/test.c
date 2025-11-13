@@ -52,7 +52,7 @@ void pushFnStmt(AstNode* fn, AstNode* stmt) {
 static AstNode* getBodyStmt(AstNode* fn, int index) {
   AstVec* stmts = &fn->as.function.body->as.block.stmts;
   if (index < 0 || index >= stmts->count) return NULL;
-  return (AstNode*)stmts->items[index];
+  return &stmts->items[index];
 }
 
 bool testLiteralNumberNode() {
@@ -3052,7 +3052,7 @@ bool testImportParsing() {
   }
 
   // Extract the first statement which should be the import block
-  AstNode* actualFirstStmt = bodyStmts->items[0];
+  AstNode* actualFirstStmt = &bodyStmts->items[0];
   if (actualFirstStmt->type != AST_BLOCK) {
     printf(
         "Expected first statement to be a block (import desugaring), got type "
@@ -3074,7 +3074,7 @@ bool testImportParsing() {
   }
 
   // Check first statement: let __import = call(exportModuleFunction)
-  AstNode* importDecl = blockStmts->items[0];
+  AstNode* importDecl = &blockStmts->items[0];
   if (importDecl->type != AST_DECL_LET) {
     printf("Expected first statement to be AST_DECL_LET, got type %d\n",
            importDecl->type);
@@ -3097,7 +3097,7 @@ bool testImportParsing() {
   }
 
   // Check second statement: let x = __import["x"]
-  AstNode* xDecl = blockStmts->items[1];
+  AstNode* xDecl = &blockStmts->items[1];
   if (xDecl->type != AST_DECL_LET) {
     printf("Expected second statement to be AST_DECL_LET for x, got type %d\n",
            xDecl->type);
@@ -3119,7 +3119,7 @@ bool testImportParsing() {
   }
 
   // Check third statement: let f = __import["f"]
-  AstNode* fDecl = blockStmts->items[2];
+  AstNode* fDecl = &blockStmts->items[2];
   if (fDecl->type != AST_DECL_LET) {
     printf("Expected third statement to be AST_DECL_LET for f, got type %d\n",
            fDecl->type);

@@ -50,7 +50,7 @@ typedef enum {
 } ComprehensionType;
 
 typedef struct {
-  AstNode** items;
+  AstNode* items;
   int count;
   int capacity;
 } AstVec;
