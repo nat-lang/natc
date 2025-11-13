@@ -91,18 +91,11 @@ typedef struct {
 
 struct ObjFunction {
   Obj obj;
-
   AstNode* node;
-
   int arity;
   bool variadic;
   bool patterned;
-  int upvalueCount;
-
   Chunk chunk;
-  Local locals[UINT8_COUNT];
-  int localCount;
-
   ObjString* name;
   ObjModule* module;
 };
