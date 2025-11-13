@@ -5,7 +5,7 @@
 
 Scanner scanner;
 
-Scanner initScanner(const char *source) {
+Scanner initScanner(const char* source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
@@ -14,7 +14,7 @@ Scanner initScanner(const char *source) {
   return scanner;
 }
 
-void initToken(Token *token) {
+void initToken(Token* token) {
   token->type = -1;
   token->start = NULL;
   token->length = -1;
@@ -22,7 +22,7 @@ void initToken(Token *token) {
   token->column = -1;
 }
 
-Token syntheticToken(const char *start) {
+Token syntheticToken(const char* start) {
   Token token;
   token.start = start;
   token.length = (int)strlen(start);
@@ -105,7 +105,7 @@ static Token makeToken(TokenType type) {
   return token;
 }
 
-static Token errorToken(const char *message) {
+static Token errorToken(const char* message) {
   Token token;
   token.type = TOKEN_ERROR;
   token.start = message;
@@ -145,11 +145,11 @@ void skipWhitespace() {
   }
 }
 
-static bool checkpoint(int start, int length, const char *rest) {
+static bool checkpoint(int start, int length, const char* rest) {
   return memcmp(scanner.start + start, rest, length) == 0;
 }
 
-static TokenType checkpointKeyword(int start, int length, const char *rest,
+static TokenType checkpointKeyword(int start, int length, const char* rest,
                                    TokenType type) {
   if (scanner.current - scanner.start == start + length &&
       checkpoint(start, length, rest)) {
@@ -402,6 +402,7 @@ Token consumeToken(char c) {
       } else if (!isWhite(peekNext())) {
         return makeToken(TOKEN_EQUAL);
       }
+      break;
     }
     case '<': {
       if (match('-')) return makeToken(TOKEN_ARROW_LEFT);
