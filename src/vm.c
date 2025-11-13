@@ -297,33 +297,102 @@ bool vmTuplify(int count, bool replace) {
   return vmCallValue(OBJ_VAL(vm.core.sSeq), count);
 }
 
-static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
-  vmRuntimeError("Unification not implemented.");
-  return false;
+// Unify a pattern node (using existing AST node types) with an argument
+static bool unifyPatternNode(AstNode* pattern, Value arg,
+                             ValueArray* bindings) {
+  if (pattern == NULL) return false;
 
-  if (!vmTuplify(argCount, false)) return false;
+  switch (pattern->type) {
+    case AST_LITERAL: {
+      // Literal pattern: must match exactly
+      return valuesEqual(pattern->as.literal.value, arg);
+    }
 
-  // Value scrutinee = vmPeek(0);
+    case AST_PARAM: {
+      // Variable pattern: always succeeds, bind the argument
+      writeValueArray(bindings, arg);
+      return true;
+    }
 
-  for (int i = 0; i < caseCount; i++) {
-    // if (!unify(cases[i], scrutinee)) return false;
+    case AST_SEQUENCE: {
+      // Sequence destructuring pattern (future)
+      // Check if arg is a sequence
+      // Recursively unify each element
+      return false;  // Not implemented yet
+    }
+
+    case AST_SET: {
+      // Set destructuring pattern (future)
+      return false;  // Not implemented yet
+    }
+
+    case AST_MAP: {
+      // Map destructuring pattern (future)
+      return false;  // Not implemented yet
+    }
+
+    default:
+      return false;
+  }
+}
+
+// Unify argument list with a case's pattern signature
+static bool unifyCaseSignature(ObjFunction* caseFunc, Value* args, int argCount,
+                               ValueArray* bindings) {
+  if (caseFunc->arity != argCount) {
     return false;
+  }
 
-    if (AS_BOOL(vmPop())) {
-      vmPop();  // the tuplified scrutinee.
+  // Access the function's AST node
+  if (caseFunc->node == NULL || caseFunc->node->type != AST_FUNCTION) {
+    return false;
+  }
 
-      vm.stackTop[-1 - argCount] = OBJ_VAL(cases[i]);
+  AstNode* signature = caseFunc->node->as.function.signature;
+  if (signature == NULL || signature->type != AST_SIGNATURE) {
+    return false;
+  }
 
-      return callClosure(cases[i], argCount);
+  // Iterate through each parameter pattern
+  for (int i = 0; i < argCount; i++) {
+    AstNode* pattern = &signature->as.signature.params.items[i];
+    Value arg = args[i];
+
+    if (!unifyPatternNode(pattern, arg, bindings)) {
+      return false;
     }
   }
 
-  // no match: replace the arguments and the case object with undef.
-  vmPop();                     // tuplified scrutinee.
-  while (argCount--) vmPop();  // args.
-  vmPop();                     // case.
-  vmPush(UNDEF_VAL);
+  return true;
+}
 
+static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
+  Value* args = vm.stackTop - argCount;
+
+  // Try each case in order
+  for (int i = 0; i < caseCount; i++) {
+    ObjClosure* caseClosure = cases[i];
+    ObjFunction* caseFunc = caseClosure->function;
+
+    ValueArray bindings;
+    initValueArray(&bindings);
+
+    // Try to unify arguments with this case's pattern
+    if (unifyCaseSignature(caseFunc, args, argCount, &bindings)) {
+      // Unification succeeded! Arguments are already on stack
+
+      freeValueArray(&bindings);
+
+      // Call the matched case with original arguments
+      return callClosure(caseClosure, argCount);
+    }
+
+    freeValueArray(&bindings);
+  }
+
+  // No case matched - return undefined
+  vm.stackTop -= argCount;
+  vmPush(UNDEF_VAL);
   return true;
 }
 

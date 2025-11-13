@@ -10,3 +10,9 @@ assert(x == 3)
 use export
 
 assert(x == 1)
+
+// upvalues.
+
+assert(g() == nil)
+o.x = 1
+assert(g() == 1)

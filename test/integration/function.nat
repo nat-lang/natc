@@ -7,3 +7,56 @@ let f = x => x + 1
 
 f(1) 
 
+// Switch functions - literal patterns
+
+let literal1 = (1) => "one", (2) => "two", (3) => "three"
+assert(literal1(1) == "one")
+assert(literal1(2) == "two")
+assert(literal1(3) == "three")
+assert(literal1(4) == undefined)
+
+// Switch functions - variable patterns
+
+let variable1 = (1) => "one", (x) => "other"
+assert(variable1(1) == "one")
+assert(variable1(99) == "other")
+
+// Switch functions - multi-param with literals
+
+let multiLiteral = (0,1) => 2, (1,0) => 3, (x,y) => x + y
+assert(multiLiteral(0,1) == 2)
+assert(multiLiteral(1,0) == 3)
+assert(multiLiteral(2,3) == 5)
+
+// Switch functions - mixed literal and variable
+
+let mixed1 = (1,x) => x * 2, (x,1) => x * 3, (x,y) => x + y
+assert(mixed1(1,5) == 10)
+assert(mixed1(5,1) == 15)
+assert(mixed1(2,3) == 5)
+
+// Switch functions - boolean and nil patterns
+
+let boolNil = (true) => 1, (false) => 0, (nil) => -1
+assert(boolNil(true) == 1)
+assert(boolNil(false) == 0)
+assert(boolNil(nil) == -1)
+
+// Switch functions - string patterns
+
+let strings = ("hello") => 1, ("world") => 2, (x) => 0
+assert(strings("hello") == 1)
+assert(strings("world") == 2)
+assert(strings("other") == 0)
+
+// Switch functions - order matters, first match wins
+
+let order = (x) => "any", (1) => "one"
+assert(order(1) == "any")
+assert(order(99) == "any")
+
+// Switch functions - factorial example
+
+let factorial = (0) => 1, (n) => n * factorial(n - 1)
+assert(factorial(5) == 120)
+
