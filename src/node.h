@@ -41,7 +41,6 @@ typedef enum {
   AST_VAR_LOCAL,
   AST_VAR_UPVALUE,
   AST_WHILE,
-
 } AstType;
 
 typedef enum {
@@ -50,26 +49,26 @@ typedef enum {
 } ComprehensionType;
 
 typedef struct {
-  AstNode** items;
+  ObjAst** items;
   int count;
   int capacity;
 } AstVec;
 
 void initAstVec(AstVec* v);
-void pushAstVec(AstVec* v, AstNode* item);
+void pushAstVec(AstVec* v, ObjAst* item);
 void freeAstVec(AstVec* v);
 
-struct AstNode {
+struct ObjAst {
+  Obj obj;
+
   AstType type;
   int line;
   int col;
 
-  AstNode* next;
-
   union {
     struct {
-      AstNode* lhs;
-      AstNode* rhs;
+      ObjAst* lhs;
+      ObjAst* rhs;
     } assignment;
 
     struct {
@@ -77,21 +76,21 @@ struct AstNode {
     } block;
 
     struct {
-      AstNode* callee;
+      ObjAst* callee;
       AstVec args;
     } call;
 
     struct {
-      AstNode* callee;
-      AstNode* lhs;
-      AstNode* rhs;
+      ObjAst* callee;
+      ObjAst* lhs;
+      ObjAst* rhs;
     } callInfix;
 
     struct {
       ObjString* name;
-      AstNode* signature;
-      AstNode* body;
-      AstNode* module;
+      ObjAst* signature;
+      ObjAst* body;
+      ObjAst* module;
 
       bool variadic;
       bool patterned;
@@ -103,23 +102,23 @@ struct AstNode {
     } function;
 
     struct {
-      AstNode* cond;
-      AstNode* then;
-      AstNode* elseBranch;
+      ObjAst* cond;
+      ObjAst* then;
+      ObjAst* elseBranch;
     } ifStmt;
     struct {
-      AstNode* initializer;
-      AstNode* condition;
-      AstNode* increment;
-      AstNode* body;
+      ObjAst* initializer;
+      ObjAst* condition;
+      ObjAst* increment;
+      ObjAst* body;
     } forStmt;
 
     struct {
-      AstNode* expr;
+      ObjAst* expr;
     } exprStmt;
 
     struct {
-      AstNode* module;
+      ObjAst* module;
       ObjString* alias;  // can be NULL
     } use;
 
@@ -128,19 +127,19 @@ struct AstNode {
     } interpolation;
 
     struct {
-      AstNode* var;
-      AstNode* iterable;
-      AstNode* body;
+      ObjAst* var;
+      ObjAst* iterable;
+      ObjAst* body;
       uint8_t iterLocal;
     } iter;
 
     struct {
-      AstNode* local;
-      AstNode* value;
+      ObjAst* local;
+      ObjAst* value;
     } declLet;
     struct {
       ObjString* name;
-      AstNode* value;
+      ObjAst* value;
     } declGlobal;
 
     struct {
@@ -151,20 +150,20 @@ struct AstNode {
       ObjString* dirName;
       ObjString* baseName;
       ObjString* source;
-      AstNode* fn;
+      ObjAst* fn;
     } module;
 
     struct {
       ObjString* name;
-      AstNode* annotation;
+      ObjAst* annotation;
     } param;
 
     struct {
-      AstNode* value;
+      ObjAst* value;
     } xReturn;
 
     struct {
-      AstNode* expr;
+      ObjAst* expr;
     } throwStmt;
 
     struct {
@@ -188,62 +187,62 @@ struct AstNode {
       AstVec values;
     } set;
     struct {
-      AstNode* value;
-      AstVec values;
+      ObjAst* value;
+      AstVec children;
     } tree;
     struct {
-      AstNode* object;
-      AstNode* index;
+      ObjAst* object;
+      ObjAst* index;
     } subscript;
     struct {
-      AstNode* object;
-      AstNode* index;
-      AstNode* value;
+      ObjAst* object;
+      ObjAst* index;
+      ObjAst* value;
     } subscriptSet;
     struct {
-      AstNode* object;
+      ObjAst* object;
       ObjString* property;
     } propertyGet;
     struct {
-      AstNode* object;
+      ObjAst* object;
       ObjString* property;
-      AstNode* value;
+      ObjAst* value;
     } propertySet;
     struct {
       AstVec entries;
     } map;
     struct {
-      AstNode* key;
-      AstNode* value;
+      ObjAst* key;
+      ObjAst* value;
     } mapEntry;
     struct {
       AstVec params;
       int varargs;
     } signature;
     struct {
-      AstNode* expr;
+      ObjAst* expr;
     } spread;
 
     struct {
-      AstNode* cond;
-      AstNode* body;
+      ObjAst* cond;
+      ObjAst* body;
     } whileStmt;
 
     struct {
-      AstNode* body;
+      ObjAst* body;
       AstVec conditions;
       ComprehensionType type;
-      AstNode* compLocal;
+      ObjAst* compLocal;
     } comprehension;
 
     struct {
-      AstNode* var;
-      AstNode* iterable;
+      ObjAst* var;
+      ObjAst* iterable;
       uint8_t iterLocal;
     } comprehensionIter;
 
     struct {
-      AstNode* predicate;
+      ObjAst* predicate;
     } comprehensionPred;
 
   } as;
@@ -251,62 +250,60 @@ struct AstNode {
 
 /* constructors */
 
-AstNode* newAssignmentNode(AstNode* lhs, AstNode* rhs);
-AstNode* newBlockNode();
-AstNode* newCallNode(AstNode* callee);
-AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs);
-AstNode* newComprehensionNode(AstNode* body, ComprehensionType type);
-AstNode* newComprehensionIterNode(AstNode* var, AstNode* iterable);
-AstNode* newComprehensionPredNode(AstNode* predicate);
-AstNode* newExprStmtNode(AstNode* expr);
-AstNode* newForNode(AstNode* initializer, AstNode* condition,
-                    AstNode* increment, AstNode* body);
-AstNode* newFunctionNode(AstNode* module);
-AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch);
-AstNode* newInterpolationNode();
-AstNode* newIterNode(AstNode* var, AstNode* iterable, AstNode* body);
-AstNode* newDeclLetNode(AstNode* local, AstNode* value);
-AstNode* newDeclGlobalNode(AstNode* value);
-AstNode* newLiteralValueNode(Value value);
-AstNode* newLiteralNode();
-AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
-                       ObjString* source);
-AstNode* newMapNode();
-AstNode* newMapEntryNode(AstNode* key, AstNode* value);
-AstNode* newParamNode(AstNode* annotation);
-AstNode* newReturnNode(AstNode* value);
-AstNode* newSequenceNode();
-AstNode* newSetNode();
-AstNode* newTreeNode();
-AstNode* newSubscriptGetNode(AstNode* object, AstNode* index);
-AstNode* newSubscriptSetNode(AstNode* object, AstNode* index, AstNode* value);
-AstNode* newPropertyGetNode(AstNode* object);
-AstNode* newPropertySetNode(AstNode* object, AstNode* value);
-AstNode* newThrowNode(AstNode* expr);
-AstNode* newSignatureNode();
-AstNode* newUnknownNode();
-AstNode* newUseNode(AstNode* module);
-AstNode* newVarGlobalNode();
-AstNode* newVarLocalNode(uint8_t index);
-AstNode* newVarUpvalueNode(uint8_t index);
-AstNode* newWhileNode(AstNode* cond, AstNode* body);
+ObjAst* newAssignmentNode(ObjAst* lhs, ObjAst* rhs);
+ObjAst* newBlockNode();
+ObjAst* newCallNode(ObjAst* callee);
+ObjAst* newCallInfixNode(ObjAst* callee, ObjAst* lhs, ObjAst* rhs);
+ObjAst* newComprehensionNode(ObjAst* body, ComprehensionType type);
+ObjAst* newComprehensionIterNode(ObjAst* var, ObjAst* iterable);
+ObjAst* newComprehensionPredNode(ObjAst* predicate);
+ObjAst* newExprStmtNode(ObjAst* expr);
+ObjAst* newForNode(ObjAst* initializer, ObjAst* condition, ObjAst* increment,
+                   ObjAst* body);
+ObjAst* newFunctionNode(ObjAst* module);
+ObjAst* newIfNode(ObjAst* cond, ObjAst* then, ObjAst* elseBranch);
+ObjAst* newInterpolationNode();
+ObjAst* newIterNode(ObjAst* var, ObjAst* iterable, ObjAst* body);
+ObjAst* newDeclLetNode(ObjAst* local, ObjAst* value);
+ObjAst* newDeclGlobalNode(ObjAst* value);
+ObjAst* newLiteralValueNode(Value value);
+ObjAst* newLiteralNode();
+ObjAst* newModuleNode(ObjString* dirName, ObjString* baseName,
+                      ObjString* source);
+ObjAst* newMapNode();
+ObjAst* newMapEntryNode(ObjAst* key, ObjAst* value);
+ObjAst* newParamNode(ObjAst* annotation);
+ObjAst* newReturnNode(ObjAst* value);
+ObjAst* newSequenceNode();
+ObjAst* newSetNode();
+ObjAst* newTreeNode();
+ObjAst* newSubscriptGetNode(ObjAst* object, ObjAst* index);
+ObjAst* newSubscriptSetNode(ObjAst* object, ObjAst* index, ObjAst* value);
+ObjAst* newPropertyGetNode(ObjAst* object);
+ObjAst* newPropertySetNode(ObjAst* object, ObjAst* value);
+ObjAst* newThrowNode(ObjAst* expr);
+ObjAst* newSignatureNode();
+ObjAst* newUnknownNode();
+ObjAst* newUseNode(ObjAst* module);
+ObjAst* newVarGlobalNode();
+ObjAst* newVarLocalNode(uint8_t index);
+ObjAst* newVarUpvalueNode(uint8_t index);
+ObjAst* newWhileNode(ObjAst* cond, ObjAst* body);
 
 /* api */
 
-bool nodesEqual(AstNode* a, AstNode* b);
-void printNode(AstNode* node);
+bool nodesEqual(ObjAst* a, ObjAst* b);
+void printNode(ObjAst* node);
 
 /* api - bytecode */
 
-bool toChunk(AstNode* node, Chunk* chunk);
-ObjFunction* toFunction(AstNode* node);
-ObjModule* toModule(AstNode* node);
+bool toChunk(ObjAst* node, Chunk* chunk);
+ObjFunction* toFunction(ObjAst* node);
+ObjModule* toModule(ObjAst* node);
 
 /* memory */
 
-void markAstNode(AstNode* n);
-void freeAstNode(AstNode* n);
-void markAstNodes(AstNode* node);
-void freeAstNodes(AstNode* node);
+void markObjectAst(ObjAst* n);
+void freeObjectAst(ObjAst* n);
 
 #endif

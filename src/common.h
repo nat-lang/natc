@@ -176,7 +176,7 @@ typedef enum {
   PREC_PRIMARY
 } Precedence;
 
-typedef struct AstNode AstNode;
+typedef struct ObjAst ObjAst;
 typedef struct ObjString ObjString;
 typedef struct ObjFunction ObjFunction;
 typedef struct ObjModule ObjModule;

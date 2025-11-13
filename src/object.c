@@ -30,13 +30,15 @@ static Obj* allocateObject(size_t size, ObjType type) {
 }
 
 ObjClosure* newClosure(ObjFunction* function) {
-  ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
-  for (int i = 0; i < function->upvalueCount; i++) upvalues[i] = NULL;
+  ObjUpvalue** upvalues =
+      ALLOCATE(ObjUpvalue*, function->node->as.function.upvalueCount);
+  for (int i = 0; i < function->node->as.function.upvalueCount; i++)
+    upvalues[i] = NULL;
 
   ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
   closure->function = function;
   closure->upvalues = upvalues;
-  closure->upvalueCount = function->upvalueCount;
+  closure->upvalueCount = function->node->as.function.upvalueCount;
   return closure;
 }
 
@@ -72,7 +74,6 @@ ObjFunction* newFunction() {
   function->arity = 0;
   function->variadic = false;
   function->patterned = false;
-  function->upvalueCount = 0;
   function->name = NULL;
   function->module = NULL;
   function->module = NULL;
@@ -369,6 +370,11 @@ void markMap(Map* map) {
 
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
+    case OBJ_AST: {
+      ObjAst* ast = AS_AST(value);
+      printf("<ast at %p>", ast);
+      break;
+    }
     case OBJ_CLOSURE: {
       ObjClosure* closure = AS_CLOSURE(value);
       printf("<closure %s at %p>", closure->function->name->chars, closure);

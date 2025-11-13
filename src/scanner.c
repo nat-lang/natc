@@ -402,6 +402,7 @@ Token consumeToken(char c) {
       } else if (!isWhite(peekNext())) {
         return makeToken(TOKEN_EQUAL);
       }
+      break;
     }
     case '<': {
       if (match('-')) return makeToken(TOKEN_ARROW_LEFT);

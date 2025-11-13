@@ -14,7 +14,7 @@
 #include "value.h"
 #include "vm.h"
 
-bool nodesEqual(AstNode* a, AstNode* b);
+bool nodesEqual(ObjAst* a, ObjAst* b);
 
 // vector.
 // ============================================================
@@ -25,7 +25,7 @@ static void ensureAstVec(AstVec* v, int need) {
   while (newCap < need) newCap *= 2;
   size_t oldBytes = (size_t)v->capacity * sizeof(void*);
   size_t newBytes = (size_t)newCap * sizeof(void*);
-  v->items = (AstNode**)reallocate(v->items, oldBytes, newBytes);
+  v->items = (ObjAst**)reallocate(v->items, oldBytes, newBytes);
   v->capacity = newCap;
 }
 
@@ -35,7 +35,7 @@ void initAstVec(AstVec* v) {
   v->capacity = 0;
 }
 
-void pushAstVec(AstVec* v, AstNode* node) {
+void pushAstVec(AstVec* v, ObjAst* node) {
   ensureAstVec(v, v->count + 1);
   v->items[v->count++] = node;
 }
@@ -61,75 +61,98 @@ bool astVecsEqual(AstVec* a, AstVec* b) {
 // constructors.
 // ============================================================
 
-static AstNode* allocNode(AstType kind) {
-  AstNode* n = ALLOCATE(AstNode, 1);
-  memset(n, 0, sizeof(AstNode));
+static ObjAst* allocateNode(AstType kind) {
+  ObjAst* n = ALLOCATE(ObjAst, 1);
+  memset(n, 0, sizeof(ObjAst));
   n->type = kind;
   n->line = -1;
-  n->next = vm.astRoot;
+  n->obj.oType = OBJ_AST;
+  n->obj.isMarked = false;
+  n->obj.next = (Obj*)vm.astRoot;
   vm.astRoot = n;
+  initMap(&n->obj.fields);
+  return n;
+}
+ObjAst* _allocateNode(AstType type) {
+  Obj* obj = (Obj*)reallocate(NULL, 0, sizeof(ObjAst));
+
+  obj->oType = OBJ_AST;
+  obj->isMarked = false;
+  obj->next = (Obj*)vm.astRoot;
+  initMap(&obj->fields);
+
+  ObjAst* n = (ObjAst*)obj;
+
+  vm.astRoot = n;
+  n->line = -1;
+  n->type = type;
+
+#ifdef DEBUG_LOG_GC
+  printf("%p allocate %zu for %d\n", (void*)object, size, type);
+#endif
+
   return n;
 }
 
-AstNode* newAssignmentNode(AstNode* lhs, AstNode* rhs) {
-  AstNode* n = allocNode(AST_ASSIGNMENT);
+ObjAst* newAssignmentNode(ObjAst* lhs, ObjAst* rhs) {
+  ObjAst* n = allocateNode(AST_ASSIGNMENT);
   n->as.assignment.lhs = lhs;
   n->as.assignment.rhs = rhs;
   return n;
 }
 
-AstNode* newBlockNode() {
-  AstNode* n = allocNode(AST_BLOCK);
+ObjAst* newBlockNode() {
+  ObjAst* n = allocateNode(AST_BLOCK);
   initAstVec(&n->as.block.stmts);
   return n;
 }
 
-AstNode* newCallInfixNode(AstNode* callee, AstNode* lhs, AstNode* rhs) {
-  AstNode* n = allocNode(AST_CALL_INFIX);
+ObjAst* newCallInfixNode(ObjAst* callee, ObjAst* lhs, ObjAst* rhs) {
+  ObjAst* n = allocateNode(AST_CALL_INFIX);
   n->as.callInfix.callee = callee;
   n->as.callInfix.lhs = lhs;
   n->as.callInfix.rhs = rhs;
   return n;
 }
 
-AstNode* newCallNode(AstNode* callee) {
-  AstNode* n = allocNode(AST_CALL);
+ObjAst* newCallNode(ObjAst* callee) {
+  ObjAst* n = allocateNode(AST_CALL);
   n->as.call.callee = callee;
   initAstVec(&n->as.call.args);
   return n;
 }
 
-AstNode* newComprehensionNode(AstNode* body, ComprehensionType type) {
-  AstNode* n = allocNode(AST_COMPREHENSION);
+ObjAst* newComprehensionNode(ObjAst* body, ComprehensionType type) {
+  ObjAst* n = allocateNode(AST_COMPREHENSION);
   n->as.comprehension.body = body;
   n->as.comprehension.type = type;
   initAstVec(&n->as.comprehension.conditions);
   return n;
 }
 
-AstNode* newComprehensionIterNode(AstNode* var, AstNode* iterable) {
-  AstNode* n = allocNode(AST_COMPREHENSION_ITER);
+ObjAst* newComprehensionIterNode(ObjAst* var, ObjAst* iterable) {
+  ObjAst* n = allocateNode(AST_COMPREHENSION_ITER);
   n->as.comprehensionIter.var = var;
   n->as.comprehensionIter.iterable = iterable;
   n->as.comprehensionIter.iterLocal = 0;
   return n;
 }
 
-AstNode* newComprehensionPredNode(AstNode* predicate) {
-  AstNode* n = allocNode(AST_COMPREHENSION_PRED);
+ObjAst* newComprehensionPredNode(ObjAst* predicate) {
+  ObjAst* n = allocateNode(AST_COMPREHENSION_PRED);
   n->as.comprehensionPred.predicate = predicate;
   return n;
 }
 
-AstNode* newExprStmtNode(AstNode* expr) {
-  AstNode* n = allocNode(AST_EXPR_STMT);
+ObjAst* newExprStmtNode(ObjAst* expr) {
+  ObjAst* n = allocateNode(AST_EXPR_STMT);
   n->as.exprStmt.expr = expr;
   return n;
 }
 
-AstNode* newForNode(AstNode* initializer, AstNode* condition,
-                    AstNode* increment, AstNode* body) {
-  AstNode* n = allocNode(AST_FOR);
+ObjAst* newForNode(ObjAst* initializer, ObjAst* condition, ObjAst* increment,
+                   ObjAst* body) {
+  ObjAst* n = allocateNode(AST_FOR);
   n->as.forStmt.initializer = initializer;
   n->as.forStmt.condition = condition;
   n->as.forStmt.increment = increment;
@@ -137,8 +160,8 @@ AstNode* newForNode(AstNode* initializer, AstNode* condition,
   return n;
 }
 
-AstNode* newFunctionNode(AstNode* module) {
-  AstNode* n = allocNode(AST_FUNCTION);
+ObjAst* newFunctionNode(ObjAst* module) {
+  ObjAst* n = allocateNode(AST_FUNCTION);
   n->as.function.name = NULL;
   n->as.function.signature = NULL;
   n->as.function.body = NULL;
@@ -164,16 +187,16 @@ AstNode* newFunctionNode(AstNode* module) {
   return n;
 }
 
-AstNode* newIfNode(AstNode* cond, AstNode* then, AstNode* elseBranch) {
-  AstNode* n = allocNode(AST_IF);
+ObjAst* newIfNode(ObjAst* cond, ObjAst* then, ObjAst* elseBranch) {
+  ObjAst* n = allocateNode(AST_IF);
   n->as.ifStmt.cond = cond;
   n->as.ifStmt.then = then;
   n->as.ifStmt.elseBranch = elseBranch;
   return n;
 }
 
-AstNode* newIterNode(AstNode* var, AstNode* iterable, AstNode* body) {
-  AstNode* n = allocNode(AST_ITER);
+ObjAst* newIterNode(ObjAst* var, ObjAst* iterable, ObjAst* body) {
+  ObjAst* n = allocateNode(AST_ITER);
   n->as.iter.var = var;
   n->as.iter.iterable = iterable;
   n->as.iter.body = body;
@@ -181,56 +204,56 @@ AstNode* newIterNode(AstNode* var, AstNode* iterable, AstNode* body) {
   return n;
 }
 
-AstNode* newUseNode(AstNode* module) {
-  AstNode* n = allocNode(AST_IMPORT);
+ObjAst* newUseNode(ObjAst* module) {
+  ObjAst* n = allocateNode(AST_IMPORT);
   n->as.use.module = module;
   n->as.use.alias = NULL;
   return n;
 }
 
-AstNode* newUnknownNode() {
-  AstNode* n = allocNode(AST_UNKNOWN);
+ObjAst* newUnknownNode() {
+  ObjAst* n = allocateNode(AST_UNKNOWN);
   return n;
 }
 
-AstNode* newWhileNode(AstNode* cond, AstNode* body) {
-  AstNode* n = allocNode(AST_WHILE);
+ObjAst* newWhileNode(ObjAst* cond, ObjAst* body) {
+  ObjAst* n = allocateNode(AST_WHILE);
   n->as.whileStmt.cond = cond;
   n->as.whileStmt.body = body;
   return n;
 }
 
-AstNode* newDeclLetNode(AstNode* local, AstNode* value) {
-  AstNode* n = allocNode(AST_DECL_LET);
+ObjAst* newDeclLetNode(ObjAst* local, ObjAst* value) {
+  ObjAst* n = allocateNode(AST_DECL_LET);
   n->as.declLet.local = local;
   n->as.declLet.value = value;
   return n;
 }
 
-AstNode* newDeclGlobalNode(AstNode* value) {
-  AstNode* n = allocNode(AST_DECL_GLOBAL);
+ObjAst* newDeclGlobalNode(ObjAst* value) {
+  ObjAst* n = allocateNode(AST_DECL_GLOBAL);
   n->as.declGlobal.name = NULL;
   n->as.declGlobal.value = value;
   return n;
 }
 
-AstNode* newLiteralValueNode(Value value) {
+ObjAst* newLiteralValueNode(Value value) {
   if (IS_OBJ(value)) {
     vmRuntimeError("Can't create literal node with object value.");
     printValue(value);
     printf("\n");
     exit(1);
   }
-  AstNode* n = allocNode(AST_LITERAL);
+  ObjAst* n = allocateNode(AST_LITERAL);
   n->as.literal.value = value;
   return n;
 }
 
-AstNode* newLiteralNode() { return newLiteralValueNode(UNDEF_VAL); }
+ObjAst* newLiteralNode() { return newLiteralValueNode(UNDEF_VAL); }
 
-AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
-                       ObjString* source) {
-  AstNode* n = allocNode(AST_MODULE);
+ObjAst* newModuleNode(ObjString* dirName, ObjString* baseName,
+                      ObjString* source) {
+  ObjAst* n = allocateNode(AST_MODULE);
   n->as.module.dirName = dirName;
   n->as.module.baseName = baseName;
   n->as.module.source = source;
@@ -238,110 +261,110 @@ AstNode* newModuleNode(ObjString* dirName, ObjString* baseName,
   return n;
 }
 
-AstNode* newParamNode(AstNode* annotation) {
-  AstNode* n = allocNode(AST_PARAM);
+ObjAst* newParamNode(ObjAst* annotation) {
+  ObjAst* n = allocateNode(AST_PARAM);
   n->as.param.name = NULL;
   n->as.param.annotation = annotation;
   return n;
 }
 
-AstNode* newSequenceNode() {
-  AstNode* n = allocNode(AST_SEQUENCE);
+ObjAst* newSequenceNode() {
+  ObjAst* n = allocateNode(AST_SEQUENCE);
   initAstVec(&n->as.sequence.values);
   return n;
 }
 
-AstNode* newSetNode() {
-  AstNode* n = allocNode(AST_SET);
+ObjAst* newSetNode() {
+  ObjAst* n = allocateNode(AST_SET);
   initAstVec(&n->as.set.values);
   return n;
 }
 
-AstNode* newTreeNode() {
-  AstNode* n = allocNode(AST_TREE);
+ObjAst* newTreeNode() {
+  ObjAst* n = allocateNode(AST_TREE);
   n->as.tree.value = NULL;
-  initAstVec(&n->as.tree.values);
+  initAstVec(&n->as.tree.children);
   return n;
 }
 
-AstNode* newSubscriptGetNode(AstNode* object, AstNode* index) {
-  AstNode* n = allocNode(AST_SUBSCRIPT_GET);
+ObjAst* newSubscriptGetNode(ObjAst* object, ObjAst* index) {
+  ObjAst* n = allocateNode(AST_SUBSCRIPT_GET);
   n->as.subscript.object = object;
   n->as.subscript.index = index;
   return n;
 }
 
-AstNode* newSubscriptSetNode(AstNode* object, AstNode* index, AstNode* value) {
-  AstNode* n = allocNode(AST_SUBSCRIPT_SET);
+ObjAst* newSubscriptSetNode(ObjAst* object, ObjAst* index, ObjAst* value) {
+  ObjAst* n = allocateNode(AST_SUBSCRIPT_SET);
   n->as.subscriptSet.object = object;
   n->as.subscriptSet.index = index;
   n->as.subscriptSet.value = value;
   return n;
 }
 
-AstNode* newPropertyGetNode(AstNode* object) {
-  AstNode* n = allocNode(AST_PROPERTY_GET);
+ObjAst* newPropertyGetNode(ObjAst* object) {
+  ObjAst* n = allocateNode(AST_PROPERTY_GET);
   n->as.propertyGet.object = object;
   n->as.propertyGet.property = NULL;
   return n;
 }
 
-AstNode* newPropertySetNode(AstNode* object, AstNode* value) {
-  AstNode* n = allocNode(AST_PROPERTY_SET);
+ObjAst* newPropertySetNode(ObjAst* object, ObjAst* value) {
+  ObjAst* n = allocateNode(AST_PROPERTY_SET);
   n->as.propertySet.object = object;
   n->as.propertySet.property = NULL;
   n->as.propertySet.value = value;
   return n;
 }
 
-AstNode* newMapNode() {
-  AstNode* n = allocNode(AST_MAP);
+ObjAst* newMapNode() {
+  ObjAst* n = allocateNode(AST_MAP);
   initAstVec(&n->as.map.entries);
   return n;
 }
 
-AstNode* newMapEntryNode(AstNode* key, AstNode* value) {
-  AstNode* n = allocNode(AST_MAP_ENTRY);
+ObjAst* newMapEntryNode(ObjAst* key, ObjAst* value) {
+  ObjAst* n = allocateNode(AST_MAP_ENTRY);
   n->as.mapEntry.key = key;
   n->as.mapEntry.value = value;
   return n;
 }
 
-AstNode* newVarGlobalNode() {
-  AstNode* n = allocNode(AST_VAR_GLOBAL);
+ObjAst* newVarGlobalNode() {
+  ObjAst* n = allocateNode(AST_VAR_GLOBAL);
   n->as.global.name = NULL;
   return n;
 }
 
-AstNode* newVarLocalNode(uint8_t index) {
-  AstNode* n = allocNode(AST_VAR_LOCAL);
+ObjAst* newVarLocalNode(uint8_t index) {
+  ObjAst* n = allocateNode(AST_VAR_LOCAL);
   n->as.local.index = index;
   n->as.local.name = NULL;
   return n;
 }
 
-AstNode* newVarUpvalueNode(uint8_t index) {
-  AstNode* n = allocNode(AST_VAR_UPVALUE);
+ObjAst* newVarUpvalueNode(uint8_t index) {
+  ObjAst* n = allocateNode(AST_VAR_UPVALUE);
   n->as.upvalue.index = index;
   n->as.upvalue.name = NULL;
   return n;
 }
 
-AstNode* newSignatureNode() {
-  AstNode* n = allocNode(AST_SIGNATURE);
+ObjAst* newSignatureNode() {
+  ObjAst* n = allocateNode(AST_SIGNATURE);
   initAstVec(&n->as.signature.params);
   n->as.signature.varargs = -1;
   return n;
 }
 
-AstNode* newReturnNode(AstNode* value) {
-  AstNode* n = allocNode(AST_RETURN);
+ObjAst* newReturnNode(ObjAst* value) {
+  ObjAst* n = allocateNode(AST_RETURN);
   n->as.xReturn.value = value;
   return n;
 }
 
-AstNode* newThrowNode(AstNode* expr) {
-  AstNode* n = allocNode(AST_THROW);
+ObjAst* newThrowNode(ObjAst* expr) {
+  ObjAst* n = allocateNode(AST_THROW);
   n->as.throwStmt.expr = expr;
   return n;
 }
@@ -349,7 +372,7 @@ AstNode* newThrowNode(AstNode* expr) {
 // api.
 // ============================================================
 
-void printNodeAt(AstNode* node, int depth);
+void printNodeAt(ObjAst* node, int depth);
 
 void printStrAt(char* str, int depth) {
   printf("%*s", depth, "");
@@ -362,7 +385,7 @@ void printNodeVecAt(AstVec* nodes, int depth) {
   }
 }
 
-void printNodeAt(AstNode* node, int depth) {
+void printNodeAt(ObjAst* node, int depth) {
   if (node == NULL) {
     printStrAt("NULL\n", depth);
     return;
@@ -532,7 +555,7 @@ void printNodeAt(AstNode* node, int depth) {
         printNodeAt(node->as.tree.value, depth + 2);
       }
       printStrAt("Children:\n", depth + 1);
-      printNodeVecAt(&node->as.tree.values, depth + 2);
+      printNodeVecAt(&node->as.tree.children, depth + 2);
       break;
     case AST_SUBSCRIPT_GET:
       printStrAt("SubscriptGet\n", depth);
@@ -590,9 +613,9 @@ void printNodeAt(AstNode* node, int depth) {
   }
 }
 
-void printNode(AstNode* node) { printNodeAt(node, 0); }
+void printNode(ObjAst* node) { printNodeAt(node, 0); }
 
-bool nodesEqual(AstNode* a, AstNode* b) {
+bool nodesEqual(ObjAst* a, ObjAst* b) {
   if (a == NULL && b == NULL) return true;
   if (a == NULL || b == NULL) return false;
 
@@ -691,8 +714,8 @@ bool nodesEqual(AstNode* a, AstNode* b) {
              astVecsEqual(&a->as.set.values, &b->as.set.values);
     case AST_TREE:
       return nodesEqual(a->as.tree.value, b->as.tree.value) &&
-             a->as.tree.values.count == b->as.tree.values.count &&
-             astVecsEqual(&a->as.tree.values, &b->as.tree.values);
+             a->as.tree.children.count == b->as.tree.children.count &&
+             astVecsEqual(&a->as.tree.children, &b->as.tree.children);
     case AST_SUBSCRIPT_GET:
       return nodesEqual(a->as.subscript.object, b->as.subscript.object) &&
              nodesEqual(a->as.subscript.index, b->as.subscript.index);
@@ -726,9 +749,11 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_UNKNOWN:
       return true;
   }
+  // unreachable.
+  return false;
 }
 
-static void error(AstNode* node, const char* format, ...) {
+static void error(ObjAst* node, const char* format, ...) {
   va_list args;
   va_start(args, format);
   fprintf(stderr, "Error in AST to bytecode at node type %i:%d ", node->type,
@@ -738,27 +763,27 @@ static void error(AstNode* node, const char* format, ...) {
   va_end(args);
 }
 
-static void emitByte(Chunk* chunk, AstNode* node, uint8_t byte) {
+static void emitByte(Chunk* chunk, ObjAst* node, uint8_t byte) {
   writeChunk(chunk, byte, node->line);
 }
 
-static void emitBytes(Chunk* chunk, AstNode* node, uint8_t byte1,
+static void emitBytes(Chunk* chunk, ObjAst* node, uint8_t byte1,
                       uint8_t byte2) {
   emitByte(chunk, node, byte1);
   emitByte(chunk, node, byte2);
 }
 
-static void emitConstant(Chunk* chunk, AstNode* node, uint16_t constant) {
+static void emitConstant(Chunk* chunk, ObjAst* node, uint16_t constant) {
   emitBytes(chunk, node, constant >> 8, constant & 0xff);
 }
 
-static void emitGlobal(Chunk* chunk, AstNode* node, ObjString* name) {
+static void emitGlobal(Chunk* chunk, ObjAst* node, ObjString* name) {
   emitByte(chunk, node, OP_GET_GLOBAL);
   uint16_t constant = addConstant(chunk, OBJ_VAL(name));
   emitConstant(chunk, node, constant);
 }
 
-void closeUpvalues(Chunk* chunk, AstNode* node) {
+void closeUpvalues(Chunk* chunk, ObjAst* node) {
   for (int i = 0; i < node->as.function.upvalueCount; i++) {
     emitByte(chunk, node, node->as.function.upvalues[i].isLocal ? 1 : 0);
     emitByte(chunk, node, node->as.function.upvalues[i].index);
@@ -766,14 +791,14 @@ void closeUpvalues(Chunk* chunk, AstNode* node) {
 }
 
 // Helper functions for control flow bytecode generation
-static int emitJump(Chunk* chunk, AstNode* node, uint8_t instruction) {
+static int emitJump(Chunk* chunk, ObjAst* node, uint8_t instruction) {
   emitByte(chunk, node, instruction);
   emitByte(chunk, node, 0xff);
   emitByte(chunk, node, 0xff);
   return chunk->count - 2;
 }
 
-static void patchJump(Chunk* chunk, AstNode* node, int offset) {
+static void patchJump(Chunk* chunk, ObjAst* node, int offset) {
   int jump = chunk->count - offset - 2;
 
   if (jump > UINT16_MAX) {
@@ -785,7 +810,7 @@ static void patchJump(Chunk* chunk, AstNode* node, int offset) {
   chunk->code[offset + 1] = jump & 0xff;
 }
 
-static void emitLoop(Chunk* chunk, AstNode* node, int loopStart) {
+static void emitLoop(Chunk* chunk, ObjAst* node, int loopStart) {
   emitByte(chunk, node, OP_LOOP);
   int offset = chunk->count - loopStart + 2;
   if (offset > UINT16_MAX) {
@@ -797,7 +822,7 @@ static void emitLoop(Chunk* chunk, AstNode* node, int loopStart) {
   emitByte(chunk, node, offset & 0xff);
 }
 
-ObjFunction* toFunction(AstNode* node);
+ObjFunction* toFunction(ObjAst* node);
 
 bool toChunkVec(AstVec* nodes, Chunk* chunk) {
   for (int i = 0; i < nodes->count; i++) {
@@ -806,7 +831,7 @@ bool toChunkVec(AstVec* nodes, Chunk* chunk) {
   return true;
 }
 
-bool toChunk(AstNode* node, Chunk* chunk) {
+bool toChunk(ObjAst* node, Chunk* chunk) {
   switch (node->type) {
     case AST_ASSIGNMENT: {
       switch (node->as.assignment.lhs->type) {
@@ -866,7 +891,7 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       break;
     }
     case AST_COMPREHENSION: {
-      AstNode* addNode = newVarGlobalNode();
+      ObjAst* addNode = newVarGlobalNode();
 
       // initialize an empty collection on top of the stack
       // and stash the addition operation.
@@ -892,14 +917,14 @@ bool toChunk(AstNode* node, Chunk* chunk) {
 
       // the innermost expression calls the addition operation with
       // the comprehension instance and the body of the comprehension.
-      AstNode* comp = newCallNode(addNode);
+      ObjAst* comp = newCallNode(addNode);
       pushAstVec(&comp->as.call.args, node->as.comprehension.compLocal);
       pushAstVec(&comp->as.call.args, node->as.comprehension.body);
       comp = newExprStmtNode(comp);
 
       // then we wrap it in the restrictions.
       for (int i = node->as.comprehension.conditions.count - 1; i >= 0; i--) {
-        AstNode* cond = node->as.comprehension.conditions.items[i];
+        ObjAst* cond = node->as.comprehension.conditions.items[i];
         switch (cond->type) {
           case AST_COMPREHENSION_ITER: {
             comp = newIterNode(cond->as.comprehensionIter.var,
@@ -1159,11 +1184,11 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       }
 
       // Emit children
-      if (!toChunkVec(&node->as.tree.values, chunk)) return false;
+      if (!toChunkVec(&node->as.tree.children, chunk)) return false;
 
       // Call tree() with interior data + children count
       emitByte(chunk, node, OP_CALL);
-      emitByte(chunk, node, (uint8_t)(1 + node->as.tree.values.count));
+      emitByte(chunk, node, (uint8_t)(1 + node->as.tree.children.count));
       break;
     }
     case AST_SUBSCRIPT_GET: {
@@ -1242,14 +1267,13 @@ bool toChunk(AstNode* node, Chunk* chunk) {
   return true;
 }
 
-ObjFunction* toFunction(AstNode* node) {
+ObjFunction* toFunction(ObjAst* node) {
   ObjFunction* fn = newFunction();
   vmPush(OBJ_VAL(fn));
 
   fn->name = node->as.function.name;
   fn->arity = node->as.function.signature->as.signature.params.count;
   fn->node = node;
-  fn->upvalueCount = node->as.function.upvalueCount;
 
   if (!toChunk(node->as.function.signature, &fn->chunk)) return false;
   if (!toChunk(node->as.function.body, &fn->chunk)) return false;
@@ -1261,7 +1285,7 @@ ObjFunction* toFunction(AstNode* node) {
   return fn;
 }
 
-ObjModule* toModule(AstNode* node) {
+ObjModule* toModule(ObjAst* node) {
   ObjModule* module =
       newModule(node->as.module.dirName, node->as.module.baseName,
                 node->as.module.source);
@@ -1279,96 +1303,32 @@ ObjModule* toModule(AstNode* node) {
 // memory.
 // ============================================================
 
-void markAstNode(AstNode* n) {
+void markObjectAst(ObjAst* n) {
   if (n == NULL) return;
 
   switch (n->type) {
     case AST_ASSIGNMENT:
-      markAstNode(n->as.assignment.lhs);
-      markAstNode(n->as.assignment.rhs);
-      break;
     case AST_BLOCK:
-      for (int i = 0; i < n->as.block.stmts.count; i++) {
-        markAstNode((AstNode*)n->as.block.stmts.items[i]);
-      }
-      break;
-
-    case AST_CALL: {
-      markAstNode(n->as.call.callee);
-      for (int i = 0; i < n->as.call.args.count; i++) {
-        markAstNode((AstNode*)n->as.call.args.items[i]);
-      }
-      break;
-    }
-    case AST_CALL_INFIX: {
-      markAstNode(n->as.callInfix.callee);
-      markAstNode(n->as.callInfix.lhs);
-      markAstNode(n->as.callInfix.rhs);
-      break;
-    }
-    case AST_COMPREHENSION: {
-      markAstNode(n->as.comprehension.body);
-      for (int i = 0; i < n->as.comprehension.conditions.count; i++) {
-        markAstNode(n->as.comprehension.conditions.items[i]);
-      }
-      break;
-    }
-    case AST_COMPREHENSION_ITER: {
-      markAstNode(n->as.comprehensionIter.var);
-      markAstNode(n->as.comprehensionIter.iterable);
-      break;
-    }
+    case AST_CALL:
+    case AST_CALL_INFIX:
+    case AST_COMPREHENSION:
+    case AST_COMPREHENSION_ITER:
     case AST_COMPREHENSION_PRED:
-      markAstNode(n->as.comprehensionPred.predicate);
-      break;
     case AST_EXPR_STMT:
-      markAstNode(n->as.exprStmt.expr);
-      break;
-
     case AST_FUNCTION: {
       markObject((Obj*)n->as.function.name);
-      markAstNode(n->as.function.module);
-      markAstNode(n->as.function.signature);
-      markAstNode(n->as.function.body);
       break;
     }
-    case AST_IF: {
-      markAstNode(n->as.ifStmt.cond);
-      markAstNode(n->as.ifStmt.then);
-      markAstNode(n->as.ifStmt.elseBranch);
-      break;
-    }
+    case AST_IF:
     case AST_FOR:
-      markAstNode(n->as.forStmt.initializer);
-      markAstNode(n->as.forStmt.condition);
-      markAstNode(n->as.forStmt.increment);
-      markAstNode(n->as.forStmt.body);
-      break;
     case AST_ITER:
-      markAstNode(n->as.iter.var);
-      markAstNode(n->as.iter.iterable);
-      markAstNode(n->as.iter.body);
-      break;
     case AST_IMPORT:
-      markAstNode(n->as.use.module);
-      if (n->as.use.alias != NULL) {
-        markObject((Obj*)n->as.use.alias);
-      }
+      if (n->as.use.alias != NULL) markObject((Obj*)n->as.use.alias);
       break;
     case AST_WHILE:
-      markAstNode(n->as.whileStmt.cond);
-      markAstNode(n->as.whileStmt.body);
-      break;
     case AST_DECL_LET:
-      markAstNode(n->as.declLet.local);
-      markAstNode(n->as.declLet.value);
-      break;
     case AST_DECL_GLOBAL:
-      markObject((Obj*)n->as.declGlobal.name);
-      markAstNode(n->as.declGlobal.value);
-      break;
     case AST_LITERAL:
-      /* Value may reference Obj* (e.g., strings); mark via markValue */
       markValue(n->as.literal.value);
       break;
     case AST_MODULE: {
@@ -1379,57 +1339,23 @@ void markAstNode(AstNode* n) {
     }
     case AST_PARAM:
       markObject((Obj*)n->as.param.name);
-      markAstNode(n->as.param.annotation);
       break;
     case AST_RETURN:
-      markAstNode(n->as.xReturn.value);
-      break;
     case AST_THROW:
-      markAstNode(n->as.throwStmt.expr);
-      break;
     case AST_SEQUENCE:
-      for (int i = 0; i < n->as.sequence.values.count; i++)
-        markAstNode((AstNode*)n->as.sequence.values.items[i]);
-      break;
     case AST_SET:
-      for (int i = 0; i < n->as.set.values.count; i++)
-        markAstNode((AstNode*)n->as.set.values.items[i]);
-      break;
     case AST_TREE:
-      markAstNode(n->as.tree.value);
-      for (int i = 0; i < n->as.tree.values.count; i++)
-        markAstNode((AstNode*)n->as.tree.values.items[i]);
-      break;
     case AST_SUBSCRIPT_GET:
-      markAstNode(n->as.subscript.object);
-      markAstNode(n->as.subscript.index);
-      break;
     case AST_SUBSCRIPT_SET:
-      markAstNode(n->as.subscriptSet.object);
-      markAstNode(n->as.subscriptSet.index);
-      markAstNode(n->as.subscriptSet.value);
-      break;
     case AST_PROPERTY_GET:
-      markAstNode(n->as.propertyGet.object);
       markObject((Obj*)n->as.propertyGet.property);
       break;
     case AST_PROPERTY_SET:
-      markAstNode(n->as.propertySet.object);
       markObject((Obj*)n->as.propertySet.property);
-      markAstNode(n->as.propertySet.value);
       break;
     case AST_MAP:
-      for (int i = 0; i < n->as.map.entries.count; i++)
-        markAstNode((AstNode*)n->as.map.entries.items[i]);
-      break;
     case AST_MAP_ENTRY:
-      markAstNode(n->as.mapEntry.key);
-      markAstNode(n->as.mapEntry.value);
-      break;
     case AST_SIGNATURE:
-      for (int i = 0; i < n->as.signature.params.count; i++)
-        markObject((Obj*)n->as.signature.params.items[i]);
-      break;
     case AST_VAR_GLOBAL:
       markObject((Obj*)n->as.global.name);
       break;
@@ -1439,20 +1365,12 @@ void markAstNode(AstNode* n) {
     case AST_VAR_UPVALUE:
       markObject((Obj*)n->as.upvalue.name);
       break;
-
     case AST_UNKNOWN:
       break;
   }
 }
 
-void markAstNodes(AstNode* node) {
-  while (node != NULL) {
-    markAstNode(node);
-    node = node->next;
-  }
-}
-
-void freeAstNode(AstNode* n) {
+void freeObjectAst(ObjAst* n) {
   if (!n) return;
 
   switch (n->type) {
@@ -1516,7 +1434,7 @@ void freeAstNode(AstNode* n) {
       freeAstVec(&n->as.set.values);
       break;
     case AST_TREE:
-      freeAstVec(&n->as.tree.values);
+      freeAstVec(&n->as.tree.children);
       break;
     case AST_SUBSCRIPT_GET:
     case AST_SUBSCRIPT_SET:
@@ -1533,12 +1451,5 @@ void freeAstNode(AstNode* n) {
   }
 
   /* finally free the node struct itself */
-  FREE(AstNode, n);
-}
-
-void freeAstNodes(AstNode* node) {
-  while (node != NULL) {
-    freeAstNode(node);
-    node = node->next;
-  }
+  FREE(ObjAst, n);
 }

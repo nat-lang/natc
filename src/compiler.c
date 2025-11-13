@@ -131,9 +131,9 @@ bool matchParamOrPattern(NodeCompiler* cmp) {
          match(cmp, TOKEN_UNDEFINED) || match(cmp, TOKEN_STRING);
 }
 
-typedef AstNode* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
-typedef AstNode* (*InfixFn)(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                            Precedence prec);
+typedef ObjAst* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
+typedef ObjAst* (*InfixFn)(NodeCompiler* cmp, bool canAssign, ObjAst* lhs,
+                           Precedence prec);
 
 typedef struct {
   ParseFn prefix;
@@ -142,14 +142,14 @@ typedef struct {
   Precedence rightPrec;
 } ParseRule;
 
-static AstNode* statement(NodeCompiler* cmp);
-static AstNode* expression(NodeCompiler* cmp);
-static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence);
-static AstNode* nakedFunction(NodeCompiler* enclosing, Token name);
-static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                          Precedence prec);
+static ObjAst* statement(NodeCompiler* cmp);
+static ObjAst* expression(NodeCompiler* cmp);
+static ObjAst* parsePrecedence(NodeCompiler* cmp, Precedence precedence);
+static ObjAst* nakedFunction(NodeCompiler* enclosing, Token name);
+static ObjAst* subscript(NodeCompiler* cmp, bool canAssign, ObjAst* lhs,
+                         Precedence prec);
 
-static AstNode* setNodeFromToken(AstNode* node, Token token) {
+static ObjAst* setNodeFromToken(ObjAst* node, Token token) {
   if (node != NULL) {
     node->line = token.line;
     node->col = token.column >= 0 ? token.column : -1;
@@ -157,7 +157,7 @@ static AstNode* setNodeFromToken(AstNode* node, Token token) {
   return node;
 }
 
-static AstNode* setNodeFromNode(AstNode* node, AstNode* origin) {
+static ObjAst* setNodeFromNode(ObjAst* node, ObjAst* origin) {
   if (node != NULL && origin != NULL) {
     node->line = origin->line;
     node->col = origin->col;
@@ -166,7 +166,7 @@ static AstNode* setNodeFromNode(AstNode* node, AstNode* origin) {
 }
 
 void initNodeCompiler(NodeCompiler* cmp, NodeCompiler* enclosing,
-                      AstNode* node) {
+                      ObjAst* node) {
   cmp->enclosing = NULL;
   cmp->enclosing = enclosing;
   cmp->fn = NULL;
@@ -266,12 +266,12 @@ static void endScope(NodeCompiler* cmp) {
   }
 }
 
-static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* identifier(NodeCompiler* cmp, bool canAssign) {
   if (check(TOKEN_FAT_ARROW)) return nakedFunction(cmp, parser.ppenult);
 
   Token name = parser.previous;
 
-  AstNode* node = setNodeFromToken(newUnknownNode(), name);
+  ObjAst* node = setNodeFromToken(newUnknownNode(), name);
   int address = -1;
   if ((address = resolveLocal(cmp, &name)) >= 0) {
     node = setNodeFromToken(newVarLocalNode((uint8_t)address), name);
@@ -287,23 +287,23 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
   if (match(cmp, TOKEN_EQUAL)) {
     Token equalToken = parser.previous;
     if (!canAssign) error(cmp, "Invalid assignment target.");
-    AstNode* rhs = expression(cmp);
-    AstNode* assign = newAssignmentNode(node, rhs);
+    ObjAst* rhs = expression(cmp);
+    ObjAst* assign = newAssignmentNode(node, rhs);
     node = setNodeFromToken(assign, equalToken);
   }
 
   return node;
 }
-static AstNode* parameter(NodeCompiler* cmp) {
+static ObjAst* parameter(NodeCompiler* cmp) {
   addLocal(cmp, parser.previous);
   markInitialized(cmp);
-  AstNode* node = setNodeFromToken(newParamNode(NULL), parser.previous);
+  ObjAst* node = setNodeFromToken(newParamNode(NULL), parser.previous);
   node->as.param.name = tokenString(parser.previous);
   return node;
 }
 
-static AstNode* signature(NodeCompiler* cmp) {
-  AstNode* node = setNodeFromToken(newSignatureNode(), parser.previous);
+static ObjAst* signature(NodeCompiler* cmp) {
+  ObjAst* node = setNodeFromToken(newSignatureNode(), parser.previous);
 
   if (!check(TOKEN_PAREN_RIGHT)) {
     do {
@@ -311,7 +311,7 @@ static AstNode* signature(NodeCompiler* cmp) {
         errorAtCurrent(cmp, "Expecting parameter name.");
         return setNodeFromToken(newUnknownNode(), parser.current);
       }
-      AstNode* paramNode = parameter(cmp);
+      ObjAst* paramNode = parameter(cmp);
       pushAstVec(&node->as.signature.params, paramNode);
     } while (match(cmp, TOKEN_COMMA));
   }
@@ -319,11 +319,11 @@ static AstNode* signature(NodeCompiler* cmp) {
   return node;
 }
 
-static AstNode* block(NodeCompiler* cmp) {
-  AstNode* block = setNodeFromToken(newBlockNode(), parser.previous);
+static ObjAst* block(NodeCompiler* cmp) {
+  ObjAst* block = setNodeFromToken(newBlockNode(), parser.previous);
 
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-    AstNode* stmtNode = statement(cmp);
+    ObjAst* stmtNode = statement(cmp);
     pushAstVec(&block->as.block.stmts, stmtNode);
   }
 
@@ -332,19 +332,19 @@ static AstNode* block(NodeCompiler* cmp) {
   return block;
 }
 
-static AstNode* functionBody(NodeCompiler* cmp) {
-  AstNode* node = NULL;
+static ObjAst* functionBody(NodeCompiler* cmp) {
+  ObjAst* node = NULL;
 
   if (check(TOKEN_LEFT_BRACE)) {
     advance(cmp);
     node = block(cmp);
-    AstNode* nilLiteral =
+    ObjAst* nilLiteral =
         setNodeFromToken(newLiteralValueNode(NIL_VAL), parser.previous);
-    AstNode* defaultReturn = newReturnNode(nilLiteral);
+    ObjAst* defaultReturn = newReturnNode(nilLiteral);
     setNodeFromNode(defaultReturn, nilLiteral);
     pushAstVec(&node->as.block.stmts, defaultReturn);
   } else {
-    AstNode* value = expression(cmp);
+    ObjAst* value = expression(cmp);
     node = newReturnNode(value);
     setNodeFromNode(node, value);
   }
@@ -352,15 +352,15 @@ static AstNode* functionBody(NodeCompiler* cmp) {
   return node;
 }
 
-static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
-  AstNode* node = setNodeFromToken(
+static ObjAst* nakedFunction(NodeCompiler* enclosing, Token name) {
+  ObjAst* node = setNodeFromToken(
       newFunctionNode(enclosing->fn->as.function.module), name);
   node->as.function.name = tokenString(name);
   NodeCompiler cmp;
   initNodeCompiler(&cmp, enclosing, node);
   beginScope(&cmp);
-  AstNode* sigNode = setNodeFromToken(newSignatureNode(), name);
-  AstNode* paramNode = parameter(&cmp);
+  ObjAst* sigNode = setNodeFromToken(newSignatureNode(), name);
+  ObjAst* paramNode = parameter(&cmp);
   pushAstVec(&sigNode->as.signature.params, paramNode);
   setNodeFromNode(sigNode, node);
   node->as.function.signature = sigNode;
@@ -371,8 +371,8 @@ static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
   return node;
 }
 
-AstNode* function(NodeCompiler* enclosing, Token name) {
-  AstNode* node = setNodeFromToken(
+ObjAst* function(NodeCompiler* enclosing, Token name) {
+  ObjAst* node = setNodeFromToken(
       newFunctionNode(enclosing->fn->as.function.module), name);
   node->as.function.name = tokenString(name);
   NodeCompiler cmp;
@@ -388,7 +388,7 @@ AstNode* function(NodeCompiler* enclosing, Token name) {
   return node;
 }
 
-static AstNode* boolean(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* boolean(NodeCompiler* cmp, bool canAssign) {
   Value value;
   switch (parser.previous.type) {
     case TOKEN_TRUE:
@@ -403,33 +403,33 @@ static AstNode* boolean(NodeCompiler* cmp, bool canAssign) {
   return setNodeFromToken(newLiteralValueNode(value), parser.previous);
 }
 
-static AstNode* literalNil(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* literalNil(NodeCompiler* cmp, bool canAssign) {
   return setNodeFromToken(newLiteralValueNode(NIL_VAL), parser.previous);
 }
 
-static AstNode* literalUndefined(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* literalUndefined(NodeCompiler* cmp, bool canAssign) {
   return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), parser.previous);
 }
 
-static AstNode* number(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* number(NodeCompiler* cmp, bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
   return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)),
                           parser.previous);
 }
 
-static AstNode* string(NodeCompiler* cmp, bool canAssign) {
-  AstNode* node = setNodeFromToken(newLiteralNode(), parser.previous);
+static ObjAst* string(NodeCompiler* cmp, bool canAssign) {
+  ObjAst* node = setNodeFromToken(newLiteralNode(), parser.previous);
   node->as.literal.value = OBJ_VAL(
       copyString(parser.previous.start + 1, parser.previous.length - 2));
   return node;
 }
-static AstNode* stringInterpolation(NodeCompiler* cmp, bool canAssign);
-static AstNode* interpolation(NodeCompiler* cmp, bool canAssign,
-                              int startOffset, int lengthOffset) {
+static ObjAst* stringInterpolation(NodeCompiler* cmp, bool canAssign);
+static ObjAst* interpolation(NodeCompiler* cmp, bool canAssign, int startOffset,
+                             int lengthOffset) {
   return NULL;
 }
 
-static AstNode* stringInterpolation(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* stringInterpolation(NodeCompiler* cmp, bool canAssign) {
   return interpolation(cmp, canAssign, 1, 3);
 }
 
@@ -437,7 +437,7 @@ static void argumentList(NodeCompiler* cmp, AstVec* vec) {
   uint8_t argCount = 0;
   if (!check(TOKEN_PAREN_RIGHT)) {
     do {
-      AstNode* node = expression(cmp);
+      ObjAst* node = expression(cmp);
       pushAstVec(vec, node);
 
       if (argCount == 255) error(cmp, "Can't have more than 255 arguments.");
@@ -448,48 +448,48 @@ static void argumentList(NodeCompiler* cmp, AstVec* vec) {
   consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after arguments.");
 }
 
-static AstNode* userInfix(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                          Precedence prec) {
-  AstNode* fn = identifier(cmp, false);
-  AstNode* rhs = parsePrecedence(cmp, prec);
-  AstNode* node = newCallInfixNode(fn, lhs, rhs);
+static ObjAst* userInfix(NodeCompiler* cmp, bool canAssign, ObjAst* lhs,
+                         Precedence prec) {
+  ObjAst* fn = identifier(cmp, false);
+  ObjAst* rhs = parsePrecedence(cmp, prec);
+  ObjAst* node = newCallInfixNode(fn, lhs, rhs);
   return setNodeFromNode(node, fn);
 }
 
-static AstNode* call(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                     Precedence prec) {
-  AstNode* node = newCallNode(lhs);
+static ObjAst* call(NodeCompiler* cmp, bool canAssign, ObjAst* lhs,
+                    Precedence prec) {
+  ObjAst* node = newCallNode(lhs);
   setNodeFromNode(node, lhs);
   argumentList(cmp, &node->as.call.args);
   return node;
 }
 
-static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                          Precedence prec) {
-  AstNode* index = expression(cmp);
+static ObjAst* subscript(NodeCompiler* cmp, bool canAssign, ObjAst* lhs,
+                         Precedence prec) {
+  ObjAst* index = expression(cmp);
   consume(cmp, TOKEN_RIGHT_BRACKET, "Expect ']' after subscript.");
 
   if (match(cmp, TOKEN_EQUAL)) {
-    AstNode* value = expression(cmp);
+    ObjAst* value = expression(cmp);
     if (!canAssign) {
       error(cmp, "Invalid assignment target.");
     }
-    AstNode* node = newSubscriptSetNode(lhs, index, value);
+    ObjAst* node = newSubscriptSetNode(lhs, index, value);
     return setNodeFromNode(node, lhs);
   }
 
-  AstNode* node = newSubscriptGetNode(lhs, index);
+  ObjAst* node = newSubscriptGetNode(lhs, index);
   return setNodeFromNode(node, lhs);
 }
 
-static AstNode* property(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                         Precedence prec) {
+static ObjAst* property(NodeCompiler* cmp, bool canAssign, ObjAst* lhs,
+                        Precedence prec) {
   consumeIdentifier(cmp, "Expect identifier after '.'.");
   Token id = parser.previous;
 
-  AstNode* node;
+  ObjAst* node;
   if (match(cmp, TOKEN_EQUAL)) {
-    AstNode* value = expression(cmp);
+    ObjAst* value = expression(cmp);
     if (!canAssign) {
       error(cmp, "Invalid assignment target.");
       vmPop();
@@ -545,20 +545,20 @@ static bool peekFunction(NodeCompiler* cmp) {
   return true;
 }
 
-static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
-                                   ComprehensionType type,
-                                   TokenType closingToken) {
+static ObjAst* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
+                                  ComprehensionType type,
+                                  TokenType closingToken) {
   int scopesOpened = 0;
   bool sawClause = false;
 
-  AstNode* comprehension =
+  ObjAst* comprehension =
       setNodeFromToken(newComprehensionNode(NULL, type), parser.previous);
 
   // local for the comprehension to occupy while it's
   // under construction.
   Token compToken = syntheticToken("#comprehension");
   uint8_t compIndex = addLocal(cmp, compToken);
-  AstNode* compVar =
+  ObjAst* compVar =
       setNodeFromToken(newVarLocalNode(compIndex), parser.previous);
   compVar->as.local.name = tokenString(compToken);
   comprehension->as.comprehension.compLocal = compVar;
@@ -574,22 +574,22 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
       uint8_t localIndex = addLocal(cmp, varName);
       markInitialized(cmp);
 
-      AstNode* var = setNodeFromToken(newVarLocalNode(localIndex), varName);
+      ObjAst* var = setNodeFromToken(newVarLocalNode(localIndex), varName);
       var->as.local.name = tokenString(varName);
 
       consume(cmp, TOKEN_IN, "Expect 'in' after variable name.");
-      AstNode* iterable = expression(cmp);
+      ObjAst* iterable = expression(cmp);
 
       uint8_t iterIndex = addLocal(cmp, syntheticToken("__iter"));
       markInitialized(cmp);
 
-      AstNode* iterCond = newComprehensionIterNode(var, iterable);
+      ObjAst* iterCond = newComprehensionIterNode(var, iterable);
       setNodeFromNode(iterCond, var);
       iterCond->as.comprehensionIter.iterLocal = iterIndex;
       pushAstVec(&comprehension->as.comprehension.conditions, iterCond);
     } else {
-      AstNode* predicate = expression(cmp);
-      AstNode* predCond =
+      ObjAst* predicate = expression(cmp);
+      ObjAst* predCond =
           setNodeFromNode(newComprehensionPredNode(predicate), predicate);
       pushAstVec(&comprehension->as.comprehension.conditions, predCond);
     }
@@ -613,7 +613,7 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
   Parser afterConditions = saveParser();
 
   gotoParser(bodyCheckpoint);
-  AstNode* body = expression(cmp);
+  ObjAst* body = expression(cmp);
   comprehension->as.comprehension.body = body;
   setNodeFromNode(comprehension, body);
 
@@ -624,20 +624,20 @@ static AstNode* parseComprehension(NodeCompiler* cmp, Parser bodyCheckpoint,
   return comprehension;
 }
 
-static AstNode* comprehensionClosure(NodeCompiler* enclosing,
-                                     Parser bodyCheckpoint,
-                                     ComprehensionType type,
-                                     TokenType closingToken) {
+static ObjAst* comprehensionClosure(NodeCompiler* enclosing,
+                                    Parser bodyCheckpoint,
+                                    ComprehensionType type,
+                                    TokenType closingToken) {
   NodeCompiler cmp;
-  AstNode* node = setNodeFromToken(
+  ObjAst* node = setNodeFromToken(
       newFunctionNode(enclosing->fn->as.function.module), parser.previous);
   node->as.function.name = tokenString(syntheticToken("#comprehension"));
   node->as.function.signature = setNodeFromNode(newSignatureNode(), node);
   initNodeCompiler(&cmp, enclosing, node);
 
   beginScope(&cmp);
-  AstNode* body = parseComprehension(&cmp, bodyCheckpoint, type, closingToken);
-  AstNode* ret = newReturnNode(body);
+  ObjAst* body = parseComprehension(&cmp, bodyCheckpoint, type, closingToken);
+  ObjAst* ret = newReturnNode(body);
   setNodeFromNode(ret, body);
   node->as.function.body = ret;
   endScope(&cmp);
@@ -645,18 +645,18 @@ static AstNode* comprehensionClosure(NodeCompiler* enclosing,
   return setNodeFromNode(newCallNode(node), node);
 }
 
-static bool isValidObjectKey(AstNode* key) {
+static bool isValidObjectKey(ObjAst* key) {
   return key->type == AST_LITERAL ||
          (key->type == AST_VAR_GLOBAL && key->as.global.name != NULL);
 }
 
-static void ensureObjectKey(NodeCompiler* cmp, AstNode* key) {
+static void ensureObjectKey(NodeCompiler* cmp, ObjAst* key) {
   if (!isValidObjectKey(key)) {
     error(cmp, "Expect identifier or literal for object key.");
   }
 }
 
-static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* leftBrace(NodeCompiler* cmp, bool canAssign) {
   Token openToken = parser.previous;
   if (check(TOKEN_RIGHT_BRACE)) {
     advance(cmp);
@@ -671,21 +671,21 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
     advanceTo(cmp, TOKEN_PIPE, TOKEN_RIGHT_BRACE, 1);
     consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
 
-    AstNode* comp = comprehensionClosure(cmp, bodyCheckpoint, COMPREHENSION_SET,
-                                         TOKEN_RIGHT_BRACE);
+    ObjAst* comp = comprehensionClosure(cmp, bodyCheckpoint, COMPREHENSION_SET,
+                                        TOKEN_RIGHT_BRACE);
     consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after comprehension.");
     return setNodeFromToken(comp, openToken);
   }
 
-  AstNode* first = expression(cmp);
+  ObjAst* first = expression(cmp);
 
   if (check(TOKEN_COLON)) {
-    AstNode* obj = setNodeFromToken(newMapNode(), openToken);
+    ObjAst* obj = setNodeFromToken(newMapNode(), openToken);
     ensureObjectKey(cmp, first);
 
     consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
-    AstNode* value = expression(cmp);
-    AstNode* entry = newMapEntryNode(first, value);
+    ObjAst* value = expression(cmp);
+    ObjAst* entry = newMapEntryNode(first, value);
     setNodeFromNode(entry, first);
     pushAstVec(&obj->as.map.entries, entry);
 
@@ -696,11 +696,11 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
       }
       if (check(TOKEN_RIGHT_BRACE)) break;
 
-      AstNode* key = expression(cmp);
+      ObjAst* key = expression(cmp);
       ensureObjectKey(cmp, key);
       consume(cmp, TOKEN_COLON, "Expect ':' after object key.");
-      AstNode* val = expression(cmp);
-      AstNode* kv = newMapEntryNode(key, val);
+      ObjAst* val = expression(cmp);
+      ObjAst* kv = newMapEntryNode(key, val);
       setNodeFromNode(kv, key);
       pushAstVec(&obj->as.map.entries, kv);
     }
@@ -709,7 +709,7 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
     return obj;
   }
 
-  AstNode* set = setNodeFromToken(newSetNode(), openToken);
+  ObjAst* set = setNodeFromToken(newSetNode(), openToken);
   pushAstVec(&set->as.set.values, first);
 
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
@@ -725,7 +725,7 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
   return set;
 }
 
-static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* parenLeft(NodeCompiler* cmp, bool canAssign) {
   Token openToken = parser.previous;
   // empty sequence.
   if (match(cmp, TOKEN_COMMA)) {
@@ -747,17 +747,17 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
     advanceTo(cmp, TOKEN_PIPE, TOKEN_PAREN_RIGHT, 1);
     consume(cmp, TOKEN_PIPE, "Expect '|' in comprehension.");
 
-    AstNode* comp = comprehensionClosure(cmp, bodyCheckpoint, COMPREHENSION_SEQ,
-                                         TOKEN_PAREN_RIGHT);
+    ObjAst* comp = comprehensionClosure(cmp, bodyCheckpoint, COMPREHENSION_SEQ,
+                                        TOKEN_PAREN_RIGHT);
     consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after comprehension.");
     return setNodeFromToken(comp, openToken);
   }
 
   // sequence or parenthesized expression.
-  AstNode* node = expression(cmp);
+  ObjAst* node = expression(cmp);
 
   if (check(TOKEN_COMMA)) {
-    AstNode* seq = setNodeFromToken(newSequenceNode(), openToken);
+    ObjAst* seq = setNodeFromToken(newSequenceNode(), openToken);
     pushAstVec(&seq->as.sequence.values, node);
     do {
       advance(cmp);
@@ -772,14 +772,14 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
   return node;
 }
 
-static AstNode* returnStatement(NodeCompiler* cmp, bool canAssign) {
-  AstNode* value = NULL;
+static ObjAst* returnStatement(NodeCompiler* cmp, bool canAssign) {
+  ObjAst* value = NULL;
   value = expression(cmp);
-  AstNode* node = newReturnNode(value);
+  ObjAst* node = newReturnNode(value);
   return setNodeFromToken(node, parser.previous);
 }
 
-static AstNode* leftBracket(NodeCompiler* cmp, bool canAssign) {
+static ObjAst* leftBracket(NodeCompiler* cmp, bool canAssign) {
   Token openToken = parser.previous;
 
   // Empty tree []
@@ -788,10 +788,10 @@ static AstNode* leftBracket(NodeCompiler* cmp, bool canAssign) {
     return setNodeFromToken(newTreeNode(), openToken);
   }
 
-  AstNode* tree = setNodeFromToken(newTreeNode(), openToken);
+  ObjAst* tree = setNodeFromToken(newTreeNode(), openToken);
 
   // Parse first element
-  AstNode* first = parsePrecedence(cmp, PREC_PRIMARY);
+  ObjAst* first = parsePrecedence(cmp, PREC_PRIMARY);
 
   // If there are more elements, first is the value, rest are children
   if (!check(TOKEN_RIGHT_BRACKET)) {
@@ -800,8 +800,8 @@ static AstNode* leftBracket(NodeCompiler* cmp, bool canAssign) {
 
     // Parse remaining space-separated children
     while (!check(TOKEN_RIGHT_BRACKET) && !check(TOKEN_EOF)) {
-      AstNode* child = parsePrecedence(cmp, PREC_PRIMARY);
-      pushAstVec(&tree->as.tree.values, child);
+      ObjAst* child = parsePrecedence(cmp, PREC_PRIMARY);
+      pushAstVec(&tree->as.tree.children, child);
 
       // Trees use space separation, not comma separation
       if (check(TOKEN_COMMA)) {
@@ -811,7 +811,7 @@ static AstNode* leftBracket(NodeCompiler* cmp, bool canAssign) {
     }
   } else {
     // Single element - it's a child, no value specified
-    pushAstVec(&tree->as.tree.values, first);
+    pushAstVec(&tree->as.tree.children, first);
   }
 
   consume(cmp, TOKEN_RIGHT_BRACKET, "Expect ']' after tree literal.");
@@ -877,8 +877,8 @@ static ParseRule* getInfixRule(NodeCompiler* cmp, Token token) {
   return &rules[token.type];
 }
 
-static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
-  AstNode* node = setNodeFromToken(newUnknownNode(), parser.current);
+static ObjAst* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
+  ObjAst* node = setNodeFromToken(newUnknownNode(), parser.current);
 
   advance(cmp);
 
@@ -905,74 +905,74 @@ static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence) {
   return node;
 }
 
-static AstNode* expression(NodeCompiler* cmp) {
+static ObjAst* expression(NodeCompiler* cmp) {
   return parsePrecedence(cmp, PREC_ASSIGNMENT);
 }
 
-static AstNode* globalDeclaration(NodeCompiler* cmp) {
+static ObjAst* globalDeclaration(NodeCompiler* cmp) {
   consumeIdentifier(cmp, "Expect variable name.");
   Token nameToken = parser.previous;
 
-  AstNode* value = NULL;
+  ObjAst* value = NULL;
   if (match(cmp, TOKEN_EQUAL)) {
     value = expression(cmp);
   } else {
     value = setNodeFromToken(newLiteralValueNode(UNDEF_VAL), nameToken);
   }
 
-  AstNode* node = newDeclGlobalNode(value);
+  ObjAst* node = newDeclGlobalNode(value);
   node->as.declGlobal.name = tokenString(nameToken);
   return setNodeFromToken(node, nameToken);
 }
 
-static AstNode* letDeclaration(NodeCompiler* cmp) {
+static ObjAst* letDeclaration(NodeCompiler* cmp) {
   consumeIdentifier(cmp, "Expect variable name.");
   Token nameToken = parser.previous;
 
   uint8_t localIndex = addLocal(cmp, nameToken);
   markInitialized(cmp);
 
-  AstNode* value = NULL;
+  ObjAst* value = NULL;
   if (match(cmp, TOKEN_EQUAL)) {
     value = expression(cmp);
   } else {
     value = setNodeFromToken(newLiteralValueNode(UNDEF_VAL), nameToken);
   }
 
-  AstNode* local = setNodeFromToken(newVarLocalNode(localIndex), nameToken);
+  ObjAst* local = setNodeFromToken(newVarLocalNode(localIndex), nameToken);
   local->as.local.name = tokenString(nameToken);
-  AstNode* node = newDeclLetNode(local, value);
+  ObjAst* node = newDeclLetNode(local, value);
   return setNodeFromToken(node, nameToken);
 }
 
-static AstNode* ifStatement(NodeCompiler* cmp) {
+static ObjAst* ifStatement(NodeCompiler* cmp) {
   Token ifToken = parser.previous;
   consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'if'.");
-  AstNode* cond = expression(cmp);
+  ObjAst* cond = expression(cmp);
   consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after condition.");
 
-  AstNode* then = statement(cmp);
+  ObjAst* then = statement(cmp);
 
-  AstNode* elseBranch = NULL;
+  ObjAst* elseBranch = NULL;
   if (match(cmp, TOKEN_ELSE)) {
     elseBranch = statement(cmp);
   }
 
-  AstNode* node = newIfNode(cond, then, elseBranch);
+  ObjAst* node = newIfNode(cond, then, elseBranch);
   return setNodeFromToken(node, ifToken);
 }
 
-static AstNode* whileStatement(NodeCompiler* cmp) {
+static ObjAst* whileStatement(NodeCompiler* cmp) {
   Token whileToken = parser.previous;
   consume(cmp, TOKEN_PAREN_LEFT, "Expect '(' after 'while'.");
-  AstNode* cond = expression(cmp);
+  ObjAst* cond = expression(cmp);
   consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after condition.");
-  AstNode* body = statement(cmp);
-  AstNode* node = newWhileNode(cond, body);
+  ObjAst* body = statement(cmp);
+  ObjAst* node = newWhileNode(cond, body);
   return setNodeFromToken(node, whileToken);
 }
 
-static AstNode* forStatement(NodeCompiler* cmp) {
+static ObjAst* forStatement(NodeCompiler* cmp) {
   Token forToken = parser.previous;
   beginScope(cmp);
 
@@ -986,20 +986,20 @@ static AstNode* forStatement(NodeCompiler* cmp) {
 
     if (match(cmp, TOKEN_IN)) {
       uint8_t varIndex = addLocal(cmp, varToken);
-      AstNode* varNode = setNodeFromToken(newVarLocalNode(varIndex), varToken);
+      ObjAst* varNode = setNodeFromToken(newVarLocalNode(varIndex), varToken);
       varNode->as.local.name = tokenString(varToken);
       markInitialized(cmp);
 
-      AstNode* iterable = expression(cmp);
+      ObjAst* iterable = expression(cmp);
 
       uint8_t iterIndex = addLocal(cmp, syntheticToken("__iter"));
       markInitialized(cmp);
 
       consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after for clause.");
 
-      AstNode* body = statement(cmp);
+      ObjAst* body = statement(cmp);
 
-      AstNode* iterNode = newIterNode(varNode, iterable, body);
+      ObjAst* iterNode = newIterNode(varNode, iterable, body);
       setNodeFromToken(iterNode, varToken);
       iterNode->as.iter.iterLocal = iterIndex;
 
@@ -1010,38 +1010,38 @@ static AstNode* forStatement(NodeCompiler* cmp) {
 
   gotoParser(checkpoint);
 
-  AstNode* initializer = NULL;
+  ObjAst* initializer = NULL;
   if (!match(cmp, TOKEN_SEMICOLON)) {
     if (match(cmp, TOKEN_LET)) {
       initializer = letDeclaration(cmp);
       consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop initializer.");
     } else {
-      AstNode* initExpr = expression(cmp);
+      ObjAst* initExpr = expression(cmp);
       initializer = newExprStmtNode(initExpr);
       setNodeFromNode(initializer, initExpr);
       consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop initializer.");
     }
   }
 
-  AstNode* condition = NULL;
+  ObjAst* condition = NULL;
   if (!check(TOKEN_SEMICOLON)) {
     condition = expression(cmp);
   }
   consume(cmp, TOKEN_SEMICOLON, "Expect ';' after loop condition.");
 
-  AstNode* increment = NULL;
+  ObjAst* increment = NULL;
   if (!check(TOKEN_PAREN_RIGHT)) {
-    AstNode* incrementExpr = expression(cmp);
+    ObjAst* incrementExpr = expression(cmp);
     increment = newExprStmtNode(incrementExpr);
     setNodeFromNode(increment, incrementExpr);
   }
   consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after for clauses.");
 
-  AstNode* body = statement(cmp);
+  ObjAst* body = statement(cmp);
 
   endScope(cmp);
 
-  AstNode* node = newForNode(initializer, condition, increment, body);
+  ObjAst* node = newForNode(initializer, condition, increment, body);
   return setNodeFromToken(node, forToken);
 }
 
@@ -1051,7 +1051,7 @@ static void rescanCurrentAsPathIdentifier(NodeCompiler* cmp) {
   parser.next = scanToken();
 }
 
-static AstNode* importStatement(NodeCompiler* cmp) {
+static ObjAst* importStatement(NodeCompiler* cmp) {
   Token useToken = parser.previous;
   rescanCurrentAsPathIdentifier(cmp);
   consume(cmp, TOKEN_IDENTIFIER, "Expect identifier for module path.");
@@ -1063,50 +1063,50 @@ static AstNode* importStatement(NodeCompiler* cmp) {
   }
 
   vmPush(OBJ_VAL(tokenString(parser.previous)));
-  AstNode* module =
+  ObjAst* module =
       vmCompileModuleNode(cmp->fn->as.function.module->as.module.dirName->chars,
                           AS_STRING(vmPeek(0))->chars);
   vmPop();  // path.
   gotoParser(checkpoint);
 
-  AstNode* node = setNodeFromToken(newUseNode(module), useToken);
-  AstNode* importBlock = newBlockNode();
+  ObjAst* node = setNodeFromToken(newUseNode(module), useToken);
+  ObjAst* importBlock = newBlockNode();
 
   // translate the import to a call to the module's function,
   // and return a map of the local variables.
-  AstNode* fn = node->as.use.module->as.module.fn;
+  ObjAst* fn = node->as.use.module->as.module.fn;
   AstVec* stmts = &fn->as.function.body->as.block.stmts;
-  AstNode* ret = stmts->items[stmts->count - 1];
+  ObjAst* ret = stmts->items[stmts->count - 1];
   ret->as.xReturn.value = newMapNode();
   for (int i = 0; i < stmts->count; i++) {
-    AstNode* stmt = stmts->items[i];
+    ObjAst* stmt = stmts->items[i];
     if (stmt->type == AST_DECL_LET) {
-      AstNode* key = newLiteralNode();
+      ObjAst* key = newLiteralNode();
       key->as.literal.value = OBJ_VAL(stmt->as.declLet.local->as.local.name);
-      AstNode* entry = newMapEntryNode(key, stmt->as.declLet.local);
+      ObjAst* entry = newMapEntryNode(key, stmt->as.declLet.local);
       pushAstVec(&ret->as.xReturn.value->as.map.entries, entry);
     }
   }
   // then build let declarations for each of the local variables,
   // pulled from the map, and add them to the function's statements.
   uint8_t importLocal = addLocal(cmp, syntheticToken("__import"));
-  AstNode* importVar = newVarLocalNode(importLocal);
+  ObjAst* importVar = newVarLocalNode(importLocal);
   importVar->as.local.name = intern("__import");
-  AstNode* importCall = setNodeFromToken(newCallNode(fn), useToken);
-  AstNode* import = newDeclLetNode(importVar, importCall);
+  ObjAst* importCall = setNodeFromToken(newCallNode(fn), useToken);
+  ObjAst* import = newDeclLetNode(importVar, importCall);
   pushAstVec(&importBlock->as.block.stmts, import);
   markInitialized(cmp);
 
   AstVec* entries = &ret->as.xReturn.value->as.map.entries;
   for (int i = 0; i < entries->count; i++) {
-    AstNode* entry = entries->items[i];
+    ObjAst* entry = entries->items[i];
     ObjString* name = AS_STRING(entry->as.mapEntry.key->as.literal.value);
     uint8_t declLocal = addLocal(cmp, syntheticToken(name->chars));
-    AstNode* nodeLocal = newVarLocalNode(declLocal);
+    ObjAst* nodeLocal = newVarLocalNode(declLocal);
     nodeLocal->as.local.name = name;
-    AstNode* key = newLiteralNode();
+    ObjAst* key = newLiteralNode();
     key->as.literal.value = OBJ_VAL(name);
-    AstNode* decl =
+    ObjAst* decl =
         newDeclLetNode(nodeLocal, newSubscriptGetNode(importVar, key));
     pushAstVec(&importBlock->as.block.stmts, decl);
     markInitialized(cmp);
@@ -1114,15 +1114,15 @@ static AstNode* importStatement(NodeCompiler* cmp) {
   return importBlock;
 }
 
-static AstNode* throwStatement(NodeCompiler* cmp) {
+static ObjAst* throwStatement(NodeCompiler* cmp) {
   Token throwToken = parser.previous;
-  AstNode* expr = expression(cmp);
-  AstNode* node = newThrowNode(expr);
+  ObjAst* expr = expression(cmp);
+  ObjAst* node = newThrowNode(expr);
   return setNodeFromToken(node, throwToken);
 }
 
-static AstNode* statement(NodeCompiler* cmp) {
-  AstNode* node;
+static ObjAst* statement(NodeCompiler* cmp) {
+  ObjAst* node;
   if (match(cmp, TOKEN_IF)) {
     node = ifStatement(cmp);
   } else if (match(cmp, TOKEN_FOR)) {
@@ -1141,7 +1141,7 @@ static AstNode* statement(NodeCompiler* cmp) {
     node = block(cmp);
   } else {
     node = expression(cmp);
-    AstNode* exprStmt = newExprStmtNode(node);
+    ObjAst* exprStmt = newExprStmtNode(node);
     setNodeFromNode(exprStmt, node);
     node = exprStmt;
   }
@@ -1151,46 +1151,39 @@ static AstNode* statement(NodeCompiler* cmp) {
 
 static void statements(NodeCompiler* cmp, AstVec* target) {
   while (!match(cmp, TOKEN_EOF)) {
-    AstNode* node = statement(cmp);
+    ObjAst* node = statement(cmp);
     pushAstVec(target, node);
   }
 }
 
-AstNode* compileFunctionNode(AstNode* module) {
+ObjAst* compileFunctionNode(ObjAst* module) {
   Scanner sc = initScanner(module->as.module.source->chars);
   initParser(sc);
   NodeCompiler cmp;
   Token synthetic = {.line = 0, .column = -1};
-  AstNode* node = setNodeFromToken(newFunctionNode(module), synthetic);
+  ObjAst* node = setNodeFromToken(newFunctionNode(module), synthetic);
   node->as.function.name = module->as.module.baseName;
   node->as.function.signature = setNodeFromToken(newSignatureNode(), synthetic);
   node->as.function.body = setNodeFromToken(newBlockNode(), synthetic);
   initNodeCompiler(&cmp, NULL, node);
 
   statements(&cmp, &node->as.function.body->as.block.stmts);
-  AstNode* nilLiteral =
+  ObjAst* nilLiteral =
       setNodeFromToken(newLiteralValueNode(NIL_VAL), synthetic);
-  AstNode* defaultReturn = newReturnNode(nilLiteral);
+  ObjAst* defaultReturn = newReturnNode(nilLiteral);
   setNodeFromToken(defaultReturn, synthetic);
   pushAstVec(&node->as.function.body->as.block.stmts, defaultReturn);
 
   return node;
 }
 
-AstNode* compileModuleNode(ObjString* dirName, ObjString* baseName,
-                           ObjString* source) {
-  AstNode* node = newModuleNode(dirName, baseName, source);
+ObjAst* compileModuleNode(ObjString* dirName, ObjString* baseName,
+                          ObjString* source) {
+  ObjAst* node = newModuleNode(dirName, baseName, source);
   node->as.module.fn = compileFunctionNode(node);
 #ifdef DEBUG_TRACE_AST
   printf("Compiling module: %s\n", node->as.module.baseName->chars);
   printNode(node);
 #endif
   return node;
-}
-
-void markNodeCompilerRoots(NodeCompiler* cmp) {
-  while (cmp != NULL) {
-    markAstNode(cmp->fn);
-    cmp = cmp->enclosing;
-  }
 }

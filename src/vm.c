@@ -122,9 +122,8 @@ void freeVM() {
   freeMap(&vm.strings);
   freeMap(&vm.prefixes);
   freeMap(&vm.infixes);
-
-  freeAstNodes(vm.astRoot);
-  freeObjects();
+  printf("freeing heap\n");
+  freeHeap();
 }
 
 void vmPush(Value value) {
@@ -383,7 +382,8 @@ void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame) {
     uint8_t isLocal = READ_BYTE();
     uint8_t index = READ_BYTE();
     if (isLocal) {
-      Token token = frame->closure->function->locals[index].name;
+      Token token =
+          frame->closure->function->node->as.function.locals[index].name;
       ObjString* name = copyString(token.start, token.length);
       vmPush(OBJ_VAL(name));
       closure->upvalues[i] =
@@ -420,7 +420,8 @@ void vmClosure(CallFrame* frame) {
 
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
-  READ_CONSTANT();  // name.
+  // Value name = READ_CONSTANT();
+  frame->ip += 2;
   int arity = 0;
   ObjOverload* overload = newOverload(cases);
 
@@ -921,14 +922,14 @@ bool vmPathBits(char* enclosingDir, char* path) {
   return true;
 }
 
-AstNode* vmCompileModuleNode(char* enclosingDir, char* path) {
+ObjAst* vmCompileModuleNode(char* enclosingDir, char* path) {
   if (!vmPathBits(enclosingDir, path)) return NULL;
 
   ObjString* objDirName = AS_STRING(vmPeek(2));
   ObjString* objBaseName = AS_STRING(vmPeek(1));
   ObjString* objSource = AS_STRING(vmPeek(0));
 
-  AstNode* moduleNode = compileModuleNode(objDirName, objBaseName, objSource);
+  ObjAst* moduleNode = compileModuleNode(objDirName, objBaseName, objSource);
 
   vmPop();  // objSource.
   vmPop();  // objBaseName.
@@ -938,7 +939,7 @@ AstNode* vmCompileModuleNode(char* enclosingDir, char* path) {
 }
 
 ObjModule* vmCompileModule(char* enclosingDir, char* path) {
-  AstNode* moduleNode = vmCompileModuleNode(enclosingDir, path);
+  ObjAst* moduleNode = vmCompileModuleNode(enclosingDir, path);
   return toModule(moduleNode);
 }
 

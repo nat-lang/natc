@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "compiler.h"
+#include "node.h"
 #include "vm.h"
 
 #ifdef DEBUG_LOG_GC
@@ -83,6 +84,10 @@ static void blackenObject(Obj* object) {
   markMap(&object->fields);
 
   switch (object->oType) {
+    case OBJ_AST: {
+      vmRuntimeError("foo");
+      break;
+    }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
@@ -103,7 +108,6 @@ static void blackenObject(Obj* object) {
     }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
-      markObject((Obj*)function->node);
       markObject((Obj*)function->name);
       markArray(&function->chunk.constants);
       markObject((Obj*)function->module);
@@ -151,6 +155,7 @@ static void blackenObject(Obj* object) {
 }
 
 static void freeObject(Obj* object) {
+  printf("  %p free type %d\n", (void*)object, object->oType);
 #ifdef DEBUG_LOG_GC
   printf("%p free type %d\n", (void*)object, object->oType);
 #endif
@@ -158,6 +163,12 @@ static void freeObject(Obj* object) {
   freeMap(&object->fields);
 
   switch (object->oType) {
+    case OBJ_AST: {
+      printf("  freeing ast at %p\n", object);
+      ObjAst* ast = (ObjAst*)object;
+      freeObjectAst(ast);
+      break;
+    }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
@@ -272,7 +283,11 @@ static void markRoots() {
   markObject((Obj*)vm.core.sValue);
   markObject((Obj*)vm.core.sTree);
 
-  markAstNodes(vm.astRoot);
+  ObjAst* ast = vm.astRoot;
+  while (ast != NULL) {
+    markObjectAst(ast);
+    ast = (ObjAst*)ast->obj.next;
+  }
 }
 
 static void traceReferences() {
@@ -324,12 +339,26 @@ void collectGarbage() {
 #endif
 }
 
-void freeObjects() {
-  Obj* object = vm.objects;
+void freeObjects(Obj* root) {
+  Obj* object = root;
   while (object != NULL) {
     Obj* next = object->next;
     freeObject(object);
     object = next;
   }
+}
+
+void freeHeap() {
+  freeObjects(vm.objects);
+
+  printf("freeing asts\n");
+  ObjAst* n = vm.astRoot;
+  while (n != NULL) {
+    printf("freeing ast at %p\n", n);
+    Obj* next = n->obj.next;
+    freeObjectAst(n);
+    n = (ObjAst*)next;
+  }
+
   free(vm.grayStack);
 }

@@ -3,11 +3,11 @@
 
 #include "chunk.h"
 #include "common.h"
-#include "node.h"
 #include "value.h"
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->oType)
 
+#define IS_AST(value) isObjType(value, OBJ_AST)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 #define IS_OVERLOAD(value) isObjType(value, OBJ_OVERLOAD)
@@ -23,6 +23,7 @@
 #define IS_MODULE(value) isObjType(value, OBJ_MODULE)
 #define IS_TREE(value) isObjType(value, OBJ_TREE)
 
+#define AS_AST(value) ((ObjAst*)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
 #define AS_OVERLOAD(value) ((ObjOverload*)AS_OBJ(value))
@@ -44,6 +45,7 @@
 #define INTERN(value) ((OBJ_VAL(intern(value))))
 
 typedef enum {
+  OBJ_AST,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
   OBJ_OVERLOAD,
@@ -92,16 +94,13 @@ typedef struct {
 struct ObjFunction {
   Obj obj;
 
-  AstNode* node;
+  ObjAst* node;
 
   int arity;
   bool variadic;
   bool patterned;
-  int upvalueCount;
 
   Chunk chunk;
-  Local locals[UINT8_COUNT];
-  int localCount;
 
   ObjString* name;
   ObjModule* module;

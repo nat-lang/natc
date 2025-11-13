@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
 
   InterpretResult status = vmInterpretEntrypoint((char*)argv[optind]);
 
+  printf("0\n");
   if (status == INTERPRET_COMPILE_ERROR) exitStatus = 65;
   if (status == INTERPRET_RUNTIME_ERROR) exitStatus = 70;
 

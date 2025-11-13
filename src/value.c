@@ -157,6 +157,8 @@ bool valuesEqual(Value a, Value b) {
       }
     }
   }
+  // unreachable.
+  return false;
 }
 
 static inline uint32_t hashBits(uint64_t hash) {

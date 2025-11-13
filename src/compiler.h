@@ -7,15 +7,15 @@
 
 typedef struct NodeCompiler {
   struct NodeCompiler* enclosing;
-  AstNode* fn;
+  ObjAst* fn;
   int scopeDepth;
   bool hadError;
 } NodeCompiler;
 
-void compileModuleImportBody(NodeCompiler* cmp, AstNode* module);
-AstNode* compileFunctionNode(AstNode* module);
-AstNode* compileModuleNode(ObjString* dirName, ObjString* baseName,
-                           ObjString* source);
+void compileModuleImportBody(NodeCompiler* cmp, ObjAst* module);
+ObjAst* compileFunctionNode(ObjAst* module);
+ObjAst* compileModuleNode(ObjString* dirName, ObjString* baseName,
+                          ObjString* source);
 
 void markNodeCompilerRoots(NodeCompiler* cmp);
 

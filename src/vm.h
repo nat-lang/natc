@@ -81,7 +81,7 @@ typedef struct {
 
   // heap.
   Obj* objects;
-  AstNode* astRoot;
+  ObjAst* astRoot;
   ObjUpvalue* openUpvalues;
   Map strings;
   Map globals;
@@ -122,7 +122,7 @@ char* vmGenerate_wasm(char* path);
 void vmInit_wasm();
 void vmFree_wasm();
 
-AstNode* vmCompileModuleNode(char* enclosingDir, char* path);
+ObjAst* vmCompileModuleNode(char* enclosingDir, char* path);
 
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
