@@ -7,6 +7,7 @@
 
 #include "common.h"
 #include "node.h"
+#include "object.h"
 #include "scanner.h"
 #include "vm.h"
 
@@ -149,8 +150,7 @@ static AstNode* nakedFunction(NodeCompiler* enclosing, Token name);
 static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
                           Precedence prec);
 static bool peekFunction(NodeCompiler* cmp);
-static bool isSwitch(NodeCompiler* cmp);
-static AstNode* patternElement(NodeCompiler* cmp);
+static AstNode* pattern(NodeCompiler* cmp);
 static AstNode* patternSequence(NodeCompiler* cmp);
 static AstNode* patternSetOrMap(NodeCompiler* cmp);
 
@@ -271,8 +271,39 @@ static void endScope(NodeCompiler* cmp) {
   }
 }
 
+Token fnToken(Token token) {
+  return token.type == TOKEN_IDENTIFIER || token.type == TOKEN_TYPE_VARIABLE
+             ? token
+             : syntheticToken("lambda");
+}
+
 static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
-  if (check(TOKEN_FAT_ARROW)) return nakedFunction(cmp, parser.ppenult);
+  // fn?
+  if (check(TOKEN_FAT_ARROW)) {
+    Token name = fnToken(parser.ppenult);
+    AstNode* node = nakedFunction(cmp, name);
+
+    // switch?
+    if (!check(TOKEN_COMMA)) return node;
+
+    // Create switch node and add first case
+    int arity = 1;
+    AstNode* switchNode = newSwitchNode();
+    switchNode->as.switchFunc.name = tokenString(name);
+    setNodeFromToken(switchNode, name);
+    switchNode->as.switchFunc.arity = arity;
+    pushAstVec(&switchNode->as.switchFunc.cases, node);
+
+    // Parse remaining cases
+    do {
+      AstNode* nextCase = nakedFunction(cmp, name);
+      pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
+    } while (match(cmp, TOKEN_COMMA));
+
+    return switchNode;
+  }
+
+  // variable.
 
   Token name = parser.previous;
 
@@ -289,6 +320,7 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
     node->as.global.name = tokenString(name);
   }
 
+  // assignment?
   if (match(cmp, TOKEN_EQUAL)) {
     Token equalToken = parser.previous;
     if (!canAssign) error(cmp, "Invalid assignment target.");
@@ -301,76 +333,69 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 }
 
 // Parse a pattern element in signature context
-static AstNode* patternElement(NodeCompiler* cmp) {
-  // Literal patterns - allocate local slot for stack alignment
-  if (match(cmp, TOKEN_NUMBER)) {
-    Token litToken = parser.previous;
-    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
-    markInitialized(cmp);
-    double value = strtod(litToken.start, NULL);
-    return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)), litToken);
+static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
+  printf("tokenPattern at: %s\n", tokenString(token)->chars);
+  switch (token.type) {
+    case TOKEN_NUMBER: {
+      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      markInitialized(cmp);
+      double value = strtod(token.start, NULL);
+      return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)), token);
+    }
+    case TOKEN_STRING: {
+      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      markInitialized(cmp);
+      ObjString* str = copyString(token.start + 1, token.length - 2);
+      AstNode* node = setNodeFromToken(newLiteralNode(), token);
+      node->as.literal.value = OBJ_VAL(str);
+      return node;
+    }
+    case TOKEN_TRUE: {
+      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      markInitialized(cmp);
+      return setNodeFromToken(newLiteralValueNode(BOOL_VAL(true)), token);
+    }
+    case TOKEN_FALSE: {
+      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      markInitialized(cmp);
+      return setNodeFromToken(newLiteralValueNode(BOOL_VAL(false)), token);
+    }
+    case TOKEN_NIL: {
+      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      markInitialized(cmp);
+      return setNodeFromToken(newLiteralValueNode(NIL_VAL), token);
+    }
+    case TOKEN_UNDEFINED: {
+      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      markInitialized(cmp);
+      return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), token);
+    }
+    case TOKEN_TYPE_VARIABLE:
+    case TOKEN_IDENTIFIER: {
+      addLocal(cmp, token);
+      markInitialized(cmp);
+      AstNode* param = setNodeFromToken(newParamNode(NULL), token);
+      param->as.param.name = tokenString(token);
+      return param;
+    }
+    case TOKEN_PAREN_LEFT: {
+      return patternSequence(cmp);
+    }
+    case TOKEN_LEFT_BRACE: {
+      return patternSetOrMap(cmp);
+    }
+
+    default: {
+      errorAtCurrent(cmp, "Expect pattern element.");
+      break;
+    }
   }
 
-  if (match(cmp, TOKEN_STRING)) {
-    Token litToken = parser.previous;
-    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
-    markInitialized(cmp);
-    ObjString* str = copyString(litToken.start + 1, litToken.length - 2);
-    AstNode* node = setNodeFromToken(newLiteralNode(), litToken);
-    node->as.literal.value = OBJ_VAL(str);
-    return node;
-  }
+  return setNodeFromToken(newUnknownNode(), token);
+}
 
-  if (match(cmp, TOKEN_TRUE)) {
-    Token litToken = parser.previous;
-    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
-    markInitialized(cmp);
-    return setNodeFromToken(newLiteralValueNode(BOOL_VAL(true)), litToken);
-  }
-
-  if (match(cmp, TOKEN_FALSE)) {
-    Token litToken = parser.previous;
-    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
-    markInitialized(cmp);
-    return setNodeFromToken(newLiteralValueNode(BOOL_VAL(false)), litToken);
-  }
-
-  if (match(cmp, TOKEN_NIL)) {
-    Token litToken = parser.previous;
-    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
-    markInitialized(cmp);
-    return setNodeFromToken(newLiteralValueNode(NIL_VAL), litToken);
-  }
-
-  if (match(cmp, TOKEN_UNDEFINED)) {
-    Token litToken = parser.previous;
-    addLocal(cmp, litToken);  // Allocate local slot for stack alignment
-    markInitialized(cmp);
-    return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), litToken);
-  }
-
-  // Variable pattern - parse as parameter, not as var reference
-  if (match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_TYPE_VARIABLE)) {
-    Token varToken = parser.previous;
-    addLocal(cmp, varToken);
-    markInitialized(cmp);
-    AstNode* param = setNodeFromToken(newParamNode(NULL), varToken);
-    param->as.param.name = tokenString(varToken);
-    return param;
-  }
-
-  // Parentheses - could be sequence pattern
-  if (check(TOKEN_PAREN_LEFT)) {
-    return patternSequence(cmp);
-  }
-
-  // Braces - could be set or map pattern
-  if (check(TOKEN_LEFT_BRACE)) {
-    return patternSetOrMap(cmp);
-  }
-
-  errorAtCurrent(cmp, "Expect pattern element.");
-  return setNodeFromToken(newUnknownNode(), parser.current);
+static AstNode* pattern(NodeCompiler* cmp) {
+  return tokenPattern(cmp, parser.current);
 }
 
 // Parse sequence pattern by reusing/adapting sequence parsing
@@ -382,7 +407,7 @@ static AstNode* patternSequence(NodeCompiler* cmp) {
 
   if (!check(TOKEN_PAREN_RIGHT)) {
     do {
-      pushAstVec(&seq->as.sequence.values, patternElement(cmp));
+      pushAstVec(&seq->as.sequence.values, pattern(cmp));
     } while (match(cmp, TOKEN_COMMA));
   }
 
@@ -402,7 +427,7 @@ static AstNode* patternSetOrMap(NodeCompiler* cmp) {
 
   // Lookahead to distinguish set from map
   Parser checkpoint = saveParser();
-  patternElement(cmp);
+  pattern(cmp);
   bool isMap = check(TOKEN_COLON);
   gotoParser(checkpoint);
 
@@ -411,9 +436,9 @@ static AstNode* patternSetOrMap(NodeCompiler* cmp) {
     AstNode* obj = setNodeFromToken(newMapNode(), openToken);
 
     do {
-      AstNode* key = patternElement(cmp);
+      AstNode* key = pattern(cmp);
       consume(cmp, TOKEN_COLON, "Expect ':' in map pattern.");
-      AstNode* value = patternElement(cmp);
+      AstNode* value = pattern(cmp);
       AstNode* entry = newMapEntryNode(key, value);
       setNodeFromNode(entry, key);
       pushAstVec(&obj->as.map.entries, entry);
@@ -426,20 +451,12 @@ static AstNode* patternSetOrMap(NodeCompiler* cmp) {
     AstNode* set = setNodeFromToken(newSetNode(), openToken);
 
     do {
-      pushAstVec(&set->as.set.values, patternElement(cmp));
+      pushAstVec(&set->as.set.values, pattern(cmp));
     } while (match(cmp, TOKEN_COMMA));
 
     consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after set pattern.");
     return set;
   }
-}
-
-static AstNode* parameter(NodeCompiler* cmp) {
-  addLocal(cmp, parser.previous);
-  markInitialized(cmp);
-  AstNode* node = setNodeFromToken(newParamNode(NULL), parser.previous);
-  node->as.param.name = tokenString(parser.previous);
-  return node;
 }
 
 static AstNode* signature(NodeCompiler* cmp) {
@@ -448,8 +465,8 @@ static AstNode* signature(NodeCompiler* cmp) {
   if (!check(TOKEN_PAREN_RIGHT)) {
     do {
       // Parse pattern element (could be literal, variable, or structure)
-      AstNode* pattern = patternElement(cmp);
-      pushAstVec(&node->as.signature.params, pattern);
+      AstNode* param = pattern(cmp);
+      pushAstVec(&node->as.signature.params, param);
     } while (match(cmp, TOKEN_COMMA));
   }
 
@@ -497,70 +514,11 @@ static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
   initNodeCompiler(&cmp, enclosing, node);
   beginScope(&cmp);
   AstNode* sigNode = setNodeFromToken(newSignatureNode(), name);
-  AstNode* paramNode = parameter(&cmp);
+  AstNode* paramNode = tokenPattern(&cmp, parser.previous);
   pushAstVec(&sigNode->as.signature.params, paramNode);
   setNodeFromNode(sigNode, node);
   node->as.function.signature = sigNode;
 
-  consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
-  node->as.function.body = functionBody(&cmp);
-  endScope(&cmp);
-
-  // Check if this is a switch function
-  if (!isSwitch(enclosing)) {
-    return node;
-  }
-
-  // Create switch node and add first case
-  int arity = node->as.function.signature->as.signature.params.count;
-  AstNode* switchNode = newSwitchNode(tokenString(name));
-  setNodeFromToken(switchNode, name);
-  switchNode->as.switchFunc.arity = arity;
-  pushAstVec(&switchNode->as.switchFunc.cases, node);
-
-  // Parse remaining cases
-  while (match(enclosing, TOKEN_COMMA)) {
-    AstNode* nextCase = nakedFunction(enclosing, name);
-
-    // If nextCase is itself a switch, we've got nested switches - error
-    if (nextCase->type == AST_SWITCH) {
-      error(enclosing, "Unexpected nested switch");
-      return switchNode;
-    }
-
-    int nextArity = nextCase->as.function.signature->as.signature.params.count;
-    if (nextArity != arity) {
-      error(enclosing, "All switch cases must have same arity");
-      return switchNode;
-    }
-
-    pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
-  }
-
-  return switchNode;
-}
-
-// Parse a function when we're already positioned after the opening paren
-static AstNode* functionInsideParens(NodeCompiler* enclosing, Token name,
-                                     Token openParen) {
-  AstNode* node = setNodeFromToken(
-      newFunctionNode(enclosing->fn->as.function.module), name);
-  node->as.function.name = tokenString(name);
-  NodeCompiler cmp;
-  initNodeCompiler(&cmp, enclosing, node);
-  beginScope(&cmp);
-
-  node->as.function.signature = setNodeFromToken(newSignatureNode(), openParen);
-
-  if (!check(TOKEN_PAREN_RIGHT)) {
-    do {
-      AstNode* pattern = patternElement(&cmp);
-      pushAstVec(&node->as.function.signature->as.signature.params, pattern);
-    } while (match(&cmp, TOKEN_COMMA));
-  }
-
-  setNodeFromNode(node->as.function.signature, node);
-  consume(&cmp, TOKEN_PAREN_RIGHT, "Expect ')' after parameters.");
   consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
   node->as.function.body = functionBody(&cmp);
   endScope(&cmp);
@@ -582,59 +540,6 @@ AstNode* function(NodeCompiler* enclosing, Token name) {
   node->as.function.body = functionBody(&cmp);
   endScope(&cmp);
   return node;
-}
-
-// Check if we're at the start of a switch function
-static bool isSwitch(NodeCompiler* cmp) {
-  if (!check(TOKEN_COMMA)) return false;
-
-  Parser checkpoint = saveParser();
-  advance(cmp);  // consume comma
-
-  // Check if we have a function starting with (
-  if (!check(TOKEN_PAREN_LEFT)) {
-    gotoParser(checkpoint);
-    return false;
-  }
-
-  advance(cmp);  // consume opening paren
-
-  bool hasNext = peekFunction(cmp);
-
-  gotoParser(checkpoint);
-  return hasNext;
-}
-
-// Parse a switch function when we're already inside the parens of the first
-// case Always creates a switch to enable pattern matching
-static AstNode* parseSwitchInsideParens(NodeCompiler* enclosing, Token name,
-                                        Token openParen) {
-  AstNode* first = functionInsideParens(enclosing, name, openParen);
-
-  int arity = first->as.function.signature->as.signature.params.count;
-
-  AstNode* switchNode = newSwitchNode(tokenString(name));
-  setNodeFromToken(switchNode, openParen);
-  switchNode->as.switchFunc.arity = arity;
-  pushAstVec(&switchNode->as.switchFunc.cases, first);
-
-  // Check for additional cases
-  while (isSwitch(enclosing) && match(enclosing, TOKEN_COMMA)) {
-    // For subsequent cases, we need to consume the opening paren
-    consume(enclosing, TOKEN_PAREN_LEFT, "Expect '(' at start of switch case.");
-    Token nextOpenParen = parser.previous;
-    AstNode* nextCase = functionInsideParens(enclosing, name, nextOpenParen);
-    int nextArity = nextCase->as.function.signature->as.signature.params.count;
-
-    if (nextArity != arity) {
-      error(enclosing, "All switch cases must have same arity");
-      return switchNode;
-    }
-
-    pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
-  }
-
-  return switchNode;
 }
 
 static AstNode* boolean(NodeCompiler* cmp, bool canAssign) {
@@ -986,8 +891,26 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
   Parser checkpoint = saveParser();
   bool isFunction = peekFunction(cmp);
   gotoParser(checkpoint);
-  if (isFunction)
-    return parseSwitchInsideParens(cmp, parser.ppenult, openToken);
+  if (isFunction) {
+    Token name = fnToken(parser.ppenult);
+    AstNode* node = function(cmp, name);
+
+    // switch?
+    if (!check(TOKEN_COMMA)) return node;
+    int arity = node->as.function.signature->as.signature.params.count;
+    AstNode* switchNode = newSwitchNode();
+    switchNode->as.switchFunc.name = tokenString(name);
+    setNodeFromToken(switchNode, name);
+    switchNode->as.switchFunc.arity = arity;
+    pushAstVec(&switchNode->as.switchFunc.cases, node);
+
+    do {
+      AstNode* nextCase = function(cmp, name);
+      pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
+    } while (match(cmp, TOKEN_COMMA));
+
+    return switchNode;
+  }
 
   Parser bodyCheckpoint = saveParser();
   bool isComprehension = advanceTo(cmp, TOKEN_PIPE, TOKEN_PAREN_RIGHT, 1);

@@ -194,7 +194,46 @@ bool testCallInfixNodeRightNested() {
   return assertNodesEqual(node, fn);
 }
 
-bool testFunctionNode() {
+bool testFunctionExprNode() {
+  AstNode* node = compile("() => 1");
+
+  AstNode* fn = newFunctionNode(NULL);
+  AstNode* body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+  fn->as.function.name = intern("lambda");
+  fn->as.function.signature = newSignatureNode();
+  fn->as.function.body = body;
+
+  AstNode* m = mkFunction();
+  pushFnStmt(m, newExprStmtNode(fn));
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(m, returnStmt);
+
+  return assertNodesEqual(node, m);
+}
+
+bool testNakedFunctionExprNode() {
+  AstNode* node = compile("x => 1");
+
+  AstNode* fn = newFunctionNode(NULL);
+  AstNode* body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
+  fn->as.function.name = intern("lambda");
+  fn->as.function.signature = newSignatureNode();
+  fn->as.function.body = body;
+  AstNode* param = newParamNode(NULL);
+  param->as.param.name = intern("x");
+  pushAstVec(&fn->as.function.signature->as.signature.params, param);
+
+  AstNode* m = mkFunction();
+  pushFnStmt(m, newExprStmtNode(fn));
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(m, returnStmt);
+
+  return assertNodesEqual(node, m);
+}
+
+bool testFunctionDeclNode() {
   AstNode* node = compile("let f = () => 1");
 
   AstNode* f = newFunctionNode(NULL);
@@ -240,7 +279,8 @@ bool testSwitchFunctionTwoCases() {
   case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(2)));
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -289,7 +329,8 @@ bool testSwitchFunctionVariablePatterns() {
   case2->as.function.body = newReturnNode(plusCall);
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -331,7 +372,8 @@ bool testSwitchFunctionMixedPatterns() {
   case2->as.function.body = newReturnNode(var);
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -354,7 +396,8 @@ bool testSwitchFunctionThreeCases() {
   AstNode* node = compile("let f = (1) => 1, (2) => 2, (3) => 3");
 
   // Create switch node with three cases
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 1;
 
   for (int i = 1; i <= 3; i++) {
@@ -412,7 +455,8 @@ bool testSwitchFunctionMultiParam() {
   case2->as.function.body = newReturnNode(var2);
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 2;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -453,7 +497,8 @@ bool testSwitchFunctionStringPatterns() {
   case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(2)));
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -492,7 +537,8 @@ bool testSwitchFunctionBooleanPatterns() {
   case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(0)));
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -1540,7 +1586,8 @@ bool testBytecodeSwitchTwoCases() {
   case2->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(2)));
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("f"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -1588,7 +1635,8 @@ bool testBytecodeSwitchTwoCases() {
 
 bool testBytecodeSwitchThreeCases() {
   // Create switch node with three cases
-  AstNode* switchNode = newSwitchNode(intern("g"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("g");
   switchNode->as.switchFunc.arity = 1;
 
   for (int i = 0; i < 3; i++) {
@@ -1668,7 +1716,8 @@ bool testBytecodeSwitchMultiParam() {
   case2->as.function.body = newReturnNode(var2);
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("h"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("h");
   switchNode->as.switchFunc.arity = 2;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -1737,7 +1786,8 @@ bool testBytecodeSwitchMixedPatterns() {
   case2->as.function.body = newReturnNode(var);
 
   // Create switch node
-  AstNode* switchNode = newSwitchNode(intern("m"));
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("m");
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
@@ -3254,7 +3304,7 @@ bool testSetComprehensionFunctionBody() {
   AstNode* expected = mkFunction();
 
   AstNode* fnExpr = newFunctionNode(NULL);
-  fnExpr->as.function.name = intern("(");
+  fnExpr->as.function.name = intern("lambda");
   fnExpr->as.function.signature = newSignatureNode();
   fnExpr->as.function.body = newReturnNode(newLiteralValueNode(NUMBER_VAL(1)));
 
@@ -4628,7 +4678,12 @@ int testMain(void) {
   fmt("    ", testCallInfixNode(), "Call Infix");
   fmt("    ", testCallInfixNodeLeftNested(), "Call Infix - Left Nested");
   fmt("    ", testCallInfixNodeRightNested(), "Call Infix - Right Nested");
-  fmt("    ", testFunctionNode(), "Function - Implicit Return - Literal");
+  fmt("    ", testFunctionExprNode(),
+      "Function - Expression - Implicit Return - Literal");
+  fmt("    ", testNakedFunctionExprNode(),
+      "Function - Expression - Naked - Implicit Return - Literal");
+  fmt("    ", testFunctionDeclNode(),
+      "Function - Declaration - Implicit Return - Literal");
   fmt("    ", testSwitchFunctionTwoCases(), "Switch function - Two cases");
   fmt("    ", testSwitchFunctionVariablePatterns(),
       "Switch function - Variable patterns");
