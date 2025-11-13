@@ -271,7 +271,7 @@ bool __obj__(int argCount, Value* args) {
 
 bool __str__(int argCount, Value* args) {
   Value value = vmPeek(0);
-  ObjString* string;
+  ObjString* string = NULL;
 
   switch (value.vmType) {
     case VAL_UNIT: {
