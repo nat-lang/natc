@@ -383,7 +383,8 @@ void vmCaptureUpvalues(ObjClosure* closure, CallFrame* frame) {
     uint8_t isLocal = READ_BYTE();
     uint8_t index = READ_BYTE();
     if (isLocal) {
-      Token token = frame->closure->function->locals[index].name;
+      Token token =
+          frame->closure->function->node->as.function.locals[index].name;
       ObjString* name = copyString(token.start, token.length);
       vmPush(OBJ_VAL(name));
       closure->upvalues[i] =

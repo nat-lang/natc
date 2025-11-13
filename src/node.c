@@ -1250,7 +1250,6 @@ ObjFunction* toFunction(AstNode* node) {
   fn->name = node->as.function.name;
   fn->arity = node->as.function.signature->as.signature.params.count;
   fn->node = node;
-  fn->upvalueCount = node->as.function.upvalueCount;
 
   if (!toChunk(node->as.function.signature, &fn->chunk)) return false;
   if (!toChunk(node->as.function.body, &fn->chunk)) return false;
