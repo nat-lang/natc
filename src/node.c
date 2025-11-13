@@ -726,6 +726,7 @@ bool nodesEqual(AstNode* a, AstNode* b) {
     case AST_UNKNOWN:
       return true;
   }
+  return false;
 }
 
 static void error(AstNode* node, const char* format, ...) {

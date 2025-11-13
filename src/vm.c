@@ -420,7 +420,8 @@ void vmClosure(CallFrame* frame) {
 
 bool vmOverload(CallFrame* frame) {
   int cases = READ_BYTE();
-  READ_CONSTANT();  // name.
+  // READ_CONSTANT();  // name.
+  frame->ip += 2;
   int arity = 0;
   ObjOverload* overload = newOverload(cases);
 
