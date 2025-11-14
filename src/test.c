@@ -3653,124 +3653,87 @@ AstNode* compileWithImportDir(char* source, char* dirName) {
 
 bool testImportSimple() {
   // Compile the import statement with the correct directory
-  AstNode* node = compileWithImportDir("use export", "test/integration/import");
+  AstNode* actual =
+      compileWithImportDir("use export", "test/integration/import");
 
-  // The import should desugar to a block containing:
+  // Expected: The import should desugar to a block containing:
   // 1. let __import = call(exportModuleFunction)
   // 2. let x = __import["x"]
   // 3. let f = __import["f"]
+  // 4. let o = __import["o"]
+  // 5. let g = __import["g"]
+  // (All exports from export.nat: x, f, o, g)
 
-  // The compiled node is a function node; get its body
-  if (node->type != AST_FUNCTION) {
-    printf("Expected compiled node to be AST_FUNCTION, got type %d\n",
-           node->type);
-    return false;
-  }
+  // Extract the module from the actual compiled structure to ensure we use
+  // the exact same module reference
+  AstNode* actualBody = actual->as.function.body;
+  AstNode* actualImportBlock = &actualBody->as.block.stmts.items[0];
+  AstNode* actualImportDecl = &actualImportBlock->as.block.stmts.items[0];
+  AstNode* actualModuleCall = actualImportDecl->as.declLet.value;
+  AstNode* actualModuleFn = actualModuleCall->as.call.callee;
 
-  AstNode* body = node->as.function.body;
-  if (body->type != AST_BLOCK) {
-    printf("Expected function body to be AST_BLOCK, got type %d\n", body->type);
-    return false;
-  }
+  // Create call to module function (using the actual module function)
+  AstNode* moduleCall = newCallNode(actualModuleFn);
 
-  // The function body should have 2 statements: the import block and the return
-  AstVec* bodyStmts = &body->as.block.stmts;
-  if (bodyStmts->count < 1) {
-    printf("Expected at least 1 statement in function body, got %d\n",
-           bodyStmts->count);
-    return false;
-  }
+  // Create import block with declarations
+  AstNode* importBlock = newBlockNode();
 
-  // Extract the first statement which should be the import block
-  AstNode* actualFirstStmt = &bodyStmts->items[0];
-  if (actualFirstStmt->type != AST_BLOCK) {
-    printf(
-        "Expected first statement to be a block (import desugaring), got type "
-        "%d\n",
-        actualFirstStmt->type);
-    return false;
-  }
+  // 1. let __import = call(moduleFn)
+  // Local slot 0 is reserved, so __import gets slot 1
+  uint8_t importLocal = 1;
+  AstNode* importVar = newVarLocalNode(importLocal);
+  importVar->as.local.name = intern("__import");
+  AstNode* importDecl = newDeclLetNode(importVar, moduleCall);
+  pushAstVec(&importBlock->as.block.stmts, importDecl);
 
-  AstVec* blockStmts = &actualFirstStmt->as.block.stmts;
+  // 2. let x = __import["x"]
+  uint8_t xLocal = 2;
+  AstNode* xVar = newVarLocalNode(xLocal);
+  xVar->as.local.name = intern("x");
+  AstNode* xKey = newLiteralNode();
+  xKey->as.literal.value = OBJ_VAL(intern("x"));
+  AstNode* xSubscript = newSubscriptGetNode(importVar, xKey);
+  AstNode* xDecl = newDeclLetNode(xVar, xSubscript);
+  pushAstVec(&importBlock->as.block.stmts, xDecl);
 
-  // Check we have 3 statements in the block:
-  // let __import = ...
-  // let x = ...
-  // let f = ...
-  if (blockStmts->count != 3) {
-    printf("Expected 3 statements in import block, got %d\n",
-           blockStmts->count);
-    return false;
-  }
+  // 3. let f = __import["f"]
+  uint8_t fLocal = 3;
+  AstNode* fVar = newVarLocalNode(fLocal);
+  fVar->as.local.name = intern("f");
+  AstNode* fKey = newLiteralNode();
+  fKey->as.literal.value = OBJ_VAL(intern("f"));
+  AstNode* fSubscript = newSubscriptGetNode(importVar, fKey);
+  AstNode* fDecl = newDeclLetNode(fVar, fSubscript);
+  pushAstVec(&importBlock->as.block.stmts, fDecl);
 
-  // Check first statement: let __import = call(exportModuleFunction)
-  AstNode* importDecl = &blockStmts->items[0];
-  if (importDecl->type != AST_DECL_LET) {
-    printf("Expected first statement to be AST_DECL_LET, got type %d\n",
-           importDecl->type);
-    return false;
-  }
-  if (importDecl->as.declLet.local->type != AST_VAR_LOCAL) {
-    printf("Expected import decl local to be AST_VAR_LOCAL\n");
-    return false;
-  }
-  ObjString* importName = importDecl->as.declLet.local->as.local.name;
-  if (strcmp(importName->chars, "__import") != 0) {
-    printf("Expected import local name to be '__import', got '%s'\n",
-           importName->chars);
-    return false;
-  }
-  if (importDecl->as.declLet.value->type != AST_CALL) {
-    printf("Expected import value to be AST_CALL, got type %d\n",
-           importDecl->as.declLet.value->type);
-    return false;
-  }
+  // 4. let o = __import["o"]
+  uint8_t oLocal = 4;
+  AstNode* oVar = newVarLocalNode(oLocal);
+  oVar->as.local.name = intern("o");
+  AstNode* oKey = newLiteralNode();
+  oKey->as.literal.value = OBJ_VAL(intern("o"));
+  AstNode* oSubscript = newSubscriptGetNode(importVar, oKey);
+  AstNode* oDecl = newDeclLetNode(oVar, oSubscript);
+  pushAstVec(&importBlock->as.block.stmts, oDecl);
 
-  // Check second statement: let x = __import["x"]
-  AstNode* xDecl = &blockStmts->items[1];
-  if (xDecl->type != AST_DECL_LET) {
-    printf("Expected second statement to be AST_DECL_LET for x, got type %d\n",
-           xDecl->type);
-    return false;
-  }
-  if (xDecl->as.declLet.local->type != AST_VAR_LOCAL) {
-    printf("Expected x decl local to be AST_VAR_LOCAL\n");
-    return false;
-  }
-  ObjString* xName = xDecl->as.declLet.local->as.local.name;
-  if (strcmp(xName->chars, "x") != 0) {
-    printf("Expected second local name to be 'x', got '%s'\n", xName->chars);
-    return false;
-  }
-  if (xDecl->as.declLet.value->type != AST_SUBSCRIPT_GET) {
-    printf("Expected x value to be AST_SUBSCRIPT_GET, got type %d\n",
-           xDecl->as.declLet.value->type);
-    return false;
-  }
+  // 5. let g = __import["g"]
+  uint8_t gLocal = 5;
+  AstNode* gVar = newVarLocalNode(gLocal);
+  gVar->as.local.name = intern("g");
+  AstNode* gKey = newLiteralNode();
+  gKey->as.literal.value = OBJ_VAL(intern("g"));
+  AstNode* gSubscript = newSubscriptGetNode(importVar, gKey);
+  AstNode* gDecl = newDeclLetNode(gVar, gSubscript);
+  pushAstVec(&importBlock->as.block.stmts, gDecl);
 
-  // Check third statement: let f = __import["f"]
-  AstNode* fDecl = &blockStmts->items[2];
-  if (fDecl->type != AST_DECL_LET) {
-    printf("Expected third statement to be AST_DECL_LET for f, got type %d\n",
-           fDecl->type);
-    return false;
-  }
-  if (fDecl->as.declLet.local->type != AST_VAR_LOCAL) {
-    printf("Expected f decl local to be AST_VAR_LOCAL\n");
-    return false;
-  }
-  ObjString* fName = fDecl->as.declLet.local->as.local.name;
-  if (strcmp(fName->chars, "f") != 0) {
-    printf("Expected third local name to be 'f', got '%s'\n", fName->chars);
-    return false;
-  }
-  if (fDecl->as.declLet.value->type != AST_SUBSCRIPT_GET) {
-    printf("Expected f value to be AST_SUBSCRIPT_GET, got type %d\n",
-           fDecl->as.declLet.value->type);
-    return false;
-  }
+  // Create expected outer function with the import block
+  AstNode* expected = mkFunction();
+  pushFnStmt(expected, importBlock);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(expected, returnStmt);
 
-  return true;
+  return assertNodesEqual(actual, expected);
 }
 
 /* Bytecode tests for Object */

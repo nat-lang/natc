@@ -334,7 +334,6 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 
 // Parse a pattern element in signature context
 static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
-  printf("tokenPattern at: %s\n", tokenString(token)->chars);
   switch (token.type) {
     case TOKEN_NUMBER: {
       addLocal(cmp, token);  // Allocate local slot for stack alignment
@@ -460,7 +459,6 @@ static AstNode* patternSetOrMap(NodeCompiler* cmp) {
 }
 
 static AstNode* signature(NodeCompiler* cmp) {
-  printf("signature at: %s\n", tokenString(parser.current)->chars);
   AstNode* node = setNodeFromToken(newSignatureNode(), parser.previous);
 
   while (!check(TOKEN_PAREN_RIGHT)) {
@@ -470,7 +468,6 @@ static AstNode* signature(NodeCompiler* cmp) {
     advance(cmp);  // eat the pattern.
     match(cmp, TOKEN_COMMA);
   }
-  printf("completed signature at: %s\n", tokenString(parser.current)->chars);
   return node;
 }
 
