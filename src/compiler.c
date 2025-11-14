@@ -460,16 +460,17 @@ static AstNode* patternSetOrMap(NodeCompiler* cmp) {
 }
 
 static AstNode* signature(NodeCompiler* cmp) {
+  printf("signature at: %s\n", tokenString(parser.current)->chars);
   AstNode* node = setNodeFromToken(newSignatureNode(), parser.previous);
 
-  if (!check(TOKEN_PAREN_RIGHT)) {
-    do {
-      // Parse pattern element (could be literal, variable, or structure)
-      AstNode* param = pattern(cmp);
-      pushAstVec(&node->as.signature.params, param);
-    } while (match(cmp, TOKEN_COMMA));
+  while (!check(TOKEN_PAREN_RIGHT)) {
+    // Parse pattern element (could be literal, variable, or structure)
+    AstNode* param = pattern(cmp);
+    pushAstVec(&node->as.signature.params, param);
+    advance(cmp);  // eat the pattern.
+    match(cmp, TOKEN_COMMA);
   }
-
+  printf("completed signature at: %s\n", tokenString(parser.current)->chars);
   return node;
 }
 
@@ -896,7 +897,7 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
     AstNode* node = function(cmp, name);
 
     // switch?
-    if (!check(TOKEN_COMMA)) return node;
+    if (!match(cmp, TOKEN_COMMA)) return node;
     int arity = node->as.function.signature->as.signature.params.count;
     AstNode* switchNode = newSwitchNode();
     switchNode->as.switchFunc.name = tokenString(name);
@@ -905,6 +906,7 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
     pushAstVec(&switchNode->as.switchFunc.cases, node);
 
     do {
+      match(cmp, TOKEN_PAREN_LEFT);
       AstNode* nextCase = function(cmp, name);
       pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
     } while (match(cmp, TOKEN_COMMA));

@@ -212,6 +212,35 @@ bool testFunctionExprNode() {
   return assertNodesEqual(node, m);
 }
 
+bool testFunctionExprNodeNArgs() {
+  AstNode* node = compile("(x, y) => x + y");
+
+  AstNode* fn = newFunctionNode(NULL);
+  AstNode* plus = newVarGlobalNode();
+  plus->as.global.name = intern("+");
+  AstNode* infix =
+      newCallInfixNode(plus, newVarLocalNode(1), newVarLocalNode(2));
+
+  AstNode* body = newReturnNode(infix);
+  fn->as.function.name = intern("lambda");
+  fn->as.function.signature = newSignatureNode();
+  fn->as.function.body = body;
+  AstNode* pX = newParamNode(NULL);
+  pX->as.param.name = intern("x");
+  pushAstVec(&fn->as.function.signature->as.signature.params, pX);
+  AstNode* pY = newParamNode(NULL);
+  pY->as.param.name = intern("y");
+  pushAstVec(&fn->as.function.signature->as.signature.params, pY);
+
+  AstNode* m = mkFunction();
+  pushFnStmt(m, newExprStmtNode(fn));
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(m, returnStmt);
+
+  return assertNodesEqual(node, m);
+}
+
 bool testNakedFunctionExprNode() {
   AstNode* node = compile("x => 1");
 
@@ -299,6 +328,39 @@ bool testSwitchFunctionTwoCases() {
   return assertNodesEqual(node, fn);
 }
 
+bool testSwitchFunctionThreeCases() {
+  AstNode* node = compile("let f = (1) => 1, (2) => 2, (3) => 3");
+
+  // Create switch node with three cases
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = intern("f");
+  switchNode->as.switchFunc.arity = 1;
+
+  for (int i = 1; i <= 3; i++) {
+    AstNode* caseNode = newFunctionNode(NULL);
+    caseNode->as.function.name = intern("f");
+    caseNode->as.function.signature = newSignatureNode();
+    AstNode* literal = newLiteralValueNode(NUMBER_VAL(i));
+    pushAstVec(&caseNode->as.function.signature->as.signature.params, literal);
+    caseNode->as.function.body =
+        newReturnNode(newLiteralValueNode(NUMBER_VAL(i)));
+    pushAstVec(&switchNode->as.switchFunc.cases, caseNode);
+  }
+
+  ObjString* objLetName = intern("f");
+  AstNode* fLocal = newVarLocalNode(1);
+  fLocal->as.local.name = objLetName;
+  AstNode* let = newDeclLetNode(fLocal, switchNode);
+
+  AstNode* fn = mkFunction();
+  pushFnStmt(fn, let);
+  AstNode* nil = newLiteralValueNode(NIL_VAL);
+  AstNode* returnStmt = newReturnNode(nil);
+  pushFnStmt(fn, returnStmt);
+
+  return assertNodesEqual(node, fn);
+}
+
 bool testSwitchFunctionVariablePatterns() {
   AstNode* node = compile("let f = (x) => x, (y) => y + 1");
 
@@ -309,7 +371,7 @@ bool testSwitchFunctionVariablePatterns() {
   AstNode* param1 = newParamNode(NULL);
   param1->as.param.name = intern("x");
   pushAstVec(&case1->as.function.signature->as.signature.params, param1);
-  AstNode* var1 = newVarLocalNode(0);
+  AstNode* var1 = newVarLocalNode(1);
   var1->as.local.name = intern("x");
   case1->as.function.body = newReturnNode(var1);
 
@@ -320,7 +382,7 @@ bool testSwitchFunctionVariablePatterns() {
   AstNode* param2 = newParamNode(NULL);
   param2->as.param.name = intern("y");
   pushAstVec(&case2->as.function.signature->as.signature.params, param2);
-  AstNode* var2 = newVarLocalNode(0);
+  AstNode* var2 = newVarLocalNode(1);
   var2->as.local.name = intern("y");
   AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* plusOp = newVarGlobalNode();
@@ -367,7 +429,7 @@ bool testSwitchFunctionMixedPatterns() {
   AstNode* param = newParamNode(NULL);
   param->as.param.name = intern("x");
   pushAstVec(&case2->as.function.signature->as.signature.params, param);
-  AstNode* var = newVarLocalNode(0);
+  AstNode* var = newVarLocalNode(1);
   var->as.local.name = intern("x");
   case2->as.function.body = newReturnNode(var);
 
@@ -377,39 +439,6 @@ bool testSwitchFunctionMixedPatterns() {
   switchNode->as.switchFunc.arity = 1;
   pushAstVec(&switchNode->as.switchFunc.cases, case1);
   pushAstVec(&switchNode->as.switchFunc.cases, case2);
-
-  ObjString* objLetName = intern("f");
-  AstNode* fLocal = newVarLocalNode(1);
-  fLocal->as.local.name = objLetName;
-  AstNode* let = newDeclLetNode(fLocal, switchNode);
-
-  AstNode* fn = mkFunction();
-  pushFnStmt(fn, let);
-  AstNode* nil = newLiteralValueNode(NIL_VAL);
-  AstNode* returnStmt = newReturnNode(nil);
-  pushFnStmt(fn, returnStmt);
-
-  return assertNodesEqual(node, fn);
-}
-
-bool testSwitchFunctionThreeCases() {
-  AstNode* node = compile("let f = (1) => 1, (2) => 2, (3) => 3");
-
-  // Create switch node with three cases
-  AstNode* switchNode = newSwitchNode();
-  switchNode->as.switchFunc.name = intern("f");
-  switchNode->as.switchFunc.arity = 1;
-
-  for (int i = 1; i <= 3; i++) {
-    AstNode* caseNode = newFunctionNode(NULL);
-    caseNode->as.function.name = intern("f");
-    caseNode->as.function.signature = newSignatureNode();
-    AstNode* literal = newLiteralValueNode(NUMBER_VAL(i));
-    pushAstVec(&caseNode->as.function.signature->as.signature.params, literal);
-    caseNode->as.function.body =
-        newReturnNode(newLiteralValueNode(NUMBER_VAL(i)));
-    pushAstVec(&switchNode->as.switchFunc.cases, caseNode);
-  }
 
   ObjString* objLetName = intern("f");
   AstNode* fLocal = newVarLocalNode(1);
@@ -437,7 +466,7 @@ bool testSwitchFunctionMultiParam() {
   AstNode* param1 = newParamNode(NULL);
   param1->as.param.name = intern("x");
   pushAstVec(&case1->as.function.signature->as.signature.params, param1);
-  AstNode* var1 = newVarLocalNode(1);
+  AstNode* var1 = newVarLocalNode(2);
   var1->as.local.name = intern("x");
   case1->as.function.body = newReturnNode(var1);
 
@@ -450,7 +479,7 @@ bool testSwitchFunctionMultiParam() {
   pushAstVec(&case2->as.function.signature->as.signature.params, param2);
   AstNode* literal2 = newLiteralValueNode(NUMBER_VAL(1));
   pushAstVec(&case2->as.function.signature->as.signature.params, literal2);
-  AstNode* var2 = newVarLocalNode(0);
+  AstNode* var2 = newVarLocalNode(1);
   var2->as.local.name = intern("x");
   case2->as.function.body = newReturnNode(var2);
 
@@ -3622,7 +3651,7 @@ AstNode* compileWithImportDir(char* source, char* dirName) {
   return node;
 }
 
-bool testImportParsing() {
+bool testImportSimple() {
   // Compile the import statement with the correct directory
   AstNode* node = compileWithImportDir("use export", "test/integration/import");
 
@@ -4680,6 +4709,8 @@ int testMain(void) {
   fmt("    ", testCallInfixNodeRightNested(), "Call Infix - Right Nested");
   fmt("    ", testFunctionExprNode(),
       "Function - Expression - Implicit Return - Literal");
+  fmt("    ", testFunctionExprNodeNArgs(),
+      "Function - Expression - Implicit Return - N Args");
   fmt("    ", testNakedFunctionExprNode(),
       "Function - Expression - Naked - Implicit Return - Literal");
   fmt("    ", testFunctionDeclNode(),
@@ -4773,7 +4804,7 @@ int testMain(void) {
   fmt("    ", testObjectNested(), "Object nested");
   fmt("    ", testObjectInExpression(), "Object in expression");
   fmt("    ", testObjectTrailingComma(), "Object trailing comma");
-  fmt("    ", testImportParsing(), "Import simple");
+  fmt("    ", testImportSimple(), "Import simple");
 
   printf("  Memory\n");
 
