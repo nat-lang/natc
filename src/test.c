@@ -3121,7 +3121,7 @@ static AstNode* wrapComprehensionInClosure(AstNode* comp) {
   return newCallNode(builder);
 }
 
-bool testSequenceComprehension() {
+bool testSequenceComprehensionSimple() {
   AstNode* actual = compile("(x | x in (1,2), x != 2)");
 
   AstNode* expected = mkFunction();
@@ -3155,7 +3155,7 @@ bool testSequenceComprehension() {
   return assertNodesEqual(actual, expected);
 }
 
-bool testSetComprehensionParse() {
+bool testSetComprehensionSimple() {
   AstNode* actual = compile("({x | x in (1,2), x != 2})");
 
   AstNode* expected = mkFunction();
@@ -4749,14 +4749,15 @@ int testMain(void) {
   fmt("    ", testPropertySet(), "Property set");
   fmt("    ", testPropertyNested(), "Property nested");
   fmt("    ", testPropertyNestedAssignment(), "Property nested assignment");
-  fmt("    ", testSequenceComprehension(), "Sequence comprehension");
+  fmt("    ", testSequenceComprehensionSimple(),
+      "Sequence comprehension simple");
   fmt("    ", testSequenceComprehensionComplexBody(),
       "Sequence comprehension complex body");
   fmt("    ", testSequenceComprehensionNestedBody(),
       "Sequence comprehension nested body");
   fmt("    ", testSequenceComprehensionNestedCondition(),
       "Sequence comprehension nested condition");
-  fmt("    ", testSetComprehensionParse(), "Set comprehension parse");
+  fmt("    ", testSetComprehensionSimple(), "Set comprehension parse simple");
   fmt("    ", testSetComprehensionComplexBody(),
       "Set comprehension complex body");
   fmt("    ", testSetComprehensionNestedBody(),

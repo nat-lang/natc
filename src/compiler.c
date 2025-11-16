@@ -125,11 +125,18 @@ void consumeIdentifier(NodeCompiler* cmp, const char* message) {
     errorAtCurrent(cmp, message);
 }
 
+bool isParamOrPattern(TokenType type) {
+  return type == TOKEN_IDENTIFIER || type == TOKEN_TYPE_VARIABLE ||
+         type == TOKEN_NUMBER || type == TOKEN_TRUE || type == TOKEN_FALSE ||
+         type == TOKEN_NIL || type == TOKEN_UNDEFINED || type == TOKEN_STRING;
+}
+
 bool matchParamOrPattern(NodeCompiler* cmp) {
-  return match(cmp, TOKEN_IDENTIFIER) || match(cmp, TOKEN_TYPE_VARIABLE) ||
-         match(cmp, TOKEN_NUMBER) || match(cmp, TOKEN_TRUE) ||
-         match(cmp, TOKEN_FALSE) || match(cmp, TOKEN_NIL) ||
-         match(cmp, TOKEN_UNDEFINED) || match(cmp, TOKEN_STRING);
+  if (isParamOrPattern(parser.current.type)) {
+    advance(cmp);
+    return true;
+  }
+  return false;
 }
 
 typedef AstNode* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
@@ -147,6 +154,7 @@ static AstNode* statement(NodeCompiler* cmp);
 static AstNode* expression(NodeCompiler* cmp);
 static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence);
 static AstNode* nakedFunction(NodeCompiler* enclosing, Token name);
+static AstNode* nakedFunctionOrSwitch(NodeCompiler* cmp);
 static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
                           Precedence prec);
 static bool peekFunction(NodeCompiler* cmp);
@@ -279,29 +287,7 @@ Token fnToken(Token token) {
 
 static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
   // fn?
-  if (check(TOKEN_FAT_ARROW)) {
-    Token name = fnToken(parser.ppenult);
-    AstNode* node = nakedFunction(cmp, name);
-
-    // switch?
-    if (!check(TOKEN_COMMA)) return node;
-
-    // Create switch node and add first case
-    int arity = 1;
-    AstNode* switchNode = newSwitchNode();
-    switchNode->as.switchFunc.name = tokenString(name);
-    setNodeFromToken(switchNode, name);
-    switchNode->as.switchFunc.arity = arity;
-    pushAstVec(&switchNode->as.switchFunc.cases, node);
-
-    // Parse remaining cases
-    do {
-      AstNode* nextCase = nakedFunction(cmp, name);
-      pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
-    } while (match(cmp, TOKEN_COMMA));
-
-    return switchNode;
-  }
+  if (check(TOKEN_FAT_ARROW)) return nakedFunctionOrSwitch(cmp);
 
   // variable.
 
@@ -332,7 +318,6 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
   return node;
 }
 
-// Parse a pattern element in signature context
 static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
   printf("tokenPattern at: %s\n", tokenString(token)->chars);
   switch (token.type) {
@@ -519,7 +504,7 @@ static AstNode* nakedFunction(NodeCompiler* enclosing, Token name) {
   setNodeFromNode(sigNode, node);
   node->as.function.signature = sigNode;
 
-  consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
+  consume(enclosing, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
   node->as.function.body = functionBody(&cmp);
   endScope(&cmp);
   return node;
@@ -542,49 +527,71 @@ AstNode* function(NodeCompiler* enclosing, Token name) {
   return node;
 }
 
-static AstNode* boolean(NodeCompiler* cmp, bool canAssign) {
-  Value value;
+AstNode* nakedFunctionOrSwitch(NodeCompiler* cmp) {
+  Token name = fnToken(parser.ppenult);
+  AstNode* node = nakedFunction(cmp, name);
+
+  // switch?
+  if (!match(cmp, TOKEN_COMMA)) return node;
+
+  // Create switch node and add first case
+  int arity = 1;
+  AstNode* switchNode = newSwitchNode();
+  switchNode->as.switchFunc.name = tokenString(name);
+  setNodeFromToken(switchNode, name);
+  switchNode->as.switchFunc.arity = arity;
+  pushAstVec(&switchNode->as.switchFunc.cases, node);
+
+  // Parse remaining cases
+  do {
+    AstNode* nextCase = NULL;
+    advance(cmp);
+    if (parser.previous.type == TOKEN_PAREN_LEFT) {
+      nextCase = function(cmp, name);
+    } else if (isParamOrPattern(parser.previous.type)) {
+      nextCase = nakedFunction(cmp, name);
+    } else {
+      error(cmp, "Expect pattern or function after ','.");
+      break;
+    }
+    pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
+  } while (match(cmp, TOKEN_COMMA));
+
+  return switchNode;
+}
+
+static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
+  // fn?
+  if (check(TOKEN_FAT_ARROW)) return nakedFunctionOrSwitch(cmp);
+
+  // literal.
   switch (parser.previous.type) {
     case TOKEN_TRUE:
-      value = BOOL_VAL(true);
-      break;
+      return setNodeFromToken(newLiteralValueNode(BOOL_VAL(true)),
+                              parser.previous);
     case TOKEN_FALSE:
-      value = BOOL_VAL(false);
-      break;
+      return setNodeFromToken(newLiteralValueNode(BOOL_VAL(false)),
+                              parser.previous);
+    case TOKEN_NIL:
+      return setNodeFromToken(newLiteralValueNode(NIL_VAL), parser.previous);
+    case TOKEN_UNDEFINED:
+      return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), parser.previous);
+    case TOKEN_NUMBER: {
+      double value = strtod(parser.previous.start, NULL);
+      return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)),
+                              parser.previous);
+    }
+    case TOKEN_STRING: {
+      AstNode* node = setNodeFromToken(newLiteralNode(), parser.previous);
+      node->as.literal.value = OBJ_VAL(
+          copyString(parser.previous.start + 1, parser.previous.length - 2));
+      return node;
+    }
+    case TOKEN_INTERPOLATION:
     default:
+      error(cmp, "Expect literal.");
       return setNodeFromToken(newUnknownNode(), parser.previous);
   }
-  return setNodeFromToken(newLiteralValueNode(value), parser.previous);
-}
-
-static AstNode* literalNil(NodeCompiler* cmp, bool canAssign) {
-  return setNodeFromToken(newLiteralValueNode(NIL_VAL), parser.previous);
-}
-
-static AstNode* literalUndefined(NodeCompiler* cmp, bool canAssign) {
-  return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), parser.previous);
-}
-
-static AstNode* number(NodeCompiler* cmp, bool canAssign) {
-  double value = strtod(parser.previous.start, NULL);
-  return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)),
-                          parser.previous);
-}
-
-static AstNode* string(NodeCompiler* cmp, bool canAssign) {
-  AstNode* node = setNodeFromToken(newLiteralNode(), parser.previous);
-  node->as.literal.value = OBJ_VAL(
-      copyString(parser.previous.start + 1, parser.previous.length - 2));
-  return node;
-}
-static AstNode* stringInterpolation(NodeCompiler* cmp, bool canAssign);
-static AstNode* interpolation(NodeCompiler* cmp, bool canAssign,
-                              int startOffset, int lengthOffset) {
-  return NULL;
-}
-
-static AstNode* stringInterpolation(NodeCompiler* cmp, bool canAssign) {
-  return interpolation(cmp, canAssign, 1, 3);
 }
 
 static void argumentList(NodeCompiler* cmp, AstVec* vec) {
@@ -993,14 +1000,14 @@ static AstNode* leftBracket(NodeCompiler* cmp, bool canAssign) {
 
 static ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {identifier, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_INTERPOLATION] = {stringInterpolation, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_INTERPOLATION] = {literal, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_TYPE_VARIABLE] = {identifier, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_NUMBER] = {number, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_STRING] = {string, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_TRUE] = {boolean, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_FALSE] = {boolean, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_NIL] = {literalNil, NULL, PREC_NONE, PREC_NONE},
-    [TOKEN_UNDEFINED] = {literalUndefined, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_NUMBER] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_STRING] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_TRUE] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_FALSE] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_NIL] = {literal, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_UNDEFINED] = {literal, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {leftBrace, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_LEFT_BRACKET] = {leftBracket, subscript, PREC_CALL, PREC_NONE},
