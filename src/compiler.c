@@ -330,8 +330,8 @@ static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
     case TOKEN_STRING: {
       addLocal(cmp, token);  // Allocate local slot for stack alignment
       markInitialized(cmp);
-      ObjString* str = copyString(token.start + 1, token.length - 2);
       AstNode* node = setNodeFromToken(newLiteralNode(), token);
+      ObjString* str = copyString(token.start + 1, token.length - 2);
       node->as.literal.value = OBJ_VAL(str);
       return node;
     }
