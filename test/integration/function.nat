@@ -7,56 +7,75 @@ let f = x => x + 1
 
 f(1) 
 
-// Switch functions - literal patterns
+// switch functions.
 
-let literal1 = (1) => "one", (2) => "two", (3) => "three"
-assert(literal1(1) == "one")
-assert(literal1(2) == "two")
-assert(literal1(3) == "three")
-assert(literal1(4) == undefined)
+// literal patterns
 
-// Switch functions - variable patterns
+let f = (1) => "one", (2) => "two", (3) => "three"
+assert(f(1) == "one")
+assert(f(2) == "two")
+assert(f(3) == "three")
+assert(f(4) == undefined)
 
-let variable1 = (1) => "one", (x) => "other"
-assert(variable1(1) == "one")
-assert(variable1(99) == "other")
+// naked literal patterns 
 
-// Switch functions - multi-param with literals
+let f = 1 => "one", 2 => "two", 3 => "three"
+assert(f(1) == "one")
+assert(f(2) == "two")
+assert(f(3) == "three")
+assert(f(4) == undefined)
 
-let multiLiteral = (0,1) => 2, (1,0) => 3, (x,y) => x + y
-assert(multiLiteral(0,1) == 2)
-assert(multiLiteral(1,0) == 3)
-assert(multiLiteral(2,3) == 5)
+// mixed naked and parenthesized cases
 
-// Switch functions - mixed literal and variable
+let f = 1 => "one", (x) => "two"
+assert(f(1) == "one")
+assert(f(2) == "two")
 
-let mixed1 = (1,x) => x * 2, (x,1) => x * 3, (x,y) => x + y
-assert(mixed1(1,5) == 10)
-assert(mixed1(5,1) == 15)
-assert(mixed1(2,3) == 5)
+// variable patterns
 
-// Switch functions - boolean and nil patterns
+let f = (1) => "one", (x) => "other"
+assert(f(1) == "one")
+assert(f(99) == "other")
 
-let boolNil = (true) => 1, (false) => 0, (nil) => 99
-assert(boolNil(true) == 1)
-assert(boolNil(false) == 0)
-assert(boolNil(nil) == 99)
+// multi-param with literals
 
-// Switch functions - string patterns
+let f = (0,1) => 2, (1,0) => 3, (x,y) => x + y
+assert(f(0,1) == 2)
+assert(f(1,0) == 3)
+assert(f(2,3) == 5)
 
-let strings = ("hello") => 1, ("world") => 2, (x) => 0
-assert(strings("hello") == 1)
-assert(strings("world") == 2)
-assert(strings("other") == 0)
+// mixed literal and variable
 
-// Switch functions - order matters, first match wins
+let f = (1,x) => x * 2, (x,1) => x * 3, (x,y) => x + y
+assert(f(1,5) == 10)
+assert(f(5,1) == 15)
+assert(f(2,3) == 5)
 
-let order = (x) => "any", (1) => "one"
-assert(order(1) == "any")
-assert(order(99) == "any")
+// boolean and nil patterns
 
-// Switch functions - factorial example
+let f = (true) => 1, (false) => 0, (nil) => 99
+assert(f(true) == 1)
+assert(f(false) == 0)
+assert(f(nil) == 99)
 
-let factorial = (0) => 1, (n) => n * factorial(n - 1)
-assert(factorial(5) == 120)
+// string patterns
 
+let f = ("hello") => 1, ("world") => 2, (x) => 0
+print(f("hello"))
+assert(f("hello") == 1)
+assert(f("world") == 2)
+assert(f("other") == 0)
+
+// factorial example
+
+let f = (0) => 1, (n) => n * f(n - 1)
+assert(f(5) == 120)
+
+// mixed literals
+
+let f = true => "true", nil => "nil", undefined => "undefined", 1 => "one"
+assert(f(true) == "true")
+assert(f(nil) == "nil")
+assert(f(undefined) == "undefined")
+assert(f(1) == "one")
+assert(f(2) == undefined)
