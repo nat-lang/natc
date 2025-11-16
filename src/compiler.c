@@ -525,22 +525,14 @@ AstNode* function(NodeCompiler* enclosing, Token name) {
   return node;
 }
 
-AstNode* nakedFunctionOrSwitch(NodeCompiler* cmp) {
-  Token name = fnToken(parser.ppenult);
-  AstNode* node = nakedFunction(cmp, name);
+AstNode* switchFunction(NodeCompiler* cmp, AstNode* firstCase, Token name) {
+  int arity = firstCase->as.function.signature->as.signature.params.count;
+  AstNode* node = newSwitchNode();
+  node->as.switchFunc.name = tokenString(name);
+  setNodeFromToken(node, name);
+  node->as.switchFunc.arity = arity;
+  pushAstVec(&node->as.switchFunc.cases, firstCase);
 
-  // switch?
-  if (!match(cmp, TOKEN_COMMA)) return node;
-
-  // Create switch node and add first case
-  int arity = 1;
-  AstNode* switchNode = newSwitchNode();
-  switchNode->as.switchFunc.name = tokenString(name);
-  setNodeFromToken(switchNode, name);
-  switchNode->as.switchFunc.arity = arity;
-  pushAstVec(&switchNode->as.switchFunc.cases, node);
-
-  // Parse remaining cases
   do {
     AstNode* nextCase = NULL;
     advance(cmp);
@@ -552,10 +544,30 @@ AstNode* nakedFunctionOrSwitch(NodeCompiler* cmp) {
       error(cmp, "Expect pattern or function after ','.");
       break;
     }
-    pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
+    pushAstVec(&node->as.switchFunc.cases, nextCase);
+
   } while (match(cmp, TOKEN_COMMA));
 
-  return switchNode;
+  return node;
+}
+
+AstNode* functionOrSwitch(NodeCompiler* cmp, Token name) {
+  AstNode* node = function(cmp, name);
+
+  // switch?
+  if (!match(cmp, TOKEN_COMMA)) return node;
+
+  return switchFunction(cmp, node, name);
+}
+
+AstNode* nakedFunctionOrSwitch(NodeCompiler* cmp) {
+  Token name = fnToken(parser.ppenult);
+  AstNode* node = nakedFunction(cmp, name);
+
+  // switch?
+  if (!match(cmp, TOKEN_COMMA)) return node;
+
+  return switchFunction(cmp, node, name);
 }
 
 static AstNode* literal(NodeCompiler* cmp, bool canAssign) {
@@ -898,24 +910,7 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
   gotoParser(checkpoint);
   if (isFunction) {
     Token name = fnToken(parser.ppenult);
-    AstNode* node = function(cmp, name);
-
-    // switch?
-    if (!match(cmp, TOKEN_COMMA)) return node;
-    int arity = node->as.function.signature->as.signature.params.count;
-    AstNode* switchNode = newSwitchNode();
-    switchNode->as.switchFunc.name = tokenString(name);
-    setNodeFromToken(switchNode, name);
-    switchNode->as.switchFunc.arity = arity;
-    pushAstVec(&switchNode->as.switchFunc.cases, node);
-
-    do {
-      match(cmp, TOKEN_PAREN_LEFT);
-      AstNode* nextCase = function(cmp, name);
-      pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
-    } while (match(cmp, TOKEN_COMMA));
-
-    return switchNode;
+    return functionOrSwitch(cmp, name);
   }
 
   Parser bodyCheckpoint = saveParser();

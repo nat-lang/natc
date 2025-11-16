@@ -25,9 +25,19 @@ assert(f(2) == "two")
 assert(f(3) == "three")
 assert(f(4) == undefined)
 
+let f = "1" => "one", "2" => "two", "3" => "three"
+assert(f("1") == "one")
+assert(f("2") == "two")
+assert(f("3") == "three")
+assert(f("4") == undefined)
+
 // mixed naked and parenthesized cases
 
 let f = 1 => "one", (x) => "two"
+assert(f(1) == "one")
+assert(f(2) == "two")
+
+let f = (1) => "one", x => "two"
 assert(f(1) == "one")
 assert(f(2) == "two")
 
