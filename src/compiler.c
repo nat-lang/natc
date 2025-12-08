@@ -26,6 +26,29 @@ typedef struct {
 
 Parser parser;
 
+typedef AstNode* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
+typedef AstNode* (*InfixFn)(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
+                            Precedence prec);
+
+typedef struct {
+  ParseFn prefix;
+  InfixFn infix;
+  Precedence leftPrec;
+  Precedence rightPrec;
+} ParseRule;
+
+static AstNode* statement(NodeCompiler* cmp);
+static AstNode* expression(NodeCompiler* cmp);
+static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence);
+static AstNode* nakedFunction(NodeCompiler* enclosing, Token name);
+static AstNode* nakedFunctionOrSwitch(NodeCompiler* cmp);
+static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
+                          Precedence prec);
+static bool peekFunction(NodeCompiler* cmp);
+static AstNode* pattern(NodeCompiler* cmp);
+static AstNode* patternSequence(NodeCompiler* cmp);
+static AstNode* patternSetOrMap(NodeCompiler* cmp);
+
 void initParser(Scanner scanner) {
   parser.scanner = scanner;
 
@@ -135,32 +158,16 @@ bool matchParamOrPattern(NodeCompiler* cmp) {
   if (isParamOrPattern(parser.current.type)) {
     advance(cmp);
     return true;
+  } else if (parser.current.type == TOKEN_PAREN_LEFT) {
+    AstNode* node = patternSequence(cmp);
+    printf("pattern sequence: %d\n", node->type == AST_SEQUENCE);
+    return node->type == AST_SEQUENCE;
+  } else if (parser.current.type == TOKEN_LEFT_BRACE) {
+    AstNode* node = patternSetOrMap(cmp);
+    return node->type == AST_SET || node->type == AST_MAP;
   }
   return false;
 }
-
-typedef AstNode* (*ParseFn)(NodeCompiler* cmp, bool canAssign);
-typedef AstNode* (*InfixFn)(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                            Precedence prec);
-
-typedef struct {
-  ParseFn prefix;
-  InfixFn infix;
-  Precedence leftPrec;
-  Precedence rightPrec;
-} ParseRule;
-
-static AstNode* statement(NodeCompiler* cmp);
-static AstNode* expression(NodeCompiler* cmp);
-static AstNode* parsePrecedence(NodeCompiler* cmp, Precedence precedence);
-static AstNode* nakedFunction(NodeCompiler* enclosing, Token name);
-static AstNode* nakedFunctionOrSwitch(NodeCompiler* cmp);
-static AstNode* subscript(NodeCompiler* cmp, bool canAssign, AstNode* lhs,
-                          Precedence prec);
-static bool peekFunction(NodeCompiler* cmp);
-static AstNode* pattern(NodeCompiler* cmp);
-static AstNode* patternSequence(NodeCompiler* cmp);
-static AstNode* patternSetOrMap(NodeCompiler* cmp);
 
 static AstNode* setNodeFromToken(AstNode* node, Token token) {
   if (node != NULL) {
@@ -321,13 +328,13 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
   switch (token.type) {
     case TOKEN_NUMBER: {
-      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      addLocal(cmp, token);
       markInitialized(cmp);
       double value = strtod(token.start, NULL);
       return setNodeFromToken(newLiteralValueNode(NUMBER_VAL(value)), token);
     }
     case TOKEN_STRING: {
-      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      addLocal(cmp, token);
       markInitialized(cmp);
       AstNode* node = setNodeFromToken(newLiteralNode(), token);
       ObjString* str = copyString(token.start + 1, token.length - 2);
@@ -335,22 +342,22 @@ static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
       return node;
     }
     case TOKEN_TRUE: {
-      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      addLocal(cmp, token);
       markInitialized(cmp);
       return setNodeFromToken(newLiteralValueNode(BOOL_VAL(true)), token);
     }
     case TOKEN_FALSE: {
-      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      addLocal(cmp, token);
       markInitialized(cmp);
       return setNodeFromToken(newLiteralValueNode(BOOL_VAL(false)), token);
     }
     case TOKEN_NIL: {
-      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      addLocal(cmp, token);
       markInitialized(cmp);
       return setNodeFromToken(newLiteralValueNode(NIL_VAL), token);
     }
     case TOKEN_UNDEFINED: {
-      addLocal(cmp, token);  // Allocate local slot for stack alignment
+      addLocal(cmp, token);
       markInitialized(cmp);
       return setNodeFromToken(newLiteralValueNode(UNDEF_VAL), token);
     }
@@ -382,21 +389,34 @@ static AstNode* pattern(NodeCompiler* cmp) {
   return tokenPattern(cmp, parser.current);
 }
 
-// Parse sequence pattern by reusing/adapting sequence parsing
 static AstNode* patternSequence(NodeCompiler* cmp) {
-  Token openToken = parser.current;
-  advance(cmp);  // consume left paren
-
-  AstNode* seq = setNodeFromToken(newSequenceNode(), openToken);
-
-  if (!check(TOKEN_PAREN_RIGHT)) {
-    do {
-      pushAstVec(&seq->as.sequence.values, pattern(cmp));
-    } while (match(cmp, TOKEN_COMMA));
+  printf("pat sequence at %s\n", tokenString(parser.current)->chars);
+  Token openToken = parser.previous;
+  // empty sequence.
+  if (match(cmp, TOKEN_COMMA)) {
+    consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')'.");
+    return setNodeFromToken(newSequenceNode(), openToken);
   }
 
-  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after sequence pattern.");
-  return seq;
+  // sequence or parenthesized expression.
+  advance(cmp);
+  AstNode* node = tokenPattern(cmp, parser.previous);
+
+  if (check(TOKEN_COMMA)) {
+    AstNode* seq = setNodeFromToken(newSequenceNode(), openToken);
+    pushAstVec(&seq->as.sequence.values, node);
+    do {
+      advance(cmp);
+      // allow a trailing comma.
+      if (check(TOKEN_PAREN_RIGHT)) break;
+      advance(cmp);
+      pushAstVec(&seq->as.sequence.values, tokenPattern(cmp, parser.previous));
+    } while (check(TOKEN_COMMA));
+
+    node = seq;
+  }
+  consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after expression.");
+  return node;
 }
 
 // Parse set or map pattern by adapting object/set parsing
@@ -709,6 +729,8 @@ static bool peekFunction(NodeCompiler* cmp) {
 
   } while (match(cmp, TOKEN_COMMA));
 
+  printf("peek 0 %s\n", tokenString(parser.current)->chars);
+
   if (!check(TOKEN_PAREN_RIGHT)) return false;
   if (!peek(TOKEN_FAT_ARROW)) return false;
 
@@ -897,6 +919,7 @@ static AstNode* leftBrace(NodeCompiler* cmp, bool canAssign) {
 }
 
 static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
+  printf("sequence at %s\n", tokenString(parser.current)->chars);
   Token openToken = parser.previous;
   // empty sequence.
   if (match(cmp, TOKEN_COMMA)) {
@@ -906,10 +929,13 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
 
   // function?
   Parser checkpoint = saveParser();
+  printf("peeking function\n");
   bool isFunction = peekFunction(cmp);
+  printf("function: %d\n", isFunction);
   gotoParser(checkpoint);
   if (isFunction) {
     Token name = fnToken(parser.ppenult);
+
     return functionOrSwitch(cmp, name);
   }
 
@@ -926,7 +952,6 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
     consume(cmp, TOKEN_PAREN_RIGHT, "Expect ')' after comprehension.");
     return setNodeFromToken(comp, openToken);
   }
-
   // sequence or parenthesized expression.
   AstNode* node = expression(cmp);
 
