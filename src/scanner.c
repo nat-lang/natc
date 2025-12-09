@@ -5,25 +5,30 @@
 
 Scanner scanner;
 
-Scanner initScanner(const char *source) {
+Scanner initScanner(const char* source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
+  scanner.lineStart = source;
 
   return scanner;
 }
 
-void initToken(Token *token) {
+void initToken(Token* token) {
   token->type = -1;
   token->start = NULL;
   token->length = -1;
   token->line = -1;
+  token->column = -1;
 }
 
-Token syntheticToken(const char *start) {
+Token syntheticToken(const char* start) {
   Token token;
   token.start = start;
   token.length = (int)strlen(start);
+  token.type = TOKEN_SYNTHETIC;
+  token.line = 0;
+  token.column = -1;
   return token;
 }
 
@@ -41,6 +46,11 @@ void gotoScanner(Scanner checkpoint) { scanner = checkpoint; }
 void rewindScanner(Token token) {
   scanner.line = token.line;
   scanner.current = scanner.start = token.start;
+  if (token.column > 0) {
+    scanner.lineStart = token.start - (token.column - 1);
+  } else {
+    scanner.lineStart = token.start;
+  }
 }
 
 static bool isAlpha(char c) {
@@ -55,7 +65,7 @@ static bool isSymbol(char c) {
   return (c == '&' || c == '^' || c == '@' || c == '#' || c == '~' ||
           c == '?' || c == '$' || c == '\'' || c == '>' || c == '<' ||
           c == '+' || c == '-' || c == '/' || c == '\\' || c == '*' ||
-          c == '|' || c == '=' || c == '_' || c == '%');
+          c == '|' || c == '=' || c == '_' || c == '%' || c == '!');
 }
 
 static bool isAtEnd() { return *scanner.current == '\0'; }
@@ -91,15 +101,17 @@ static Token makeToken(TokenType type) {
   token.start = scanner.start;
   token.length = (int)(scanner.current - scanner.start);
   token.line = scanner.line;
+  token.column = (int)(scanner.start - scanner.lineStart) + 1;
   return token;
 }
 
-static Token errorToken(const char *message) {
+static Token errorToken(const char* message) {
   Token token;
   token.type = TOKEN_ERROR;
   token.start = message;
   token.length = (int)strlen(message);
   token.line = scanner.line;
+  token.column = (int)(scanner.start - scanner.lineStart) + 1;
   return token;
 }
 
@@ -115,8 +127,9 @@ void skipWhitespace() {
         advance();
         break;
       case '\n':
-        scanner.line++;
         advance();
+        scanner.line++;
+        scanner.lineStart = scanner.current;
         break;
       case '/':
         if (peekNext() == '/') {
@@ -132,11 +145,11 @@ void skipWhitespace() {
   }
 }
 
-static bool checkpoint(int start, int length, const char *rest) {
+static bool checkpoint(int start, int length, const char* rest) {
   return memcmp(scanner.start + start, rest, length) == 0;
 }
 
-static TokenType checkpointKeyword(int start, int length, const char *rest,
+static TokenType checkpointKeyword(int start, int length, const char* rest,
                                    TokenType type) {
   if (scanner.current - scanner.start == start + length &&
       checkpoint(start, length, rest)) {
@@ -179,6 +192,8 @@ static TokenType identifierType() {
         }
       }
       break;
+    case 'g':
+      return checkpointKeyword(1, 5, "lobal", TOKEN_GLOBAL);
     case 'i':
       if (CURRENT - START > 1) {
         switch (START[1]) {
@@ -329,10 +344,16 @@ static Token string(TokenType type, TokenType interpolationType) {
     if (peek() == '#' && peekNext() == '{') {
       advance();
       advance();
+      scanner.start = scanner.current - 2;
       return makeToken(interpolationType);
     }
 
-    if (peek() == '\n') scanner.line++;
+    if (peek() == '\n') {
+      advance();
+      scanner.line++;
+      scanner.lineStart = scanner.current;
+      continue;
+    }
     advance();
   }
 
@@ -346,9 +367,9 @@ static Token string(TokenType type, TokenType interpolationType) {
 Token consumeToken(char c) {
   switch (c) {
     case '(':
-      return makeToken(TOKEN_LEFT_PAREN);
+      return makeToken(TOKEN_PAREN_LEFT);
     case ')':
-      return makeToken(TOKEN_RIGHT_PAREN);
+      return makeToken(TOKEN_PAREN_RIGHT);
     case '{':
       return makeToken(TOKEN_LEFT_BRACE);
     case '}':
@@ -375,14 +396,13 @@ Token consumeToken(char c) {
         return makeToken(TOKEN_PIPE);
       break;
     }
-    case '!':
-      return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=': {
       if (match('>')) {
         return makeToken(TOKEN_FAT_ARROW);
-      } else {
-        return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+      } else if (!isWhite(peekNext())) {
+        return makeToken(TOKEN_EQUAL);
       }
+      break;
     }
     case '<': {
       if (match('-')) return makeToken(TOKEN_ARROW_LEFT);
@@ -427,7 +447,8 @@ Token scanVirtualToken(char c) {
 }
 
 Token scanPathIdentifier() {
-  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/' || peek() == '.')
+  while (isAlpha(peek()) || isDigit(peek()) || peek() == '/' || peek() == '.' ||
+         peek() == '_')
     advance();
 
   return scanner.current == scanner.start ? errorToken("Unexpected character.")

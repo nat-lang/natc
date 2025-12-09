@@ -20,7 +20,7 @@ class OString extends CObject {}
 class ONative extends CObject {}
 class OFunction extends CObject {}
 class OBoundFunction extends CObject {}
-class OOverload extends CObject {}
+class OSwitch extends CObject {}
 class OSequence extends CObject {}
 
 let callable = x => {
@@ -28,7 +28,7 @@ let callable = x => {
   return type == OClass ||
          type == OFunction ||
          type == OBoundFunction ||
-         type == OOverload ||
+         type == OSwitch ||
          (type == OInstance && callable(x.call));
 };
 

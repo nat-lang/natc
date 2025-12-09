@@ -6,11 +6,18 @@ Nat is a programming language and toolchain for linguistic semantics, designed t
 
 - Twin imperative and functional paradigms.
 - Pattern matching.
+<<<<<<< HEAD
 - A dynamic, incrementally adoptable, and extensible suite of type systems. Types are values.
 - Metaprogramming: program AST is accessible at runtime.
 - Sundry formalism from the semanticist's toolbox: set comprehensions, trees, quantifiers, infixable functions, and more.
 - A standard library of data structures and utilities for building grammars.
 - Integration with LaTeX.
+=======
+- Sundry formalism from the semanticist's toolbox: set comprehensions, trees, quantifiers, infixable functions, and more.
+- A core library of data structures and utilities for building grammars.
+- Tight integration with LaTeX.
+- Runtime access to the AST.
+>>>>>>> b966b4d (chore: rm js interface from core)
 
 ### Development
 

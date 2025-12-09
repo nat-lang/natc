@@ -1,0 +1,5 @@
+
+let x = 1
+let f = () => 2
+let o = {}
+let g = () => o.x

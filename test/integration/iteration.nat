@@ -1,67 +1,63 @@
 
-// native for-loop.
+// for loop.
 
-for (let i = 0; i < 10; i = i + 1) {
-  assert(i < 10 and i >= 0);
+let sum = 0
+for (let i = 0; i < 5; i = i + 1) {
+  sum = sum + i
+}
+assert(sum == 10)
+
+// for loop, expression body.
+
+let last
+for (let i = 0; i < 3; i = i + 1) last = i
+assert(last == 2)
+
+// nested for loop.
+
+let sum = 0
+for (let i = 0; i < 3; i = i + 1) {
+  for (let j = 0; j < 3; j = j + 1) {
+    sum = sum + i + j
+  }
+}
+assert(sum == 18)
+
+// for in loop.
+
+for (y in (,)) assert(false)
+
+for (y in (,)) {
+  assert(false)
 }
 
-// native while loop.
-
-let i = 0;
-
-while (i < 10) {
-  assert(i < 10 and i >= 0);
-  i = i + 1;
+let sum = 0
+for (x in (1,2,3)) {
+  sum = sum + x
 }
+assert(sum == 6)
 
-// core sequence iteration.
+// for in loop, nested.
 
-for (y in []) {
-  assert(false);
+let last = nil
+for (y in (4,5)) last = y
+assert(last == 5)
+
+// nested for in loop.
+let sum = 0
+for (x in (1,2,3)) {
+  for (y in (4,5)) {
+    sum = sum + x + y
+  }
 }
+assert(sum == 39)
 
-for (y in [1,2,3]) {
-  assert(y == 1 or y == 2 or y == 3);
-}
+// for in loop, nested iterable.
 
-for (x in [[1,2], [3,4]]) {
-  assert(x == [1,2] or x == [3,4]);
-
+let sum = 0
+for (x in ((1,2), (3,4))) {
   for (a in x) {
-    assert(a == 1 or a == 2 or a == 3 or a == 4);
+    sum = sum + a
   }
 }
-
-// iteration protocol.
-
-class Iterable {
-  init() => {
-    this[0] = "a";
-    this[1] = "b";
-    this[2] = "c";
-  }
-
-  __iter__() => Iterator([this[0], this[1], this[2]], 0, 3);
-}
-
-for (x in Iterable()) { 
-  assert(
-    (x == "a") or (x == "b") or (x == "c")
-  );
-}
-
-let iterator = iter(Iterable());
-
-assert(len(iterator) == 3);
-
-assert(iterator.next() == "a");
-assert(len(iterator) == 2);
-assert(iterator.more());
-
-assert(iterator.next() == "b");
-assert(len(iterator) == 1);
-assert(iterator.more());
-
-assert(iterator.next() == "c");
-assert(len(iterator) == 0);
-assert(!iterator.more());
+assert(sum == 10)

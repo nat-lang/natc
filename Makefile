@@ -10,7 +10,7 @@ default: clean dev
 
 # Remove all build outputs and intermediate files.
 clean:
-	@ rm -rf $(BUILD_DIR)/release $(BUILD_DIR)/debug $(BUILD_DIR)/wasm 
+	@ rm -rf $(BUILD_DIR)/release $(BUILD_DIR)/debug $(BUILD_DIR)/wasm $(BUILD_DIR)/test
 	@ rm -f $(BUILD_DIR)/nat $(BUILD_DIR)/nat.wasm $(BUILD_DIR)/lib.so $(BIN)/nat
 
 configure:
@@ -32,36 +32,39 @@ debug:
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug SOURCE_DIR=src
 
 # Compile the interpreter with instruction and stack tracing enabled.
-debug-stack:
+trace-stack:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stack SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace-stack SOURCE_DIR=src
 
-debug-chunk:
+trace-chunk:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-chunk SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace-chunk SOURCE_DIR=src
 
-debug-trace:
+trace-ast:
 	@ $(MAKE) configure
-	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-trace SOURCE_DIR=src
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace-ast SOURCE_DIR=src
+
+trace:
+	@ $(MAKE) configure
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=trace SOURCE_DIR=src
 
 # Compile the interpreter with an eager garbage collector.
-debug-stress-gc:
+stress-gc:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-stress-gc SOURCE_DIR=src
 
 # Compile the interpreter with a verbose garbage collector.
-debug-log-gc:
+log-gc:
 	@ $(MAKE) configure
 	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=nat MODE=debug-log-gc SOURCE_DIR=src
 
+unit:
+	@ $(MAKE) configure
+	@ $(MAKE) -f $(BUILD_DIR)/c.make NAME=test MODE=unit SOURCE_DIR=src
+	@ $(BUILD_DIR)/test
+
 integration:
 	@ $(BUILD_DIR)/nat test/integration/index
-
-regression:
-	@ $(BUILD_DIR)/nat test/regression/index
-
-trip:
-	@ $(BUILD_DIR)/nat test/trip/index
 
 tests:
 	@ $(MAKE) integration

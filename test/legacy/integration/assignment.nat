@@ -1,0 +1,77 @@
+
+// property assignment leaves the possessor on the stack.
+
+let x = Object();
+assert((x.x = 1) == x);
+
+// assignment of a global from an immediate lambda invocation.
+
+let a = (() => {
+  return 1 + 1;
+})();
+
+assert(a == 2);
+
+// assignment of a global property from an immediate lambda invocation.
+
+class A {}
+
+let a = A();
+a.z = (() => {
+  return 1 + 1;
+})();
+
+// assignment of a local from an immediate lambda invocation.
+
+(() => {
+  let a = (() => {
+    return 1 + 2;
+  })();
+
+  assert(a == 3);
+})();
+
+// assignment of a local property from an immediate lambda invocation.
+
+(() => {
+  let a = A();
+  a.z = (() => {
+    return 1 + 4;
+  })();
+
+  assert(a.z == 5);
+})();
+
+// multi let shorthand.
+
+let x,y,z;
+
+x = 1;
+y = 2;
+z = 3;
+
+assert(x == 1);
+assert(y == 2);
+assert(z == 3);
+
+let x = 1, y = 2, z = 3;
+
+assert(x == 1);
+assert(y == 2);
+assert(z == 3);
+
+let x = () => 1, y = () => 2, z = () => 3;
+
+assert(x() == 1);
+assert(y() == 2);
+assert(z() == 3);
+
+// with annotation.
+
+let x: () -> num = () => 1,
+    y: () -> num = () => 2,
+    z: () -> num = () => 3;
+
+assert(x() == 1);
+assert(y() == 2);
+assert(z() == 3);

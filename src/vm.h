@@ -53,50 +53,23 @@ typedef struct {
   ObjString* sQuote;
   ObjString* sBackslash;
 
+  ObjString* sLen;
+  ObjString* sLt;
+  ObjString* sAdd;
+  ObjString* sIter;
+  ObjString* sMore;
+  ObjString* sNext;
+
   ObjString* sMain;
   ObjString* sExecMain;
   ObjString* sOut;
-
-  ObjClass* base;
-  ObjClass* object;
-  ObjClass* module;
-  ObjClass* tuple;
-  ObjClass* sequence;
-  ObjClass* map;
-  ObjClass* set;
-  ObjClass* generator;
-
-  ObjClass* astClosure;
-  ObjClass* astComprehension;
-  ObjClass* astClassMethod;
-  ObjClass* astMethod;
-
-  ObjClass* astExternalUpvalue;
-  ObjClass* astInternalUpvalue;
-  ObjClass* astLocal;
-  ObjClass* astGlobal;
-  ObjClass* astOverload;
-  ObjClass* astMembership;
-  ObjClass* astBlock;
-  ObjClass* astQuantification;
-
-  ObjClass* vmTypeUnit;
-  ObjClass* vmTypeBool;
-  ObjClass* vmTypeNil;
-  ObjClass* vmTypeNumber;
-  ObjClass* vmTypeUndef;
-  ObjClass* oTypeVariable;
-  ObjClass* oTypeClass;
-  ObjClass* oTypeInstance;
-  ObjClass* oTypeString;
-  ObjClass* oTypeNative;
-  ObjClass* oTypeFunction;
-  ObjClass* oTypeBoundFunction;
-  ObjClass* oTypeOverload;
-  ObjClass* oTypeSequence;
-
-  ObjClosure* unify;
-  ObjInstance* typeSystem;
+  ObjString* sSeq;
+  ObjString* sSeqPush;
+  ObjString* sObj;
+  ObjString* sSet;
+  ObjString* sSetAdd;
+  ObjString* sTree;
+  ObjString* sValue;
 } Core;
 
 typedef struct {
@@ -108,16 +81,12 @@ typedef struct {
 
   // heap.
   Obj* objects;
+  AstNode* astRoot;
   ObjUpvalue* openUpvalues;
-  ObjMap strings;
-  ObjMap globals;
-  ObjMap typeEnv;
-  ObjMap prefixes;
-  ObjMap infixes;
-  ObjMap methodInfixes;
-
-  // generator.
-  ObjInstance* gen;
+  Map strings;
+  Map globals;
+  Map prefixes;
+  Map infixes;
 
   // core defs.
   Core core;
@@ -129,14 +98,8 @@ typedef struct {
   size_t bytesAllocated;
   size_t nextGC;
 
-  // root compiler.
-  Compiler* compiler;
-
   // currently executing module.
   ObjModule* module;
-
-  int comprehensionDepth;
-  Obj* comprehensions[COMPREHENSION_DEPTH_MAX];
 } VM;
 
 typedef enum {
@@ -152,7 +115,6 @@ void freeVM();
 
 void vmRuntimeError(const char* format, ...);
 
-InterpretResult vmInterpretExpr(char* path, char* expr);
 InterpretResult vmInterpretEntrypoint(char* path);
 
 char* vmInterpretEntrypoint_wasm(char* path);
@@ -160,15 +122,12 @@ char* vmGenerate_wasm(char* path);
 void vmInit_wasm();
 void vmFree_wasm();
 
-ObjModule* vmCompileModule(char* enclosingDir, Token path, ModuleType type);
-ObjClosure* vmCompileClosure(Token path, char* source, ObjModule* module);
-bool vmImport(ObjModule* module, ObjMap* target);
-bool vmImportAsInstance(ObjModule* module);
+AstNode* vmCompileModuleNode(char* enclosingDir, char* path);
+
 InterpretResult vmExecute(int baseFrame);
 void vmPush(Value value);
 Value vmPop();
 Value vmPeek(int distance);
-bool vmInitInstance(ObjClass* klass, int argCount);
 bool vmInvoke(ObjString* name, int argCount);
 bool vmExecuteMethod(char* method, int argCount);
 bool vmHashValue(Value value, uint32_t* hash);
@@ -176,10 +135,9 @@ void vmInitFrame(ObjClosure* closure, int offset);
 bool vmCallValue(Value value, int argCount);
 void vmCloseUpvalues(Value* last);
 void vmClosure(CallFrame* frame);
-bool vmOverload(CallFrame* frame);
+bool vmSwitch(CallFrame* frame);
 void vmVariable(CallFrame* frame);
 void vmSign(CallFrame* frame);
-bool vmSequenceValueField(ObjInstance* obj, Value* seq);
 bool vmTuplify(int count, bool replace);
 ObjUpvalue* vmCaptureUpvalue(Value* local, uint8_t slot, ObjString* name);
 

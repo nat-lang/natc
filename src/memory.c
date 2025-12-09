@@ -80,30 +80,9 @@ static void blackenObject(Obj* object) {
   printf("\n");
 #endif
 
-  markArray(&object->annotations);
+  markMap(&object->fields);
 
   switch (object->oType) {
-    case OBJ_BOUND_FUNCTION: {
-      ObjBoundFunction* obj = (ObjBoundFunction*)object;
-      markValue(obj->receiver);
-
-      switch (obj->type) {
-        case BOUND_METHOD:
-          markObject((Obj*)obj->bound.method);
-          break;
-        case BOUND_NATIVE:
-          markObject((Obj*)obj->bound.native);
-          break;
-      }
-      break;
-    }
-    case OBJ_CLASS: {
-      ObjClass* klass = (ObjClass*)object;
-      markObject((Obj*)klass->name);
-      markObject((Obj*)klass->super);
-      markMap(&klass->fields);
-      break;
-    }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       markObject((Obj*)closure->function);
@@ -111,29 +90,20 @@ static void blackenObject(Obj* object) {
         markObject((Obj*)closure->upvalues[i]);
       break;
     }
-    case OBJ_OVERLOAD: {
-      ObjOverload* overload = (ObjOverload*)object;
+    case OBJ_SWITCH: {
+      ObjSwitch* overload = (ObjSwitch*)object;
       for (int i = 0; i < overload->cases; i++)
         markObject((Obj*)overload->closures[i]);
-      markMap(&overload->fields);
-      break;
-    }
-    case OBJ_INSTANCE: {
-      ObjInstance* instance = (ObjInstance*)object;
-      markObject((Obj*)instance->klass);
-      markMap(&instance->fields);
       break;
     }
     case OBJ_UPVALUE: {
       ObjUpvalue* upvalue = (ObjUpvalue*)(object);
       markValue(upvalue->closed);
-      markObject((Obj*)upvalue->name);
       break;
     }
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
-      markMap(&function->fields);
       markArray(&function->chunk.constants);
       markObject((Obj*)function->module);
       break;
@@ -142,16 +112,15 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)((ObjVariable*)object)->name);
       break;
     }
-    case OBJ_MAP: {
-      ObjMap* map = (ObjMap*)object;
-      markMap(map);
+    case OBJ_MAP:
+      break;
+    case OBJ_SET: {
+      ObjSet* set = (ObjSet*)object;
+      markMap(&set->elements);
       break;
     }
-    case OBJ_NATIVE: {
-      ObjNative* native = (ObjNative*)object;
-      markMap(&native->fields);
+    case OBJ_NATIVE:
       break;
-    }
     case OBJ_STRING:
       break;
     case OBJ_SEQUENCE: {
@@ -164,13 +133,17 @@ static void blackenObject(Obj* object) {
       markValue(spread->value);
       break;
     }
+    case OBJ_TREE: {
+      ObjTree* tree = (ObjTree*)object;
+      markArray(&tree->children);
+      break;
+    }
     case OBJ_MODULE: {
       ObjModule* module = (ObjModule*)object;
       markObject((Obj*)module->source);
       markObject((Obj*)module->closure);
       markObject((Obj*)module->dirName);
       markObject((Obj*)module->baseName);
-      markMap(&module->namespace);
       break;
     }
   }
@@ -178,22 +151,12 @@ static void blackenObject(Obj* object) {
 
 static void freeObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
-  printf("%p free type %d\n", (void*)object, object->type);
+  printf("%p free type %d\n", (void*)object, object->oType);
 #endif
 
-  freeValueArray(&object->annotations);
+  freeMap(&object->fields);
 
   switch (object->oType) {
-    case OBJ_BOUND_FUNCTION:
-      FREE(ObjBoundFunction, object);
-      break;
-    case OBJ_CLASS: {
-      ObjClass* klass = (ObjClass*)object;
-      klass->super = NULL;
-      freeMap(&klass->fields);
-      FREE(ObjClass, object);
-      break;
-    }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
@@ -203,32 +166,16 @@ static void freeObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
-      freeMap(&function->fields);
-      freeMap(&function->constants);
       FREE(ObjFunction, object);
       break;
     }
-    case OBJ_INSTANCE: {
-      ObjInstance* instance = (ObjInstance*)object;
-      freeMap(&instance->fields);
-      FREE(ObjInstance, object);
-      break;
-    }
-    case OBJ_OVERLOAD: {
-      ObjOverload* overload = (ObjOverload*)object;
-      freeMap(&overload->fields);
-      FREE_ARRAY(ObjOverload*, overload->closures, overload->cases);
-      FREE(ObjOverload, object);
-      break;
-    }
-    case OBJ_MAP: {
-      ObjMap* map = (ObjMap*)object;
-      freeMap(map);
+    case OBJ_SWITCH: {
+      ObjSwitch* overload = (ObjSwitch*)object;
+      FREE_ARRAY(ObjSwitch*, overload->closures, overload->cases);
+      FREE(ObjSwitch, object);
       break;
     }
     case OBJ_MODULE: {
-      ObjModule* module = (ObjModule*)object;
-      freeMap(&module->namespace);
       FREE(ObjModule, object);
       break;
     }
@@ -247,8 +194,24 @@ static void freeObject(Obj* object) {
       FREE(ObjSequence, object);
       break;
     }
+    case OBJ_MAP: {
+      FREE(ObjMap, object);
+      break;
+    }
+    case OBJ_SET: {
+      ObjSet* set = (ObjSet*)object;
+      freeMap(&set->elements);
+      FREE(ObjSet, object);
+      break;
+    }
     case OBJ_SPREAD: {
       FREE(ObjSpread, object);
+      break;
+    }
+    case OBJ_TREE: {
+      ObjTree* tree = (ObjTree*)object;
+      freeValueArray(&tree->children);
+      FREE(ObjTree, object);
       break;
     }
     case OBJ_UPVALUE:
@@ -272,14 +235,9 @@ static void markRoots() {
        upvalue = upvalue->next) {
     markObject((Obj*)upvalue);
   }
-
-  for (int i = 0; i < vm.comprehensionDepth; i++)
-    markObject(vm.comprehensions[i]);
-
   markMap(&vm.globals);
   markMap(&vm.prefixes);
   markMap(&vm.infixes);
-  markMap(&vm.methodInfixes);
 
   markObject((Obj*)vm.module);
 
@@ -298,9 +256,22 @@ static void markRoots() {
   markObject((Obj*)vm.core.sExecMain);
   markObject((Obj*)vm.core.sOut);
 
-  markObject((Obj*)vm.gen);
+  markObject((Obj*)vm.core.sSeq);
+  markObject((Obj*)vm.core.sSeqPush);
+  markObject((Obj*)vm.core.sObj);
+  markObject((Obj*)vm.core.sSet);
+  markObject((Obj*)vm.core.sSetAdd);
 
-  markCompilerRoots(vm.compiler);
+  markObject((Obj*)vm.core.sLen);
+  markObject((Obj*)vm.core.sLt);
+  markObject((Obj*)vm.core.sAdd);
+  markObject((Obj*)vm.core.sIter);
+  markObject((Obj*)vm.core.sMore);
+  markObject((Obj*)vm.core.sNext);
+  markObject((Obj*)vm.core.sValue);
+  markObject((Obj*)vm.core.sTree);
+
+  markAstNodes(vm.astRoot);
 }
 
 static void traceReferences() {

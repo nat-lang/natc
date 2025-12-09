@@ -233,7 +233,7 @@ class Lattice {
   );
 
   sum(Y: Set) => this.X.reduce(
-    (x, y) => this.join(x, y) , this.X[0]
+    (x, y) => this.join(x, y), this.X[0]
   );
 
   top() => this.X.find(x => this.X.all(x' => this.meet(x, x') == x'));

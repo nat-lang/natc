@@ -1,0 +1,15 @@
+
+// if statements.
+
+if (true) 1
+if (false) 1 else 2
+
+if (true) if (false) 1 else 2
+
+if (true) 1 else if (false) 2 else 3
+
+if (true) 1 else if (false) 2 else if (true) 3 else 4
+
+if (true) 1 else if (false) 2 else if (true) 3 else if (false) 4 else 5
+
+if (true) 1 else if (false) 2 else if (true) 3 else if (false) 4 else if (true) 5 else 6

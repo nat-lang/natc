@@ -1,7 +1,19 @@
+class Codeblock {
+  init(text) => {
+    this.text = text;
+  }
+}
+
 let output: [Codeblock or TexDoc] = [];
 
 let prefix codeblock = output.push . Codeblock;
 let prefix render = output.push . StandaloneTexDoc;
+
+let serialize = x => jsonEncode({
+  "success": true,
+  "out": x,
+  "type": "foo"
+});
 
 let main = () => Generator(output, serialize);
 

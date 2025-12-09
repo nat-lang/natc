@@ -46,7 +46,7 @@
 #define S_AST_INTERNAL_UPVALUE "ASTInternalUpvalue"
 #define S_AST_LOCAL "ASTLocal"
 #define S_AST_GLOBAL "ASTGlobal"
-#define S_AST_OVERLOAD "ASTOverload"
+#define S_AST_SWITCH "ASTSwitch"
 #define S_AST_MEMBERSHIP "ASTMembership"
 #define S_AST_BLOCK "ASTBlock"
 #define S_AST_QUANTIFICATION "ASTQuantification"
@@ -63,7 +63,7 @@
 #define S_OTYPE_FUNCTION "OFunction"
 #define S_OTYPE_BOUND_FUNCTION "OBoundFunction"
 #define S_OTYPE_NATIVE "ONative"
-#define S_OTYPE_OVERLOAD "OOverload"
+#define S_OTYPE_SWITCH "OSwitch"
 #define S_OTYPE_SEQUENCE "OSequence"
 
 #define S_GRAMMAR "Grammar"
@@ -73,8 +73,8 @@
 
 typedef enum {
   // Single-character tokens.
-  TOKEN_LEFT_PAREN,
-  TOKEN_RIGHT_PAREN,
+  TOKEN_PAREN_LEFT,
+  TOKEN_PAREN_RIGHT,
   TOKEN_LEFT_BRACE,
   TOKEN_RIGHT_BRACE,
   TOKEN_LEFT_BRACKET,
@@ -117,6 +117,8 @@ typedef enum {
   TOKEN_FOR,
   TOKEN_FROM,
   TOKEN_IF,
+  TOKEN_GLOBAL,
+  TOKEN_IMPORT,
   TOKEN_IN,
   TOKEN_PREFIX,
   TOKEN_INFIX,
@@ -137,6 +139,7 @@ typedef enum {
   TOKEN_USE,
   TOKEN_USER_PREFIX,
   TOKEN_USER_INFIX,
+  TOKEN_SYNTHETIC
 } TokenType;
 
 typedef struct {
@@ -144,12 +147,38 @@ typedef struct {
   const char* start;
   int length;
   int line;
+  int column;
 } Token;
 
+typedef struct {
+  uint8_t index;
+  bool isLocal;
+} Upvalue;
 typedef struct {
   Token name;
   int depth;
   bool isCaptured;
 } Local;
+
+typedef enum {
+  PREC_NONE,
+  PREC_PREFIX,
+  PREC_ASSIGNMENT,       // =
+  PREC_TYPE_ASSIGNMENT,  // : _ =
+  PREC_OR,               // or
+  PREC_AND,              // and
+  PREC_EQUALITY,         // == !=
+  PREC_COMPARISON,       // < > <= >=
+  PREC_TERM,             // + -
+  PREC_FACTOR,           // * /
+  PREC_UNARY,            // ! -
+  PREC_CALL,             // . ()
+  PREC_PRIMARY
+} Precedence;
+
+typedef struct AstNode AstNode;
+typedef struct ObjString ObjString;
+typedef struct ObjFunction ObjFunction;
+typedef struct ObjModule ObjModule;
 
 #endif

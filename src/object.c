@@ -19,8 +19,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
   object->oType = type;
   object->isMarked = false;
   object->next = vm.objects;
-  object->hash = 0;
-  initValueArray(&object->annotations);
+  initMap(&object->fields);
   vm.objects = object;
 
 #ifdef DEBUG_LOG_GC
@@ -30,61 +29,36 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
-ObjBoundFunction* newBoundMethod(Value receiver, ObjClosure* method) {
-  ObjBoundFunction* obj = ALLOCATE_OBJ(ObjBoundFunction, OBJ_BOUND_FUNCTION);
-  obj->type = BOUND_METHOD;
-  obj->receiver = receiver;
-  obj->bound.method = method;
-  return obj;
-}
-
-ObjBoundFunction* newBoundNative(Value receiver, ObjNative* native) {
-  ObjBoundFunction* obj = ALLOCATE_OBJ(ObjBoundFunction, OBJ_BOUND_FUNCTION);
-  obj->type = BOUND_NATIVE;
-  obj->receiver = receiver;
-  obj->bound.native = native;
-  return obj;
-}
-
-ObjClass* newClass(ObjString* name) {
-  ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
-  klass->name = name;
-  klass->super = NULL;
-  initMap(&klass->fields);
-  return klass;
-}
-
 ObjClosure* newClosure(ObjFunction* function) {
-  ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
-  for (int i = 0; i < function->upvalueCount; i++) upvalues[i] = NULL;
+  ObjUpvalue** upvalues =
+      ALLOCATE(ObjUpvalue*, function->node->as.function.upvalueCount);
+  for (int i = 0; i < function->node->as.function.upvalueCount; i++)
+    upvalues[i] = NULL;
 
   ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
   closure->function = function;
   closure->upvalues = upvalues;
-  closure->upvalueCount = function->upvalueCount;
+  closure->upvalueCount = function->node->as.function.upvalueCount;
   return closure;
 }
 
-ObjModule* newModule(ObjString* dirName, ObjString* baseName, ObjString* source,
-                     ModuleType type) {
+ObjModule* newModule(ObjString* dirName, ObjString* baseName,
+                     ObjString* source) {
   ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
-  module->type = type;
   module->dirName = dirName;
   module->baseName = baseName;
   module->source = source;
   module->closure = NULL;
-  initMap(&module->namespace);
   return module;
 }
 
-ObjOverload* newOverload(int cases) {
+ObjSwitch* newSwitch(int cases) {
   ObjClosure** closures = ALLOCATE(ObjClosure*, cases);
   for (int i = 0; i < cases; i++) closures[i] = NULL;
 
-  ObjOverload* overload = ALLOCATE_OBJ(ObjOverload, OBJ_OVERLOAD);
+  ObjSwitch* overload = ALLOCATE_OBJ(ObjSwitch, OBJ_SWITCH);
   overload->closures = closures;
   overload->cases = cases;
-  initMap(&overload->fields);
   return overload;
 }
 
@@ -94,27 +68,17 @@ ObjVariable* newVariable(ObjString* name) {
   return variable;
 }
 
-ObjFunction* newFunction(ObjModule* module) {
+ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
-
+  function->node = NULL;
   function->arity = 0;
   function->variadic = false;
   function->patterned = false;
-  function->upvalueCount = 0;
   function->name = NULL;
   function->module = NULL;
-  function->module = module;
-  initMap(&function->fields);
+  function->module = NULL;
   initChunk(&function->chunk);
-  initMap(&function->constants);
   return function;
-}
-
-ObjInstance* newInstance(ObjClass* klass) {
-  ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
-  instance->klass = klass;
-  initMap(&instance->fields);
-  return instance;
 }
 
 ObjNative* newNative(int arity, bool variadic, ObjString* name,
@@ -124,8 +88,18 @@ ObjNative* newNative(int arity, bool variadic, ObjString* name,
   native->variadic = variadic;
   native->name = name;
   native->function = function;
-  initMap(&native->fields);
   return native;
+}
+
+ObjMap* newMap() {
+  ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
+  return map;
+}
+
+ObjSet* newSet() {
+  ObjSet* set = ALLOCATE_OBJ(ObjSet, OBJ_SET);
+  initMap(&set->elements);
+  return set;
 }
 
 ObjSequence* newSequence() {
@@ -134,11 +108,17 @@ ObjSequence* newSequence() {
   return sequence;
 }
 
+ObjTree* newTree() {
+  ObjTree* tree = ALLOCATE_OBJ(ObjTree, OBJ_TREE);
+  initValueArray(&tree->children);
+  return tree;
+}
+
 static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;
-  string->obj.hash = hash;
+  string->hash = hash;
 
   vmPush(OBJ_VAL(string));
   mapSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
@@ -192,7 +172,7 @@ void setStringChar(ObjString* string, ObjString* character, int idx) {
 
   uint32_t hash = hashString(string->chars, string->length);
 
-  string->obj.hash = hash;
+  string->hash = hash;
 }
 
 ObjString* intern(const char* chars) {
@@ -202,10 +182,8 @@ ObjString* intern(const char* chars) {
 ObjUpvalue* newUpvalue(Value* value, uint8_t slot, ObjString* name) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
   upvalue->location = value;
-  upvalue->slot = slot;
   upvalue->closed = NIL_VAL;
   upvalue->next = NULL;
-  upvalue->name = name;
   return upvalue;
 }
 
@@ -215,13 +193,13 @@ ObjSpread* newSpread(Value value) {
   return spread;
 }
 
-void initMap(ObjMap* map) {
+void initMap(Map* map) {
   map->count = 0;
   map->capacity = 0;
   map->entries = NULL;
 }
 
-void freeMap(ObjMap* map) {
+void freeMap(Map* map) {
   FREE_ARRAY(MapEntry, map->entries, map->capacity);
   initMap(map);
 }
@@ -255,7 +233,7 @@ static MapEntry* mapFindEntry(MapEntry* entries, int capacity, Value key) {
   return mapFindHash(entries, capacity, key, hashValue(key));
 }
 
-static void mapAdjustCapacity(ObjMap* map, int capacity) {
+static void mapAdjustCapacity(Map* map, int capacity) {
   MapEntry* entries = ALLOCATE(MapEntry, capacity);
 
   for (int i = 0; i < capacity; i++) {
@@ -280,7 +258,7 @@ static void mapAdjustCapacity(ObjMap* map, int capacity) {
   map->capacity = capacity;
 }
 
-bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
+bool mapHasHash(Map* map, Value key, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -288,11 +266,11 @@ bool mapHasHash(ObjMap* map, Value key, uint32_t hash) {
   return !IS_UNDEF(entry->key);
 }
 
-bool mapHas(ObjMap* map, Value key) {
+bool mapHas(Map* map, Value key) {
   return mapHasHash(map, key, hashValue(key));
 }
 
-bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
+bool mapGetHash(Map* map, Value key, Value* value, uint32_t hash) {
   if (map->count == 0) return false;
 
   MapEntry* entry = mapFindHash(map->entries, map->capacity, key, hash);
@@ -304,11 +282,11 @@ bool mapGetHash(ObjMap* map, Value key, Value* value, uint32_t hash) {
   return true;
 }
 
-bool mapGet(ObjMap* map, Value key, Value* value) {
+bool mapGet(Map* map, Value key, Value* value) {
   return mapGetHash(map, key, value, hashValue(key));
 }
 
-bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
+bool mapSetHash(Map* map, Value key, Value value, uint32_t hash) {
   if (map->count + 1 > map->capacity * MAP_MAX_LOAD) {
     int capacity = GROW_CAPACITY(map->capacity);
     mapAdjustCapacity(map, capacity);
@@ -324,11 +302,11 @@ bool mapSetHash(ObjMap* map, Value key, Value value, uint32_t hash) {
   return isNewKey;
 }
 
-bool mapSet(ObjMap* map, Value key, Value value) {
+bool mapSet(Map* map, Value key, Value value) {
   return mapSetHash(map, key, value, hashValue(key));
 }
 
-bool mapDelete(ObjMap* map, Value key) {
+bool mapDelete(Map* map, Value key) {
   if (map->count == 0) return false;
 
   // Find the entry.
@@ -341,7 +319,7 @@ bool mapDelete(ObjMap* map, Value key) {
   return true;
 }
 
-void mapAddAll(ObjMap* from, ObjMap* to) {
+void mapAddAll(Map* from, Map* to) {
   for (int i = 0; i < from->capacity; i++) {
     MapEntry* entry = &from->entries[i];
     if (!IS_UNDEF(entry->key)) {
@@ -350,7 +328,7 @@ void mapAddAll(ObjMap* from, ObjMap* to) {
   }
 }
 
-ObjString* mapFindString(ObjMap* map, const char* chars, int length,
+ObjString* mapFindString(Map* map, const char* chars, int length,
                          uint32_t hash) {
   if (map->count == 0) return NULL;
 
@@ -362,7 +340,7 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
       if (IS_NIL(entry->value)) return NULL;
     } else if (IS_STRING(entry->key) &&
                AS_STRING(entry->key)->length == length &&
-               AS_STRING(entry->key)->obj.hash == hash &&
+               AS_STRING(entry->key)->hash == hash &&
                memcmp(AS_STRING(entry->key)->chars, chars, length) == 0) {
       // We found it.
       return AS_STRING(entry->key);
@@ -372,7 +350,7 @@ ObjString* mapFindString(ObjMap* map, const char* chars, int length,
   }
 }
 
-void mapRemoveWhite(ObjMap* map) {
+void mapRemoveWhite(Map* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
     if (!IS_UNDEF(entry->key) && IS_OBJ(entry->key) &&
@@ -382,7 +360,7 @@ void mapRemoveWhite(ObjMap* map) {
   }
 }
 
-void markMap(ObjMap* map) {
+void markMap(Map* map) {
   for (int i = 0; i < map->capacity; i++) {
     MapEntry* entry = &map->entries[i];
     markValue(entry->key);
@@ -390,77 +368,33 @@ void markMap(ObjMap* map) {
   }
 }
 
-static void printMap(ObjMap* map) { printf("<map>"); }
-
-// Is [a] a subclass of [b]?
-bool isSubclass(ObjClass* a, ObjClass* b) {
-  ObjClass* k = a;
-  while (k != NULL) {
-    if (k == b) return true;
-    k = k->super;
-  }
-  return false;
-}
-
-bool leastCommonAncestor(ObjClass* a, ObjClass* b, ObjClass* ancestor) {
-  ObjClass* k = a;
-
-  while (k != NULL) {
-    if (isSubclass(b, k)) {
-      *ancestor = *k;
-      return true;
-    }
-
-    k = k->super;
-  }
-
-  return false;
-}
-
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
-    case OBJ_BOUND_FUNCTION: {
-      ObjBoundFunction* obj = AS_BOUND_FUNCTION(value);
-
-      switch (obj->type) {
-        case BOUND_METHOD: {
-          printf("<bound method %s at %p>",
-                 obj->bound.method->function->name->chars, obj);
-          break;
-        }
-        case BOUND_NATIVE: {
-          printf("<bound native %s>", obj->bound.native->name->chars);
-          break;
-        }
-      }
+    case OBJ_CLOSURE: {
+      ObjClosure* closure = AS_CLOSURE(value);
+      printf("<closure %s at %p>", closure->function->name->chars, closure);
       break;
     }
-    case OBJ_CLASS:
-      printf("<class %s>", AS_CLASS(value)->name->chars);
-      break;
-    case OBJ_CLOSURE:
-      printf("<closure %s at %p>", AS_CLOSURE(value)->function->name->chars,
-             AS_CLOSURE(value));
-      break;
     case OBJ_FUNCTION:
       printf("<function %s at %p>", AS_FUNCTION(value)->name->chars,
              AS_FUNCTION(value));
       break;
-    case OBJ_OVERLOAD:
-      printf("<overload at %p>", AS_OVERLOAD(value));
+    case OBJ_SWITCH:
+      printf("<overload at %p>", AS_SWITCH(value));
       break;
     case OBJ_VARIABLE:
       printf("<var %s>", AS_VARIABLE(value)->name->chars);
       break;
-    case OBJ_INSTANCE:
-      printf("<%s object at %p>", AS_INSTANCE(value)->klass->name->chars,
-             AS_INSTANCE(value));
-      break;
     case OBJ_MAP:
-      printMap(AS_MAP(value));
+      printf("<map at %p>", AS_MAP(value));
       break;
+    case OBJ_SET: {
+      printf("<set at %p>", AS_SET(value));
+      break;
+    }
     case OBJ_MODULE:
-      printf("<module %s>", AS_MODULE(value)->closure->function->name->chars);
+      printf("<module %s/%s>", AS_MODULE(value)->dirName->chars,
+             AS_MODULE(value)->baseName->chars);
       break;
     case OBJ_NATIVE:
       printf("<native %s>", AS_NATIVE(value)->name->chars);
@@ -477,8 +411,30 @@ void printObject(Value value) {
     case OBJ_STRING:
       printf("%s", AS_CSTRING(value));
       break;
+    case OBJ_TREE: {
+      ObjTree* tree = AS_TREE(value);
+      printf("Tree(");
+      // Print value from fields map
+      Value treeValue;
+      if (mapGet(&tree->obj.fields, INTERN("value"), &treeValue)) {
+        printValue(treeValue);
+      } else {
+        printf("nil");
+      }
+      printf(", [");
+      for (int i = 0; i < tree->children.count; i++) {
+        if (i > 0) printf(", ");
+        printValue(tree->children.values[i]);
+      }
+      printf("])");
+      break;
+    }
     case OBJ_UPVALUE:
       printf("<upvalue at %p>", AS_UPVALUE(value));
       break;
   }
+}
+
+ObjString* tokenString(Token token) {
+  return copyString(token.start, token.length);
 }

@@ -1,0 +1,159 @@
+// Property access and assignment integration tests
+
+// Basic property access on objects
+let obj = {}
+obj.foo = 42
+assert(obj.foo == 42)
+
+// Property assignment returns the object
+let result = (obj.bar = 99)
+assert(result.bar == 99)
+assert(obj.bar == 99)
+
+// Multiple properties on same object
+obj.a = 1
+obj.b = 2
+obj.c = 3
+assert(obj.a == 1)
+assert(obj.b == 2)
+assert(obj.c == 3)
+
+// Nested property access
+let nested = {}
+nested.child = {}
+nested.child.value = "hello"
+assert(nested.child.value == "hello")
+
+// Deep nesting
+nested.a = {}
+nested.a.b = {}
+nested.a.b.c = {}
+nested.a.b.c.d = 100
+assert(nested.a.b.c.d == 100)
+
+// Property access on tree nodes
+let tree = [1 2 3]
+assert(tree.value == 1)
+assert(tree[0] == 2)
+assert(tree[1] == 3)
+
+// Nested tree property access
+let nestedTree = [[10 20] [30 40]]
+assert(nestedTree.value.value == 10)
+assert(nestedTree.value[0] == 20)
+assert(nestedTree[0].value == 30)
+assert(nestedTree[0][0] == 40)
+
+// Property assignment on tree nodes (sets in fields map)
+tree.custom = "custom_value"
+assert(tree.custom == "custom_value")
+
+// Property access with different value types
+let types = {}
+types.num = 42
+types.str = "text"
+types.bool = true
+types.nothing = nil
+assert(types.num == 42)
+assert(types.str == "text")
+assert(types.bool == true)
+assert(types.nothing == nil)
+
+// Property access in expressions
+let calc = {}
+calc.x = 10
+calc.y = 20
+assert(calc.x + calc.y == 30)
+assert(calc.x * calc.y == 200)
+
+// Property access in function calls
+let getValue = thing => thing.value
+let testObj = {}
+testObj.value = 777
+assert(getValue(testObj) == 777)
+
+// Property assignment in functions
+let setter = someArg => {
+  someArg.prop = 123
+  return someArg
+}
+let modified = setter({})
+assert(modified.prop == 123)
+
+// Chained property access and assignment
+let chain = {}
+chain.level1 = {}
+chain.level1.level2 = {}
+chain.level1.level2.data = 456
+assert(chain.level1.level2.data == 456)
+
+// Property on function result
+let makeObj = () => {
+  let o = {}
+  o.field = "result"
+  return o
+}
+assert(makeObj().field == "result")
+
+// Property access with sequences
+let withSeq = {}
+withSeq.items = (1, 2, 3)
+assert(withSeq.items[0] == 1)
+assert(withSeq.items[1] == 2)
+assert(withSeq.items[2] == 3)
+
+// Property access with sets
+let withSet = {}
+withSet.nums = {1, 2, 3}
+assert(withSet.nums[1] == true)
+assert(withSet.nums[2] == true)
+assert(withSet.nums[5] == false)
+
+// Multiple property accesses in same expression
+let multi = {}
+multi.a = 5
+multi.b = 3
+assert(multi.a > multi.b)
+assert(multi.a + multi.b == 8)
+
+// Property overwrite
+let overwrite = {}
+overwrite.val = "first"
+assert(overwrite.val == "first")
+overwrite.val = "second"
+assert(overwrite.val == "second")
+
+// Accessing undefined property returns nil
+let undef = {}
+assert(undef.nonexistent == nil)
+
+// Property access in conditionals
+let cond = {}
+cond.flag = true
+if (cond.flag != true) assert(false)
+
+cond.flag = false
+if (cond.flag) assert(false)
+
+// Property access in loops
+let loop = {}
+loop.count = 0
+let idx = 0
+while (idx < 5) {
+  loop.count = loop.count + 1
+  idx = idx + 1
+}
+assert(loop.count == 5)
+
+// Property assignment with complex expressions
+let complex = {}
+complex.result = (10 + 20) * 2
+assert(complex.result == 60)
+
+// Property access on property access result
+let cascade = {}
+cascade.inner = {}
+cascade.inner.value = 888
+let temp = cascade.inner
+assert(temp.value == 888)
+

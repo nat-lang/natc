@@ -1,0 +1,42 @@
+class IterationProtocolError extends Error {}
+
+class Iterator {
+  init(seq, start, end) => {
+    this.seq = seq;
+    this.idx = start;
+    this.end = end;
+  }
+
+  more() => this.idx != this.end;
+
+  next() => {
+    let value = this.seq[this.idx];
+    this.idx = this.idx + 1;
+    return value;
+  }
+
+  __len__() => this.end - this.idx;
+}
+
+let iter = object => {
+  if (object is Sequential or vmType(object) == OString)
+    return Iterator(object, 0, len(object));
+
+  if (vmType(object) != OInstance)
+    throw IterationProtocolError("Can't iterate over #{object}.");
+
+  if (callable(object.__iter__)) return object.__iter__();
+
+  throw IterationProtocolError("Must define an '__iter__' method to iterate.");
+};
+
+iter.tex = (args: ASTArgumentSequence) => args[0].tex();
+
+let range = (x,y) => {
+  if (x == y) return [];
+
+  let seq = [x];
+  for (let i = x + 1; i < y; i = i + 1)
+    seq.push(i);
+  return seq;
+};

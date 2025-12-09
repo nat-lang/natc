@@ -1,101 +1,110 @@
-use ../utils
-let tree;
+let t
 
-// literal trees.
+// empty tree
+t = []
+assert(t.value == nil)
 
-tree = [1 2 3];
+// simple leaf tree - single element is a child
+t = [1]
+assert(t[0] == 1)
 
-assert(tree[0].data == 1);
-assert(tree[1].data == 2);
-assert(tree[2].data == 3);
+// tree with value and children - first is value, rest are children
+t = [1 2 3]
+assert(t.value == 1)
+assert(t[0] == 2)
+assert(t[1] == 3)
 
-tree = [1 [2 3 4] [5 6 7]];
+// nested tree literals
+t = [[1] [2] [3]]
+// First element [1] is the value, [2] and [3] are children
+assert(t.value[0] == 1)
+assert(t[0][0] == 2)
+assert(t[1][0] == 3)
 
-assert(tree[0].data == 1);
-assert(tree[1][0].data == 2);
-assert(tree[1][1].data == 3);
-assert(tree[1][2].data == 4);
-assert(tree[2][0].data == 5);
-assert(tree[2][1].data == 6);
-assert(tree[2][2].data == 7);
+// deeper nesting with values
+t = [[1 2] [3 4 5] [6]]
+assert(t.value.value == 1)
+assert(t.value[0] == 2)
+assert(t[0].value == 3)
+assert(t[0][0] == 4)
+assert(t[0][1] == 5)
+assert(t[1][0] == 6)
 
-tree = [151334 [134152 312451 41556341] [5124125 613412 7124124]];
+// tree with value and nested children
+t = [1 [2 3 4] [5 6 7]]
+assert(t.value == 1)
+assert(t[0].value == 2)
+assert(t[0][0] == 3)
+assert(t[0][1] == 4)
+assert(t[1].value == 5)
+assert(t[1][0] == 6)
+assert(t[1][1] == 7)
 
-assert(tree[0].data == 151334);
-assert(tree[1][0].data == 134152);
-assert(tree[1][1].data == 312451);
-assert(tree[1][2].data == 41556341);
-assert(tree[2][0].data == 5124125);
-assert(tree[2][1].data == 613412);
-assert(tree[2][2].data == 7124124);
+// tree native function with direct arguments
+t = tree(1, 2, 3, 4)
+assert(t.value == 1)
+assert(t[0] == 2)
+assert(t[1] == 3)
+assert(t[2] == 4)
 
-tree = [true false false];
+// tree native function with sequence conversion
+t = tree((1, 2, 3))
+assert(t.value == 1)
+assert(t[0] == 2)
+assert(t[1] == 3)
 
-assert(tree[0].data);
-assert(!tree[1].data);
-assert(!tree[2].data);
+// nested sequence conversion
+t = tree((1, (2, (,)), (3, (,))))
+assert(t.value == 1)
+assert(t[0].value == 2)
+assert(t[1].value == 3)
 
-// expression trees.
+// more complex sequence conversion
+t = tree((1, (2, 3, 4), (5, 6, 7)))
+assert(t.value == 1)
+assert(t[0].value == 2)
+assert(t[0][0] == 3)
+assert(t[0][1] == 4)
+assert(t[1].value == 5)
+assert(t[1][0] == 6)
+assert(t[1][1] == 7)
 
-tree = [(1 + 1) (1 + 2) (1 + 3)];
+// tree with different data types
+t = [true false nil]
+assert(t.value == true)
+assert(t[0] == false)
+assert(t[1] == nil)
 
-assert(tree[0].data == 2);
-assert(tree[1].data == 3);
-assert(tree[2].data == 4);
+// tree with strings
+t = ["a" "b" "c"]
+assert(t.value == "a")
+assert(t[0] == "b")
+assert(t[1] == "c")
 
-let id = (a) => a;
+// tree equality
+let t1 = tree(1, 2, 3)
+let t2 = tree(1, 2, 3)
+assert(t1 == t2)
 
-tree = [id(1) id(2) id(3)];
+let t3 = tree(2, 2, 3)
+assert(t2 != t3)
 
-assert(tree[0].data == 1);
-assert(tree[1].data == 2);
-assert(tree[2].data == 3);
+// expression trees
+t = [(1 + 1) (2 + 2) (3 + 3)]
+assert(t.value == 2)
+assert(t[0] == 4)
+assert(t[1] == 6)
 
-// interior nodes.
+// trees with function results
+let double = x => x * 2
+t = [(double(1)) (double(2)) (double(3))]
+assert(t.value == 2)
+assert(t[0] == 4)
+assert(t[1] == 6)
 
-tree = [.1 2 3];
-
-assert(tree == Tree(1, [Tree(2, []), Tree(3, [])]));
-
-tree = [.1 [.2 3 4] [.3 5 6] [.6 5 3]];
-
-assert(tree == Tree(1, [
-  Tree(2, [
-    Tree(3, []),
-    Tree(4, [])
-  ]),
-  Tree(3, [
-    Tree(5, []),
-    Tree(6, [])
-  ]),
-  Tree(6, [
-    Tree(5, []),
-    Tree(3, [])
-  ])
-]));
-
-tree = [.(1 + 1) 2 3];
-
-assert(tree == Tree(2, [Tree(2, []), Tree(3, [])]));
-
-tree = [.(x => x) true false];
-
-assert(vmType(tree.data) == OFunction && tree.data(1) == 1);
-
-// tree api.
-
-tree = [1 [2 3 4] [5 6 7]];
-
-let leaves = tree.leaves();
-
-assert(leaves == [1,2,3,4,5,6,7]);
-
-// fill the interior nodes.
-tree = tree.dmap((data) => {
-  if (!data) return 0;
-  return data; 
-});
-
-let sum = tree.reduce(+, 0);
-
-assert(sum == 28);
+// empty children sequence conversion
+t = tree((5, (,), (,)))
+assert(t.value == 5)
+// two children with nil values
+assert(t[0].value == nil)
+assert(t[1].value == nil)

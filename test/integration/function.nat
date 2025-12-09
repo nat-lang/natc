@@ -1,0 +1,81 @@
+
+// naked function declarations.
+
+let f = x => x + 1 
+
+// naked function calls.
+
+f(1) 
+
+// switch functions.
+
+// literal patterns
+
+let f = (1) => "one", (2) => "two", (3) => "three"
+assert(f(1) == "one")
+assert(f(2) == "two")
+assert(f(3) == "three")
+assert(f(4) == undefined)
+
+// naked literal patterns 
+
+let f = 1 => "one", 2 => "two", 3 => "three"
+assert(f(1) == "one")
+assert(f(2) == "two")
+assert(f(3) == "three")
+assert(f(4) == undefined)
+
+// mixed naked and parenthesized cases
+
+let f = 1 => "one", (x) => "two"
+assert(f(1) == "one")
+assert(f(2) == "two")
+
+// variable patterns
+
+let f = (1) => "one", (x) => "other"
+assert(f(1) == "one")
+assert(f(99) == "other")
+
+// multi-param with literals
+
+let f = (0,1) => 2, (1,0) => 3, (x,y) => x + y
+assert(f(0,1) == 2)
+assert(f(1,0) == 3)
+assert(f(2,3) == 5)
+
+// mixed literal and variable
+
+let f = (1,x) => x * 2, (x,1) => x * 3, (x,y) => x + y
+assert(f(1,5) == 10)
+assert(f(5,1) == 15)
+assert(f(2,3) == 5)
+
+// boolean and nil patterns
+
+let f = (true) => 1, (false) => 0, (nil) => 99
+assert(f(true) == 1)
+assert(f(false) == 0)
+assert(f(nil) == 99)
+
+// string patterns
+
+let f = ("hello") => 1, ("world") => 2, (x) => 0
+print(f("hello"))
+assert(f("hello") == 1)
+assert(f("world") == 2)
+assert(f("other") == 0)
+
+// factorial example
+
+let f = (0) => 1, (n) => n * f(n - 1)
+assert(f(5) == 120)
+
+// mixed literals
+
+let f = true => "true", nil => "nil", undefined => "undefined", 1 => "one"
+assert(f(true) == "true")
+assert(f(nil) == "nil")
+assert(f(undefined) == "undefined")
+assert(f(1) == "one")
+assert(f(2) == undefined)
