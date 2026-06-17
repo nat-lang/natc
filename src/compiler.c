@@ -319,7 +319,6 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
 }
 
 static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
-  printf("tokenPattern at: %s\n", tokenString(token)->chars);
   switch (token.type) {
     case TOKEN_NUMBER: {
       addLocal(cmp, token);  // Allocate local slot for stack alignment
@@ -380,7 +379,16 @@ static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
 }
 
 static AstNode* pattern(NodeCompiler* cmp) {
-  return tokenPattern(cmp, parser.current);
+  // Delimiter-led patterns (sequence/set/map) consume their own opening token
+  // and everything up to the matching close, so dispatch before advancing.
+  if (check(TOKEN_PAREN_LEFT)) return patternSequence(cmp);
+  if (check(TOKEN_LEFT_BRACE)) return patternSetOrMap(cmp);
+
+  // Terminal patterns: consume the token (mirroring the naked-function path,
+  // where the pattern token is already in parser.previous), then build from it.
+  Token token = parser.current;
+  advance(cmp);
+  return tokenPattern(cmp, token);
 }
 
 // Parse sequence pattern by reusing/adapting sequence parsing
@@ -903,7 +911,7 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
     AstNode* node = function(cmp, name);
 
     // switch?
-    if (!check(TOKEN_COMMA)) return node;
+    if (!match(cmp, TOKEN_COMMA)) return node;
     int arity = node->as.function.signature->as.signature.params.count;
     AstNode* switchNode = newSwitchNode();
     switchNode->as.switchFunc.name = tokenString(name);
@@ -911,8 +919,18 @@ static AstNode* parenLeft(NodeCompiler* cmp, bool canAssign) {
     switchNode->as.switchFunc.arity = arity;
     pushAstVec(&switchNode->as.switchFunc.cases, node);
 
+    // Remaining cases may be parenthesized (`(p) => ...`) or naked (`p => ...`).
     do {
-      AstNode* nextCase = function(cmp, name);
+      AstNode* nextCase = NULL;
+      advance(cmp);
+      if (parser.previous.type == TOKEN_PAREN_LEFT) {
+        nextCase = function(cmp, name);
+      } else if (isParamOrPattern(parser.previous.type)) {
+        nextCase = nakedFunction(cmp, name);
+      } else {
+        error(cmp, "Expect pattern or function after ','.");
+        break;
+      }
       pushAstVec(&switchNode->as.switchFunc.cases, nextCase);
     } while (match(cmp, TOKEN_COMMA));
 

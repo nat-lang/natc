@@ -309,7 +309,9 @@ bool testSwitchFunctionVariablePatterns() {
   AstNode* param1 = newParamNode(NULL);
   param1->as.param.name = intern("x");
   pushAstVec(&case1->as.function.signature->as.signature.params, param1);
-  AstNode* var1 = newVarLocalNode(0);
+  // Slot 0 is reserved in every function frame, so the first parameter binds
+  // to slot 1.
+  AstNode* var1 = newVarLocalNode(1);
   var1->as.local.name = intern("x");
   case1->as.function.body = newReturnNode(var1);
 
@@ -320,7 +322,7 @@ bool testSwitchFunctionVariablePatterns() {
   AstNode* param2 = newParamNode(NULL);
   param2->as.param.name = intern("y");
   pushAstVec(&case2->as.function.signature->as.signature.params, param2);
-  AstNode* var2 = newVarLocalNode(0);
+  AstNode* var2 = newVarLocalNode(1);
   var2->as.local.name = intern("y");
   AstNode* one = newLiteralValueNode(NUMBER_VAL(1));
   AstNode* plusOp = newVarGlobalNode();
@@ -367,7 +369,8 @@ bool testSwitchFunctionMixedPatterns() {
   AstNode* param = newParamNode(NULL);
   param->as.param.name = intern("x");
   pushAstVec(&case2->as.function.signature->as.signature.params, param);
-  AstNode* var = newVarLocalNode(0);
+  // Slot 0 is reserved, so the first parameter binds to slot 1.
+  AstNode* var = newVarLocalNode(1);
   var->as.local.name = intern("x");
   case2->as.function.body = newReturnNode(var);
 
@@ -437,7 +440,8 @@ bool testSwitchFunctionMultiParam() {
   AstNode* param1 = newParamNode(NULL);
   param1->as.param.name = intern("x");
   pushAstVec(&case1->as.function.signature->as.signature.params, param1);
-  AstNode* var1 = newVarLocalNode(1);
+  // Slot 0 is reserved; params are slots 1.. so the 2nd param `x` is slot 2.
+  AstNode* var1 = newVarLocalNode(2);
   var1->as.local.name = intern("x");
   case1->as.function.body = newReturnNode(var1);
 
@@ -450,7 +454,8 @@ bool testSwitchFunctionMultiParam() {
   pushAstVec(&case2->as.function.signature->as.signature.params, param2);
   AstNode* literal2 = newLiteralValueNode(NUMBER_VAL(1));
   pushAstVec(&case2->as.function.signature->as.signature.params, literal2);
-  AstNode* var2 = newVarLocalNode(0);
+  // First param `x` binds to slot 1 (slot 0 reserved).
+  AstNode* var2 = newVarLocalNode(1);
   var2->as.local.name = intern("x");
   case2->as.function.body = newReturnNode(var2);
 
@@ -1415,9 +1420,20 @@ bool testLineColLeadingBlankLines() {
  * Bytecode (AST -> Chunk) helpers and tests.
  * ============================================================ */
 
+// Compile `expr` into `*chunk`. The objects emitted into the chunk's constant
+// table (e.g. the ObjFunction for each switch case) are heap-allocated during
+// compilation; a bare stack Chunk is not a GC root, so under an eager collector
+// an allocation made while compiling a later node can free an earlier constant
+// and reuse its slot. The real compiler avoids this because every chunk lives
+// inside a reachable ObjFunction. Mirror that here: build into a heap
+// ObjFunction kept alive on the VM stack, then hand its chunk back to the
+// caller. The fn stays on the stack (a GC root) until the test returns.
 static bool buildChunkForExpr(AstNode* expr, Chunk* chunk) {
-  initChunk(chunk);
-  return toChunk(expr, chunk);
+  ObjFunction* holder = newFunction();
+  vmPush(OBJ_VAL(holder));  // root the holder (and thus its constants).
+  bool ok = toChunk(expr, &holder->chunk);
+  *chunk = holder->chunk;
+  return ok;
 }
 
 static uint16_t read_u16(uint8_t hi, uint8_t lo) {
@@ -3664,12 +3680,16 @@ bool testImportParsing() {
 
   AstVec* blockStmts = &actualFirstStmt->as.block.stmts;
 
-  // Check we have 3 statements in the block:
-  // let __import = ...
-  // let x = ...
-  // let f = ...
-  if (blockStmts->count != 3) {
-    printf("Expected 3 statements in import block, got %d\n",
+  // The fixture test/integration/import/export.nat exports four bindings
+  // (x, f, o, g), so `use export` desugars to one statement binding the imported
+  // module plus one statement per export:
+  //   let __import = call(exportModuleFunction)
+  //   let x = __import["x"]
+  //   let f = __import["f"]
+  //   let o = __import["o"]
+  //   let g = __import["g"]
+  if (blockStmts->count != 5) {
+    printf("Expected 5 statements in import block, got %d\n",
            blockStmts->count);
     return false;
   }
@@ -3739,6 +3759,33 @@ bool testImportParsing() {
     printf("Expected f value to be AST_SUBSCRIPT_GET, got type %d\n",
            fDecl->as.declLet.value->type);
     return false;
+  }
+
+  // Check remaining exports (o, g) desugar the same way: let <name> =
+  // __import[<name>].
+  const char* remaining[] = {"o", "g"};
+  for (int i = 0; i < 2; i++) {
+    AstNode* decl = &blockStmts->items[3 + i];
+    if (decl->type != AST_DECL_LET) {
+      printf("Expected statement %d to be AST_DECL_LET for %s, got type %d\n",
+             3 + i, remaining[i], decl->type);
+      return false;
+    }
+    if (decl->as.declLet.local->type != AST_VAR_LOCAL) {
+      printf("Expected %s decl local to be AST_VAR_LOCAL\n", remaining[i]);
+      return false;
+    }
+    ObjString* name = decl->as.declLet.local->as.local.name;
+    if (strcmp(name->chars, remaining[i]) != 0) {
+      printf("Expected local name to be '%s', got '%s'\n", remaining[i],
+             name->chars);
+      return false;
+    }
+    if (decl->as.declLet.value->type != AST_SUBSCRIPT_GET) {
+      printf("Expected %s value to be AST_SUBSCRIPT_GET, got type %d\n",
+             remaining[i], decl->as.declLet.value->type);
+      return false;
+    }
   }
 
   return true;

@@ -1266,6 +1266,18 @@ bool toChunk(AstNode* node, Chunk* chunk) {
   return true;
 }
 
+// A function is "patterned" when any of its parameters is not a plain variable
+// binding (AST_PARAM) but a value/structure pattern (e.g. a literal `1`, or a
+// sequence/set/map). Such a function must dispatch through callCases so the
+// argument is unified against the pattern rather than bound unconditionally.
+static bool signatureIsPatterned(AstNode* signature) {
+  AstVec* params = &signature->as.signature.params;
+  for (int i = 0; i < params->count; i++) {
+    if (params->items[i].type != AST_PARAM) return true;
+  }
+  return false;
+}
+
 ObjFunction* toFunction(AstNode* node) {
   ObjFunction* fn = newFunction();
   vmPush(OBJ_VAL(fn));
@@ -1273,6 +1285,7 @@ ObjFunction* toFunction(AstNode* node) {
   fn->name = node->as.function.name;
   fn->arity = node->as.function.signature->as.signature.params.count;
   fn->node = node;
+  fn->patterned = signatureIsPatterned(node->as.function.signature);
 
   if (!toChunk(node->as.function.signature, &fn->chunk)) return false;
   if (!toChunk(node->as.function.body, &fn->chunk)) return false;
