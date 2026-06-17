@@ -70,6 +70,10 @@ typedef struct {
   ObjString* sSetAdd;
   ObjString* sTree;
   ObjString* sValue;
+  ObjString* sInit;
+  ObjString* sThis;
+  ObjString* sSuper;
+  ObjString* sClass;
 } Core;
 
 typedef struct {

@@ -41,7 +41,10 @@ typedef enum {
   OP_PROPERTY_SET,
   OP_SPREAD,
   OP_UNIT,
-  OP_QUANTIFY
+  OP_QUANTIFY,
+  OP_CLASS,
+  OP_INHERIT,
+  OP_METHOD
 } OpCode;
 
 typedef struct {

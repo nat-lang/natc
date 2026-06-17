@@ -161,6 +161,10 @@ static bool peekFunction(NodeCompiler* cmp);
 static AstNode* pattern(NodeCompiler* cmp);
 static AstNode* patternSequence(NodeCompiler* cmp);
 static AstNode* patternSetOrMap(NodeCompiler* cmp);
+static AstNode* expression(NodeCompiler* cmp);
+AstNode* function(NodeCompiler* enclosing, Token name);
+static int resolveLocal(NodeCompiler* cmp, Token* name);
+static int resolveUpvalue(NodeCompiler* cmp, Token* name);
 
 static AstNode* setNodeFromToken(AstNode* node, Token token) {
   if (node != NULL) {
@@ -318,6 +322,37 @@ static AstNode* identifier(NodeCompiler* cmp, bool canAssign) {
   return node;
 }
 
+// `this` resolves to the receiver, which lives in slot 0 of every method
+// frame (named "this" when the method is compiled). Resolve it as a local or,
+// for closures nested inside a method, an upvalue.
+static AstNode* thisExpr(NodeCompiler* cmp, bool canAssign) {
+  Token name = parser.previous;
+  int address;
+  AstNode* node;
+  if ((address = resolveLocal(cmp, &name)) >= 0) {
+    node = setNodeFromToken(newVarLocalNode((uint8_t)address), name);
+    node->as.local.name = tokenString(name);
+  } else if ((address = resolveUpvalue(cmp, &name)) >= 0) {
+    node = setNodeFromToken(newVarUpvalueNode((uint8_t)address), name);
+    node->as.upvalue.name = tokenString(name);
+  } else {
+    error(cmp, "Can't use 'this' outside of a method.");
+    node = setNodeFromToken(newUnknownNode(), name);
+  }
+  return node;
+}
+
+// `super.method` resolves a method off the enclosing class's superclass,
+// bound to the current receiver.
+static AstNode* superExpr(NodeCompiler* cmp, bool canAssign) {
+  Token superToken = parser.previous;
+  consume(cmp, TOKEN_DOT, "Expect '.' after 'super'.");
+  consumeIdentifier(cmp, "Expect superclass method name.");
+  AstNode* node = setNodeFromToken(newSuperNode(tokenString(parser.previous)),
+                                   superToken);
+  return node;
+}
+
 static AstNode* tokenPattern(NodeCompiler* cmp, Token token) {
   switch (token.type) {
     case TOKEN_NUMBER: {
@@ -469,9 +504,12 @@ static AstNode* signature(NodeCompiler* cmp) {
 static AstNode* block(NodeCompiler* cmp) {
   AstNode* block = setNodeFromToken(newBlockNode(), parser.previous);
 
+  while (match(cmp, TOKEN_SEMICOLON));  // skip empty statements.
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
     AstNode* stmtNode = statement(cmp);
     pushAstVec(&block->as.block.stmts, stmtNode);
+    // statements may be terminated/separated by ';'.
+    while (match(cmp, TOKEN_SEMICOLON));
   }
 
   consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after block.");
@@ -1036,6 +1074,8 @@ static ParseRule rules[] = {
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE, PREC_NONE},
     [TOKEN_USER_INFIX] = {NULL, userInfix, PREC_NONE, PREC_NONE},
     [TOKEN_RETURN] = {returnStatement, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_THIS] = {thisExpr, NULL, PREC_NONE, PREC_NONE},
+    [TOKEN_SUPER] = {superExpr, NULL, PREC_NONE, PREC_NONE},
 };
 
 #define PREC_STEP 1
@@ -1121,6 +1161,83 @@ static AstNode* globalDeclaration(NodeCompiler* cmp) {
   AstNode* node = newDeclGlobalNode(value);
   node->as.declGlobal.name = tokenString(nameToken);
   return setNodeFromToken(node, nameToken);
+}
+
+// Parse a class method: `name(params) => body`. Compiles like a function but
+// names slot 0 "this" so the body (and nested closures) can reach the receiver.
+static AstNode* method(NodeCompiler* enclosing) {
+  consumeIdentifier(enclosing, "Expect method name.");
+  Token name = parser.previous;
+
+  AstNode* node = setNodeFromToken(
+      newFunctionNode(enclosing->fn->as.function.module), name);
+  node->as.function.name = tokenString(name);
+  NodeCompiler cmp;
+  initNodeCompiler(&cmp, enclosing, node);
+  // Reserved slot 0 = the receiver; name it so `this` resolves to it.
+  node->as.function.locals[0].name = syntheticToken("this");
+  node->as.function.locals[0].depth = 0;
+  beginScope(&cmp);
+
+  consume(&cmp, TOKEN_PAREN_LEFT, "Expect '(' after method name.");
+  node->as.function.signature = signature(&cmp);
+  setNodeFromNode(node->as.function.signature, node);
+  if (node->as.function.signature->as.signature.varargs)
+    node->as.function.variadic = true;
+  consume(&cmp, TOKEN_PAREN_RIGHT, "Expect ')' after parameters.");
+  consume(&cmp, TOKEN_FAT_ARROW, "Expect '=>' after signature.");
+  node->as.function.body = functionBody(&cmp);
+
+  // `init` implicitly returns the receiver so instantiation yields the
+  // instance, not init's own (usually nil) return. functionBody appends a
+  // trailing `return nil` to block bodies; for init, rewrite that trailing
+  // return's value to `this` (slot 0) so the LAST return yields the instance.
+  if (name.length == 4 && memcmp(name.start, "init", 4) == 0 &&
+      node->as.function.body->type == AST_BLOCK) {
+    AstVec* stmts = &node->as.function.body->as.block.stmts;
+    AstNode* thisNode = setNodeFromToken(newVarLocalNode(0), name);
+    thisNode->as.local.name = tokenString(syntheticToken("this"));
+    if (stmts->count > 0 &&
+        stmts->items[stmts->count - 1].type == AST_RETURN) {
+      stmts->items[stmts->count - 1].as.xReturn.value = thisNode;
+    } else {
+      AstNode* ret = newReturnNode(thisNode);
+      setNodeFromToken(ret, name);
+      pushAstVec(stmts, ret);
+    }
+  }
+
+  endScope(&cmp);
+  return node;
+}
+
+static AstNode* classDeclaration(NodeCompiler* cmp) {
+  consumeIdentifier(cmp, "Expect class name.");
+  Token nameToken = parser.previous;
+
+  uint8_t localIndex = addLocal(cmp, nameToken);
+  markInitialized(cmp);
+
+  AstNode* node = setNodeFromToken(newClassNode(tokenString(nameToken)),
+                                   nameToken);
+  AstNode* local = setNodeFromToken(newVarLocalNode(localIndex), nameToken);
+  local->as.local.name = tokenString(nameToken);
+  node->as.classDecl.local = local;
+
+  if (match(cmp, TOKEN_EXTENDS)) {
+    consumeIdentifier(cmp, "Expect superclass name.");
+    node->as.classDecl.superclass = identifier(cmp, false);
+  }
+
+  consume(cmp, TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+  while (match(cmp, TOKEN_SEMICOLON));  // skip blank lines.
+  while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+    pushAstVec(&node->as.classDecl.methods, method(cmp));
+    while (match(cmp, TOKEN_SEMICOLON));  // methods may be ';'-separated.
+  }
+  consume(cmp, TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+
+  return node;
 }
 
 static AstNode* letDeclaration(NodeCompiler* cmp) {
@@ -1333,6 +1450,8 @@ static AstNode* statement(NodeCompiler* cmp) {
     node = throwStatement(cmp);
   } else if (match(cmp, TOKEN_LET)) {
     node = letDeclaration(cmp);
+  } else if (match(cmp, TOKEN_CLASS)) {
+    node = classDeclaration(cmp);
   } else if (match(cmp, TOKEN_GLOBAL)) {
     node = globalDeclaration(cmp);
   } else if (match(cmp, TOKEN_LEFT_BRACE)) {
@@ -1348,9 +1467,12 @@ static AstNode* statement(NodeCompiler* cmp) {
 }
 
 static void statements(NodeCompiler* cmp, AstVec* target) {
+  while (match(cmp, TOKEN_SEMICOLON));  // skip empty statements.
   while (!match(cmp, TOKEN_EOF)) {
     AstNode* node = statement(cmp);
     pushAstVec(target, node);
+    // statements may be terminated/separated by ';'.
+    while (match(cmp, TOKEN_SEMICOLON));
   }
 }
 

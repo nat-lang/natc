@@ -104,6 +104,11 @@ bool initVM() {
   vm.core.sSetAdd = intern("setAdd");
   vm.core.sTree = intern("tree");
 
+  vm.core.sInit = intern("init");
+  vm.core.sThis = intern("this");
+  vm.core.sSuper = intern("super");
+  vm.core.sClass = intern("__class__");
+
   vm.core.sLen = intern("len");
   vm.core.sLt = intern("<");
   vm.core.sAdd = intern("+");
@@ -396,6 +401,17 @@ static bool callCases(ObjClosure** cases, int caseCount, int argCount) {
   return true;
 }
 
+// Resolve a method (closure) named [name] on [klass] or any of its ancestors.
+// Returns NULL if not found.
+static ObjClosure* findMethod(ObjClass* klass, Value name) {
+  for (ObjClass* k = klass; k != NULL; k = k->super) {
+    Value method;
+    if (mapGet(&k->obj.fields, name, &method) && IS_CLOSURE(method))
+      return AS_CLOSURE(method);
+  }
+  return NULL;
+}
+
 bool vmCallValue(Value caller, int argCount) {
   if (IS_OBJ(caller)) {
     switch (OBJ_TYPE(caller)) {
@@ -412,6 +428,27 @@ bool vmCallValue(Value caller, int argCount) {
       }
       case OBJ_NATIVE:
         return callNative(AS_NATIVE(caller), argCount);
+      case OBJ_CLASS: {
+        // Instantiate: build an instance, drop it into the callee slot (so it
+        // becomes `this`/slot 0), and run init if the class defines one.
+        ObjClass* klass = AS_CLASS(caller);
+        ObjInstance* instance = newInstance(klass);
+        vm.stackTop[-argCount - 1] = OBJ_VAL(instance);
+
+        ObjClosure* initializer = findMethod(klass, OBJ_VAL(vm.core.sInit));
+        if (initializer != NULL) return callClosure(initializer, argCount);
+        if (argCount != 0) {
+          vmRuntimeError("Expected 0 arguments but got %d.", argCount);
+          return false;
+        }
+        return true;
+      }
+      case OBJ_BOUND_METHOD: {
+        // Bind the receiver into the callee slot (= slot 0 = `this`).
+        ObjBoundMethod* bound = AS_BOUND_METHOD(caller);
+        vm.stackTop[-argCount - 1] = bound->receiver;
+        return callClosure(bound->method, argCount);
+      }
       default:
         break;  // Non-callable object type.
     }
@@ -666,16 +703,29 @@ InterpretResult vmExecute(int baseFrame) {
       case OP_GET_PROPERTY: {
         Value name = READ_CONSTANT();
         Value value = NIL_VAL;
+        Value obj = vmPeek(0);
 
-        if (!IS_OBJ(vmPeek(0))) {
+        if (!IS_OBJ(obj)) {
           vmRuntimeError("Can only get property of object.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        mapGet(&AS_OBJ(vmPeek(0))->fields, name, &value);
 
+        if (mapGet(&AS_OBJ(obj)->fields, name, &value)) {
+          vmPop();
+          vmPush(value);
+          break;
+        }
+        if (IS_INSTANCE(obj)) {
+          ObjClosure* method = findMethod(AS_INSTANCE(obj)->klass, name);
+          if (method != NULL) {
+            ObjBoundMethod* bound = newBoundMethod(obj, method);
+            vmPop();
+            vmPush(OBJ_VAL(bound));
+            break;
+          }
+        }
         vmPop();
-        vmPush(value);
-
+        vmPush(NIL_VAL);
         break;
       }
       case OP_SET_PROPERTY: {
@@ -861,10 +911,26 @@ InterpretResult vmExecute(int baseFrame) {
           return INTERPRET_RUNTIME_ERROR;
         }
 
-        Value val = NIL_VAL;
-        mapGet(&AS_OBJ(obj)->fields, OBJ_VAL(prop), &val);
+        // Instance field hit takes precedence; otherwise fall through to a
+        // method on the class chain, returned bound to the instance.
+        Value val;
+        if (mapGet(&AS_OBJ(obj)->fields, OBJ_VAL(prop), &val)) {
+          vmPop();
+          vmPush(val);
+          break;
+        }
+        if (IS_INSTANCE(obj)) {
+          ObjClosure* method =
+              findMethod(AS_INSTANCE(obj)->klass, OBJ_VAL(prop));
+          if (method != NULL) {
+            ObjBoundMethod* bound = newBoundMethod(obj, method);
+            vmPop();
+            vmPush(OBJ_VAL(bound));
+            break;
+          }
+        }
         vmPop();
-        vmPush(val);
+        vmPush(NIL_VAL);
         break;
       }
       case OP_PROPERTY_SET: {
@@ -954,6 +1020,49 @@ InterpretResult vmExecute(int baseFrame) {
         if (!vmCallValue(quantifier, 2)) return INTERPRET_RUNTIME_ERROR;
         frame = &vm.frames[vm.frameCount - 1];
 
+        break;
+      }
+      case OP_CLASS: {
+        ObjString* name = READ_STRING();
+        vmPush(OBJ_VAL(newClass(name)));
+        break;
+      }
+      case OP_INHERIT: {
+        Value super = vmPeek(0);
+        Value sub = vmPeek(1);
+        if (!IS_CLASS(super)) {
+          vmRuntimeError("Superclass must be a class.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        AS_CLASS(sub)->super = AS_CLASS(super);
+        vmPop();  // pop the superclass; the subclass stays on the stack.
+        break;
+      }
+      case OP_METHOD: {
+        ObjString* name = READ_STRING();
+        Value method = vmPeek(0);
+        ObjClass* klass = AS_CLASS(vmPeek(1));
+        mapSet(&klass->obj.fields, OBJ_VAL(name), method);
+        vmPop();  // pop the method closure; the class stays on the stack.
+        break;
+      }
+      case OP_GET_SUPER: {
+        ObjString* name = READ_STRING();
+        // `this` is the receiver in slot 0; resolve the method on the
+        // receiver's class's superclass and bind it to the receiver.
+        Value receiver = frame->slots[0];
+        if (!IS_INSTANCE(receiver)) {
+          vmRuntimeError("'super' is only valid inside a method.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        ObjClass* klass = AS_INSTANCE(receiver)->klass;
+        ObjClosure* method =
+            klass->super ? findMethod(klass->super, OBJ_VAL(name)) : NULL;
+        if (method == NULL) {
+          vmRuntimeError("Undefined superclass method '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        vmPush(OBJ_VAL(newBoundMethod(receiver, method)));
         break;
       }
       default:

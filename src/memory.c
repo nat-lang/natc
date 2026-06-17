@@ -146,6 +146,23 @@ static void blackenObject(Obj* object) {
       markObject((Obj*)module->baseName);
       break;
     }
+    case OBJ_CLASS: {
+      ObjClass* klass = (ObjClass*)object;
+      markObject((Obj*)klass->name);
+      markObject((Obj*)klass->super);
+      break;
+    }
+    case OBJ_INSTANCE: {
+      ObjInstance* instance = (ObjInstance*)object;
+      markObject((Obj*)instance->klass);
+      break;
+    }
+    case OBJ_BOUND_METHOD: {
+      ObjBoundMethod* bound = (ObjBoundMethod*)object;
+      markValue(bound->receiver);
+      markObject((Obj*)bound->method);
+      break;
+    }
   }
 }
 
@@ -221,6 +238,18 @@ static void freeObject(Obj* object) {
       FREE(ObjVariable, object);
       break;
     }
+    case OBJ_CLASS: {
+      FREE(ObjClass, object);
+      break;
+    }
+    case OBJ_INSTANCE: {
+      FREE(ObjInstance, object);
+      break;
+    }
+    case OBJ_BOUND_METHOD: {
+      FREE(ObjBoundMethod, object);
+      break;
+    }
   }
 }
 
@@ -270,6 +299,10 @@ static void markRoots() {
   markObject((Obj*)vm.core.sNext);
   markObject((Obj*)vm.core.sValue);
   markObject((Obj*)vm.core.sTree);
+  markObject((Obj*)vm.core.sInit);
+  markObject((Obj*)vm.core.sThis);
+  markObject((Obj*)vm.core.sSuper);
+  markObject((Obj*)vm.core.sClass);
 
   markAstNodes(vm.astRoot);
 }

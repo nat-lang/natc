@@ -22,6 +22,9 @@
 #define IS_UPVALUE(value) isObjType(value, OBJ_UPVALUE)
 #define IS_MODULE(value) isObjType(value, OBJ_MODULE)
 #define IS_TREE(value) isObjType(value, OBJ_TREE)
+#define IS_CLASS(value) isObjType(value, OBJ_CLASS)
+#define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
+#define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
@@ -38,6 +41,9 @@
 #define AS_UPVALUE(value) (((ObjUpvalue*)AS_OBJ(value)))
 #define AS_MODULE(value) (((ObjModule*)AS_OBJ(value)))
 #define AS_TREE(value) ((ObjTree*)AS_OBJ(value))
+#define AS_CLASS(value) ((ObjClass*)AS_OBJ(value))
+#define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
+#define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 
 #define BOUND_FUNCTION_TYPE(value) (AS_BOUND_FUNCTION(value)->type)
 
@@ -57,6 +63,9 @@ typedef enum {
   OBJ_VARIABLE,
   OBJ_MODULE,
   OBJ_TREE,
+  OBJ_CLASS,
+  OBJ_INSTANCE,
+  OBJ_BOUND_METHOD,
 } ObjType;
 
 typedef struct {
@@ -162,6 +171,30 @@ typedef struct {
   ValueArray children;
 } ObjTree;
 
+// A class. Its methods live in the generic Obj `fields` map (keyed by name);
+// `super` links to the parent class (NULL for a root class). Static/class-level
+// values (e.g. `Symbol.count`) are also stored in `fields`.
+typedef struct ObjClass {
+  Obj obj;
+  ObjString* name;
+  struct ObjClass* super;
+} ObjClass;
+
+// An instance. Its state lives in the generic Obj `fields` map; `klass` links
+// to its class, where unresolved property lookups fall through to find methods.
+typedef struct {
+  Obj obj;
+  ObjClass* klass;
+} ObjInstance;
+
+// A method closure paired with the receiver it will run against (bound to the
+// reserved slot 0 = `this` when called).
+typedef struct {
+  Obj obj;
+  Value receiver;
+  ObjClosure* method;
+} ObjBoundMethod;
+
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
 ObjSwitch* newSwitch(int cases);
@@ -174,6 +207,9 @@ ObjSequence* newSequence();
 ObjMap* newMap();
 ObjSet* newSet();
 ObjTree* newTree();
+ObjClass* newClass(ObjString* name);
+ObjInstance* newInstance(ObjClass* klass);
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
 ObjString* concatenateStrings(ObjString* a, ObjString* b);

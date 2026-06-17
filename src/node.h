@@ -42,6 +42,8 @@ typedef enum {
   AST_VAR_LOCAL,
   AST_VAR_UPVALUE,
   AST_WHILE,
+  AST_CLASS,
+  AST_SUPER,
 
 } AstType;
 
@@ -252,6 +254,17 @@ struct AstNode {
       AstNode* predicate;
     } comprehensionPred;
 
+    struct {
+      ObjString* name;
+      AstNode* local;        // the AST_VAR_* node the class binds to
+      AstNode* superclass;   // AST_VAR_* for the parent, or NULL
+      AstVec methods;        // AST_FUNCTION nodes (each method)
+    } classDecl;
+
+    struct {
+      ObjString* method;     // method name resolved off the superclass
+    } super;
+
   } as;
 };
 
@@ -297,6 +310,8 @@ AstNode* newVarGlobalNode();
 AstNode* newVarLocalNode(uint8_t index);
 AstNode* newVarUpvalueNode(uint8_t index);
 AstNode* newWhileNode(AstNode* cond, AstNode* body);
+AstNode* newClassNode(ObjString* name);
+AstNode* newSuperNode(ObjString* method);
 
 /* api */
 

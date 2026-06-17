@@ -192,6 +192,21 @@ AstNode* newWhileNode(AstNode* cond, AstNode* body) {
   return n;
 }
 
+AstNode* newClassNode(ObjString* name) {
+  AstNode* n = allocNode(AST_CLASS);
+  n->as.classDecl.name = name;
+  n->as.classDecl.local = NULL;
+  n->as.classDecl.superclass = NULL;
+  initAstVec(&n->as.classDecl.methods);
+  return n;
+}
+
+AstNode* newSuperNode(ObjString* method) {
+  AstNode* n = allocNode(AST_SUPER);
+  n->as.super.method = method;
+  return n;
+}
+
 AstNode* newDeclLetNode(AstNode* local, AstNode* value) {
   AstNode* n = allocNode(AST_DECL_LET);
   n->as.declLet.local = local;
@@ -590,6 +605,20 @@ void printNodeAt(AstNode* node, int depth) {
              node->as.upvalue.name->chars);
       break;
 
+    case AST_CLASS:
+      printStrAt("Class ", depth);
+      printf("(%s)\n", node->as.classDecl.name->chars);
+      if (node->as.classDecl.superclass != NULL) {
+        printStrAt("Extends\n", depth + 1);
+        printNodeAt(node->as.classDecl.superclass, depth + 2);
+      }
+      printNodeVecAt(&node->as.classDecl.methods, depth + 1);
+      break;
+    case AST_SUPER:
+      printStrAt("Super ", depth);
+      printf(".%s\n", node->as.super.method->chars);
+      break;
+
     case AST_UNKNOWN:
       printStrAt("Unknown\n", depth);
       break;
@@ -732,6 +761,13 @@ bool nodesEqual(AstNode* a, AstNode* b) {
       return a->as.local.index == b->as.local.index;
     case AST_VAR_UPVALUE:
       return a->as.upvalue.index == b->as.upvalue.index;
+    case AST_CLASS:
+      return a->as.classDecl.name == b->as.classDecl.name &&
+             nodesEqual(a->as.classDecl.superclass,
+                        b->as.classDecl.superclass) &&
+             astVecsEqual(&a->as.classDecl.methods, &b->as.classDecl.methods);
+    case AST_SUPER:
+      return a->as.super.method == b->as.super.method;
     case AST_UNKNOWN:
       return true;
   }
@@ -1256,6 +1292,57 @@ bool toChunk(AstNode* node, Chunk* chunk) {
       emitConstant(chunk, node, node->as.upvalue.index);
       break;
     }
+    case AST_CLASS: {
+      AstNode* local = node->as.classDecl.local;
+      bool isLocal = local->type == AST_VAR_LOCAL;
+
+      // A local declaration occupies its own stack slot; seed it (mirrors
+      // AST_DECL_LET's leading OP_UNDEFINED) so OP_SET_LOCAL targets the right
+      // slot. The class is then built on top as a working copy.
+      if (isLocal) emitByte(chunk, node, OP_UNDEFINED);
+
+      emitByte(chunk, node, OP_CLASS);
+      uint16_t nameConst = addConstant(chunk, OBJ_VAL(node->as.classDecl.name));
+      emitConstant(chunk, node, nameConst);
+
+      // Link the superclass first (so inherited methods are visible): push it,
+      // OP_INHERIT pops it and sets class->super, leaving the class on top.
+      if (node->as.classDecl.superclass != NULL) {
+        if (!toChunk(node->as.classDecl.superclass, chunk)) return false;
+        emitByte(chunk, node, OP_INHERIT);
+      }
+
+      // Install each method into the class's fields.
+      for (int i = 0; i < node->as.classDecl.methods.count; i++) {
+        AstNode* method = &node->as.classDecl.methods.items[i];
+        if (!toChunk(method, chunk)) return false;  // closure on stack
+        emitByte(chunk, node, OP_METHOD);
+        uint16_t mConst =
+            addConstant(chunk, OBJ_VAL(method->as.function.name));
+        emitConstant(chunk, node, mConst);
+      }
+
+      // Bind the class to its variable. The class stays on the stack after
+      // SET_LOCAL/GET_GLOBAL; pop the working copy so only the binding holds it.
+      if (isLocal) {
+        emitByte(chunk, node, OP_SET_LOCAL);
+        emitConstant(chunk, node, local->as.local.index);
+        emitByte(chunk, node, OP_POP);
+      } else {
+        emitByte(chunk, node, OP_DEFINE_GLOBAL);
+        uint16_t gConst = addConstant(chunk, OBJ_VAL(local->as.global.name));
+        emitConstant(chunk, node, gConst);
+      }
+      break;
+    }
+    case AST_SUPER: {
+      // `super.method` resolves the method off the enclosing class's
+      // superclass and binds it to the current receiver (slot 0 = this).
+      emitByte(chunk, node, OP_GET_SUPER);
+      uint16_t constant = addConstant(chunk, OBJ_VAL(node->as.super.method));
+      emitConstant(chunk, node, constant);
+      break;
+    }
     case AST_UNKNOWN: {
       error(node, "Unknown node.");
       exit(2);
@@ -1413,6 +1500,12 @@ void markAstNode(AstNode* n) {
     case AST_VAR_UPVALUE:
       markObject((Obj*)n->as.upvalue.name);
       break;
+    case AST_CLASS:
+      markObject((Obj*)n->as.classDecl.name);
+      break;
+    case AST_SUPER:
+      markObject((Obj*)n->as.super.method);
+      break;
 
     case AST_UNKNOWN:
       break;
@@ -1507,6 +1600,11 @@ void freeAstNode(AstNode* n) {
       freeAstVec(&n->as.map.entries);
       break;
     case AST_MAP_ENTRY:
+      break;
+    case AST_CLASS:
+      freeAstVec(&n->as.classDecl.methods);
+      break;
+    case AST_SUPER:
       break;
   }
 
